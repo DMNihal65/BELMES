@@ -2,6 +2,7 @@ import { Image, Menu } from 'antd'
 import { BarChart2, FileText, Home, Settings, User, Users } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useStore from '../../store/useStore'
+import belLogo from '../../assets/bel.png';
 
 function Sidebar() {
   const navigate = useNavigate()
@@ -65,17 +66,17 @@ function Sidebar() {
       <div className="p-4 flex justify-center">
         {isCollapsed ? (
           <Image
-            src="/logo-small.png" // Add your small logo
+            src={belLogo} // Added bel logo
             alt="Logo"
             preview={false}
             width={32}
           />
         ) : (
           <Image
-            src="/logo.png" // Add your full logo
+            src={belLogo} // Added bel logo
             alt="Logo"
             preview={false}
-            height={32}
+            height={36}
           />
         )}
       </div>

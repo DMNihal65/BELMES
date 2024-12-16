@@ -2,6 +2,7 @@ import { Avatar, Button, Dropdown, Input, Layout, Space } from 'antd'
 import { LogOut, Menu as MenuIcon, Search, User } from 'lucide-react'
 import useStore from '../../store/useStore'
 import { useNavigate } from 'react-router-dom'
+import cmtiLogo from '../../assets/cmti.png';
 
 const { Header: AntHeader } = Layout
 
@@ -49,7 +50,17 @@ function Header() {
         style={{ maxWidth: '400px' }}
       />
       
+
+      
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {/* CMTI Logo */}
+      <img
+        src={cmtiLogo}
+        alt="CMTI Logo"
+        style={{ height: '60px', width:'96px', marginRight: '16px', cursor: 'pointer' }}
+        onClick={() => navigate('/')} // Redirect to home on click
+      />
+
         <Dropdown menu={{ items: profileMenuItems }} placement="bottomRight">
           <Space className="cursor-pointer">
             <Avatar src={user?.avatar} />

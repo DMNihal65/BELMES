@@ -10,10 +10,6 @@ const useStore = create((set) => ({
   setUser: (user) => set({ user }),
   logout: () => set({ user: null }),
   
-  // Theme state
-  isDarkMode: false,
-  toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
-  
   // Sidebar state
   isSidebarCollapsed: false,
   toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),

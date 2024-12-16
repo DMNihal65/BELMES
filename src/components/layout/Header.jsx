@@ -1,13 +1,12 @@
-import { Avatar, Button, Dropdown, Input, Layout, Space, theme } from 'antd'
-import { LogOut, Menu as MenuIcon, Moon, Search, Sun, User } from 'lucide-react'
+import { Avatar, Button, Dropdown, Input, Layout, Space } from 'antd'
+import { LogOut, Menu as MenuIcon, Search, User } from 'lucide-react'
 import useStore from '../../store/useStore'
 import { useNavigate } from 'react-router-dom'
 
 const { Header: AntHeader } = Layout
 
 function Header() {
-  const { toggleSidebar, isDarkMode, toggleDarkMode, user, logout } = useStore()
-  const { token } = theme.useToken()
+  const { toggleSidebar, user, logout } = useStore()
   const navigate = useNavigate()
 
   const profileMenuItems = [
@@ -31,7 +30,7 @@ function Header() {
   return (
     <AntHeader
       style={{ 
-        background: token.colorBgContainer,
+        background: '#fff',
         padding: '0 16px',
         display: 'flex',
         alignItems: 'center',
@@ -51,12 +50,6 @@ function Header() {
       />
       
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <Button
-          type="text"
-          icon={isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-          onClick={toggleDarkMode}
-        />
-        
         <Dropdown menu={{ items: profileMenuItems }} placement="bottomRight">
           <Space className="cursor-pointer">
             <Avatar src={user?.avatar} />

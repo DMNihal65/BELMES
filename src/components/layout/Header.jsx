@@ -1,16 +1,28 @@
 import { Avatar, Button, Dropdown, Input, Layout, Space } from 'antd'
 import { LogOut, Menu as MenuIcon, Search, User } from 'lucide-react'
 import useStore from '../../store/useStore'
+import useAuthStore from '../../store/useAuthStore'
 import { useNavigate } from 'react-router-dom'
-import cmtiLogo from '../../assets/cmti.png';
+import cmtiLogo from '../../assets/cmti.png'
 
 const { Header: AntHeader } = Layout
 
 function Header() {
-  const { toggleSidebar, user, logout } = useStore()
+  const { toggleSidebar } = useStore()
+  const { user, role, logout } = useAuthStore()
   const navigate = useNavigate()
 
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
   const profileMenuItems = [
+    {
+      key: 'role',
+      label: `Role: ${role}`,
+      disabled: true,
+    },
     {
       key: 'profile',
       icon: <User size={16} />,
@@ -24,7 +36,7 @@ function Header() {
       key: 'logout',
       icon: <LogOut size={16} />,
       label: 'Logout',
-      onClick: logout,
+      onClick: handleLogout,
     },
   ]
 
@@ -50,21 +62,21 @@ function Header() {
         style={{ maxWidth: '400px' }}
       />
       
-
-      
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {/* CMTI Logo */}
-      <img
-        src={cmtiLogo}
-        alt="CMTI Logo"
-        style={{ height: '60px', width:'96px', marginRight: '16px', cursor: 'pointer' }}
-        onClick={() => navigate('/')} // Redirect to home on click
-      />
+        <img
+          src={cmtiLogo}
+          alt="CMTI Logo"
+          style={{ height: '60px', width:'96px', marginRight: '16px', cursor: 'pointer' }}
+          onClick={() => navigate('/')}
+        />
 
         <Dropdown menu={{ items: profileMenuItems }} placement="bottomRight">
           <Space className="cursor-pointer">
             <Avatar src={user?.avatar} />
-            <span>{user?.name}</span>
+            <div className="flex flex-col">
+              <span>{user?.name}</span>
+              <span className="text-xs text-gray-500">{role}</span>
+            </div>
           </Space>
         </Dropdown>
       </div>

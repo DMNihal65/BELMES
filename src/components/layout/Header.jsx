@@ -11,6 +11,8 @@ function Header() {
   const { toggleSidebar } = useStore();
   const navigate = useNavigate();
   const [operatorName, setOperatorName] = useState('');
+  const [role, setRole] = useState('');
+  
 
   useEffect(() => {
     // Get operator name from localStorage

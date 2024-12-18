@@ -113,6 +113,14 @@ function Sidebar() {
 
   const menuItems = userRole === 'supervisor' ? supervisorMenuItems : operatorMenuItems;
 
+  function getMenuItems() {
+    if (userRole === 'supervisor') {
+      return supervisorMenuItems;
+    } else {
+      return operatorMenuItems;
+    }
+  }
+
   // Redirect to role-specific dashboard if on root path
   useEffect(() => {
     if (location.pathname === '/' && userRole) {

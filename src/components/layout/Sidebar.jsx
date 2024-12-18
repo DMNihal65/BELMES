@@ -57,6 +57,11 @@ function Sidebar() {
       label: 'Inspection Results',
     },
     {
+      key: '/operator/inventory',
+      icon: <Archive size={20} />,
+      label: 'Inventory Data',
+    },
+    {
       key: '/operator/help',
       icon: <HelpCircle size={20} />,
       label: 'Help and Support',

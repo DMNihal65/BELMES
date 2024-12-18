@@ -58,4 +58,6 @@ export const router = createBrowserRouter([
       },
     ],
   },
-]) 
+], {
+  basename: '/bel', // Set the base path
+}) 

@@ -11,6 +11,8 @@ function Header() {
   const { toggleSidebar } = useStore();
   const navigate = useNavigate();
   const [operatorName, setOperatorName] = useState('');
+  const [role, setRole] = useState('');
+  
 
   useEffect(() => {
     // Get operator name from localStorage
@@ -28,6 +30,11 @@ function Header() {
   };
 
   const profileMenuItems = [
+    {
+      key: 'role',
+      label: `Role: ${role}`,
+      disabled: true,
+    },
     {
       key: 'profile',
       icon: <User size={16} />,

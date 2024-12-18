@@ -1,7 +1,10 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
-import Dashboard from '../pages/dashboard/Dashboard';
+import OperatorDashboard from '../pages/operatorscreens/dashboard';
+import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
 import Login from '../pages/auth/Login';
+import Planning from '../pages/supervisorscreens/productionplanning/planning';
+import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -42,7 +45,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'dashboard',
-            element: <Dashboard />,
+            element: <OperatorDashboard/>,
           },
           {
             path: 'job-details',
@@ -72,7 +75,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'dashboard',
-            element: <Dashboard />,
+            element: <SupervisorDashboard />,
           },
           {
             path: 'order-management',
@@ -83,11 +86,11 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: 'planning',
-                element: <div>Capacity Planning</div>,
+                element: <Planning />,
               },
               {
                 path: 'scheduling',
-                element: <div>Scheduling</div>,
+                element: <Scheduling />,
               },
             ],
           },

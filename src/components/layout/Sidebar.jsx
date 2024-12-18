@@ -113,6 +113,14 @@ function Sidebar() {
 
   const menuItems = userRole === 'supervisor' ? supervisorMenuItems : operatorMenuItems;
 
+  function getMenuItems() {
+    if (userRole === 'supervisor') {
+      return supervisorMenuItems;
+    } else {
+      return operatorMenuItems;
+    }
+  }
+
   // Redirect to role-specific dashboard if on root path
   useEffect(() => {
     if (location.pathname === '/' && userRole) {
@@ -145,7 +153,7 @@ function Sidebar() {
         selectedKeys={[location.pathname]}
         defaultOpenKeys={['capacity-planning']}
         collapsed={isCollapsed}
-        items={menuItems}
+        items={getMenuItems()}
         onClick={({ key }) => navigate(key)}
       />
     </div>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Select, Card, message } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+// import bgImage from '../../assets/bg.jpg'
 
 const { Option } = Select;
 
@@ -19,6 +20,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+       {/* <div  className="min-h-screen flex items-center justify-center p-4"
+    style={{
+      backgroundImage: `url(${bgImage})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }}></div> */}
       <Card className="w-full max-w-md shadow-2xl bg-white rounded-xl">
         {/* Header */}
         <div className="text-center">

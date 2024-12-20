@@ -6,6 +6,7 @@ import Login from '../pages/auth/Login';
 import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
 import JobDetails from '../pages/operatorscreens/jobdetails';
+import Inventory from '../pages/operatorscreens/inventory/inventory';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -63,6 +64,10 @@ export const router = createBrowserRouter([
           {
             path: 'inspection',
             element: <div>Inspection Results</div>,
+          },
+          {
+            path: 'inventory',
+            element:<Inventory />,
           },
           {
             path: 'help',

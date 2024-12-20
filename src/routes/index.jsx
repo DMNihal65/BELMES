@@ -5,6 +5,7 @@ import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
 import Login from '../pages/auth/Login';
 import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
+import JobDetails from '../pages/operatorscreens/jobdetails';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -49,7 +50,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'job-details',
-            element: <div>Job Details Page</div>,
+            element: <JobDetails/>,
           },
           {
             path: 'alerts',

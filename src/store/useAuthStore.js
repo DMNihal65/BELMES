@@ -21,7 +21,7 @@ const useAuthStore = create(
         token: null,
         role: null,
         isAuthenticated: false,
-      }),
+      }), 
     }),
     {
       name: 'auth-storage',

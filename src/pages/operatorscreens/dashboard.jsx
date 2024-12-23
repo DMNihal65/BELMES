@@ -1,10 +1,11 @@
 import React from 'react';
 import { Card, Col, Row, Button, Statistic } from 'antd';
 import { Settings, AlertCircle, Activity } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 function Dashboard() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isOperator = location.pathname.includes('/operator');
 
   const currentJob = {
@@ -18,6 +19,10 @@ function Dashboard() {
     efficiency: 85,
     productivity: 92,
     quality: 95
+  };
+
+  const handleJobDetailsClick = () => {
+    navigate('/operator/job-details');
   };
 
   if (isOperator) {
@@ -39,7 +44,11 @@ function Dashboard() {
                 <div className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
                   {currentJob.status}
                 </div>
-                <Button type="primary" className="mt-4 w-full">
+                <Button 
+                  type="primary" 
+                  className="mt-4 w-full"
+                  onClick={handleJobDetailsClick}
+                >
                   View Details
                 </Button>
               </div>
@@ -57,7 +66,11 @@ function Dashboard() {
                 <div className="text-2xl font-bold text-red-500">
                   {currentJob.alerts}
                 </div>
-                <Button type="default" className="mt-4 w-full">
+                <Button 
+                  type="default" 
+                  className="mt-4 w-full"
+                  onClick={() => navigate('/operator/alerts')}
+                >
                   View Alerts
                 </Button>
               </div>
@@ -91,7 +104,12 @@ function Dashboard() {
                 <p className="font-medium">Current Job ID: {currentJob.jobId}</p>
                 <p className="text-gray-600">Part Description: {currentJob.partDescription}</p>
               </div>
-              <Button type="primary">Job Details</Button>
+              <Button 
+                type="primary"
+                onClick={handleJobDetailsClick}
+              >
+                Job Details
+              </Button>
             </div>
           </div>
         </Card>

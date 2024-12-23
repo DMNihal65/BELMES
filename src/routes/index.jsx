@@ -1,11 +1,13 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
 import OperatorDashboard from '../pages/operatorscreens/dashboard';
+import Inventory from '../pages/operatorscreens/inventory/inventoryRequest';
 import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
 import Login from '../pages/auth/Login';
 import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
-import Inventory from '../pages/operatorscreens/inventory/inventory';
+import InventoryUsageAndAnalytics from '../pages/supervisorscreens/inventory/inventoryMaster';
+import RequestsCalibrationHistory from '../pages/supervisorscreens/inventory/requestsCalibrationHistory';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -108,8 +110,17 @@ export const router = createBrowserRouter([
             element: <div>Quality Management</div>,
           },
           {
-            path: 'inventory',
-            element: <div>Inventory Management</div>,
+            path: 'inventory_master',
+            children: [
+              {
+                path: 'inventory_usage_and_analytics',
+                element: <InventoryUsageAndAnalytics />,
+              },
+              {
+                path: 'requests_calibration_history',
+                element: <RequestsCalibrationHistory />,
+              },
+            ]
           },
           {
             path: 'documents',

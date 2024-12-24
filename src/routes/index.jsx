@@ -8,6 +8,7 @@ import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling
 import JobDetails from '../pages/operatorscreens/jobdetails';
 import Inventory from '../pages/operatorscreens/inventory/inventory';
 import ProductionMonitoring from '../pages/supervisorscreens/productionMonitoring';
+import OrderDashboard from '../pages/supervisorscreens/ordermanagement/orderdashboard';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -86,7 +87,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'order-management',
-            element: <div>Order Management</div>,
+            element: <OrderDashboard />,
           },
           {
             path: 'capacity-planning',

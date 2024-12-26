@@ -24,6 +24,7 @@
     "react-echarts": "^0.1.1",
     "react-router-dom": "^7.0.2",
     "recharts": "^2.15.0",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

@@ -177,7 +177,7 @@ const Tools = () => {
                 description: item.description || '',
                 bel_part_number: item.bel_part_number || '', // Ensure partNumber is included
                 quantity: parseInt(item.quantity) || 0,
-                status_id: `S${toolsData.length + index + 1}`,
+                status_id: `Available`,
             }));
 
             setToolsData([...toolsData, ...formattedData]);
@@ -223,7 +223,7 @@ const columns = [
         onFilter: (value, record) => record.description.indexOf(value) === 0,
       },
       {
-        title: 'Part Number',
+        title: 'BEL Part Number',
         dataIndex: 'bel_part_number',
         key: 'bel_part_number',
         sorter: (a, b) => a.bel_part_number.localeCompare(b.bel_part_number),

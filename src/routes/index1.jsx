@@ -3,26 +3,15 @@ import MainLayout from '../components/layout/MainLayout';
 import OperatorDashboard from '../pages/operatorscreens/dashboard';
 import Inventory from '../pages/operatorscreens/inventory/inventoryRequest';
 import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
-
-import JobDetails from '../pages/operatorscreens/jobdetails';
-import AlertScreens from '../pages/operatorscreens/AlertScreens';
 import Login from '../pages/auth/Login';
 import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
-
 import InventoryUsageAndAnalytics from '../pages/supervisorscreens/inventory/inventoryMaster';
 import RequestsCalibrationHistory from '../pages/supervisorscreens/inventory/requestsCalibrationHistory';
-
-import ProductionMonitoring from '../pages/supervisorscreens/ProductionMon'
+import JobDetails from '../pages/operatorscreens/jobdetails';
+// import Inventory from '../pages/operatorscreens/inventory/inventory';
+import ProductionMonitoring from '../pages/supervisorscreens/ProductionMonitoring';
 import OrderDashboard from '../pages/supervisorscreens/ordermanagement/orderdashboard';
-
-import MaintenanceScreen from '../pages/operatorscreens/MaintenanceScreen';
-import InspectionResult from '../pages/operatorscreens/InspectionResult';
-import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
-import DocumentManagement from '../pages/supervisorscreens/documentmanagement';
-import QualityManagement from '../pages/supervisorscreens/qualitymanagement';
-// import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
-
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -63,52 +52,31 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'dashboard',
-            element: (
-              <ProtectedRoute allowedRole="operator">
-                <OperatorDashboard />
-              </ProtectedRoute>
-            ),
+            element: <OperatorDashboard/>,
           },
           {
             path: 'job-details',
-            element: <JobDetails />,
+            element: <JobDetails/>,
           },
           {
             path: 'alerts',
-            element: (
-              <ProtectedRoute allowedRole="operator">
-                <AlertScreens />
-              </ProtectedRoute>
-            ),
+            element: <div>Alert Screen</div>,
           },
           {
             path: 'maintenance',
-            element: (
-              <ProtectedRoute allowedRole="operator">
-                <MaintenanceScreen/>
-              </ProtectedRoute>
-            ),
+            element: <div>Maintenance Guide</div>,
           },
-          // Updated Inspection Route
           {
             path: 'inspection',
-            element: (
-              <ProtectedRoute allowedRole="operator">
-                <InspectionResult />
-              </ProtectedRoute>
-            ),
+            element: <div>Inspection Results</div>,
           },
           {
             path: 'inventory',
-            element: <Inventory />,
+            element:<Inventory />,
           },
           {
             path: 'help',
-            element: (
-              <ProtectedRoute allowedRole="operator">
-                <HelpAndSupport />
-              </ProtectedRoute>
-            ),
+            element: <div>Help and Support</div>,
           },
         ],
       },
@@ -118,65 +86,34 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'dashboard',
-            element: (
-              <ProtectedRoute allowedRole="supervisor">
-                <SupervisorDashboard />
-              </ProtectedRoute>
-            ),
+            element: <SupervisorDashboard />,
           },
           {
             path: 'order-management',
-
             element: <OrderDashboard />,
-
           },
           {
-            path: 'production-planning',
+            path: 'capacity-planning',
             children: [
               {
-                index: true,
-                element: (
-                  <ProtectedRoute allowedRole="supervisor">
-                    <Planning />
-                  </ProtectedRoute>
-                ),
-              },
-              {
                 path: 'planning',
-                element: (
-                  <ProtectedRoute allowedRole="supervisor">
-                    <Planning />
-                  </ProtectedRoute>
-                ),
+                element: <Planning />,
               },
               {
                 path: 'scheduling',
-                element: (
-                  <ProtectedRoute allowedRole="supervisor">
-                    <Scheduling />
-                  </ProtectedRoute>
-                ),
+                element: <Scheduling />,
               },
             ],
           },
           {
-            path: 'production-monitoring',
-            element: (
-              <ProtectedRoute allowedRole="supervisor">
-                <ProductionMonitoring />
-              </ProtectedRoute>
-            ),
+            path: 'production',
+            element: <ProductionMonitoring/>,
           },
           {
-            path: 'quality-management',
-            element: (
-              <ProtectedRoute allowedRole="supervisor">
-                <QualityManagement />
-              </ProtectedRoute>
-            ),
+            path: 'quality',
+            element: <div>Quality Management</div>,
           },
           {
-
             path: 'inventory_master',
             children: [
               {
@@ -188,15 +125,10 @@ export const router = createBrowserRouter([
                 element: <RequestsCalibrationHistory />,
               },
             ]
-
           },
           {
             path: 'documents',
-            element: (
-              <ProtectedRoute allowedRole="supervisor">
-                <DocumentManagement />
-              </ProtectedRoute>
-            ),
+            element: <div>Document Management</div>,
           },
         ],
       },
@@ -206,4 +138,7 @@ export const router = createBrowserRouter([
     path: '*',
     element: <Navigate to="/" replace />,
   },
-])
+  // {
+  //   basename: '/bel'
+  // }
+]);

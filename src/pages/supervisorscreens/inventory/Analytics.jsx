@@ -1,6 +1,6 @@
 import React from 'react';
 import { ToolOutlined, CheckCircleOutlined, DownloadOutlined, BarChartOutlined, PieChartOutlined, LineChartOutlined, DashboardOutlined } from '@ant-design/icons';
-import MetricCard from './MetricCard'; // Import MetricCard component
+import MetricCard from './cards/MetricCard'; // Import MetricCard component
 
 const Analytics = () => {
   const summaryData = {

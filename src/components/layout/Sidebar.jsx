@@ -80,11 +80,7 @@ function Sidebar() {
       icon: <Package size={20} />,
       label: 'Order Management',
     },
-    {
-      key: '/supervisor/inventory-management',
-      icon: <Box size={20} />,
-      label: 'Inventory Management',
-    },
+    
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,

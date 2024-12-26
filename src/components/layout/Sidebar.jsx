@@ -12,7 +12,8 @@ import {
   Activity,
   CheckSquare,
   Archive,
-  Files
+  Files,
+  Box
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -80,27 +81,32 @@ function Sidebar() {
       label: 'Order Management',
     },
     {
-      key: 'capacity-planning',
+      key: '/supervisor/inventory-management',
+      icon: <Box size={20} />,
+      label: 'Inventory Management',
+    },
+    {
+      key: 'production-planning',
       icon: <Calendar size={20} />,
-      label: 'Capacity Planning',
+      label: 'Production Planning',
       children: [
         {
-          key: '/supervisor/capacity-planning/planning',
+          key: '/supervisor/production-planning/planning',
           label: 'Planning',
         },
         {
-          key: '/supervisor/capacity-planning/scheduling',
+          key: '/supervisor/production-planning/scheduling',
           label: 'Scheduling',
         },
       ],
     },
     {
-      key: '/supervisor/production',
+      key: '/supervisor/production-monitoring',
       icon: <Activity size={20} />,
       label: 'Production Monitoring',
     },
     {
-      key: '/supervisor/quality',
+      key: '/supervisor/quality-management',
       icon: <CheckSquare size={20} />,
       label: 'Quality Management',
     },
@@ -110,6 +116,8 @@ function Sidebar() {
     //   label: 'Inventory Management',
     // },
     {
+
+
       key: 'inventory_master',
       icon: <Archive size={20} />,
       label: 'Inventory Management',
@@ -126,55 +134,36 @@ function Sidebar() {
     },
     {
       key: '/supervisor/documents',
+
       icon: <Files size={20} />,
       label: 'Document Management',
     },
   ];
 
-  const menuItems = userRole === 'supervisor' ? supervisorMenuItems : operatorMenuItems;
+  const handleMenuClick = (item) => {
+    navigate(item.key);
+  };
 
-  function getMenuItems() {
-    if (userRole === 'supervisor') {
-      return supervisorMenuItems;
-    } else {
-      return operatorMenuItems;
-    }
-  }
-
-  // Redirect to role-specific dashboard if on root path
-  useEffect(() => {
-    if (location.pathname === '/' && userRole) {
-      navigate(`/${userRole}/dashboard`);
-    }
-  }, [location.pathname, userRole, navigate]);
+  const selectedKey = location.pathname;
+  const openKey = selectedKey.split('/').slice(0, 3).join('/');
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="h-screen flex flex-col">
       <div className="p-4 flex justify-center">
-        {isCollapsed ? (
-          <Image
-            src={belLogo}
-            alt="Logo"
-            preview={false}
-            width={32}
-          />
-        ) : (
-          <Image
-            src={belLogo}
-            alt="Logo"
-            preview={false}
-            height={36}
-          />
-        )}
+        <Image
+          src={belLogo}
+          alt="BEL Logo"
+          preview={false}
+          width={isCollapsed ? 40 : 100}
+        />
       </div>
       <Menu
+        theme="light"
         mode="inline"
-        className="flex-1 border-r"
-        selectedKeys={[location.pathname]}
-        defaultOpenKeys={['capacity-planning']}
-        collapsed={isCollapsed}
-        items={getMenuItems()}
-        onClick={({ key }) => navigate(key)}
+        selectedKeys={[selectedKey]}
+        defaultOpenKeys={[openKey]}
+        items={userRole === 'operator' ? operatorMenuItems : supervisorMenuItems}
+        onClick={handleMenuClick}
       />
     </div>
   );

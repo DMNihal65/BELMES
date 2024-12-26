@@ -3,15 +3,20 @@ import MainLayout from '../components/layout/MainLayout';
 import OperatorDashboard from '../pages/operatorscreens/dashboard';
 import Inventory from '../pages/operatorscreens/inventory/inventoryRequest';
 import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
+import OrderManagement from '../pages/supervisorscreens/OrderManagement';
+import JobDetails from '../pages/operatorscreens/jobdetails';
+import AlertScreens from '../pages/operatorscreens/AlertScreens';
 import Login from '../pages/auth/Login';
 import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
+
 import InventoryUsageAndAnalytics from '../pages/supervisorscreens/inventory/inventoryMaster';
 import RequestsCalibrationHistory from '../pages/supervisorscreens/inventory/requestsCalibrationHistory';
 import JobDetails from '../pages/operatorscreens/jobdetails';
 // import Inventory from '../pages/operatorscreens/inventory/inventory';
 import ProductionMonitoring from '../pages/supervisorscreens/productionMonitoring';
 import OrderDashboard from '../pages/supervisorscreens/ordermanagement/orderdashboard';
+
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -52,31 +57,52 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'dashboard',
-            element: <OperatorDashboard/>,
+            element: (
+              <ProtectedRoute allowedRole="operator">
+                <OperatorDashboard />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'job-details',
-            element: <JobDetails/>,
+            element: <JobDetails />,
           },
           {
             path: 'alerts',
-            element: <div>Alert Screen</div>,
+            element: (
+              <ProtectedRoute allowedRole="operator">
+                <AlertScreens />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'maintenance',
-            element: <div>Maintenance Guide</div>,
+            element: (
+              <ProtectedRoute allowedRole="operator">
+                <MaintenanceScreen />
+              </ProtectedRoute>
+            ),
           },
+          // Updated Inspection Route
           {
             path: 'inspection',
-            element: <div>Inspection Results</div>,
+            element: (
+              <ProtectedRoute allowedRole="operator">
+                <InspectionResult />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'inventory',
-            element:<Inventory />,
+            element: <Inventory />,
           },
           {
             path: 'help',
-            element: <div>Help and Support</div>,
+            element: (
+              <ProtectedRoute allowedRole="operator">
+                <HelpAndSupport />
+              </ProtectedRoute>
+            ),
           },
         ],
       },
@@ -86,34 +112,61 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'dashboard',
-            element: <SupervisorDashboard />,
+            element: (
+              <ProtectedRoute allowedRole="supervisor">
+                <SupervisorDashboard />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'order-management',
+
             element: <OrderDashboard />,
+
           },
           {
-            path: 'capacity-planning',
+            path: 'production-planning',
             children: [
               {
+                index: true,
+                element: (
+                  <ProtectedRoute allowedRole="supervisor">
+                    <Planning />
+                  </ProtectedRoute>
+                ),
+              },
+              {
                 path: 'planning',
-                element: <Planning />,
+                element: (
+                  <ProtectedRoute allowedRole="supervisor">
+                    <Planning />
+                  </ProtectedRoute>
+                ),
               },
               {
                 path: 'scheduling',
-                element: <Scheduling />,
+                element: (
+                  <ProtectedRoute allowedRole="supervisor">
+                    <Scheduling />
+                  </ProtectedRoute>
+                ),
               },
             ],
           },
           {
             path: 'production',
-            element: <ProductionMonitoring/>,
+            element: <ProductionMonitoring />,
           },
           {
-            path: 'quality',
-            element: <div>Quality Management</div>,
+            path: 'quality-management',
+            element: (
+              <ProtectedRoute allowedRole="supervisor">
+                <QualityManagement />
+              </ProtectedRoute>
+            ),
           },
           {
+
             path: 'inventory_master',
             children: [
               {
@@ -125,10 +178,15 @@ export const router = createBrowserRouter([
                 element: <RequestsCalibrationHistory />,
               },
             ]
+
           },
           {
-            path: 'documents',
-            element: <div>Document Management</div>,
+            path: 'document-management',
+            element: (
+              <ProtectedRoute allowedRole="supervisor">
+                <DocumentManagement />
+              </ProtectedRoute>
+            ),
           },
         ],
       },
@@ -138,7 +196,4 @@ export const router = createBrowserRouter([
     path: '*',
     element: <Navigate to="/" replace />,
   },
-  // {
-  //   basename: '/bel'
-  // }
-]);
+

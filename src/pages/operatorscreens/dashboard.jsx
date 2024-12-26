@@ -2,8 +2,11 @@ import React from 'react';
 import { Card, Badge, Button, Progress, Space, Tag } from 'antd';
 import { Activity, AlertTriangle, Clock } from 'lucide-react';
 import { ToolFilled } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';  // Import useNavigate
 
 const OperatorDashboard = () => {
+  const navigate = useNavigate();  // Initialize navigate
+
   const assignedMachines = [
     {
       id: 'DMG-001',
@@ -45,6 +48,10 @@ const OperatorDashboard = () => {
       error: { color: 'red', text: 'Error' }
     };
     return configs[status] || configs.idle;
+  };
+
+  const handleViewDetails = (jobId) => {
+    navigate(`/operator/job-details`, { state: { jobId } }); // Navigate to JobDetails with jobId as state
   };
 
   return (
@@ -137,6 +144,7 @@ const OperatorDashboard = () => {
                   type="primary"
                   className="flex-1 flex items-center justify-center gap-2"
                   icon={<ToolFilled className="w-4 h-4" />}
+                  onClick={() => handleViewDetails(machine.currentJob.jobId)}  // Add onClick to navigate
                 >
                   View Details
                 </Button>

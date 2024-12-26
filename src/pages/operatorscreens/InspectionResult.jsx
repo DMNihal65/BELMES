@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker } from 'antd';
-import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -50,11 +52,13 @@ function InspectionResult() {
     },
   ];
 
+  // Table columns
   const columns = [
     {
       title: 'Date',
       dataIndex: 'date',
       key: 'date',
+      sorter: (a, b) => new Date(a.date) - new Date(b.date),
     },
     {
       title: 'Part Number',
@@ -92,6 +96,16 @@ function InspectionResult() {
       key: 'remarks',
     },
   ];
+
+  // Handle export to Excel
+  const handleExport = () => {
+    const ws = XLSX.utils.json_to_sheet(inspectionHistory); // Convert data to Excel sheet
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inspection Results');
+    
+    // Export as Excel file
+    XLSX.writeFile(wb, 'inspection_results.xlsx');
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -186,6 +200,16 @@ function InspectionResult() {
             pagination={{ pageSize: 10 }}
           />
         </Card>
+
+        {/* Export Button */}
+        <Button
+          icon={<DownloadOutlined />}
+          onClick={handleExport}
+          type="primary"
+          style={{ marginTop: '20px' }}
+        >
+          Export to Excel
+        </Button>
       </div>
     </div>
   );

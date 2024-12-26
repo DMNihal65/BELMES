@@ -30,7 +30,7 @@ function HelpAndSupport() {
     {
       title: 'Machine Issues',
       key: '0-0',
-      icon: <ToolOutlined />,
+      icon: <ToolOutlined style={{ color: '#0284C7' }} />,
       children: [
         { title: 'Machine not starting', key: '0-0-0' },
         { title: 'Unusual noise', key: '0-0-1' },
@@ -40,7 +40,7 @@ function HelpAndSupport() {
     {
       title: 'Software Issues',
       key: '0-1',
-      icon: <BugOutlined />,
+      icon: <BugOutlined style={{ color: '#38BDF8' }} />,
       children: [
         { title: 'Login problems', key: '0-1-0' },
         { title: 'Data not saving', key: '0-1-1' },
@@ -50,7 +50,7 @@ function HelpAndSupport() {
     {
       title: 'Process Issues',
       key: '0-2',
-      icon: <FileTextOutlined />,
+      icon: <FileTextOutlined style={{ color: '#7DD3FC' }} />,
       children: [
         { title: 'Quality concerns', key: '0-2-0' },
         { title: 'Production delays', key: '0-2-1' },
@@ -85,28 +85,28 @@ function HelpAndSupport() {
       title: 'Operator Manual',
       description: 'Complete guide for machine operation and maintenance',
       link: '/docs/operator-manual.pdf',
-      icon: <FileTextOutlined style={{ fontSize: '24px', color: '#1890ff' }} />,
+      icon: <FileTextOutlined style={{ fontSize: '24px', color: '#0284C7' }} />,
       type: 'Primary',
     },
     {
       title: 'Quick Start Guide',
       description: 'Basic instructions for daily operations',
       link: '/docs/quick-start.pdf',
-      icon: <RightOutlined style={{ fontSize: '24px', color: '#52c41a' }} />,
+      icon: <RightOutlined style={{ fontSize: '24px', color: '#38BDF8' }} />,
       type: 'Guide',
     },
     {
       title: 'Safety Guidelines',
       description: 'Important safety procedures and protocols',
       link: '/docs/safety-guidelines.pdf',
-      icon: <ToolOutlined style={{ fontSize: '24px', color: '#faad14' }} />,
+      icon: <ToolOutlined style={{ fontSize: '24px', color: '#7DD3FC' }} />,
       type: 'Safety',
     },
     {
       title: 'Troubleshooting Guide',
       description: 'Common issues and their solutions',
       link: '/docs/troubleshooting.pdf',
-      icon: <BugOutlined style={{ fontSize: '24px', color: '#ff4d4f' }} />,
+      icon: <BugOutlined style={{ fontSize: '24px', color: '#082F49' }} />,
       type: 'Support',
     },
   ];
@@ -135,7 +135,7 @@ function HelpAndSupport() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 bg-white p-6 rounded-lg shadow-sm gap-4">
           <div className="flex items-center gap-4">
             <Button
-              icon={<ArrowLeftOutlined />}
+              icon={<ArrowLeftOutlined style={{ color: '#0284C7' }} />}
               onClick={() => navigate('/operator/dashboard')}
               size="large"
               className="hover:scale-105 transition-transform"
@@ -143,7 +143,7 @@ function HelpAndSupport() {
               Back to Dashboard
             </Button>
             <div>
-              <Title level={4} style={{ margin: 0 }}>Help and Support</Title>
+              <Title level={4} style={{ margin: 0, color: '#0284C7' }}>Help and Support</Title>
               <Text type="secondary">Get assistance and find answers to your questions</Text>
             </div>
           </div>
@@ -161,13 +161,13 @@ function HelpAndSupport() {
           <Card 
             title={
               <Space>
-                <MessageOutlined style={{ color: '#1890ff' }} />
+                <MessageOutlined style={{ color: '#0284C7' }} />
                 <span className="font-semibold">Report an Issue</span>
-                <Badge count="New" style={{ backgroundColor: '#52c41a' }} />
+                <Badge count="New" style={{ backgroundColor: '#38BDF8' }} />
               </Space>
             }
             className="hover:shadow-lg transition-shadow"
-            headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
+            headStyle={{ background: '#EFF6FF', borderBottom: '2px solid #0284C7' }}
           >
             <Paragraph className="mb-4">
               Select an issue category below to report a problem. Our support team will assist you as soon as possible.
@@ -186,12 +186,12 @@ function HelpAndSupport() {
           <Card 
             title={
               <Space>
-                <QuestionCircleOutlined style={{ color: '#52c41a' }} />
+                <QuestionCircleOutlined style={{ color: '#38BDF8' }} />
                 <span className="font-semibold">Frequently Asked Questions</span>
               </Space>
             }
             className="hover:shadow-lg transition-shadow"
-            headStyle={{ background: '#f6ffed', borderBottom: '2px solid #52c41a' }}
+            headStyle={{ background: '#E0F2FE', borderBottom: '2px solid #38BDF8' }}
           >
             <Collapse 
               bordered={false}
@@ -219,12 +219,12 @@ function HelpAndSupport() {
         <Card 
           title={
             <Space>
-              <BookOutlined style={{ color: '#722ed1' }} />
+              <BookOutlined style={{ color: '#0284C7' }} />
               <span className="font-semibold">Documentation</span>
             </Space>
           }
           className="mt-6 hover:shadow-lg transition-shadow"
-          headStyle={{ background: '#f9f0ff', borderBottom: '2px solid #722ed1' }}
+          headStyle={{ background: '#BAE6FD', borderBottom: '2px solid #0284C7' }}
         >
           <List
             grid={{ gutter: 16, column: 2 }}
@@ -260,7 +260,7 @@ function HelpAndSupport() {
         <Modal
           title={
             <Space>
-              <MessageOutlined style={{ color: '#1890ff' }} />
+              <MessageOutlined style={{ color: '#0284C7' }} />
               <span>Report Issue: {selectedIssueType}</span>
             </Space>
           }
@@ -270,7 +270,7 @@ function HelpAndSupport() {
           okText="Submit Issue"
           cancelText="Cancel"
           okButtonProps={{ 
-            style: { background: '#1890ff' },
+            style: { background: '#0284C7' },
             className: 'hover:scale-105 transition-transform'
           }}
         >
@@ -302,7 +302,7 @@ function HelpAndSupport() {
 
         <style jsx>{`
           .custom-tree .ant-tree-node-content-wrapper:hover {
-            background-color: #e6f7ff;
+            background-color: #EFF6FF;
           }
           .custom-collapse .ant-collapse-item {
             margin-bottom: 8px;

@@ -59,8 +59,8 @@ function Sidebar() {
     },
     {
       key: '/operator/inventory',
-      icon: <Box size={20} />,
-      label: 'Inventory',
+      icon: <Archive size={20} />,
+      label: 'Inventory Data',
     },
     {
       key: '/operator/help',

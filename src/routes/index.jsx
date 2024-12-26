@@ -3,19 +3,23 @@ import MainLayout from '../components/layout/MainLayout';
 import OperatorDashboard from '../pages/operatorscreens/dashboard';
 import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
 import OrderManagement from '../pages/supervisorscreens/OrderManagement';
-import JobDetails from '../pages/operatorscreens/JobDetails';
+import JobDetails from '../pages/operatorscreens/jobdetails';
 import AlertScreens from '../pages/operatorscreens/AlertScreens';
 import Login from '../pages/auth/Login';
 import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
-import MaintenanceScreen from '../pages/operatorscreens/MaintenanceScreen';
-import Inventory from '../pages/operatorscreens/Inventory';
-import InspectionResult from '../pages/operatorscreens/InspectionResult';
+import Inventory from '../pages/operatorscreens/inventory/inventory';
+import ProductionMonitoring from '../pages/supervisorscreens/productionMonitoring';
 import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
-import InventoryManagement from '../pages/supervisorscreens/InventoryManagement';
-import ProductionMonitoring from '../pages/supervisorscreens/ProductionMonitoring';
-import DocumentManagement from '../pages/supervisorscreens/DocumentManagement';
+import MaintenanceScreen from '../pages/operatorscreens/MaintenanceScreen';
 import QualityManagement from '../pages/supervisorscreens/QualityManagement';
+import InventoryManagement from "../pages/supervisorscreens/InventoryManagement";
+import DocumentManagement from "../pages/supervisorscreens/DocumentManagement";
+
+// Import InspectionResult component
+import InspectionResult from '../pages/operatorscreens/InspectionResult';
+
+// Use InventoryManagement in your routes or wherever it's required
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -64,11 +68,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'job-details',
-            element: (
-              <ProtectedRoute allowedRole="operator">
-                <JobDetails />
-              </ProtectedRoute>
-            ),
+            element: <JobDetails />,
           },
           {
             path: 'alerts',
@@ -86,6 +86,7 @@ export const router = createBrowserRouter([
               </ProtectedRoute>
             ),
           },
+          // Updated Inspection Route
           {
             path: 'inspection',
             element: (
@@ -95,18 +96,14 @@ export const router = createBrowserRouter([
             ),
           },
           {
+            path: 'inventory',
+            element: <Inventory />,
+          },
+          {
             path: 'help',
             element: (
               <ProtectedRoute allowedRole="operator">
                 <HelpAndSupport />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'inventory',
-            element: (
-              <ProtectedRoute allowedRole="operator">
-                <Inventory />
               </ProtectedRoute>
             ),
           },
@@ -162,12 +159,8 @@ export const router = createBrowserRouter([
             ],
           },
           {
-            path: 'production-monitoring',
-            element: (
-              <ProtectedRoute allowedRole="supervisor">
-                <ProductionMonitoring />
-              </ProtectedRoute>
-            ),
+            path: 'production',
+            element: <ProductionMonitoring />,
           },
           {
             path: 'quality-management',

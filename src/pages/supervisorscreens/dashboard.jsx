@@ -1,378 +1,368 @@
-import React, { useState } from 'react';
-import { 
-  Card, 
-  Col, 
-  Row, 
-  Button, 
-  Statistic, 
-  Typography, 
-  Space, 
-  Table, 
-  Badge, 
-  Progress, 
-  Select, 
-  DatePicker,
-  Tooltip
-} from 'antd';
-import { 
-  BarChartOutlined,
-  UserOutlined,
-  WarningOutlined,
-  ClockCircleOutlined,
-  ShoppingOutlined,
-  LineChartOutlined,
-  ToolOutlined,
-  CheckCircleOutlined,
-  RiseOutlined,
-  FileTextOutlined,
-  SettingOutlined,
-  TeamOutlined,
-  DashboardOutlined
-} from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Card, Row, Col, Table, Badge, Progress, Statistic, Timeline, Select } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import ReactECharts from 'echarts-for-react';
 
-const { Title, Text } = Typography;
-const { RangePicker } = DatePicker;
+// Mock data
+const machineData = [
+  {
+    id: 'DMG-001',
+    name: 'DMG DMU 60 eVo linear',
+    status: 'running',
+    oee: 87,
+    currentProgram: 'OP-1234',
+    partNumber: 'PART-789',
+    totalCount: 145,
+    targetCount: 200,
+    operator: 'John Doe',
+    startTime: '08:00 AM',
+    estimatedCompletion: '04:30 PM',
+    cycleTime: '45 min',
+    downtime: '2%',
+  },
+  {
+    id: 'DMG-001',
+    name: 'DMG DMU 60 eVo linear',
+    status: 'running',
+    oee: 87,
+    currentProgram: 'OP-1234',
+    partNumber: 'PART-789',
+    totalCount: 145,
+    targetCount: 200,
+    operator: 'John Doe',
+    startTime: '08:00 AM',
+    estimatedCompletion: '04:30 PM',
+    cycleTime: '45 min',
+    downtime: '2%',
+  },
+];
 
-function Dashboard() {
-  const navigate = useNavigate();
+const SupervisorDashboard = () => {
   const [timeRange, setTimeRange] = useState('today');
-  const [selectedMachine, setSelectedMachine] = useState('all');
+  const [chartInstances, setChartInstances] = useState({});
 
-  // Mock data for production overview
-  const productionMetrics = {
-    totalOrders: 145,
-    completedOrders: 98,
-    inProgress: 42,
-    delayed: 5,
-    efficiency: 87,
-    utilization: 92,
-    quality: 95,
-    oee: 89
+  // Cleanup function for charts
+  useEffect(() => {
+    return () => {
+      Object.values(chartInstances).forEach(instance => {
+        if (instance && instance.dispose) {
+          instance.dispose();
+        }
+      });
+    };
+  }, [chartInstances]);
+
+  // Sparkline options for mini charts
+  const getSparklineOption = (data, color, type = 'line') => ({
+    animation: false,
+    grid: {
+      left: 2,
+      right: 2,
+      top: 2,
+      bottom: 2,
+    },
+    xAxis: {
+      type: 'category',
+      show: false,
+      boundaryGap: false,
+      data: Array.from({ length: data.length }, (_, i) => i.toString()),
+    },
+    yAxis: {
+      type: 'value',
+      show: false,
+      min: Math.min(...data) * 0.9,
+      max: Math.max(...data) * 1.1,
+    },
+    series: [{
+      data: data,
+      type: type,
+      smooth: true,
+      symbol: 'none',
+      lineStyle: {
+        color: color,
+        width: 2,
+      },
+      itemStyle: {
+        color: color,
+      },
+      areaStyle: type === 'line' ? {
+        color: color,
+        opacity: 0.2,
+      } : undefined,
+    }],
+    tooltip: {
+      show: false,
+    },
+  });
+
+  // Machine Status Overview Chart
+  const machineStatusOption = {
+    tooltip: { 
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
+      }
+    },
+    legend: {
+      data: ['Running', 'Idle', 'Down'],
+      bottom: 0
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%',
+      top: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: ['6AM', '8AM', '10AM', '12PM', '2PM', '4PM'],
+      axisLabel: {
+        interval: 0
+      }
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 20
+    },
+    series: [
+      {
+        name: 'Running',
+        type: 'line',
+        data: [12, 13, 15, 14, 13, 15],
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: {
+          width: 3
+        }
+      },
+      {
+        name: 'Idle',
+        type: 'line',
+        data: [5, 4, 3, 4, 5, 3],
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: {
+          width: 3
+        }
+      },
+      {
+        name: 'Down',
+        type: 'line',
+        data: [2, 1, 2, 1, 2, 1],
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: {
+          width: 3
+        }
+      }
+    ]
   };
 
-  // Mock data for recent orders
-  const recentOrders = [
-    {
-      key: '1',
-      orderId: 'ORD-2024-001',
-      customer: 'Aerospace Corp',
-      status: 'In Progress',
-      progress: 75,
-      dueDate: '2024-12-25',
-      priority: 'High'
-    },
-    {
-      key: '2',
-      orderId: 'ORD-2024-002',
-      customer: 'Defense Systems',
-      status: 'Pending',
-      progress: 0,
-      dueDate: '2024-12-28',
-      priority: 'Medium'
-    },
-    {
-      key: '3',
-      orderId: 'ORD-2024-003',
-      customer: 'Naval Tech',
-      status: 'Completed',
-      progress: 100,
-      dueDate: '2024-12-15',
-      priority: 'Low'
-    }
-  ];
-
-  // Table columns for recent orders
+  // Table columns configuration
   const columns = [
     {
-      title: 'Order ID',
-      dataIndex: 'orderId',
-      key: 'orderId',
-      render: (text) => <a>{text}</a>,
-    },
-    {
-      title: 'Customer',
-      dataIndex: 'customer',
-      key: 'customer',
+      title: 'Machine',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text, record) => (
+        <div>
+          <div className="font-medium">{text}</div>
+          <div className="text-xs text-gray-500">{record.id}</div>
+        </div>
+      ),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => {
-        const colors = {
-          'In Progress': 'processing',
-          'Completed': 'success',
-          'Pending': 'warning',
-          'Delayed': 'error'
-        };
-        return <Badge status={colors[status]} text={status} />;
-      },
-    },
-    {
-      title: 'Progress',
-      dataIndex: 'progress',
-      key: 'progress',
-      render: (progress) => (
-        <Progress percent={progress} size="small" status={progress === 100 ? "success" : "active"} />
+      render: (status) => (
+        <Badge
+          status={status === 'running' ? 'success' : status === 'idle' ? 'warning' : 'error'}
+          text={status.charAt(0).toUpperCase() + status.slice(1)}
+        />
       ),
     },
     {
-      title: 'Due Date',
-      dataIndex: 'dueDate',
-      key: 'dueDate',
+      title: 'Current Job',
+      dataIndex: 'currentProgram',
+      key: 'currentProgram',
+      render: (text, record) => (
+        <div>
+          <div>{text}</div>
+          <div className="text-xs text-gray-500">Part: {record.partNumber}</div>
+        </div>
+      ),
     },
     {
-      title: 'Priority',
-      dataIndex: 'priority',
-      key: 'priority',
-      render: (priority) => {
-        const colors = {
-          High: 'red',
-          Medium: 'orange',
-          Low: 'green'
-        };
-        return <Badge color={colors[priority]} text={priority} />;
-      },
+      title: 'Progress',
+      key: 'progress',
+      render: (_, record) => (
+        <div>
+          <Progress 
+            percent={Math.round((record.totalCount / record.targetCount) * 100)} 
+            size="small" 
+            status="active"
+          />
+          <div className="text-xs text-gray-500">
+            {record.totalCount} / {record.targetCount} parts
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'OEE',
+      dataIndex: 'oee',
+      key: 'oee',
+      render: (oee) => (
+        <Progress
+          type="circle"
+          percent={oee}
+          width={50}
+          format={(percent) => `${percent}%`}
+          status={oee >= 85 ? 'success' : oee >= 70 ? 'normal' : 'exception'}
+        />
+      ),
     },
   ];
 
+  const onChartReady = (chart, id) => {
+    setChartInstances(prev => ({
+      ...prev,
+      [id]: chart
+    }));
+  };
+
   return (
-      <div className="p-6 bg-gray-50 min-h-screen">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white p-6 rounded-lg shadow-sm">
-          <Space>
-            <DashboardOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
-            <div>
-              <Title level={4} style={{ margin: 0 }}>Supervisor Dashboard</Title>
-              <Text type="secondary">Production Overview and Analytics</Text>
-            </div>
-          </Space>
-        <Space>
-            <Select
-              defaultValue="today"
-              style={{ width: 120 }}
-            onChange={setTimeRange}
-              options={[
-                { value: 'today', label: 'Today' },
-                { value: 'week', label: 'This Week' },
-                { value: 'month', label: 'This Month' },
-              ]}
+    <div className="p-6 h-screen bg-gray-50">
+      {/* Top Stats Row */}
+      <Row gutter={16} className="mb-6">
+        <Col span={6}>
+          <Card bordered={false}>
+            <Statistic
+              title="Overall OEE"
+              value={85.7}
+              precision={1}
+              valueStyle={{ color: '#3f8600' }}
+              prefix={<ArrowUpOutlined />}
+              suffix="%"
             />
-          <RangePicker />
-          </Space>
-        </div>
+            <div className="h-[40px]">
+              <ReactECharts
+                option={getSparklineOption([40, 45, 50, 55, 60, 45, 85], '#3f8600', 'line')}
+                style={{ height: '100%', width: '100%' }}
+                onChartReady={(chart) => onChartReady(chart, 'oee')}
+                notMerge={true}
+                lazyUpdate={true}
+              />
+            </div>
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bordered={false}>
+            <Statistic
+              title="Total Parts Today"
+              value={2847}
+              valueStyle={{ color: '#3f8600' }}
+              prefix={<ArrowUpOutlined />}
+            />
+            <div className="h-[40px]">
+              <ReactECharts
+                option={getSparklineOption([28, 35, 40, 45, 50, 55, 60], '#3f8600', 'bar')}
+                style={{ height: '100%', width: '100%' }}
+                onChartReady={(chart) => onChartReady(chart, 'totalParts')}
+                notMerge={true}
+                lazyUpdate={true}
+              />
+            </div>
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bordered={false}>
+            <Statistic
+              title="Active Machines"
+              value={12}
+              suffix="/ 15"
+            />
+            <Progress percent={80} size="small" showInfo={false} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bordered={false}>
+            <Statistic
+              title="Efficiency"
+              value={92.3}
+              precision={1}
+              valueStyle={{ color: '#cf1322' }}
+              prefix={<ArrowDownOutlined />}
+              suffix="%"
+            />
+            <div className="h-[40px]">
+              <ReactECharts
+                option={getSparklineOption([90, 92, 91, 94, 90, 92, 92], '#cf1322', 'line')}
+                style={{ height: '100%', width: '100%' }}
+                onChartReady={(chart) => onChartReady(chart, 'efficiency')}
+                notMerge={true}
+                lazyUpdate={true}
+              />
+            </div>
+          </Card>
+        </Col>
+      </Row>
 
-        {/* Key Metrics Section */}
-        <Row gutter={[16, 16]} className="mb-6">
-          <Col xs={24} sm={12} md={6}>
-          <Card hoverable>
-              <Statistic
-                title={
-                  <Space>
-                    <ShoppingOutlined style={{ color: '#1890ff' }} />
-                    <span>Total Orders</span>
-                  </Space>
-                }
-                value={productionMetrics.totalOrders}
-                valueStyle={{ color: '#1890ff' }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-          <Card hoverable>
-              <Statistic
-                title={
-                  <Space>
-                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                    <span>Completed</span>
-                  </Space>
-                }
-                value={productionMetrics.completedOrders}
-                valueStyle={{ color: '#52c41a' }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-          <Card hoverable>
-              <Statistic
-                title={
-                  <Space>
-                    <ClockCircleOutlined style={{ color: '#faad14' }} />
-                    <span>In Progress</span>
-                  </Space>
-                }
-                value={productionMetrics.inProgress}
-                valueStyle={{ color: '#faad14' }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-          <Card hoverable>
-              <Statistic
-                title={
-                  <Space>
-                    <WarningOutlined style={{ color: '#ff4d4f' }} />
-                    <span>Delayed</span>
-                  </Space>
-                }
-                value={productionMetrics.delayed}
-                valueStyle={{ color: '#ff4d4f' }}
-              />
-            </Card>
-          </Col>
-        </Row>
+      {/* Main Content Area */}
+      <Row gutter={16} className="h-[calc(100vh-200px)]">
+        {/* Left Column - Machine List */}
+        <Col span={16}>
+          <Card 
+            title="Machine Overview" 
+            extra={
+              <Select defaultValue="today" style={{ width: 120 }} onChange={setTimeRange}>
+                <Select.Option value="today">Today</Select.Option>
+                <Select.Option value="week">This Week</Select.Option>
+                <Select.Option value="month">This Month</Select.Option>
+              </Select>
+            }
+            className="h-full"
+          >
+            <Table 
+              columns={columns} 
+              dataSource={machineData}
+              pagination={false}
+              scroll={{ y: 'calc(100vh - 400px)' }}
+            />
+          </Card>
+        </Col>
 
-        {/* Performance Metrics */}
-        <Row gutter={[16, 16]} className="mb-6">
-          <Col xs={24} md={12}>
-            <Card 
-              title={
-                <Space>
-                  <LineChartOutlined />
-                  <span>Performance Metrics</span>
-                </Space>
-              }
-              hoverable
-            >
-              <Row gutter={[16, 16]}>
-                <Col span={12}>
-                  <Tooltip title="Machine Efficiency Rate">
-                    <Card className="text-center" bordered={false}>
-                      <Statistic
-                        title="Efficiency"
-                        value={productionMetrics.efficiency}
-                        suffix="%"
-                        valueStyle={{ color: '#1890ff' }}
-                        prefix={<RiseOutlined />}
-                      />
-                    <Progress percent={productionMetrics.efficiency} strokeColor="#1890ff" />
-                    </Card>
-                  </Tooltip>
-                </Col>
-                <Col span={12}>
-                  <Tooltip title="Product Quality Rate">
-                    <Card className="text-center" bordered={false}>
-                      <Statistic
-                        title="Quality"
-                        value={productionMetrics.quality}
-                        suffix="%"
-                        valueStyle={{ color: '#52c41a' }}
-                        prefix={<CheckCircleOutlined />}
-                      />
-                    <Progress percent={productionMetrics.quality} strokeColor="#52c41a" />
-                    </Card>
-                  </Tooltip>
-                </Col>
-                <Col span={12}>
-                  <Tooltip title="Machine Utilization Rate">
-                    <Card className="text-center" bordered={false}>
-                      <Statistic
-                        title="Utilization"
-                        value={productionMetrics.utilization}
-                        suffix="%"
-                        valueStyle={{ color: '#722ed1' }}
-                        prefix={<DashboardOutlined />}
-                      />
-                    <Progress percent={productionMetrics.utilization} strokeColor="#722ed1" />
-                    </Card>
-                  </Tooltip>
-                </Col>
-                <Col span={12}>
-                  <Tooltip title="Overall Equipment Effectiveness">
-                    <Card className="text-center" bordered={false}>
-                      <Statistic
-                        title="OEE"
-                        value={productionMetrics.oee}
-                        suffix="%"
-                        valueStyle={{ color: '#eb2f96' }}
-                        prefix={<LineChartOutlined />}
-                      />
-                    <Progress percent={productionMetrics.oee} strokeColor="#eb2f96" />
-                    </Card>
-                  </Tooltip>
-                </Col>
-              </Row>
-            </Card>
-          </Col>
-          <Col xs={24} md={12}>
-            <Card 
-              title={
-                <Space>
-                  <SettingOutlined />
-                  <span>Quick Actions</span>
-                </Space>
-              }
-              hoverable
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <Tooltip title="Create New Production Order">
-                  <Button 
-                    type="primary" 
-                    icon={<ShoppingOutlined />}
-                    onClick={() => navigate('/supervisor/order-management')}
-                    className="h-16"
-                  >
-                    New Order
-                  </Button>
-                </Tooltip>
-                <Tooltip title="Schedule Machine Maintenance">
-                  <Button 
-                    type="default"
-                    icon={<ToolOutlined />}
-                    onClick={() => navigate('/supervisor/maintenance')}
-                    className="h-16"
-                  >
-                    Schedule Maintenance
-                  </Button>
-                </Tooltip>
-                <Tooltip title="Manage Workforce Schedule">
-                  <Button 
-                    type="default"
-                    icon={<TeamOutlined />}
-                    onClick={() => navigate('/supervisor/workforce')}
-                    className="h-16"
-                  >
-                    Workforce Management
-                  </Button>
-                </Tooltip>
-                <Tooltip title="Generate Production Reports">
-                  <Button 
-                    type="default"
-                    icon={<BarChartOutlined />}
-                    onClick={() => navigate('/supervisor/reports')}
-                    className="h-16"
-                  >
-                    Generate Reports
-                  </Button>
-                </Tooltip>
-              </div>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* Recent Orders Table */}
-        <Card 
-          title={
-            <Space>
-              <ShoppingOutlined />
-              <span>Recent Orders</span>
-            </Space>
-          }
-          extra={
-          <Button type="primary" icon={<FileTextOutlined />} onClick={() => navigate('/supervisor/order-management')}>
-                View All Orders
-              </Button>
-          }
-        >
-          <Table 
-            columns={columns} 
-            dataSource={recentOrders}
-          pagination={false}
-          />
-        </Card>
-      </div>
+        {/* Right Column - Charts & Timeline */}
+        <Col span={8} className="h-full">
+          <Row gutter={[0, 16]} className="h-full">
+            <Col span={24} className="h-1/2">
+              <Card title="Machine Status Timeline" className="h-full">
+                <ReactECharts option={machineStatusOption} style={{ height: '100%' }} />
+              </Card>
+            </Col>
+            <Col span={24} className="h-1/2">
+              <Card title="Recent Events" className="h-full overflow-auto">
+                <Timeline
+                  items={[
+                    { color: 'green', children: 'DMG-001 started Job OP-1234' },
+                    { color: 'red', children: 'VMC-001 reported error: Tool breakage' },
+                    { color: 'blue', children: 'New job scheduled for HMC-001' },
+                    { color: 'gray', children: 'Maintenance due for DMG-002' },
+                  ]}
+                />
+              </Card>
+            </Col>
+          </Row>
+        </Col>
+      </Row>
+    </div>
   );
-}
+};
 
-export default Dashboard;
+export default SupervisorDashboard;

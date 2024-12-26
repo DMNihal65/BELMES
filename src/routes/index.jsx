@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
 import OperatorDashboard from '../pages/operatorscreens/dashboard';
+import Inventory from '../pages/operatorscreens/inventory/inventoryRequest';
 import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
 import OrderManagement from '../pages/supervisorscreens/OrderManagement';
 import JobDetails from '../pages/operatorscreens/jobdetails';
@@ -8,18 +9,14 @@ import AlertScreens from '../pages/operatorscreens/AlertScreens';
 import Login from '../pages/auth/Login';
 import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
-import Inventory from '../pages/operatorscreens/inventory/inventory';
+
+import InventoryUsageAndAnalytics from '../pages/supervisorscreens/inventory/inventoryMaster';
+import RequestsCalibrationHistory from '../pages/supervisorscreens/inventory/requestsCalibrationHistory';
+import JobDetails from '../pages/operatorscreens/jobdetails';
+// import Inventory from '../pages/operatorscreens/inventory/inventory';
 import ProductionMonitoring from '../pages/supervisorscreens/productionMonitoring';
-import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
-import MaintenanceScreen from '../pages/operatorscreens/MaintenanceScreen';
-import QualityManagement from '../pages/supervisorscreens/QualityManagement';
-import InventoryManagement from "../pages/supervisorscreens/InventoryManagement";
-import DocumentManagement from "../pages/supervisorscreens/DocumentManagement";
+import OrderDashboard from '../pages/supervisorscreens/ordermanagement/orderdashboard';
 
-// Import InspectionResult component
-import InspectionResult from '../pages/operatorscreens/InspectionResult';
-
-// Use InventoryManagement in your routes or wherever it's required
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -123,11 +120,9 @@ export const router = createBrowserRouter([
           },
           {
             path: 'order-management',
-            element: (
-              <ProtectedRoute allowedRole="supervisor">
-                <OrderManagement />
-              </ProtectedRoute>
-            ),
+
+            element: <OrderDashboard />,
+
           },
           {
             path: 'production-planning',
@@ -171,12 +166,19 @@ export const router = createBrowserRouter([
             ),
           },
           {
-            path: 'inventory-management',
-            element: (
-              <ProtectedRoute allowedRole="supervisor">
-                <InventoryManagement />
-              </ProtectedRoute>
-            ),
+
+            path: 'inventory_master',
+            children: [
+              {
+                path: 'inventory_usage_and_analytics',
+                element: <InventoryUsageAndAnalytics />,
+              },
+              {
+                path: 'requests_calibration_history',
+                element: <RequestsCalibrationHistory />,
+              },
+            ]
+
           },
           {
             path: 'document-management',
@@ -194,4 +196,4 @@ export const router = createBrowserRouter([
     path: '*',
     element: <Navigate to="/" replace />,
   },
-]);
+

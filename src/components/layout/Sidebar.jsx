@@ -116,11 +116,11 @@ function Sidebar() {
       children: [
         {
           key: '/supervisor/inventory_master/inventory_usage_and_analytics',
-          label: 'Inventory Usage and Analytics',
+          label: 'Master Data',
         },
         {
           key: '/supervisor/inventory_master/requests_calibration_history',
-          label: 'Requests, Calibration and History',
+          label: 'Overview ',
         },
       ],
     },

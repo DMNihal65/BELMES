@@ -221,18 +221,6 @@ function Inventory() {
       onFilter: (value, record) => record.toolName.indexOf(value) === 0,
     },
     {
-      title: 'Part Number',
-      dataIndex: 'partNumber',
-      key: 'partNumber',
-      sorter: (a, b) => a.partNumber.localeCompare(b.partNumber),
-      filterSearch: true,
-      filters: [...new Set(toolsData.map(item => ({
-        text: item.partNumber,
-        value: item.partNumber,
-      })))],
-      onFilter: (value, record) => record.partNumber.indexOf(value) === 0,
-    },
-    {
       title: 'Category',
       dataIndex: 'category',
       key: 'category',
@@ -288,7 +276,30 @@ function Inventory() {
         </span>
       ),
     },
-    
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_, record) => (
+        <Button 
+        className="bg-sky-500" 
+        style={{ color: record.status === 'In Use' ? '#000000' : '#FFFFFF'}} // Change text color to black if 'In Use'
+        disabled={record.status === 'In Use'}
+        onClick={() => handleRequest(record)}
+        onMouseEnter={(e) => {
+          if (record.status !== 'In Use') {
+            e.currentTarget.style.color = '#0EA5E9'; // Change color on hover only if not 'In Use'
+          }
+        }} 
+        onMouseLeave={(e) => {
+          if (record.status !== 'In Use') {
+            e.currentTarget.style.color = '#FFFFFF'; // Reset color on mouse leave only if not 'In Use'
+          }
+        }}
+      >
+        Request
+      </Button>
+      ),
+    },
   ];
 
   const handleRequest = (record) => {
@@ -306,34 +317,32 @@ function Inventory() {
   const handleFileUpload = (file) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-        try {
-            const workbook = XLSX.read(e.target.result, { type: 'binary' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const data = XLSX.utils.sheet_to_json(worksheet);
-            
-            const formattedData = data.map((item, index) => ({
-                key: `T${toolsData.length + index + 1}`,
-                toolId: item.toolId || `T${toolsData.length + index + 1}`,
-                toolName: item.toolName || '',
-                quantity: parseInt(item.quantity) || 0,
-                location: item.location || '',
-                lastUpdated: item.lastUpdated || dayjs().format('YYYY-MM-DD'),
-                status: item.status || 'Available',
-                partNumber: item.partNumber || '', // Ensure partNumber is included
-                category: item.category || '' // Ensure category is included
-            }));
-
-            setToolsData([...toolsData, ...formattedData]);
-            message.success(`Successfully added ${formattedData.length} tools`);
-        } catch (error) {
-            message.error('Error processing file');
-            console.error(error);
-        }
+      try {
+        const workbook = XLSX.read(e.target.result, { type: 'binary' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+        
+        const formattedData = data.map((item, index) => ({
+          key: `T${toolsData.length + index + 1}`,
+          toolId: item.toolId || `T${toolsData.length + index + 1}`,
+          toolName: item.toolName || '',
+          quantity: parseInt(item.quantity) || 0,
+          location: item.location || '',
+          lastUpdated: item.lastUpdated || dayjs().format('YYYY-MM-DD'),
+          status: item.status || 'Available'
+        }));
+  
+        setToolsData([...toolsData, ...formattedData]);
+        message.success(`Successfully added ${formattedData.length} tools`);
+      } catch (error) {
+        message.error('Error processing file');
+        console.error(error);
+      }
     };
     reader.readAsBinaryString(file);
-    return false; // Prevent automatic upload
-};
+    return false;
+  };
 
   const MetricCard = ({ title, value, trend, trendPeriod, icon: Icon }) => {
     return (
@@ -417,7 +426,7 @@ function Inventory() {
                 <Button className='bg-sky-500 ' style={{ color: '#FFFFFF'}} onMouseEnter={(e) => e.currentTarget.style.color = '#0EA5E9'} 
                   onMouseLeave={(e) => e.currentTarget.style.color = '#FFFFFF'}   onClick={showModal}>Add New Tool</Button>
                 <Button icon={<DownloadOutlined />} onClick={handleDownloadData}>
-                  Download
+                  Download Template
                 </Button>
                 <Upload
                   accept=".xlsx,.xls"

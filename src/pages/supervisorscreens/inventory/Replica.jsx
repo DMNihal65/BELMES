@@ -1,64 +1,19 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, Row, Col, Space, Upload, message, Modal, Form, Input, Select, DatePicker } from 'antd';
-import dayjs from 'dayjs';
-import { 
-  ToolOutlined, 
-  CheckCircleOutlined, 
-  DownloadOutlined, 
-  UploadOutlined 
-} from '@ant-design/icons';
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Select, DatePicker } from 'antd';
+import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'; // Import the icons
+import dayjs from 'dayjs'; // Import dayjs
 import * as XLSX from 'xlsx';
 
-function Inventory() {
-  // Sample data for cards
-  const summaryData = {
-    totalTools: 156,
-    availableTools: 98,
-    inUseTools: 58,
-  };
-
-   // Add these new state variables at the top of the component
-   const [isModalVisible, setIsModalVisible] = useState(false);
-   const [form] = Form.useForm();
- 
-   // Add these new handler functions
-   const showModal = () => {
-     setIsModalVisible(true);
-   };
- 
-   const handleCancel = () => {
-     form.resetFields();
-     setIsModalVisible(false);
-   };
-
-   const handleSubmit = (values) => {
-    const newTool = {
-      key: `T${toolsData.length + 1}`,
-      toolId: values.toolId,
-      toolName: values.toolName,
-      quantity: values.quantity,
-      location: values.location,
-      lastUpdated: values.lastUpdated.format('YYYY-MM-DD'),
-      status: 'Available'
-    };
-    
-    console.log('New tool:', newTool);
-    // Here you would typically update your state/backend
-    
-     // Update the table data by adding the new tool
-     setToolsData([...toolsData, newTool]);
-     
-     message.success('Tool added successfully');
-    handleCancel();
-  };
-
-  
-  // Sample data for table
-  const [toolsData, setToolsData] = useState([
+const Tools = () => {
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [form] = Form.useForm();
+ // Sample data for table
+ const [toolsData, setToolsData] = useState([
     {
       key: '1',
       toolId: 'T001',
       toolName: 'Power Drill',
+      category: 'Cutting Tools',
       quantity: 5,
       location: 'Warehouse A',
       lastUpdated: '2024-03-15',
@@ -68,6 +23,7 @@ function Inventory() {
       key: '2',
       toolId: 'T002',
       toolName: 'Circular Saw',
+      category: 'Cutting Tools',
       quantity: 3,
       location: 'Warehouse B',
       lastUpdated: '2024-03-14',
@@ -77,6 +33,7 @@ function Inventory() {
       key: '3',
       toolId: 'T003',
       toolName: 'Wrench Set',
+      category: 'Tool Holders',
       quantity: 8,
       location: 'Warehouse A',
       lastUpdated: '2024-03-13',
@@ -86,6 +43,7 @@ function Inventory() {
       key: '4',
       toolId: 'T004',
       toolName: 'Safety Goggles',
+      category: 'Consumables',
       quantity: 0,
       location: 'Warehouse C',
       lastUpdated: '2024-03-12',
@@ -95,6 +53,7 @@ function Inventory() {
       key: '5',
       toolId: 'T005',
       toolName: 'Hammer',
+      category: 'Raw Materials',
       quantity: 12,
       location: 'Warehouse B',
       lastUpdated: '2024-03-11',
@@ -104,6 +63,7 @@ function Inventory() {
       key: '6',
       toolId: 'T006',
       toolName: 'Screwdriver Set',
+      category: 'Tool Holders',
       quantity: 4,
       location: 'Warehouse A',
       lastUpdated: '2024-03-10',
@@ -113,6 +73,7 @@ function Inventory() {
       key: '7',
       toolId: 'T007',
       toolName: 'Level Tool',
+      category: 'Measuring Instruments',
       quantity: 6,
       location: 'Warehouse C',
       lastUpdated: '2024-03-09',
@@ -122,6 +83,7 @@ function Inventory() {
       key: '8',
       toolId: 'T008',
       toolName: 'Measuring Tape',
+      category: 'Measuring Instruments',
       quantity: 15,
       location: 'Warehouse B',
       lastUpdated: '2024-03-08',
@@ -130,13 +92,79 @@ function Inventory() {
     {
       key: '9',
       toolId: 'T009',
-      toolName: 'Measuring Tape',
+      toolName: 'Machine Oil',
+      category: 'Consumables',
       quantity: 15,
       location: 'Warehouse D',
       lastUpdated: '2024-03-09',
       status: 'Available',
     },
   ]);
+
+  const showModal = () => {
+    setIsModalVisible(true);
+  };
+
+  const handleCancel = () => {
+    form.resetFields();
+    setIsModalVisible(false);
+  };
+
+  const handleSubmit = (values) => {
+    const newTool = {
+      key: `T${toolsData.length + 1}`,
+      toolId: values.toolId,
+      category: values.category,
+      toolName: values.toolName,
+      quantity: values.quantity,
+      location: values.location,
+      lastUpdated: values.lastUpdated.format('YYYY-MM-DD'),
+      status: 'Available'
+    };
+    
+    setToolsData([...toolsData, newTool]);
+    message.success('Tool added successfully');
+    handleCancel();
+  };
+
+  const handleDownloadData = () => {
+    const ws = XLSX.utils.json_to_sheet(toolsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tools Data");
+    XLSX.writeFile(wb, "tools_template.xlsx");
+  };
+
+  const handleFileUpload = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const workbook = XLSX.read(e.target.result, { type: 'binary' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const data = XLSX.utils.sheet_to_json(worksheet);
+            
+            const formattedData = data.map((item, index) => ({
+                key: `T${toolsData.length + index + 1}`,
+                toolId: item.toolId || `T${toolsData.length + index + 1}`,
+                toolName: item.toolName || '',
+                quantity: parseInt(item.quantity) || 0,
+                location: item.location || '',
+                lastUpdated: item.lastUpdated || dayjs().format('YYYY-MM-DD'),
+                status: item.status || 'Available',
+                partNumber: item.partNumber || '', // Ensure partNumber is included
+                category: item.category || '' // Ensure category is included
+            }));
+
+            setToolsData([...toolsData, ...formattedData]);
+            message.success(`Successfully added ${formattedData.length} tools`);
+        } catch (error) {
+            message.error('Error processing file');
+            console.error(error);
+        }
+    };
+    reader.readAsBinaryString(file);
+    return false; // Prevent automatic upload
+};
 
   const columns = [
     {
@@ -151,6 +179,23 @@ function Inventory() {
       })))],
       onFilter: (value, record) => record.toolId.indexOf(value) === 0,
     },
+    {
+        title: 'Category',
+        dataIndex: 'category',
+        key: 'category',
+        filters: [
+          { text: 'Raw Materials', value: 'Raw Materials' },
+          { text: 'Cutting Tools', value: 'Cutting Tools' },
+          { text: 'Consumables', value: 'Consumables' },
+          { text: 'Spares', value: 'Spares' },
+          { text: 'Tool Holders', value: 'Tool Holders' },
+          { text: 'Jigs & Fixtures', value: 'Jigs & Fixtures' },
+          { text: 'Measuring Instruments', value: 'Measuring Instruments' },
+        ],
+        onFilter: (value, record) => record.category === value,
+        sorter: (a, b) => a.category.localeCompare(b.category),
+        filterSearch: true,
+      },
     {
       title: 'Tool Name',
       dataIndex: 'toolName',
@@ -178,6 +223,7 @@ function Inventory() {
         value: item.location,
       })))],
       onFilter: (value, record) => record.location === value,
+      filterSearch: true,
     },
     {
       title: 'Last Updated',
@@ -194,111 +240,27 @@ function Inventory() {
         { text: 'In Use', value: 'In Use' },
       ],
       onFilter: (value, record) => record.status === value,
+      filterSearch: true,
       render: (status) => (
         <span style={{ color: status === 'Available' ? '#52c41a' : '#faad14' }}>
           {status}
         </span>
       ),
     },
-    {
-      title: 'Action',
-      key: 'action',
-      render: (_, record) => (
-        <Button 
-          type="primary" 
-          disabled={record.status === 'In Use'}
-          onClick={() => handleRequest(record)}
-        >
-          Request
-        </Button>
-      ),
-    },
+    
   ];
 
-  // Handler for request button
-  const handleRequest = (record) => {
-    console.log('Requesting tool:', record);
-    // Add your request logic here
-  };
-
-  const handleDownloadData = () => {
-    // Create a template or export current data
-    const ws = XLSX.utils.json_to_sheet(toolsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Tools Data");
-    XLSX.writeFile(wb, "tools_template.xlsx");
-  };
-
-  const handleFileUpload = (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const workbook = XLSX.read(e.target.result, { type: 'binary' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
-        
-        // Transform the Excel data to match our table structure
-        const formattedData = data.map((item, index) => ({
-          key: `T${toolsData.length + index + 1}`,
-          toolId: item.toolId || `T${toolsData.length + index + 1}`,
-          toolName: item.toolName || '',
-          quantity: parseInt(item.quantity) || 0,
-          location: item.location || '',
-          lastUpdated: item.lastUpdated || dayjs().format('YYYY-MM-DD'),
-          status: item.status || 'Available'
-        }));
-  
-        // Update the table with both existing and new data
-        setToolsData([...toolsData, ...formattedData]);
-        message.success(`Successfully added ${formattedData.length} tools`);
-      } catch (error) {
-        message.error('Error processing file');
-        console.error(error);
-      }
-    };
-    reader.readAsBinaryString(file);
-    return false; // Prevent default upload behavior
-  };
-
   return (
-    <div style={{ padding: '24px' }}>
-      {/* Summary Cards */}
-      <Row gutter={[16, 16]}>
-        <Col span={12}>
-          <Card hoverable>
-            <Space align="center">
-              <ToolOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
-              <div>
-                <h3 style={{ margin: 0, color: '#8c8c8c' }}>Total Tools</h3>
-                <h2 style={{ margin: '8px 0 0 0' }}>{summaryData.totalTools}</h2>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card hoverable>
-            <Space align="center">
-              <CheckCircleOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
-              <div>
-                <h3 style={{ margin: 0, color: '#8c8c8c' }}>Available Tools</h3>
-                <h2 style={{ margin: '8px 0 0 0' }}>{summaryData.availableTools}</h2>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
-      
-      {/* Tools Table */}
+    <div>
       <Card 
-        title="Tools Inventory" 
-        style={{ marginTop: '24px' }}
+        title="Tools Inventory"
         extra={
           <Space>
-            <Button type="primary" onClick={showModal}>Add New Tool</Button>
-            <Button icon={<DownloadOutlined />} onClick={handleDownloadData}>
-              Download Template
-            </Button>
+            <Button className='bg-sky-500 ' style={{ color: '#FFFFFF'}} onMouseEnter={(e) => e.currentTarget.style.color = '#0EA5E9'} 
+                  onMouseLeave={(e) => e.currentTarget.style.color = '#FFFFFF'}   onClick={showModal}>Add New Tool</Button>
+           <Button icon={<DownloadOutlined />} onClick={handleDownloadData}>
+                  Download
+                </Button>
             <Upload
               accept=".xlsx,.xls"
               showUploadList={false}
@@ -346,6 +308,14 @@ function Inventory() {
           </Form.Item>
           
           <Form.Item
+            name="category"
+            label="Category "
+            rules={[{ required: true, message: 'Please input the Category!' }]}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item
             name="toolName"
             label="Tool Name"
             rules={[{ required: true, message: 'Please input the Tool Name!' }]}
@@ -378,11 +348,11 @@ function Inventory() {
             name="lastUpdated"
             label="Last Updated"
           >
-            <DatePicker style={{ width: '100%' }} disabled />
+            <DatePicker className="w-full" disabled />
           </Form.Item>
 
           <Form.Item>
-            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Space className="w-full justify-end">
               <Button onClick={handleCancel}>Cancel</Button>
               <Button type="primary" htmlType="submit">Submit</Button>
             </Space>
@@ -391,6 +361,6 @@ function Inventory() {
       </Modal>
     </div>
   );
-}
+};
 
-export default Inventory;
+export default Tools;

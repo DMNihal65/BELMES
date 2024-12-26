@@ -8,6 +8,9 @@ import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
 import InventoryUsageAndAnalytics from '../pages/supervisorscreens/inventory/inventoryMaster';
 import RequestsCalibrationHistory from '../pages/supervisorscreens/inventory/requestsCalibrationHistory';
+import Requests from '../pages/supervisorscreens/inventory/Requests';
+import Calibration from '../pages/supervisorscreens/inventory/Calibration';
+import History from '../pages/supervisorscreens/inventory/History';
 import JobDetails from '../pages/operatorscreens/jobdetails';
 // import Inventory from '../pages/operatorscreens/inventory/inventory';
 import ProductionMonitoring from '../pages/supervisorscreens/productionMonitoring';
@@ -122,6 +125,20 @@ export const router = createBrowserRouter([
               {
                 path: 'requests_calibration_history',
                 element: <RequestsCalibrationHistory />,
+                children: [
+                  {
+                    path: 'requests', // Child route for requests
+                    element: <Requests />,
+                  },
+                  {
+                    path: 'calibration', // Child route for calibration
+                    element: <Calibration />,
+                  },
+                  {
+                    path: 'history', // Child route for history
+                    element: <History />,
+                  },
+                ]
               },
             ]
           },

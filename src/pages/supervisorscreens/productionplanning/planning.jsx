@@ -1,393 +1,134 @@
 import React, { useState } from 'react';
 import {
-  Card,
-  Row,
-  Col,
-  Button,
-  Table,
-  Space,
-  Typography,
-  Select,
-  Form,
-  Input,
-  DatePicker,
-  Modal,
-  Upload,
-  message,
-  Tag,
-  Tooltip,
-  Progress
+  Card, Row, Col, Button, Space, Select, DatePicker,
+  Tabs, Progress, Tooltip, Badge
 } from 'antd';
 import {
-  PlusOutlined,
-  ReloadOutlined,
-  UploadOutlined,
-  SearchOutlined,
-  ClockCircleOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  AreaChartOutlined
+  ReloadOutlined, CalendarOutlined
 } from '@ant-design/icons';
-import { Area } from '@ant-design/charts';
-import dayjs from 'dayjs';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip as RechartsTooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import CapacityOverview from '../../../components/ProductionPlanning/CapacityOverview';
+import MachineUtilization from '../../../components/ProductionPlanning/MachineUtilization';
+import PlanningCalendar from '../../../components/ProductionPlanning/PlanningCalendar';
+import CapacityAllocationModal from '../../../components/ProductionPlanning/CapacityAllocationModal';
+import { mockMachineData, mockCapacityData } from '../../../data/mockPlanningData';
 
-const { Title } = Typography;
-const { Option } = Select;
+const { TabPane } = Tabs;
 const { RangePicker } = DatePicker;
 
 const Planning = () => {
-  const [loading, setLoading] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [form] = Form.useForm();
+  const [selectedMachines, setSelectedMachines] = useState(['all']);
+  const [selectedPartNumbers, setSelectedPartNumbers] = useState(['all']);
+  const [dateRange, setDateRange] = useState(null);
+  const [viewMode, setViewMode] = useState('day');
+  const [isAllocationModalVisible, setIsAllocationModalVisible] = useState(false);
 
-  // Mock data for capacity utilization
-  const capacityData = [
-    { date: '2024-01-01', utilization: 75 },
-    { date: '2024-01-02', utilization: 82 },
-    { date: '2024-01-03', utilization: 65 },
-    { date: '2024-01-04', utilization: 90 },
-    { date: '2024-01-05', utilization: 85 },
-    { date: '2024-01-06', utilization: 70 },
-    { date: '2024-01-07', utilization: 88 },
-  ];
+  // Get filtered data based on selections
+  const getFilteredData = () => {
+    let machines = selectedMachines.includes('all') 
+      ? mockMachineData 
+      : mockMachineData.filter(m => selectedMachines.includes(m.id));
 
-  // Area chart configuration
-  const areaConfig = {
-    data: capacityData,
-    xField: 'date',
-    yField: 'utilization',
-    smooth: true,
-    areaStyle: {
-      fill: 'l(270) 0:#ffffff 0.5:#7ec2f3 1:#1890ff',
-    },
-    line: {
-      color: '#1890ff',
-    },
-    yAxis: {
-      label: {
-        formatter: (v) => `${v}%`,
-      },
-    },
-    tooltip: {
-      formatter: (datum) => {
-        return { name: 'Utilization', value: datum.utilization + '%' };
-      },
-    },
-  };
-
-  // Table columns for existing plans
-  const columns = [
-    {
-      title: 'Job ID',
-      dataIndex: 'jobId',
-      key: 'jobId',
-      sorter: (a, b) => a.jobId.localeCompare(b.jobId),
-    },
-    {
-      title: 'Part Number',
-      dataIndex: 'partNumber',
-      key: 'partNumber',
-      sorter: (a, b) => a.partNumber.localeCompare(b.partNumber),
-    },
-    {
-      title: 'Machine Type',
-      dataIndex: 'machineType',
-      key: 'machineType',
-      filters: [
-        { text: 'CNC', value: 'CNC' },
-        { text: 'Assembly', value: 'Assembly' },
-      ],
-      onFilter: (value, record) => record.machineType === value,
-    },
-    {
-      title: 'Start Date',
-      dataIndex: 'startDate',
-      key: 'startDate',
-      sorter: (a, b) => new Date(a.startDate) - new Date(b.startDate),
-    },
-    {
-      title: 'End Date',
-      dataIndex: 'endDate',
-      key: 'endDate',
-      sorter: (a, b) => new Date(a.endDate) - new Date(b.endDate),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => {
-        let color = status === 'Completed' ? 'green' : status === 'In Progress' ? 'blue' : 'orange';
-        return (
-          <Tag color={color}>
-            {status}
-          </Tag>
-        );
-      },
-      filters: [
-        { text: 'Completed', value: 'Completed' },
-        { text: 'In Progress', value: 'In Progress' },
-        { text: 'Planned', value: 'Planned' },
-      ],
-      onFilter: (value, record) => record.status === value,
-    },
-    {
-      title: 'Progress',
-      dataIndex: 'progress',
-      key: 'progress',
-      render: (progress) => (
-        <Progress 
-          percent={progress} 
-          size="small" 
-          status={progress === 100 ? 'success' : 'active'}
-        />
-      ),
-    },
-    {
-      title: 'Action',
-      key: 'action',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button type="link">Edit</Button>
-          <Button type="link">View</Button>
-        </Space>
-      ),
-    },
-  ];
-
-  // Mock data for plans table
-  const plansData = [
-    {
-      key: '1',
-      jobId: 'JOB-001',
-      partNumber: 'PART-001',
-      machineType: 'CNC',
-      startDate: '2024-01-19',
-      endDate: '2024-01-25',
-      status: 'In Progress',
-      progress: 45,
-    },
-    {
-      key: '2',
-      jobId: 'JOB-002',
-      partNumber: 'PART-002',
-      machineType: 'Assembly',
-      startDate: '2024-01-20',
-      endDate: '2024-01-23',
-      status: 'Planned',
-      progress: 0,
-    },
-  ];
-
-  const handleNewJob = async () => {
-    try {
-      const values = await form.validateFields();
-      setLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        message.success('New job plan created successfully');
-        setModalVisible(false);
-        setLoading(false);
-        form.resetFields();
-      }, 1000);
-    } catch (error) {
-      console.error('Validation failed:', error);
-    }
-  };
-
-  const handleRefresh = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      message.success('Data refreshed successfully');
-    }, 1000);
+    return machines.map(machine => ({
+      ...machine,
+      capacityData: mockCapacityData
+        .filter(c => c.machineId === machine.id)
+        .filter(c => {
+          if (!dateRange) return true;
+          const [start, end] = dateRange;
+          const date = new Date(c.date);
+          return date >= start && date <= end;
+        })
+    }));
   };
 
   return (
-    <div className="p-6">
-      <Row gutter={[16, 16]}>
-        {/* Capacity Summary Section */}
-        <Col span={24}>
-          <Card
-            title={
-              <Space>
-                <AreaChartOutlined />
-                <span>Capacity Utilization</span>
-              </Space>
-            }
-            extra={
-              <Space>
-                <RangePicker />
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={handleRefresh}
-                >
-                  Refresh
-                </Button>
-              </Space>
-            }
-          >
-            <Area {...areaConfig} height={300} />
-          </Card>
-        </Col>
-
-        {/* Statistics Cards */}
-        <Col span={8}>
-          <Card>
-            <Tooltip title="Jobs currently in progress">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Space>
-                  <ClockCircleOutlined style={{ color: '#1890ff', fontSize: '24px' }} />
-                  <span>In Progress</span>
-                </Space>
-                <Title level={3}>5 Jobs</Title>
-              </Space>
-            </Tooltip>
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card>
-            <Tooltip title="Jobs completed this week">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Space>
-                  <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '24px' }} />
-                  <span>Completed</span>
-                </Space>
-                <Title level={3}>12 Jobs</Title>
-              </Space>
-            </Tooltip>
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card>
-            <Tooltip title="Jobs planned for next week">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Space>
-                  <ExclamationCircleOutlined style={{ color: '#faad14', fontSize: '24px' }} />
-                  <span>Planned</span>
-                </Space>
-                <Title level={3}>8 Jobs</Title>
-              </Space>
-            </Tooltip>
-          </Card>
-        </Col>
-
-        {/* Existing Plans Section */}
-        <Col span={24}>
-          <Card
-            title="Existing Plans"
-            extra={
-              <Space>
-                <Input
-                  placeholder="Search plans"
-                  prefix={<SearchOutlined />}
-                  style={{ width: 200 }}
-                />
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => setModalVisible(true)}
-                >
-                  New Job Plan
-                </Button>
-              </Space>
-            }
-          >
-            <Table
-              columns={columns}
-              dataSource={plansData}
-              loading={loading}
-              pagination={{
-                total: 100,
-                pageSize: 10,
-                showSizeChanger: true,
-                showQuickJumper: true,
-              }}
+    <div className="space-y-6">
+      {/* Header Controls */}
+      <Card className="shadow-sm">
+        <div className="flex justify-between items-center">
+          <Space size="large">
+            <Select
+              mode="multiple"
+              style={{ width: '300px' }}
+              placeholder="Select Machines"
+              value={selectedMachines}
+              onChange={setSelectedMachines}
+              options={[
+                { value: 'all', label: 'All Machines' },
+                ...mockMachineData.map(m => ({
+                  value: m.id,
+                  label: `${m.name} (${m.id})`
+                }))
+              ]}
             />
-          </Card>
-        </Col>
-      </Row>
+            <Select
+              mode="multiple"
+              style={{ width: '300px' }}
+              placeholder="Select Part Numbers"
+              value={selectedPartNumbers}
+              onChange={setSelectedPartNumbers}
+              options={[
+                { value: 'all', label: 'All Parts' },
+                // Add part number options
+              ]}
+            />
+            <RangePicker 
+              value={dateRange}
+              onChange={setDateRange}
+            />
+          </Space>
+          <Space>
+            <Select
+              value={viewMode}
+              onChange={setViewMode}
+              options={[
+                { value: 'day', label: 'Daily View' },
+                { value: 'week', label: 'Weekly View' },
+                { value: 'month', label: 'Monthly View' },
+              ]}
+            />
+            <Button 
+              type="primary"
+              onClick={() => setIsAllocationModalVisible(true)}
+            >
+              Allocate Capacity
+            </Button>
+          </Space>
+        </div>
+      </Card>
 
-      {/* New Job Modal */}
-      <Modal
-        title="Create New Job Plan"
-        open={modalVisible}
-        onOk={handleNewJob}
-        onCancel={() => {
-          setModalVisible(false);
-          form.resetFields();
-        }}
-        confirmLoading={loading}
-        width={600}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-        >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="partNumber"
-                label="Part Number"
-                rules={[{ required: true, message: 'Please enter part number' }]}
-              >
-                <Input placeholder="Enter part number" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="quantity"
-                label="Quantity"
-                rules={[{ required: true, message: 'Please enter quantity' }]}
-              >
-                <Input type="number" min={1} placeholder="Enter quantity" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="machineType"
-                label="Machine Type"
-                rules={[{ required: true, message: 'Please select machine type' }]}
-              >
-                <Select placeholder="Select machine type">
-                  <Option value="CNC">CNC</Option>
-                  <Option value="Assembly">Assembly</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="priority"
-                label="Priority"
-                rules={[{ required: true, message: 'Please select priority' }]}
-              >
-                <Select placeholder="Select priority">
-                  <Option value="high">High</Option>
-                  <Option value="medium">Medium</Option>
-                  <Option value="low">Low</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item
-            name="dateRange"
-            label="Date Range"
-            rules={[{ required: true, message: 'Please select date range' }]}
-          >
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item
-            name="files"
-            label="Upload Files"
-          >
-            <Upload>
-              <Button icon={<UploadOutlined />}>Click to Upload</Button>
-            </Upload>
-          </Form.Item>
-        </Form>
-      </Modal>
+      {/* Main Content */}
+      <Tabs defaultActiveKey="overview" className="bg-white p-4 rounded-lg shadow-sm">
+        <TabPane tab="Capacity Overview" key="overview">
+          <CapacityOverview 
+            data={getFilteredData()}
+            viewMode={viewMode}
+          />
+        </TabPane>
+        <TabPane tab="Machine Utilization" key="utilization">
+          <MachineUtilization 
+            data={getFilteredData()}
+            viewMode={viewMode}
+          />
+        </TabPane>
+        <TabPane tab="Planning Calendar" key="calendar">
+          <PlanningCalendar 
+            data={getFilteredData()}
+            viewMode={viewMode}
+          />
+        </TabPane>
+      </Tabs>
+
+      {/* Capacity Allocation Modal */}
+      <CapacityAllocationModal
+        visible={isAllocationModalVisible}
+        onCancel={() => setIsAllocationModalVisible(false)}
+        machines={getFilteredData()}
+      />
     </div>
   );
 };

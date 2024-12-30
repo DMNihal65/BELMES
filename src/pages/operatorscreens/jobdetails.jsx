@@ -1,217 +1,355 @@
 import React, { useState } from 'react';
-import { Card, Button, Input, Checkbox, Layout, Modal, Spin } from 'antd';
-import { BellOutlined, UserOutlined, LoadingOutlined } from '@ant-design/icons';
+import { 
+  Card, Button, Input, Layout, Modal, Tabs,
+  Row, Col, Statistic, Badge, Space, Progress, Avatar,
+  Tooltip, Divider, Alert, message
+} from 'antd';
+import { 
+  ClockCircleOutlined, UserOutlined, BellOutlined,
+  ToolOutlined, CheckCircleOutlined, FileTextOutlined,
+  ArrowLeftOutlined
+} from '@ant-design/icons';
+import {
+  Timer, AlertTriangle, CheckCircle2, 
+  FileText, Eye, Gauge, Settings, AlertOctagon
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
-import MPP from '../operatorscreens/JobDetails/Mpp'; // Import MPP component
-import IPID from '../operatorscreens/JobDetails/IPID'; // Import IPID component
+import MPP from './JobDetails/Mpp';
+import IPID from './JobDetails/IPID';
+import OperationDetails from './JobDetails/OperationDetails';
+import PokaYokeChecklist from './JobDetails/PokaYokeChecklist';
 
-const { Content, Header } = Layout;
+const { Content } = Layout;
+const { TabPane } = Tabs;
+
+// Mock data
+const mockJobData = {
+  jobId: 'JOB-2024-001',
+  partNumber: 'PA-0014',
+  partName: 'Aluminum Housing',
+  batchSize: 120,
+  priority: 'High',
+  machine: {
+    id: 'OP10',
+    name: 'DMG DMU 60 eVo',
+    status: 'running',
+    efficiency: 92,
+    currentCycle: '02:45',
+    nextMaintenance: '4hrs',
+    alerts: 2,
+    totalParts: 120,
+    completedParts: 75,
+    parameters: {
+      speed: '1200 RPM',
+      feed: '300 mm/min',
+      temperature: '28°C'
+    }
+  },
+  operator: {
+    id: 'OP-001',
+    name: 'John Doe',
+    shift: 'Morning',
+    experience: '5 years',
+    certification: 'Level 3',
+    photo: null,
+    lastLogin: '08:00 AM'
+  },
+  schedule: {
+    startTime: '2024-01-15T08:00:00',
+    endTime: '2024-01-15T16:00:00',
+    breakTimes: ['10:30-10:45', '13:00-13:30'],
+    estimatedCompletion: '15:30'
+  },
+  quality: {
+    inspectionPoints: 5,
+    completedInspections: 3,
+    lastInspection: '11:30 AM',
+    deviations: 0
+  },
+  steps: [
+    { id: 1, title: 'Safety Checks', status: 'completed', time: '08:00' },
+    { id: 2, title: 'Tool Setup', status: 'completed', time: '08:15' },
+    { id: 3, title: 'Material Loading', status: 'completed', time: '08:30' },
+    { id: 4, title: 'Program Verification', status: 'in-progress', time: '08:45' },
+    { id: 5, title: 'Production Start', status: 'pending', time: '09:00' }
+  ]
+};
 
 const JobDetails = () => {
-  const jobData = {
-    jobId: 'JOB-2024-001',
-    partNumber: 'PA-0014',
-    batchSize: '120',
-    priority: 'High',
-    machine: 'OP10',
-    operator: 'John Doe',
-    startTime: '1/15/2024, 8:00:00 AM',
-    endTime: '1/15/2024, 4:00:00 PM',
-    steps: [
-      { title: 'Prepare workstation', status: 'completed' },
-      { title: 'Install fixtures', status: 'completed' },
-      { title: 'Load raw materials', status: 'in-progress' },
-      { title: 'Calibrate machine', status: 'pending' },
-      { title: 'Begin machining', status: 'pending' }
-    ]
-  };
-
   // State management
-  const [isLoading, setIsLoading] = useState(false);
-  const [partCount, setPartCount] = useState(15);
-  const [steps, setSteps] = useState(jobData.steps);
-  const [isMPPVisible, setIsMPPVisible] = useState(false); // Manage MPP modal visibility
+  const [jobData, setJobData] = useState(mockJobData);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showPokaYoke, setShowPokaYoke] = useState(false);
+  const [partCount, setPartCount] = useState(jobData.machine.completedParts);
 
-  // Handle IPID button click with backend call
-  const handleIPIDClick = async () => {
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('http://localhost:3001/open-exe', { method: 'POST' });
-
-      if (response.ok) {
-        console.log('QMS application opened successfully');
-      } else {
-        throw new Error('Failed to open QMS application');
-      }
-    } catch (error) {
-      console.error(error);
-      Modal.error({
-        title: 'Error',
-        content: 'Failed to open QMS application. Please try again.',
-      });
-    } finally {
-      setIsLoading(false);
+  // Handle part count update
+  const handlePartCountUpdate = (newCount) => {
+    if (newCount > jobData.batchSize) {
+      message.error('Count cannot exceed batch size');
+      return;
     }
-  };
-
-  // Handle part count change
-  const handlePartCountChange = (e) => {
-    setPartCount(e.target.value);
-  };
-
-  // Handle submit action for part count
-  const handleSubmit = () => {
-    console.log(`Part Count updated to: ${partCount}`);
-  };
-
-  // Handle checkbox change for steps
-  const handleCheckboxChange = (index) => {
-    const updatedSteps = [...steps];
-    updatedSteps[index].status = updatedSteps[index].status === 'completed' ? 'in-progress' : 'completed';
-    setSteps(updatedSteps);
-  };
-
-  // Handle MPP modal visibility
-  const handleMPPClick = () => {
-    setIsMPPVisible(true); // Show the MPP modal
-  };
-
-  const handleMPPClose = () => {
-    setIsMPPVisible(false); // Hide the MPP modal
+    setPartCount(newCount);
+    message.success('Part count updated successfully');
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Link to="/dashboard">
-              <Button>Back to Dashboard</Button>
-            </Link>
-            <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Job Details</h1>
+    <Layout className="min-h-screen bg-gray-50">
+      {/* Top Bar */}
+      <div className="bg-white px-6 py-4 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-4">
+          <Link to="/dashboard">
+            <Button type="text" icon={<ArrowLeftOutlined />}>Back</Button>
+          </Link>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold m-0">{jobData.partName}</h1>
+              <Badge 
+                status={jobData.machine.status === 'running' ? 'success' : 'warning'} 
+                text={jobData.machine.status.toUpperCase()} 
+              />
+            </div>
+            <Space className="text-gray-500">
+              <span>Job: {jobData.jobId}</span>
+              <Divider type="vertical" />
+              <span>Part: {jobData.partNumber}</span>
+            </Space>
           </div>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <Button type="text" icon={<BellOutlined />} />
-            <Button type="text" icon={<UserOutlined />} />
-          </div>
-        </Header>
+        </div>
+        
+      </div>
 
-        <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px' }}>
-            {/* Job Information Card */}
-            <Card title="Job Information">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                <div>
-                  <p>Job ID: {jobData.jobId}</p>
-                  <p>Part Number: {jobData.partNumber}</p>
-                  <p>Batch Size: {jobData.batchSize}</p>
-                  <p>Priority: {jobData.priority}</p>
-                </div>
-                <div>
-                  <p>Machine: {jobData.machine}</p>
-                  <p>Operator: {jobData.operator}</p>
-                  <p>Start: {jobData.startTime}</p>
-                  <p>End: {jobData.endTime}</p>
-                </div>
-              </div>
-            </Card>
-
-            {/* Part Count Update Card */}
-            <Card title="Update PartCount">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                <span>Machine1 OP10</span>
-                <Input 
-                  type="number" 
-                  value={partCount} 
-                  onChange={handlePartCountChange} 
-                  style={{ width: '100px' }} 
-                />
-              </div>
-              <Button type="primary" onClick={handleSubmit}>Submit</Button>
-            </Card>
-
-            {/* Steps and Documents Card */}
-            <Card title="Steps and Documents">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <IPID /> {/* Render the IPID component */}
-                <Button
-                  type="primary"
-                  onClick={handleMPPClick} // Show MPP modal on click
-                  style={{ width: '200px', textAlign: 'center' }}
-                >
-                  MPP
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={() => console.log('Other Documents clicked')}
-                  style={{ width: '200px', textAlign: 'center' }}
-                >
-                  Other Documents
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={() => console.log('Tools Used clicked')}
-                  style={{ width: '200px', textAlign: 'center' }}
-                >
-                  Tools Used
-                </Button>
-              </div>
-            </Card>
-
-            {/* Task Progress Card */}
+      {/* Main Content */}
+      <Content className="p-6">
+        <Row gutter={[16, 16]}>
+          {/* Machine Status Card */}
+          <Col span={8}>
             <Card 
               title={
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Task Progress</span>
-                  <span style={{ color: '#1890ff' }}>poka-yoke</span>
-                </div>
+                <Space>
+                  < ToolOutlined className="text-blue-500" />
+                  <span>Machine Status</span>
+                </Space>
               }
+              className="shadow-sm hover:shadow-md transition-shadow"
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {steps.map((step, index) => (
-                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <Checkbox 
-                      checked={step.status === 'completed'} 
-                      onChange={() => handleCheckboxChange(index)} 
+              <Space direction="vertical" className="w-full">
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Statistic 
+                      title="Efficiency" 
+                      value={jobData.machine.efficiency} 
+                      suffix="%" 
+                      prefix={<Gauge size={16} />}
+                      valueStyle={{ color: '#52c41a' }}
                     />
-                    <span>{step.title}</span>
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="Cycle Time" 
+                      value={jobData.machine.currentCycle}
+                      prefix={<Timer size={16} />}
+                    />
+                  </Col>
+                </Row>
+                <Divider className="my-3" />
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Machine Parameters</span>
+                    <Button type="link" icon={<Settings size={14} />}>
+                      Details
+                    </Button>
                   </div>
-                ))}
-              </div>
+                  <Space direction="vertical" className="w-full">
+                    {Object.entries(jobData.machine.parameters).map(([key, value]) => (
+                      <div key={key} className="flex justify-between text-sm">
+                        <span className="text-gray-500">{key}:</span>
+                        <span>{value}</span>
+                      </div>
+                    ))}
+                  </Space>
+                </div>
+              </Space>
             </Card>
-          </div>
-        </Content>
-      </Layout>
+          </Col>
 
-      {/* Loading Modal */}
+          {/* Production Progress Card */}
+          <Col span={8}>
+            <Card 
+              title={
+                <Space>
+                  <CheckCircle2 className="text-blue-500" />
+                  <span>Production Progress</span>
+                </Space>
+              }
+              className="shadow-sm hover:shadow-md transition-shadow"
+            >
+              <Space direction="vertical" className="w-full">
+                <div className="text-center mb-4">
+                  <Progress 
+                    type="circle" 
+                    percent={Math.round((partCount / jobData.batchSize) * 100)}
+                    format={percent => (
+                      <div>
+                        <div className="text-lg font-semibold">{percent}%</div>
+                        <div className="text-xs text-gray-500">Complete</div>
+                      </div>
+                    )}
+                  />
+                </div>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Statistic 
+                      title="Completed" 
+                      value={partCount}
+                      suffix={`/ ${jobData.batchSize}`}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="Remaining" 
+                      value={jobData.batchSize - partCount}
+                      valueStyle={{ color: '#faad14' }}
+                    />
+                  </Col>
+                </Row>
+                <Divider className="my-3" />
+                <Space className="w-full justify-between">
+                  <Input 
+                    type="number"
+                    value={partCount}
+                    onChange={e => setPartCount(parseInt(e.target.value))}
+                    style={{ width: 100 }}
+                  />
+                  <Button 
+                    type="primary"
+                    onClick={() => handlePartCountUpdate(partCount)}
+                  >
+                    Update Count
+                  </Button>
+                </Space>
+              </Space>
+            </Card>
+          </Col>
+
+          {/* Quality Status Card */}
+          <Col span={8}>
+            <Card 
+              title={
+                <Space>
+                  <Eye className="text-blue-500" />
+                  <span>Quality Status</span>
+                </Space>
+              }
+              className="shadow-sm hover:shadow-md transition-shadow"
+            >
+              <Space direction="vertical" className="w-full">
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Statistic 
+                      title="Inspections" 
+                      value={jobData.quality.completedInspections}
+                      suffix={`/ ${jobData.quality.inspectionPoints}`}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="Deviations" 
+                      value={jobData.quality.deviations}
+                      valueStyle={{ color: jobData.quality.deviations > 0 ? '#ff4d4f' : '#52c41a' }}
+                    />
+                  </Col>
+                </Row>
+                <Divider className="my-3" />
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>Last Inspection:</span>
+                    <span>{jobData.quality.lastInspection}</span>
+                  </div>
+                  <Space className="w-full">
+                    <Button 
+                      type="primary" 
+                      icon={<FileTextOutlined />}
+                      onClick={() => setShowPokaYoke(true)}
+                      block
+                    >
+                      Poka-Yoke Checklist
+                    </Button>
+                  </Space>
+                </div>
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Main Content Tabs */}
+        <Card className="mt-4 shadow-sm">
+          <Tabs 
+            activeKey={activeTab} 
+            onChange={setActiveTab}
+            type="card"
+            className="custom-tabs"
+          >
+            <TabPane 
+              tab={
+                <span>
+                  <FileText size={16} className="mr-2" />
+                  Operation Details
+                </span>
+              } 
+              key="operations"
+            >
+              <OperationDetails jobData={jobData} />
+            </TabPane>
+            <TabPane 
+              tab={
+                <span>
+                  < ToolOutlined size={16} className="mr-2" />
+                  MPP
+                </span>
+              } 
+              key="mpp"
+            >
+              <MPP jobData={jobData} />
+            </TabPane>
+            <TabPane 
+              tab={
+                <span>
+                  <AlertTriangle size={16} className="mr-2" />
+                  IPID
+                </span>
+              } 
+              key="ipid"
+            >
+              <IPID jobData={jobData} />
+            </TabPane>
+          </Tabs>
+        </Card>
+      </Content>
+
+      {/* Poka-Yoke Modal */}
       <Modal
-        title="QMS Loading"
-        open={isLoading}
+        title="Poka-Yoke Checklist"
+        open={showPokaYoke}
+        onCancel={() => setShowPokaYoke(false)}
         footer={null}
-        closable={false}
-        centered
-        maskClosable={false}
+        width={800}
       >
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <Spin 
-            indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} 
-            size="large"
-          />
-          <p style={{ marginTop: '16px' }}>Loading QMS, please wait...</p>
-        </div>
+        <PokaYokeChecklist jobId={jobData.jobId} />
       </Modal>
 
-      {/* MPP Modal */}
-      <Modal
-        title="Manufacturing Process Plan (MPP)"
-        open={isMPPVisible}
-        onCancel={handleMPPClose}
-        footer={null}
-        width={1700}
-      >
-        <MPP /> {/* MPP Component inside modal */}
-      </Modal>
+      <style jsx global>{`
+        .custom-tabs .ant-tabs-nav {
+          margin-bottom: 16px;
+        }
+        
+        .ant-card-head {
+          border-bottom: none;
+        }
+        
+        .hover\:shadow-md:hover {
+          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+      `}</style>
     </Layout>
   );
 };

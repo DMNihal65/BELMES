@@ -79,6 +79,7 @@ const ProductionMonitoring = () => {
     <div className="space-y-6">
       {/* Header with Machine Selection and Time Controls */}
       <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+        <div>herlooooooooo</div>
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold">Production Monitoring</h1>
           <Select

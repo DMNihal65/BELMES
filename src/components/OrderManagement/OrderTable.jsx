@@ -25,8 +25,13 @@ const OrderTable = ({ orders }) => {
       title: 'Order Number',
       dataIndex: 'orderNumber',
       key: 'orderNumber',
-      render: (text) => <a>{text}</a>,
+      render: (text) => <span>{text}</span>,
       sorter: (a, b) => a.orderNumber.localeCompare(b.orderNumber),
+      filters: [
+        // Add unique order numbers for filtering
+        ...new Set(orders.map(order => ({ text: order.orderNumber, value: order.orderNumber })))
+      ],
+      onFilter: (value, record) => record.orderNumber === value,
     },
     {
       title: 'Material',
@@ -39,6 +44,18 @@ const OrderTable = ({ orders }) => {
         </div>
       ),
       sorter: (a, b) => a.materialNumber.localeCompare(b.materialNumber),
+    },
+    {
+      title: 'Part Number',
+      dataIndex: 'partNumber',
+      key: 'partNumber',
+      render: (text) => <span>{text}</span>,
+      sorter: (a, b) => a.partNumber.localeCompare(b.partNumber),
+      filters: [
+        // Add unique part numbers for filtering
+        ...new Set(orders.map(order => ({ text: order.partNumber, value: order.partNumber })))
+      ],
+      onFilter: (value, record) => record.partNumber === value,
     },
     {
       title: 'Quantity',

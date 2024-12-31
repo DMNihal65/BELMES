@@ -1,364 +1,499 @@
 import React, { useState } from 'react';
 import {
-  Layout,
-  Card,
-  Row,
-  Col,
-  Button,
-  Space,
-  Input,
-  Select,
-  DatePicker,
-  Table,
-  Tag,
-  Form,
-  Modal,
-  Typography,
-  Divider
+  Layout, Card, Row, Col, Button, Space, Input, Select, 
+  DatePicker, Table, Tag, Form, Modal, Typography, Divider,
+  Tabs, Badge, Timeline, Alert, Tooltip, Progress, Statistic,
+  message
 } from 'antd';
 import {
-  ScheduleOutlined,
-  SyncOutlined,
-  SearchOutlined,
-  HistoryOutlined,
-  CalendarOutlined,
-  ClockCircleOutlined,
-  BarChartOutlined
+  ScheduleOutlined, SyncOutlined, SearchOutlined,
+  HistoryOutlined, CalendarOutlined, ClockCircleOutlined,
+  BarChartOutlined, WarningOutlined, SwapOutlined,
+  ExclamationCircleOutlined, CheckCircleOutlined
 } from '@ant-design/icons';
-import { Line } from '@ant-design/plots';
+import { Gantt, ViewMode } from 'gantt-task-react';
+import "gantt-task-react/dist/index.css";
+import { mockMachineData, mockPartNumbers } from '../../../data/mockPlanningData';
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
 const { Option } = Select;
+const { TabPane } = Tabs;
 
 const Scheduling = () => {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [selectedPartNo, setSelectedPartNo] = useState(null);
+  const [dateRange, setDateRange] = useState(null);
+  const [isRescheduleModalVisible, setIsRescheduleModalVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState('current');
+  const [viewMode, setViewMode] = useState('Day');
+  const [scheduleView, setScheduleView] = useState('gantt');
+  const [selectedJob, setSelectedJob] = useState(null);
 
-  // Mock data for Gantt-style visualization
-  const scheduleData = [
-    { date: '2024-01-19', machine: 'Machine 1', job: 'Job 001', value: 1 },
-    { date: '2024-01-20', machine: 'Machine 1', job: 'Job 001', value: 1 },
-    { date: '2024-01-21', machine: 'Machine 2', job: 'Job 002', value: 1 },
-    { date: '2024-01-22', machine: 'Machine 2', job: 'Job 002', value: 1 },
-    { date: '2024-01-23', machine: 'Machine 3', job: 'Job 003', value: 1 },
+  // Enhanced mock data
+  const currentSchedule = [
+    {
+      id: '1',
+      machineId: 'DMG-001',
+      partNo: 'PART-001',
+      startTime: '08:00',
+      endTime: '16:00',
+      status: 'running',
+      operator: 'John Doe',
+      progress: 75,
+      efficiency: 92,
+      plannedQuantity: 100,
+      completedQuantity: 75,
+      nextMaintenance: '2hrs',
+      shiftSupervisor: 'Jane Smith',
+      priority: 'high'
+    },
+    // ... more schedule data
   ];
 
-  // Chart configuration
-  const chartConfig = {
-    data: scheduleData,
-    xField: 'date',
-    yField: 'machine',
-    seriesField: 'job',
-    stepType: 'vh',
-    xAxis: {
-      type: 'time',
-      tickCount: 5,
-      label: {
-        style: {
-          fill: '#666',
-          fontSize: 12,
-        },
-      },
-      grid: {
-        line: {
-          style: {
-            stroke: '#f0f0f0',
-            lineWidth: 1,
-            lineDash: [4, 4],
-          },
-        },
-      },
-    },
-    yAxis: {
-      label: {
-        style: {
-          fill: '#666',
-          fontSize: 12,
-        },
-      },
-      grid: {
-        line: {
-          style: {
-            stroke: '#f0f0f0',
-            lineWidth: 1,
-            lineDash: [4, 4],
-          },
-        },
-      },
-    },
-    animation: {
-      appear: {
-        animation: 'fade-in',
-        duration: 500,
-      },
-    },
-    legend: {
-      position: 'top-right',
-      itemName: {
-        style: {
-          fill: '#666',
-          fontSize: 12,
-        },
-      },
-    },
-    tooltip: {
-      showMarkers: false,
-      shared: true,
-      domStyles: {
-        'g2-tooltip': {
-          backgroundColor: '#fff',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          padding: '8px 12px',
-          border: '1px solid #f0f0f0',
-        },
-      },
-    },
-    color: ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'],
+  const scheduleHistory = [
+    {
+      date: '2024-01-19',
+      changes: [
+        {
+          type: 'reschedule',
+          machine: 'DMG-001',
+          reason: 'Machine Maintenance',
+          from: '08:00',
+          to: '10:00',
+          by: 'John Supervisor'
+        }
+      ]
+    }
+  ];
+
+  const scheduleAnalytics = {
+    machineUtilization: 85,
+    scheduledJobs: 12,
+    completedJobs: 8,
+    delayedJobs: 2,
+    averageEfficiency: 89,
+    upcomingMaintenance: 3
   };
 
-  // Schedule history columns
-  const historyColumns = [
-    {
-      title: 'Job ID',
-      dataIndex: 'jobId',
-      key: 'jobId',
-      render: (text) => <Text strong>{text}</Text>,
-    },
-    {
-      title: 'Previous Start',
-      dataIndex: 'previousStart',
-      key: 'previousStart',
-      render: (text) => (
-        <Space>
-          <ClockCircleOutlined style={{ color: '#8c8c8c' }} />
-          {text}
-        </Space>
-      ),
-    },
-    {
-      title: 'Updated Start',
-      dataIndex: 'updatedStart',
-      key: 'updatedStart',
-      render: (text) => (
-        <Space>
-          <ClockCircleOutlined style={{ color: '#8c8c8c' }} />
-          {text}
-        </Space>
-      ),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={status === 'Updated' ? 'success' : 'warning'} style={{ borderRadius: '12px', padding: '0 12px' }}>
-          {status}
-        </Tag>
-      ),
-    },
-  ];
+  // Gantt chart data
+  const ganttData = {
+    tasks: currentSchedule.map((schedule, index) => ({
+      id: `task-${index}`,
+      name: `${schedule.machineId} - ${schedule.partNo}`,
+      start: new Date(),
+      end: new Date(new Date().getTime() + 3600000),
+      progress: schedule.progress,
+      type: 'task',
+      styles: { progressColor: '#1890ff', backgroundColor: '#e6f7ff' }
+    }))
+  };
 
-  // Mock data for history
-  const historyData = [
-    {
-      key: '1',
-      jobId: 'JOB-001',
-      previousStart: '2024-01-18 09:00',
-      updatedStart: '2024-01-19 09:00',
-      status: 'Updated',
-    },
-    {
-      key: '2',
-      jobId: 'JOB-002',
-      previousStart: '2024-01-19 14:00',
-      updatedStart: '2024-01-20 14:00',
-      status: 'Pending',
-    },
-  ];
-
-  const handleGenerateSchedule = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      Modal.success({
-        title: 'Schedule Generated',
-        content: 'New schedule has been generated successfully.',
-        className: 'custom-modal',
-      });
-    }, 1500);
+  // Handle reschedule
+  const handleReschedule = (values) => {
+    Modal.confirm({
+      title: 'Confirm Rescheduling',
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <div>
+          <p>Are you sure you want to reschedule this job?</p>
+          <p>Reason: {values.reason}</p>
+          <p>New Time Slot: {values.newTimeSlot}</p>
+        </div>
+      ),
+      onOk() {
+        // Implement rescheduling logic
+        message.success('Job rescheduled successfully');
+        setIsRescheduleModalVisible(false);
+      }
+    });
   };
 
   return (
     <Layout className="min-h-screen bg-gray-50">
-      <Sider width={300} theme="light" className="p-6 shadow-sm" style={{ background: '#fff' }}>
+      {/* Enhanced Sidebar */}
+      <Sider width={300} theme="light" className="p-6 shadow-sm">
         <div className="flex items-center space-x-2 mb-6">
           <ScheduleOutlined className="text-xl text-blue-500" />
-          <Title level={4} style={{ margin: 0 }}>Production Scheduling</Title>
+          <Title level={4} style={{ margin: 0 }}>Production Schedule</Title>
         </div>
-        <Divider style={{ margin: '16px 0' }} />
-        <Form
-          form={form}
-          layout="vertical"
-          className="scheduling-form"
-        >
-          <Form.Item 
-            label={<Text strong>Machine ID</Text>}
-            className="mb-4"
-          >
+        
+        <Form form={form} layout="vertical" className="scheduling-form">
+          <Form.Item label={<Text strong>Machine</Text>}>
             <Select
               placeholder="Select Machine"
+              onChange={setSelectedMachine}
               className="w-full"
-              size="large"
             >
-              <Option value="m1">Machine 1</Option>
-              <Option value="m2">Machine 2</Option>
-              <Option value="m3">Machine 3</Option>
+              {mockMachineData.map(machine => (
+                <Option key={machine.id} value={machine.id}>
+                  {machine.name}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
-          <Form.Item 
-            label={<Text strong>Job ID</Text>}
-            className="mb-4"
-          >
+
+          <Form.Item label={<Text strong>Part Number</Text>}>
             <Select
-              placeholder="Select Job"
+              placeholder="Select Part"
+              onChange={setSelectedPartNo}
               className="w-full"
-              size="large"
             >
-              <Option value="j1">JOB-001</Option>
-              <Option value="j2">JOB-002</Option>
-              <Option value="j3">JOB-003</Option>
+              {mockPartNumbers.map(part => (
+                <Option key={part.id} value={part.id}>
+                  {part.name}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
-          <Form.Item 
-            label={<Text strong>Part No.</Text>}
-            className="mb-4"
-          >
-            <Input 
-              placeholder="Enter Part Number"
-              size="large"
-            />
-          </Form.Item>
-          <Form.Item 
-            label={<Text strong>Date Range</Text>}
-            className="mb-6"
-          >
+
+          <Form.Item label={<Text strong>Date Range</Text>}>
             <DatePicker.RangePicker 
               className="w-full"
-              size="large"
+              onChange={setDateRange}
             />
           </Form.Item>
+
+          <Form.Item label={<Text strong>Schedule View</Text>}>
+            <Select
+              value={scheduleView}
+              onChange={setScheduleView}
+              className="w-full"
+            >
+              <Option value="gantt">Gantt Chart</Option>
+              <Option value="timeline">Timeline</Option>
+              <Option value="calendar">Calendar</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item label={<Text strong>View Mode</Text>}>
+            <Select
+              value={viewMode}
+              onChange={setViewMode}
+              className="w-full"
+            >
+              <Option value="Day">Daily</Option>
+              <Option value="Week">Weekly</Option>
+              <Option value="Month">Monthly</Option>
+            </Select>
+          </Form.Item>
+
           <Button 
             type="primary" 
-            size="large"
+            icon={<SearchOutlined />}
             block
-            onClick={handleGenerateSchedule}
-            loading={loading}
-            className="scheduling-button"
-            style={{
-              height: '48px',
-              fontSize: '16px',
-              background: '#1890ff',
-              borderRadius: '8px',
-              boxShadow: '0 2px 0 rgba(0,0,0,0.045)',
-            }}
+            size="large"
           >
-            Generate Schedule
+            View Schedule
           </Button>
         </Form>
+
+        {/* Enhanced Quick Stats */}
+        <Divider />
+        <div className="space-y-4">
+          <Card size="small" className="hover:shadow-md transition-shadow">
+            <Statistic
+              title={<span className="flex items-center gap-2"><CalendarOutlined /> Scheduled Jobs</span>}
+              value={scheduleAnalytics.scheduledJobs}
+              suffix={
+                <Tooltip title="View Details">
+                  <Button type="link" size="small">Details</Button>
+                </Tooltip>
+              }
+            />
+          </Card>
+          <Card size="small" className="hover:shadow-md transition-shadow">
+            <Statistic
+              title={<span className="flex items-center gap-2"><BarChartOutlined /> Machine Utilization</span>}
+              value={scheduleAnalytics.machineUtilization}
+              suffix="%"
+              valueStyle={{ color: scheduleAnalytics.machineUtilization > 80 ? '#52c41a' : '#faad14' }}
+            />
+          </Card>
+          <Card size="small" className="hover:shadow-md transition-shadow">
+            <Statistic
+              title={<span className="flex items-center gap-2"><WarningOutlined /> Delayed Jobs</span>}
+              value={scheduleAnalytics.delayedJobs}
+              valueStyle={{ color: '#ff4d4f' }}
+            />
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <Divider>Quick Actions</Divider>
+        <Space direction="vertical" className="w-full">
+          <Button 
+            icon={<SwapOutlined />} 
+            block
+            onClick={() => setIsRescheduleModalVisible(true)}
+          >
+            Reschedule Job
+          </Button>
+          <Button 
+            icon={<WarningOutlined />} 
+            block
+            type="danger"
+            ghost
+          >
+            Report Issue
+          </Button>
+        </Space>
       </Sider>
-      
+
+      {/* Enhanced Main Content */}
       <Content className="p-8">
-        <Row gutter={[24, 24]}>
-          {/* Gantt Chart Section */}
-          <Col span={24}>
-            <Card
-              className="shadow-sm hover:shadow-md transition-shadow"
-              style={{ borderRadius: '12px' }}
+        <Tabs 
+          activeKey={activeTab} 
+          onChange={setActiveTab}
+          type="card"
+          className="schedule-tabs"
+        >
+          {/* Current Schedule Tab */}
+          <TabPane 
+            tab={
+              <span>
+                <ClockCircleOutlined />
+                Current Schedule
+              </span>
+            } 
+            key="current"
+          >
+            {/* Machine Status Overview */}
+            <Card className="mb-6">
+              <Row gutter={[16, 16]}>
+                {mockMachineData.map(machine => (
+                  <Col span={8} key={machine.id}>
+                    <Card 
+                      size="small" 
+                      className={`hover:shadow-md transition-shadow ${
+                        machine.status === 'running' ? 'border-green-500' : 
+                        machine.status === 'idle' ? 'border-yellow-500' : 
+                        'border-red-500'
+                      } border-l-4`}
+                      actions={[
+                        <Tooltip title="View Details">
+                          <Button type="link" size="small">Details</Button>
+                        </Tooltip>,
+                        <Tooltip title="View History">
+                          <Button type="link" size="small">History</Button>
+                        </Tooltip>
+                      ]}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium">{machine.name}</div>
+                          <div className="text-sm text-gray-500">{machine.id}</div>
+                        </div>
+                        <Badge 
+                          status={
+                            machine.status === 'running' ? 'success' :
+                            machine.status === 'idle' ? 'warning' :
+                            'error'
+                          } 
+                          text={machine.status.toUpperCase()}
+                        />
+                      </div>
+                      {machine.currentJob && (
+                        <div className="mt-2">
+                          <div className="text-sm flex justify-between">
+                            <span>Current: {machine.currentJob.partNumber}</span>
+                            <Tag color={machine.currentJob.progress > 90 ? 'success' : 'processing'}>
+                              {machine.currentJob.progress}%
+                            </Tag>
+                          </div>
+                          <Progress 
+                            percent={machine.currentJob.progress} 
+                            size="small"
+                            status={machine.currentJob.progress < 50 ? 'active' : 'normal'}
+                          />
+                          <div className="text-xs text-gray-500 mt-1">
+                            Next Maintenance: {machine.nextMaintenance || 'N/A'}
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </Card>
+
+            {/* Schedule Timeline */}
+            <Card 
               title={
-                <Space size="middle">
-                  <BarChartOutlined className="text-xl text-blue-500" />
-                  <Text strong style={{ fontSize: '16px' }}>Schedule Visualization</Text>
+                <Space>
+                  <BarChartOutlined />
+                  <span>Schedule Timeline</span>
                 </Space>
               }
               extra={
                 <Space>
-                  <Button 
-                    type="default"
-                    icon={<SyncOutlined />}
-                    onClick={() => setLoading(true)}
-                    size="large"
-                    className="flex items-center"
+                  <Select
+                    value={viewMode}
+                    onChange={setViewMode}
+                    style={{ width: 120 }}
                   >
-                    Refresh
+                    <Option value="Day">Daily</Option>
+                    <Option value="Week">Weekly</Option>
+                    <Option value="Month">Monthly</Option>
+                  </Select>
+                  <Button icon={<SyncOutlined />}>Refresh</Button>
+                  <Button 
+                    type="primary"
+                    icon={<SwapOutlined />}
+                    onClick={() => setIsRescheduleModalVisible(true)}
+                  >
+                    Reschedule
                   </Button>
                 </Space>
               }
-              bodyStyle={{ padding: '24px' }}
             >
-              <Line {...chartConfig} height={400} />
-            </Card>
-          </Col>
-
-          {/* Schedule History */}
-          <Col span={24}>
-            <Card
-              className="shadow-sm hover:shadow-md transition-shadow"
-              style={{ borderRadius: '12px' }}
-              title={
-                <Space size="middle">
-                  <HistoryOutlined className="text-xl text-blue-500" />
-                  <Text strong style={{ fontSize: '16px' }}>Schedule History</Text>
-                </Space>
-              }
-              extra={
-                <Input
-                  placeholder="Search history"
-                  prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
-                  style={{ width: 250 }}
-                  size="large"
-                  className="search-input"
+              <div style={{ height: '400px' }}>
+                <Gantt
+                  tasks={ganttData.tasks}
+                  viewMode={ViewMode[viewMode]}
+                  onDateChange={() => {}}
+                  onProgressChange={() => {}}
+                  onDoubleClick={() => {}}
+                  listCellWidth=""
+                  columnWidth={60}
                 />
-              }
-              bodyStyle={{ padding: '24px' }}
-            >
-              <Table
-                columns={historyColumns}
-                dataSource={historyData}
-                pagination={false}
-                className="custom-table"
-              />
+              </div>
             </Card>
-          </Col>
-        </Row>
+          </TabPane>
+
+          {/* Enhanced Schedule History Tab */}
+          <TabPane 
+            tab={
+              <span>
+                <HistoryOutlined />
+                Schedule History
+              </span>
+            } 
+            key="history"
+          >
+            <Card>
+              <Timeline mode="left">
+                {scheduleHistory.map((item, index) => (
+                  <Timeline.Item 
+                    key={index}
+                    color={item.changes[0].type === 'reschedule' ? 'blue' : 'green'}
+                    label={item.date}
+                  >
+                    {item.changes.map((change, changeIndex) => (
+                      <Card size="small" key={changeIndex} className="mb-3">
+                        <p className="font-medium">{change.type.toUpperCase()}</p>
+                        <p>Machine: {change.machine}</p>
+                        <p>Reason: {change.reason}</p>
+                        <p className="text-sm text-gray-500">
+                          Changed by {change.by}
+                        </p>
+                      </Card>
+                    ))}
+                  </Timeline.Item>
+                ))}
+              </Timeline>
+            </Card>
+          </TabPane>
+
+          {/* Enhanced Analytics Tab */}
+          <TabPane
+            tab={
+              <span>
+                <BarChartOutlined />
+                Analytics
+              </span>
+            }
+            key="analytics"
+          >
+            <Row gutter={[16, 16]}>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="Average Efficiency"
+                    value={scheduleAnalytics.averageEfficiency}
+                    suffix="%"
+                    prefix={<BarChartOutlined />}
+                  />
+                </Card>
+              </Col>
+              {/* Add more analytics cards */}
+            </Row>
+          </TabPane>
+        </Tabs>
       </Content>
 
+      {/* Enhanced Reschedule Modal */}
+      <Modal
+        title={
+          <div>
+            <h3 className="text-lg font-semibold">Reschedule Job</h3>
+            <p className="text-sm text-gray-500">
+              Provide details for rescheduling
+            </p>
+          </div>
+        }
+        open={isRescheduleModalVisible}
+        onCancel={() => setIsRescheduleModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <Form onFinish={handleReschedule} layout="vertical">
+          <Form.Item
+            name="reason"
+            label="Reason for Rescheduling"
+            rules={[{ required: true }]}
+          >
+            <Select>
+              <Option value="maintenance">Machine Maintenance</Option>
+              <Option value="breakdown">Machine Breakdown</Option>
+              <Option value="operator">Operator Unavailable</Option>
+              <Option value="material">Material Shortage</Option>
+              <Option value="priority">Priority Change</Option>
+              <Option value="other">Other</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="newTimeSlot"
+            label="New Time Slot"
+            rules={[{ required: true }]}
+          >
+            <DatePicker.RangePicker 
+              showTime 
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+
+          <Form.Item name="notes" label="Additional Notes">
+            <Input.TextArea rows={4} />
+          </Form.Item>
+
+          <Form.Item className="mb-0">
+            <Space className="w-full justify-end">
+              <Button onClick={() => setIsRescheduleModalVisible(false)}>
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit">
+                Confirm Reschedule
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
       <style jsx global>{`
-        .scheduling-form .ant-form-item-label > label {
-          font-size: 14px;
+        .schedule-tabs .ant-tabs-nav {
+          margin-bottom: 16px;
         }
         
-        .custom-table .ant-table-thead > tr > th {
+        .ant-card-actions {
           background: #fafafa;
-          font-weight: 600;
         }
         
-        .search-input .ant-input-prefix {
-          margin-right: 8px;
-        }
-        
-        .custom-modal .ant-modal-content {
-          border-radius: 12px;
-        }
-        
-        .ant-card-head {
-          border-bottom: 1px solid #f0f0f0;
-          padding: 16px 24px;
-        }
-        
-        .ant-card-body {
-          padding: 24px;
+        .hover\:shadow-md:hover {
+          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
       `}</style>
     </Layout>

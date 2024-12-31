@@ -1,393 +1,320 @@
 import React, { useState } from 'react';
 import {
-  Card,
-  Row,
-  Col,
-  Button,
-  Table,
-  Space,
-  Typography,
-  Select,
-  Form,
-  Input,
-  DatePicker,
-  Modal,
-  Upload,
-  message,
-  Tag,
-  Tooltip,
-  Progress
+  Card, Row, Col, Button, Space, Select, Input, 
+  Table, Modal, Steps, Tabs, Upload, message,
+  Typography, Tag, Tooltip, Form, Drawer, Descriptions,
+  Statistic, Progress, Badge, Alert
 } from 'antd';
 import {
-  PlusOutlined,
-  ReloadOutlined,
-  UploadOutlined,
-  SearchOutlined,
-  ClockCircleOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  AreaChartOutlined
+  UploadOutlined, FileTextOutlined, EditOutlined,
+  SaveOutlined, PlusOutlined, ClockCircleOutlined,
+  CalendarOutlined, BarChartOutlined,
+  ToolOutlined
 } from '@ant-design/icons';
-import { Area } from '@ant-design/charts';
-import dayjs from 'dayjs';
+import {
+  Timer, AlertTriangle, CheckCircle2, 
+  Gauge, Settings, Users, Calendar
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import JobOperationsTable from '../../../components/ProductionPlanning/JobOperationsTable';
+import OperationMPPDetails from '../../../components/ProductionPlanning/OperationMPPDetails';
+import ResourceUtilization from '../../../components/ProductionPlanning/ResourceUtilization';
+import { mockJobData, mockPartNumbers, mockMachines } from '../../../data/mockPlanningData';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
+const { TabPane } = Tabs;
 
 const Planning = () => {
-  const [loading, setLoading] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [form] = Form.useForm();
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [showMPPDetails, setShowMPPDetails] = useState(false);
+  const [selectedOperation, setSelectedOperation] = useState(null);
+  const [activeTab, setActiveTab] = useState('jobDetails');
 
-  // Mock data for capacity utilization
-  const capacityData = [
-    { date: '2024-01-01', utilization: 75 },
-    { date: '2024-01-02', utilization: 82 },
-    { date: '2024-01-03', utilization: 65 },
-    { date: '2024-01-04', utilization: 90 },
-    { date: '2024-01-05', utilization: 85 },
-    { date: '2024-01-06', utilization: 70 },
-    { date: '2024-01-07', utilization: 88 },
+  // Use mockJobData for available jobs
+  const availableJobs = [
+    mockJobData,
+    // Add more jobs if needed
   ];
 
-  // Area chart configuration
-  const areaConfig = {
-    data: capacityData,
-    xField: 'date',
-    yField: 'utilization',
-    smooth: true,
-    areaStyle: {
-      fill: 'l(270) 0:#ffffff 0.5:#7ec2f3 1:#1890ff',
-    },
-    line: {
-      color: '#1890ff',
-    },
-    yAxis: {
-      label: {
-        formatter: (v) => `${v}%`,
-      },
-    },
-    tooltip: {
-      formatter: (datum) => {
-        return { name: 'Utilization', value: datum.utilization + '%' };
-      },
-    },
+  const handleJobSelect = (jobId) => {
+    const job = availableJobs.find(j => j.id === jobId);
+    setSelectedJob(job);
   };
 
-  // Table columns for existing plans
-  const columns = [
-    {
-      title: 'Job ID',
-      dataIndex: 'jobId',
-      key: 'jobId',
-      sorter: (a, b) => a.jobId.localeCompare(b.jobId),
-    },
-    {
-      title: 'Part Number',
-      dataIndex: 'partNumber',
-      key: 'partNumber',
-      sorter: (a, b) => a.partNumber.localeCompare(b.partNumber),
-    },
-    {
-      title: 'Machine Type',
-      dataIndex: 'machineType',
-      key: 'machineType',
-      filters: [
-        { text: 'CNC', value: 'CNC' },
-        { text: 'Assembly', value: 'Assembly' },
-      ],
-      onFilter: (value, record) => record.machineType === value,
-    },
-    {
-      title: 'Start Date',
-      dataIndex: 'startDate',
-      key: 'startDate',
-      sorter: (a, b) => new Date(a.startDate) - new Date(b.startDate),
-    },
-    {
-      title: 'End Date',
-      dataIndex: 'endDate',
-      key: 'endDate',
-      sorter: (a, b) => new Date(a.endDate) - new Date(b.endDate),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => {
-        let color = status === 'Completed' ? 'green' : status === 'In Progress' ? 'blue' : 'orange';
-        return (
-          <Tag color={color}>
-            {status}
-          </Tag>
-        );
-      },
-      filters: [
-        { text: 'Completed', value: 'Completed' },
-        { text: 'In Progress', value: 'In Progress' },
-        { text: 'Planned', value: 'Planned' },
-      ],
-      onFilter: (value, record) => record.status === value,
-    },
-    {
-      title: 'Progress',
-      dataIndex: 'progress',
-      key: 'progress',
-      render: (progress) => (
-        <Progress 
-          percent={progress} 
-          size="small" 
-          status={progress === 100 ? 'success' : 'active'}
-        />
-      ),
-    },
-    {
-      title: 'Action',
-      key: 'action',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button type="link">Edit</Button>
-          <Button type="link">View</Button>
-        </Space>
-      ),
-    },
-  ];
+  const handleOperationEdit = (operation) => {
+    setSelectedOperation(operation);
+    setShowMPPDetails(true);
+  };
 
-  // Mock data for plans table
-  const plansData = [
-    {
-      key: '1',
-      jobId: 'JOB-001',
-      partNumber: 'PART-001',
-      machineType: 'CNC',
-      startDate: '2024-01-19',
-      endDate: '2024-01-25',
-      status: 'In Progress',
-      progress: 45,
-    },
-    {
-      key: '2',
-      jobId: 'JOB-002',
-      partNumber: 'PART-002',
-      machineType: 'Assembly',
-      startDate: '2024-01-20',
-      endDate: '2024-01-23',
-      status: 'Planned',
-      progress: 0,
-    },
-  ];
-
-  const handleNewJob = async () => {
-    try {
-      const values = await form.validateFields();
-      setLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        message.success('New job plan created successfully');
-        setModalVisible(false);
-        setLoading(false);
-        form.resetFields();
-      }, 1000);
-    } catch (error) {
-      console.error('Validation failed:', error);
+  const handleUpload = (info) => {
+    if (info.file.status === 'done') {
+      message.success(`${info.file.name} file uploaded successfully`);
+    } else if (info.file.status === 'error') {
+      message.error(`${info.file.name} file upload failed.`);
     }
   };
 
-  const handleRefresh = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      message.success('Data refreshed successfully');
-    }, 1000);
+  // Stats data
+  const planningStats = {
+    totalJobs: 45,
+    inPlanning: 12,
+    scheduled: 28,
+    delayed: 5,
+    machineUtilization: 78,
+    upcomingMaintenance: 3
   };
 
   return (
-    <div className="p-6">
+    <div className="space-y-6 p-6">
+      {/* Stats Overview */}
       <Row gutter={[16, 16]}>
-        {/* Capacity Summary Section */}
-        <Col span={24}>
-          <Card
-            title={
-              <Space>
-                <AreaChartOutlined />
-                <span>Capacity Utilization</span>
-              </Space>
-            }
-            extra={
-              <Space>
-                <RangePicker />
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={handleRefresh}
-                >
-                  Refresh
-                </Button>
-              </Space>
-            }
-          >
-            <Area {...areaConfig} height={300} />
+        <Col span={4}>
+          <Card bordered={false} className="hover:shadow-md transition-shadow">
+            <Statistic 
+              title="Total Jobs"
+              value={planningStats.totalJobs}
+              prefix={<FileTextOutlined />}
+            />
           </Card>
         </Col>
-
-        {/* Statistics Cards */}
-        <Col span={8}>
-          <Card>
-            <Tooltip title="Jobs currently in progress">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Space>
-                  <ClockCircleOutlined style={{ color: '#1890ff', fontSize: '24px' }} />
-                  <span>In Progress</span>
-                </Space>
-                <Title level={3}>5 Jobs</Title>
-              </Space>
-            </Tooltip>
+        <Col span={4}>
+          <Card bordered={false} className="hover:shadow-md transition-shadow">
+            <Statistic 
+              title="In Planning"
+              value={planningStats.inPlanning}
+              prefix={<EditOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
           </Card>
         </Col>
-        <Col span={8}>
-          <Card>
-            <Tooltip title="Jobs completed this week">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Space>
-                  <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '24px' }} />
-                  <span>Completed</span>
-                </Space>
-                <Title level={3}>12 Jobs</Title>
-              </Space>
-            </Tooltip>
+        <Col span={4}>
+          <Card bordered={false} className="hover:shadow-md transition-shadow">
+            <Statistic 
+              title="Scheduled"
+              value={planningStats.scheduled}
+              prefix={<CheckCircle2 size={16} />}
+              valueStyle={{ color: '#52c41a' }}
+            />
           </Card>
         </Col>
-        <Col span={8}>
-          <Card>
-            <Tooltip title="Jobs planned for next week">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Space>
-                  <ExclamationCircleOutlined style={{ color: '#faad14', fontSize: '24px' }} />
-                  <span>Planned</span>
-                </Space>
-                <Title level={3}>8 Jobs</Title>
-              </Space>
-            </Tooltip>
+        <Col span={4}>
+          <Card bordered={false} className="hover:shadow-md transition-shadow">
+            <Statistic 
+              title="Delayed"
+              value={planningStats.delayed}
+              prefix={<AlertTriangle size={16} />}
+              valueStyle={{ color: '#ff4d4f' }}
+            />
           </Card>
         </Col>
-
-        {/* Existing Plans Section */}
-        <Col span={24}>
-          <Card
-            title="Existing Plans"
-            extra={
-              <Space>
-                <Input
-                  placeholder="Search plans"
-                  prefix={<SearchOutlined />}
-                  style={{ width: 200 }}
-                />
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => setModalVisible(true)}
-                >
-                  New Job Plan
-                </Button>
-              </Space>
-            }
-          >
-            <Table
-              columns={columns}
-              dataSource={plansData}
-              loading={loading}
-              pagination={{
-                total: 100,
-                pageSize: 10,
-                showSizeChanger: true,
-                showQuickJumper: true,
-              }}
+        <Col span={4}>
+          <Card bordered={false} className="hover:shadow-md transition-shadow">
+            <Statistic 
+              title="Machine Utilization"
+              value={planningStats.machineUtilization}
+              prefix={<Gauge size={16} />}
+              suffix="%"
+            />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card bordered={false} className="hover:shadow-md transition-shadow">
+            <Statistic 
+              title="Upcoming Maintenance"
+              value={planningStats.upcomingMaintenance}
+              prefix={<Settings size={16} />}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* New Job Modal */}
-      <Modal
-        title="Create New Job Plan"
-        open={modalVisible}
-        onOk={handleNewJob}
-        onCancel={() => {
-          setModalVisible(false);
-          form.resetFields();
-        }}
-        confirmLoading={loading}
-        width={600}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-        >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="partNumber"
-                label="Part Number"
-                rules={[{ required: true, message: 'Please enter part number' }]}
-              >
-                <Input placeholder="Enter part number" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="quantity"
-                label="Quantity"
-                rules={[{ required: true, message: 'Please enter quantity' }]}
-              >
-                <Input type="number" min={1} placeholder="Enter quantity" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="machineType"
-                label="Machine Type"
-                rules={[{ required: true, message: 'Please select machine type' }]}
-              >
-                <Select placeholder="Select machine type">
-                  <Option value="CNC">CNC</Option>
-                  <Option value="Assembly">Assembly</Option>
+      {/* Job Selection Section with improved layout */}
+      <Card className="shadow-sm">
+        <Row gutter={24} align="middle">
+          <Col span={16}>
+            <Space size="large" className="w-full">
+              <Form.Item label="Select Job/Part Number" className="mb-0 flex-1">
+                <Select
+                  showSearch
+                  placeholder="Search by Job ID or Part Number"
+                  onChange={handleJobSelect}
+                  optionFilterProp="children"
+                  className="w-full"
+                >
+                  {availableJobs.map(job => (
+                    <Option key={job.id} value={job.id}>
+                      <Space>
+                        {`${job.partNumber} - ${job.partName}`}
+                        <Tag color={job.priority === 'high' ? 'red' : 'blue'}>
+                          {job.priority.toUpperCase()}
+                        </Tag>
+                      </Space>
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="priority"
-                label="Priority"
-                rules={[{ required: true, message: 'Please select priority' }]}
+              <Upload 
+                accept=".pdf"
+                onChange={handleUpload}
+                customRequest={({ onSuccess }) => setTimeout(() => onSuccess("ok"), 0)}
               >
-                <Select placeholder="Select priority">
-                  <Option value="high">High</Option>
-                  <Option value="medium">Medium</Option>
-                  <Option value="low">Low</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item
-            name="dateRange"
-            label="Date Range"
-            rules={[{ required: true, message: 'Please select date range' }]}
+                <Button icon={<UploadOutlined />}>Upload OARC</Button>
+              </Upload>
+            </Space>
+          </Col>
+          <Col span={8} className="text-right">
+            <Space>
+              <Button type="primary" icon={<SaveOutlined />}>
+                Save Plan
+              </Button>
+              <Button type="primary" icon={<PlusOutlined />}>
+                New Job
+              </Button>
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+
+      {selectedJob && (
+        <>
+          {/* Job Details Section */}
+          <Card className="shadow-sm">
+            <Tabs 
+              activeKey={activeTab} 
+              onChange={setActiveTab}
+              tabBarExtraContent={
+                <Link to="/scheduling">
+                  <Button type="primary" icon={<CalendarOutlined />}>
+                    Open Scheduler
+                  </Button>
+                </Link>
+              }
+            >
+              <TabPane 
+                tab={
+                  <span>
+                    <FileTextOutlined />
+                    Job Details
+                  </span>
+                }
+                key="jobDetails"
+              >
+                <Row gutter={[24, 24]}>
+                  <Col span={8}>
+                    <Card 
+                      title="Project Information" 
+                      size="small"
+                      className="h-full"
+                    >
+                      <Descriptions column={1}>
+                        <Descriptions.Item label="Project">
+                          {selectedJob.project}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Customer">
+                          {selectedJob.customer}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Material">
+                          {selectedJob.material}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Quantity">
+                          {selectedJob.quantity}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Due Date">
+                          {selectedJob.dueDate}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Priority">
+                          <Tag color={selectedJob.priority === 'high' ? 'red' : 'blue'}>
+                            {selectedJob.priority.toUpperCase()}
+                          </Tag>
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </Card>
+                  </Col>
+                  <Col span={16}>
+                    <JobOperationsTable 
+                      jobId={selectedJob.id}
+                      onOperationEdit={handleOperationEdit}
+                      operations={selectedJob.operations}
+                    />
+                  </Col>
+                </Row>
+              </TabPane>
+
+              <TabPane 
+                tab={
+                  <span>
+                    <BarChartOutlined />
+                    Resources
+                  </span>
+                }
+                key="resources"
+              >
+                <ResourceUtilization 
+                  machines={mockMachines}
+                  selectedJob={selectedJob}
+                />
+              </TabPane>
+
+              <TabPane 
+                tab={
+                  <span>
+                    <CalendarOutlined />
+                    Schedule Guide
+                  </span>
+                }
+                key="schedule"
+              >
+                <Card className="bg-gray-50">
+                  <Steps 
+                    direction="vertical" 
+                    current={1}
+                    className="max-w-3xl mx-auto"
+                  >
+                    <Steps.Step 
+                      title="Plan Operations" 
+                      description="Define all operations and their requirements"
+                      icon={<ToolOutlined size={16} />}
+                    />
+                    <Steps.Step 
+                      title="Check Resources" 
+                      description="Verify machine and tool availability"
+                      icon={<Gauge size={16} />}
+                    />
+                    <Steps.Step 
+                      title="Schedule Operations" 
+                      description="Allocate time slots for each operation"
+                      icon={<Calendar size={16} />}
+                    />
+                    <Steps.Step 
+                      title="Assign Personnel" 
+                      description="Assign operators to scheduled operations"
+                      icon={<Users size={16} />}
+                    />
+                  </Steps>
+                </Card>
+              </TabPane>
+            </Tabs>
+          </Card>
+
+          {/* MPP Details Drawer */}
+          <Drawer
+            title={`Operation Details - ${selectedOperation?.opNo}`}
+            width={1200}
+            open={showMPPDetails}
+            onClose={() => setShowMPPDetails(false)}
+            destroyOnClose
           >
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item
-            name="files"
-            label="Upload Files"
-          >
-            <Upload>
-              <Button icon={<UploadOutlined />}>Click to Upload</Button>
-            </Upload>
-          </Form.Item>
-        </Form>
-      </Modal>
+            <OperationMPPDetails 
+              operation={selectedOperation}
+              onSave={() => {
+                setShowMPPDetails(false);
+                message.success('Operation details updated');
+              }}
+            />
+          </Drawer>
+        </>
+      )}
     </div>
   );
 };

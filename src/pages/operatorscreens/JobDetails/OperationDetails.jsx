@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Table, Card, Button, Space, Drawer, Upload, 
   Tabs, Typography, Tag, Image, Tooltip, Steps,
-  Divider, Row, Col, Progress, Badge
+  Divider, Row, Col, Progress, Badge, Descriptions,Collapse,List
 } from 'antd';
 import { 
   FileTextOutlined, EyeOutlined, UploadOutlined,
@@ -16,6 +16,7 @@ import {
 
 const { Title, Text } = Typography;
 const { Step } = Steps;
+const { Panel } = Collapse;
 
 const OperationDetails = ({ jobData }) => {
   const [selectedOperation, setSelectedOperation] = useState(null);
@@ -292,8 +293,8 @@ const OperationDetails = ({ jobData }) => {
         />
       </Card>
 
-      {/* Operation Details Drawer */}
-      <Drawer
+     {/* Operation Details Drawer */}
+     <Drawer
         title={
           <Space>
             <Text strong className="text-lg">
@@ -310,79 +311,95 @@ const OperationDetails = ({ jobData }) => {
       >
         {selectedOperation && (
           <div className="space-y-6">
-            {/* Setup Information */}
-            <Card title="Setup Information" className="shadow-sm">
+            {/* Fixture and IPID Information */}
+            <Card title="Fixture & IPID Details" className="shadow-sm">
+              <Descriptions column={1} bordered>
+                <Descriptions.Item label="Fixture No with Rev.">
+                  <Text strong>Fx-62805080AA-70.80-Rev.01</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="IPID No with Rev.">
+                  <Text strong>IPID-62805080AA-80-Rev.01</Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* Datum Information */}
+            <Card title="Datum Information" className="shadow-sm">
+              <Descriptions column={1} bordered>
+                <Descriptions.Item label="Datum X Axis">
+                  <Text strong>0 at the job center</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Datum Y Axis">
+                  <Text strong>0 at the job center</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Datum Z Axis">
+                  <Text strong>+0.25mm at top of the job</Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* Work Holding Instructions */}
+            <Card title="Work Holding Instructions" className="shadow-sm">
+              <Collapse defaultActiveKey={['1']} ghost>
+                <Panel header="Fixture Setup" key="1">
+                  <List>
+                    <List.Item>
+                      <Text>Hold the fixture in vise with around 3 to 5 mm projection over jaws.</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Clamp the job on fixture with (14X) MS screws while ensuring longest edge to be parallel to X axis within +/-0.1 mm through dialing.</Text>
+                    </List.Item>
+                  </List>
+                </Panel>
+                <Panel header="Job Preparation" key="2">
+                  <List>
+                    <List.Item>
+                      <Text>Ensure that the job surface butting to the fixture is burr free.</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Ensure guide holes to be maintained to required tolerance as per program.</Text>
+                    </List.Item>
+                  </List>
+                </Panel>
+                <Panel header="Post-Machining Steps" key="3">
+                  <List>
+                    <List.Item>
+                      <Text>Blow off any chips, coolant, foreign materials with compressed air after completion of job.</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Perform necessary stage inspections as per IPID.</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Wrap the job in bubble sheet to prevent any damage and store it in a plastic cover.</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Attach the existing job card to the batch after completion of machining.</Text>
+                    </List.Item>
+                  </List>
+                </Panel>
+              </Collapse>
+            </Card>
+
+            {/* Reference Images */}
+            <Card title="Reference Images" className="shadow-sm">
               <Row gutter={[16, 16]}>
                 <Col span={12}>
-                  <div className="space-y-4">
-                    <div>
-                      <Text type="secondary">Required Tools</Text>
-                      <div className="mt-2 space-x-2">
-                        {selectedOperation.tools.map(tool => (
-                          <Tag 
-                            key={tool} 
-                            icon={<ToolOutlined size={14} />}
-                            className="px-3 py-1"
-                          >
-                            {tool}
-                          </Tag>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <Text type="secondary">Required Fixtures</Text>
-                      <div className="mt-2 space-x-2">
-                        {selectedOperation.fixtures.map(fixture => (
-                          <Tag 
-                            key={fixture}
-                            icon={<Settings size={14} />}
-                            className="px-3 py-1"
-                          >
-                            {fixture}
-                          </Tag>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <Image
+                    src="/images/job_loading.png"
+                    alt="Job Loading"
+                    className="rounded-lg shadow-sm hover:shadow-md transition-transform"
+                  />
+                  <Text className="block mt-2 text-center">Job Loading</Text>
                 </Col>
                 <Col span={12}>
-                  <div className="space-y-4">
-                    {Object.entries(selectedOperation.parameters).map(([key, value]) => (
-                      <div key={key}>
-                        <Text type="secondary" className="capitalize">{key}</Text>
-                        <div className="text-lg font-medium">{value}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <Image
+                    src="/images/post_machine.png"
+                    alt="Post Machining"
+                    className="rounded-lg shadow-sm hover:shadow-md transition-transform"
+                  />
+                  <Text className="block mt-2 text-center">Post Machining</Text>
                 </Col>
               </Row>
-            </Card>
-
-            {/* Setup Images */}
-            <Card 
-              title="Setup Images" 
-              className="shadow-sm"
-              extra={
-                <Button icon={<ImageIcon size={14} />}>
-                  Add Image
-                </Button>
-              }
-            >
-              <div className="grid grid-cols-2 gap-4">
-                {selectedOperation.images.map((image, index) => (
-                  <Image
-                    key={index}
-                    src={image}
-                    alt={`Setup ${index + 1}`}
-                    className="rounded-lg shadow-sm hover:shadow-md transition-shadow"
-                  />
-                ))}
-              </div>
-            </Card>
-
-            {/* Notes & Instructions */}
-            <Card title="Notes & Instructions" className="shadow-sm">
-              <Text>{selectedOperation.notes}</Text>
             </Card>
           </div>
         )}
@@ -450,4 +467,4 @@ const OperationDetails = ({ jobData }) => {
   );
 };
 
-export default OperationDetails; 
+export default OperationDetails;

@@ -162,14 +162,6 @@ const MachineScheduleChart = () => {
           name: 'Planned',
           data: plannedData,
         },
-        {
-          name: 'Actual',
-          data: actualData,
-        },
-        {
-          name: 'Delay',
-          data: delayData,
-        },
       ],
       options: {
         chart: {
@@ -195,7 +187,7 @@ const MachineScheduleChart = () => {
           type: 'solid',
           opacity: 0.8,
         },
-        colors: ['#0000FF', '#00E396', '#FF0000'],
+        colors: ['#0000FF'],
         tooltip: {
           custom: ({ seriesIndex, dataPointIndex, w }) => {
             const data = w.config.series[seriesIndex].data[dataPointIndex];
@@ -223,7 +215,7 @@ const MachineScheduleChart = () => {
           horizontalAlign: 'left',
         },
       },
-    });
+    });    
   }, [selectedMachines, timeRange, customDateRange]);
 
   const handleTimeRangeChange = (value) => {

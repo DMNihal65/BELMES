@@ -188,51 +188,6 @@ const ComponentLegend = ({ componentColors }) => {
   );
 };
 
-const getDelayColor = (hours) => {
-  if (hours <= 4) return '#1890ff'; // blue
-  if (hours <= 8) return '#faad14'; // orange
-  if (hours <= 16) return '#52c41a'; // green
-  if (hours <= 24) return '#fa8c16'; // darker orange
-  return '#ff4d4f'; // red
-};
-
-class ScheduleErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('Schedule error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <Card>
-          <Alert
-            message="Something went wrong"
-            description="There was an error loading the schedule comparison. Please try again."
-            type="error"
-            showIcon
-            action={
-              <Button type="primary" onClick={() => this.setState({ hasError: false })}>
-                Try Again
-              </Button>
-            }
-          />
-        </Card>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
 const Scheduling = () => {
   const [form] = Form.useForm();
   const { 
@@ -262,7 +217,6 @@ const Scheduling = () => {
   const [showCompleted, setShowCompleted] = useState(true);
   const [componentColors, setComponentColors] = useState(null);
   const styleElementRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('schedule');
 
   useEffect(() => {
     fetchScheduleData();
@@ -580,12 +534,7 @@ const Scheduling = () => {
   return (
     <Layout className="min-h-screen bg-gray-50">
       <Content className="p-8">
-        <Tabs 
-          activeKey={activeTab} 
-          onChange={setActiveTab} 
-          type="card"
-          destroyInactiveTabPane={false}
-        >
+        <Tabs defaultActiveKey="schedule" type="card">
           <TabPane tab={<span><ScheduleOutlined /> Production Schedule</span>} key="schedule">
             <Card>
               <div className="flex justify-between items-center mb-4">
@@ -688,9 +637,7 @@ const Scheduling = () => {
           </TabPane>
           
           <TabPane tab={<span><GitCompare /> Schedule Comparison</span>} key="comparison">
-            <ScheduleErrorBoundary>
-              <ScheduleComparison />
-            </ScheduleErrorBoundary>
+            <ScheduleComparison />
           </TabPane>
           
           <TabPane tab={<span><WarningOutlined /> Delay Analysis</span>} key="delays">
@@ -1045,239 +992,101 @@ const ScheduleComparison = () => {
   const { 
     fetchScheduleComparison, 
     getScheduleComparison,
-    comparisonMetrics,
-    loading
+    comparisonMetrics 
   } = useScheduleStore();
   const [selectedView, setSelectedView] = useState('timeline');
-  const [selectedMachine, setSelectedMachine] = useState(null);
-  const [localLoading, setLocalLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      setLocalLoading(true);
-      try {
-        await fetchScheduleComparison();
-      } catch (error) {
-        console.error('Error loading comparison data:', error);
-        message.error('Failed to load comparison data');
-      } finally {
-        setLocalLoading(false);
-      }
-    };
-
-    loadData();
-  }, [fetchScheduleComparison]);
+    fetchScheduleComparison();
+  }, []);
 
   const comparison = getScheduleComparison();
 
-  // Show loading state only during initial load
-  if (localLoading || loading) {
-    return (
-      <Card>
-        <div className="flex justify-center items-center h-64">
-          <Spin size="large" tip="Loading comparison data..." />
-        </div>
-      </Card>
-    );
-  }
-
-  // Show error state if no data
-  if (!comparison || !comparisonMetrics) {
-    return (
-      <Card>
-        <Alert
-          message="Data Not Available"
-          description="Unable to load comparison data. Please try again later."
-          type="error"
-          showIcon
-        />
-      </Card>
-    );
-  }
-
-  // Timeline chart options
-  const timelineOptions = {
-    chart: {
-      type: 'rangeBar',
-      height: 400,
-      toolbar: {
-        show: true,
-        tools: {
-          download: true,
-          zoom: true,
-          zoomin: true,
-          zoomout: true,
-          pan: true,
-        }
+  const chartOptions = {
+    series: [
+      {
+        name: 'Actual',
+        data: comparison?.actual?.scheduled_operations.map(op => ({
+          x: op.machine,
+          y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()]
+        })) || []
+      },
+      {
+        name: 'Planned',
+        data: comparison?.planned?.scheduled_operations.map(op => ({
+          x: op.machine,
+          y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()]
+        })) || []
+      },
+      {
+        name: 'Forecast',
+        data: comparison?.forecast?.scheduled_operations.map(op => ({
+          x: op.machine,
+          y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()]
+        })) || []
       }
-    },
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        barHeight: '80%',
-        rangeBarGroupRows: true
-      }
-    },
-    xaxis: {
-      type: 'datetime',
-      labels: {
-        datetimeFormatter: {
-          year: 'yyyy',
-          month: "MMM 'yy",
-          day: 'dd MMM',
-          hour: 'HH:mm'
-        }
-      }
-    },
-    yaxis: {
-      labels: {
-        style: {
-          fontSize: '12px'
-        }
-      }
-    },
-    colors: ['#1890ff', '#52c41a', '#faad14'],
-    legend: {
-      position: 'top',
-      horizontalAlign: 'left'
-    },
-    tooltip: {
-      custom: function({ seriesIndex, dataPointIndex, w }) {
-        const series = w.config.series[seriesIndex];
-        const data = series.data[dataPointIndex];
-        return `
-          <div class="custom-tooltip p-2">
-            <div class="font-bold">${series.name}</div>
-            <div>${data.component}</div>
-            <div>${data.description}</div>
-            <div class="text-sm text-gray-500">
-              ${new Date(data.y[0]).toLocaleString()} - 
-              ${new Date(data.y[1]).toLocaleString()}
-            </div>
-          </div>
-        `;
-      }
-    }
+    ],
+    // ... chart options
   };
 
-  // Timeline series data
-  const timelineSeries = comparison ? [
-    {
-      name: 'Actual',
-      data: comparison.actual.scheduled_operations.map(op => ({
-        x: op.machine,
-        y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()],
-        component: op.component,
-        description: op.description
-      }))
-    },
-    {
-      name: 'Planned',
-      data: comparison.planned.scheduled_operations.map(op => ({
-        x: op.machine,
-        y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()],
-        component: op.component,
-        description: op.description
-      }))
-    },
-    {
-      name: 'Forecast',
-      data: comparison.forecast.scheduled_operations.map(op => ({
-        x: op.machine,
-        y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()],
-        component: op.component,
-        description: op.description
-      }))
-    }
-  ] : [];
+  return (
+    <Card>
+      <div className="flex justify-between items-center mb-4">
+        <Title level={4}>Schedule Comparison</Title>
+        <Radio.Group value={selectedView} onChange={e => setSelectedView(e.target.value)}>
+          <Radio.Button value="timeline">Timeline</Radio.Button>
+          <Radio.Button value="metrics">Metrics</Radio.Button>
+          <Radio.Button value="deviations">Deviations</Radio.Button>
+        </Radio.Group>
+      </div>
 
-  // Bottleneck Analysis Component
-  const BottleneckAnalysis = () => (
-    <div>
-      <Title level={5}>Machine Bottleneck Analysis</Title>
-      <Row gutter={[16, 16]}>
-        {comparisonMetrics.bottlenecks.map(bottleneck => (
-          <Col span={8} key={bottleneck.machine}>
+      {selectedView === 'timeline' && (
+        <ReactApexChart
+          options={chartOptions}
+          series={chartOptions.series}
+          type="rangeBar"
+          height={400}
+        />
+      )}
+
+      {selectedView === 'metrics' && comparisonMetrics && (
+        <Row gutter={[16, 16]}>
+          <Col span={8}>
             <Card>
               <Statistic
-                title={`${bottleneck.machine} Utilization`}
-                value={bottleneck.utilizationRate}
+                title="Schedule Adherence"
+                value={comparisonMetrics.adherence}
                 suffix="%"
-                valueStyle={{ 
-                  color: bottleneck.utilizationRate > 90 ? '#ff4d4f' : '#52c41a'
-                }}
+                precision={2}
               />
-              <div className="mt-4">
-                <div className="flex justify-between mb-2">
-                  <span>Queue Time:</span>
-                  <span>{bottleneck.queueTime}h</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span>Waiting Jobs:</span>
-                  <span>{bottleneck.waitingJobs}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Avg. Process Time:</span>
-                  <span>{bottleneck.avgProcessTime}h</span>
-                </div>
-              </div>
             </Card>
           </Col>
-        ))}
-      </Row>
-    </div>
-  );
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="Resource Utilization"
+                value={comparisonMetrics.utilization}
+                suffix="%"
+                precision={2}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="On-Time Completion"
+                value={comparisonMetrics.onTime}
+                suffix="%"
+                precision={2}
+              />
+            </Card>
+          </Col>
+        </Row>
+      )}
 
-  // Resource Utilization Chart
-  const ResourceUtilizationChart = () => {
-    const options = {
-      chart: {
-        type: 'line',
-        toolbar: { show: true }
-      },
-      stroke: { curve: 'smooth', width: 2 },
-      xaxis: {
-        categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-      },
-      yaxis: {
-        title: { text: 'Utilization %' }
-      },
-      markers: { size: 4 },
-      tooltip: { shared: true }
-    };
-
-    const series = Object.entries(comparisonMetrics.resourceUtilization).map(([machine, data]) => ({
-      name: machine,
-      data: data
-    }));
-
-    return (
-      <div>
-        <Title level={5}>Weekly Resource Utilization</Title>
-        <ReactApexChart
-          options={options}
-          series={series}
-          type="line"
-          height={300}
-        />
-      </div>
-    );
-  };
-
-  // Workload Distribution Chart
-  const WorkloadDistribution = () => {
-    const data = Object.entries(comparisonMetrics.workloadDistribution).map(([machine, values]) => ({
-      machine,
-      planned: values.planned,
-      actual: values.actual,
-      difference: values.actual - values.planned
-    }));
-
-    return (
-      <div>
-        <Title level={5}>Workload Distribution Analysis</Title>
+      {selectedView === 'deviations' && comparison?.deviations && (
         <Table
-          dataSource={data}
+          dataSource={comparison.deviations}
           columns={[
             {
               title: 'Machine',
@@ -1285,127 +1094,32 @@ const ScheduleComparison = () => {
               key: 'machine',
             },
             {
-              title: 'Planned Load (%)',
-              dataIndex: 'planned',
-              key: 'planned',
+              title: 'Component',
+              dataIndex: 'component',
+              key: 'component',
             },
             {
-              title: 'Actual Load (%)',
-              dataIndex: 'actual',
-              key: 'actual',
+              title: 'Planned Start',
+              dataIndex: 'plannedStart',
+              render: (text) => new Date(text).toLocaleString(),
             },
             {
-              title: 'Variance',
-              dataIndex: 'difference',
-              key: 'difference',
-              render: (value) => (
-                <Tag color={value > 0 ? 'red' : 'green'}>
-                  {value > 0 ? `+${value}%` : `${value}%`}
+              title: 'Actual Start',
+              dataIndex: 'actualStart',
+              render: (text) => new Date(text).toLocaleString(),
+            },
+            {
+              title: 'Deviation',
+              dataIndex: 'deviation',
+              render: (hours) => (
+                <Tag color={hours > 0 ? 'red' : 'green'}>
+                  {hours > 0 ? `+${hours}h` : `${hours}h`}
                 </Tag>
-              )
-            }
+              ),
+            },
           ]}
-          pagination={false}
         />
-      </div>
-    );
-  };
-
-  return (
-    <Card>
-      <div className="flex justify-between items-center mb-4">
-        <Title level={4}>Schedule Analysis Dashboard</Title>
-        <Space>
-          <Select
-            placeholder="Select Machine"
-            allowClear
-            style={{ width: 200 }}
-            onChange={setSelectedMachine}
-            value={selectedMachine}
-          >
-            {Object.keys(comparisonMetrics.resourceUtilization).map(machine => (
-              <Option key={machine} value={machine}>{machine}</Option>
-            ))}
-          </Select>
-          <Radio.Group 
-            value={selectedView} 
-            onChange={e => setSelectedView(e.target.value)}
-            buttonStyle="solid"
-          >
-            <Radio.Button value="timeline">Timeline</Radio.Button>
-            <Radio.Button value="metrics">Metrics</Radio.Button>
-            <Radio.Button value="bottlenecks">Bottlenecks</Radio.Button>
-            <Radio.Button value="utilization">Utilization</Radio.Button>
-          </Radio.Group>
-        </Space>
-      </div>
-
-      {selectedView === 'timeline' && (
-        <div className="mb-8">
-          <ReactApexChart
-            options={timelineOptions}
-            series={timelineSeries}
-            type="rangeBar"
-            height={400}
-          />
-        </div>
       )}
-
-      {selectedView === 'metrics' && (
-        <div className="space-y-8">
-          <Row gutter={[16, 16]}>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Schedule Adherence"
-                  value={comparisonMetrics.adherence}
-                  suffix="%"
-                  precision={1}
-                  valueStyle={{ color: comparisonMetrics.adherence >= 85 ? '#52c41a' : '#ff4d4f' }}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Resource Utilization"
-                  value={comparisonMetrics.utilization}
-                  suffix="%"
-                  precision={1}
-                  valueStyle={{ color: '#1890ff' }}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="On-Time Completion"
-                  value={comparisonMetrics.onTime}
-                  suffix="%"
-                  precision={1}
-                  valueStyle={{ color: comparisonMetrics.onTime >= 80 ? '#52c41a' : '#ff4d4f' }}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Overall Efficiency"
-                  value={comparisonMetrics.efficiency}
-                  suffix="%"
-                  precision={1}
-                  valueStyle={{ color: '#faad14' }}
-                />
-              </Card>
-            </Col>
-          </Row>
-          <WorkloadDistribution />
-        </div>
-      )}
-
-      {selectedView === 'bottlenecks' && <BottleneckAnalysis />}
-      
-      {selectedView === 'utilization' && <ResourceUtilizationChart />}
     </Card>
   );
 };
@@ -1414,137 +1128,68 @@ const DelayAnalysis = () => {
   const { getDelayAnalysis } = useScheduleStore();
   const delayData = getDelayAnalysis();
 
-  // Add local calculation function
-  const calculateLocalDelayDistribution = (delays) => {
-    if (!delays) return [0, 0, 0, 0, 0];
-    
-    const distribution = [0, 0, 0, 0, 0]; // [0-4h, 4-8h, 8-16h, 16-24h, >24h]
-    
-    delays.forEach(delay => {
-      const hours = delay.delay;
-      if (hours <= 4) distribution[0]++;
-      else if (hours <= 8) distribution[1]++;
-      else if (hours <= 16) distribution[2]++;
-      else if (hours <= 24) distribution[3]++;
-      else distribution[4]++;
-    });
-    
-    return distribution;
-  };
-
-  const chartOptions = {
-    chart: {
-      type: 'bar',
-      stacked: true,
-      toolbar: {
-        show: true
-      }
-    },
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        columnWidth: '55%',
-        endingShape: 'rounded'
-      },
-    },
-    dataLabels: {
-      enabled: true
-    },
-    xaxis: {
-      categories: ['0-4h', '4-8h', '8-16h', '16-24h', '>24h'],
-      title: {
-        text: 'Delay Duration'
-      }
-    },
-    yaxis: {
-      title: {
-        text: 'Number of Delays'
-      }
-    },
-    fill: {
-      opacity: 1
-    },
-    colors: ['#1890ff']
-  };
-
-  const series = [{
-    name: 'Delays',
-    data: calculateLocalDelayDistribution(delayData?.delays)
-  }];
-
-  if (!delayData) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Spin size="large" tip="Loading delay analysis..." />
-      </div>
-    );
-  }
-
   return (
     <Card title="Delay Analysis">
       <Row gutter={[16, 16]} className="mb-4">
         <Col span={8}>
-          <Card>
-            <Statistic
-              title="Total Delays"
-              value={delayData.totalDelays}
-              prefix={<WarningOutlined style={{ color: '#faad14' }} />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
+          <Statistic
+            title="Total Delays"
+            value={delayData?.totalDelays}
+            prefix={<WarningOutlined />}
+          />
         </Col>
         <Col span={8}>
-          <Card>
-            <Statistic
-              title="Average Delay"
-              value={delayData.averageDelay}
-              suffix="hours"
-              precision={1}
-              prefix={<ClockCircleOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
+          <Statistic
+            title="Average Delay"
+            value={delayData?.averageDelay}
+            suffix="hours"
+            precision={1}
+          />
         </Col>
         <Col span={8}>
-          <Card>
-            <Statistic
-              title="Critical Delays"
-              value={delayData.criticalDelays.length}
-              prefix={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
-              valueStyle={{ color: '#ff4d4f' }}
-            />
-          </Card>
+          <Statistic
+            title="Critical Delays"
+            value={delayData?.criticalDelays.length}
+            prefix={<ExclamationCircleOutlined />}
+          />
         </Col>
       </Row>
 
       <Tabs>
         <TabPane tab="Delay Distribution" key="distribution">
           <ReactApexChart
-            options={chartOptions}
-            series={series}
+            options={{
+              chart: {
+                type: 'bar',
+                stacked: true
+              },
+              xaxis: {
+                categories: ['0-4h', '4-8h', '8-16h', '16-24h', '>24h']
+              }
+            }}
+            series={[
+              {
+                name: 'Delays',
+                data: calculateDelayDistribution(delayData?.delays)
+              }
+            ]}
             type="bar"
             height={300}
           />
         </TabPane>
         <TabPane tab="Delay Details" key="details">
           <Table
-            dataSource={delayData.delays}
+            dataSource={delayData?.delays}
             columns={[
               {
                 title: 'Component',
                 dataIndex: 'component',
                 key: 'component',
-                sorter: (a, b) => a.component.localeCompare(b.component)
               },
               {
                 title: 'Machine',
                 dataIndex: 'machine',
                 key: 'machine',
-                filters: [...new Set(delayData.delays.map(d => d.machine))].map(m => ({
-                  text: m,
-                  value: m,
-                })),
-                onFilter: (value, record) => record.machine === value,
               },
               {
                 title: 'Operation',
@@ -1555,7 +1200,6 @@ const DelayAnalysis = () => {
                 title: 'Delay Duration',
                 dataIndex: 'delay',
                 key: 'delay',
-                sorter: (a, b) => a.delay - b.delay,
                 render: (hours) => (
                   <Tag color={getDelayColor(hours)}>
                     {`${hours.toFixed(1)}h`}
@@ -1565,19 +1209,15 @@ const DelayAnalysis = () => {
               {
                 title: 'Impact',
                 key: 'impact',
-                sorter: (a, b) => a.delay - b.delay,
                 render: (_, record) => (
                   <Progress
                     percent={Math.min((record.delay / 24) * 100, 100)}
                     status={record.delay > 24 ? 'exception' : 'active'}
                     size="small"
-                    strokeColor={getDelayColor(record.delay)}
                   />
                 ),
               },
             ]}
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: true }}
           />
         </TabPane>
       </Tabs>

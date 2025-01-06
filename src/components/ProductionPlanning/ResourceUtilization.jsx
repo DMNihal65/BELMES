@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import {
-  Card, Row, Col, Table, Progress, Space, Tag, 
+  Card, Row, Col, Progress, Space, Tag, 
   DatePicker, Select, Button, Statistic, Alert,
-  Typography, Empty
+  Typography, Empty, Divider
 } from 'antd';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip as RechartsTooltip, ResponsiveContainer,
-  Legend
+  Legend, AreaChart, Area
 } from 'recharts';
 import { 
   ClockCircleOutlined, ToolOutlined, 
   AlertOutlined, CheckCircleOutlined,
-  FilterOutlined, ReloadOutlined
+  FilterOutlined, ReloadOutlined,
+  DashboardOutlined
 } from '@ant-design/icons';
 
 const { RangePicker } = DatePicker;
@@ -25,7 +26,6 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
 
   const handleFilter = () => {
     setLoading(true);
-    // Simulate API call
     setTimeout(() => {
       setLoading(false);
     }, 1000);
@@ -35,97 +35,6 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
     setDateRange(null);
     setSelectedMachine(null);
   };
-
-  // Machine utilization table columns
-  const columns = [
-    {
-      title: 'Machine',
-      dataIndex: 'name',
-      key: 'name',
-      width: 200,
-      fixed: 'left',
-      render: (text, record) => (
-        <Space>
-          <Text strong>{text}</Text>
-          <Tag color={record.status === 'available' ? 'green' : 'orange'}>
-            {record.status}
-          </Tag>
-        </Space>
-      ),
-    },
-    {
-      title: 'Current Job',
-      dataIndex: 'currentJob',
-      key: 'currentJob',
-      width: 200,
-      render: (job) => job ? (
-        <Space direction="vertical" size="small">
-          <Text>{job.partNumber}</Text>
-          <Progress 
-            percent={Math.round((job.completed / job.quantity) * 100)} 
-            size="small"
-            status={job.completed === job.quantity ? 'success' : 'active'}
-          />
-        </Space>
-      ) : <Text type="secondary">No active job</Text>
-    },
-    {
-      title: 'Utilization',
-      key: 'utilization',
-      width: 250,
-      render: (_, record) => {
-        const used = record.usedCapacity || 0;
-        const planned = record.plannedCapacity || 0;
-        const total = record.totalCapacity || 0;
-        const available = total - used - planned;
-        
-        return (
-          <Space direction="vertical" size="small" className="w-full">
-            <Progress
-              percent={100}
-              success={{ percent: (used / total) * 100 }}
-              trailColor="#ffd591"
-              strokeColor="#1890ff"
-              showInfo={false}
-            />
-            <Space className="text-xs" wrap>
-              <Tag color="blue">{`Used: ${used}h`}</Tag>
-              <Tag color="orange">{`Planned: ${planned}h`}</Tag>
-              <Tag color="green">{`Available: ${available}h`}</Tag>
-            </Space>
-          </Space>
-        );
-      }
-    },
-    {
-      title: 'Efficiency',
-      dataIndex: 'efficiency',
-      key: 'efficiency',
-      width: 120,
-      render: (value = 0) => (
-        <Progress 
-          type="circle" 
-          percent={value} 
-          width={50}
-          format={(percent) => `${percent}%`}
-          status={value >= 80 ? 'success' : value >= 60 ? 'normal' : 'exception'}
-        />
-      ),
-    },
-    {
-      title: 'Next Maintenance',
-      dataIndex: 'nextMaintenance',
-      key: 'nextMaintenance',
-      width: 150,
-      render: (value) => value ? (
-        <Tag icon={<ClockCircleOutlined />} color="processing">
-          {value}
-        </Tag>
-      ) : (
-        <Tag color="success">No scheduled maintenance</Tag>
-      )
-    }
-  ];
 
   // Stats cards data
   const stats = {
@@ -138,157 +47,248 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Filters */}
-      <Card className="shadow-sm">
-        <Space size="large" wrap>
-          <RangePicker 
-            onChange={setDateRange}
-            value={dateRange}
-            placeholder={['Start Date', 'End Date']}
-            className="w-64"
-          />
-          <Select
-            placeholder="Select Machine"
-            style={{ width: 200 }}
-            onChange={setSelectedMachine}
-            value={selectedMachine}
-            allowClear
-          >
-            {machines.map(machine => (
-              <Select.Option key={machine.id} value={machine.id}>
-                {machine.name}
-              </Select.Option>
-            ))}
-          </Select>
-          <Space>
-            <Button 
-              type="primary" 
-              icon={<FilterOutlined />}
-              onClick={handleFilter}
-              loading={loading}
-            >
-              Apply Filters
-            </Button>
-            <Button 
-              icon={<ReloadOutlined />}
-              onClick={handleReset}
-            >
-              Reset
-            </Button>
-          </Space>
-        </Space>
-      </Card>
+    <div className="space-y-4 bg-gray-50 p-4">
+      {/* Header & Filters Section */}
+     
 
       {/* Stats Overview */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+      <Row gutter={[8, 8]}>
+        <Col xs={12} sm={12} md={6}>
+          <Card bordered={false} className="shadow-sm rounded-lg" size="small">
             <Statistic
-              title={<Text strong>Total Capacity</Text>}
+              title={
+                <Space size={4}>
+                  <ClockCircleOutlined className="text-blue-500" />
+                  <Text strong className="text-sm">Total Capacity</Text>
+                </Space>
+              }
               value={`${stats.totalCapacity}h`}
-              prefix={<ClockCircleOutlined className="text-blue-500" />}
+              valueStyle={{ fontSize: '20px' }}
             />
+            <Progress percent={100} showInfo={false} strokeColor="#1890ff" size="small" className="mt-1" />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+        <Col xs={12} sm={12} md={6}>
+          <Card bordered={false} className="shadow-sm rounded-lg" size="small">
             <Statistic
-              title={<Text strong>Used Capacity</Text>}
+              title={
+                <Space size={4}>
+                  <ToolOutlined className="text-blue-500" />
+                  <Text strong className="text-sm">Used Capacity</Text>
+                </Space>
+              }
               value={`${stats.usedCapacity}h`}
-              prefix={<ToolOutlined className="text-blue-500" />}
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: '#1890ff', fontSize: '20px' }}
+            />
+            <Progress 
+              percent={(stats.usedCapacity / stats.totalCapacity) * 100} 
+              strokeColor="#1890ff"
+              size="small"
+              className="mt-1" 
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+        <Col xs={12} sm={12} md={6}>
+          <Card bordered={false} className="shadow-sm rounded-lg" size="small">
             <Statistic
-              title={<Text strong>Planned Capacity</Text>}
+              title={
+                <Space size={4}>
+                  <AlertOutlined className="text-orange-500" />
+                  <Text strong className="text-sm">Planned Capacity</Text>
+                </Space>
+              }
               value={`${stats.plannedCapacity}h`}
-              prefix={<AlertOutlined className="text-orange-500" />}
-              valueStyle={{ color: '#faad14' }}
+              valueStyle={{ color: '#faad14', fontSize: '20px' }}
+            />
+            <Progress 
+              percent={(stats.plannedCapacity / stats.totalCapacity) * 100} 
+              strokeColor="#faad14"
+              size="small"
+              className="mt-1" 
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+        <Col xs={12} sm={12} md={6}>
+          <Card bordered={false} className="shadow-sm rounded-lg" size="small">
             <Statistic
-              title={<Text strong>Average Efficiency</Text>}
+              title={
+                <Space size={4}>
+                  <CheckCircleOutlined className="text-green-500" />
+                  <Text strong className="text-sm">Efficiency</Text>
+                </Space>
+              }
               value={stats.averageEfficiency}
-              prefix={<CheckCircleOutlined className="text-green-500" />}
               suffix="%"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#52c41a', fontSize: '20px' }}
+            />
+            <Progress 
+              percent={stats.averageEfficiency} 
+              strokeColor="#52c41a"
+              size="small"
+              className="mt-1" 
             />
           </Card>
         </Col>
       </Row>
 
-      {/* Utilization Chart */}
+      <Card className="shadow-sm rounded-lg" size="small">
+        <div className="flex flex-wrap gap-4 justify-between items-center">
+          <div className="flex-1">
+            <Title level={5} className="mb-1">Resource Management</Title>
+            <div className="flex flex-wrap gap-4 items-center">
+              <RangePicker 
+                onChange={setDateRange}
+                value={dateRange}
+                placeholder={['Start Date', 'End Date']}
+                size="small"
+              />
+              <Select
+                placeholder="Select Machine"
+                style={{ width: 180 }}
+                onChange={setSelectedMachine}
+                value={selectedMachine}
+                allowClear
+                size="small"
+              >
+                {machines.map(machine => (
+                  <Select.Option key={machine.id} value={machine.id}>
+                    {machine.name}
+                  </Select.Option>
+                ))}
+              </Select>
+              <Button 
+                type="primary" 
+                icon={<FilterOutlined />}
+                onClick={handleFilter}
+                loading={loading}
+                size="small"
+              >
+                Apply
+              </Button>
+              <Button 
+                icon={<ReloadOutlined />}
+                onClick={handleReset}
+                size="small"
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+      {/* Charts Section */}
       <Card 
-        title={<Title level={5}>Machine Utilization Overview</Title>}
-        className="shadow-sm"
+        className="shadow-sm rounded-lg"
+        size="small"
+        title={
+          <div className="flex justify-between items-center">
+            <Space size={4}>
+              <DashboardOutlined className="text-blue-500" />
+              <Text strong>Machine Utilization</Text>
+            </Space>
+            <Tag color="blue" className="text-xs">Last 7 Days</Tag>
+          </div>
+        }
+        bodyStyle={{ padding: '12px' }}
       >
         {machines.length > 0 ? (
-          <div style={{ height: 300 }}>
+          <div style={{ height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={machines}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
+                barSize={25}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <RechartsTooltip />
-                <Legend />
-                <Bar dataKey="usedCapacity" stackId="a" fill="#1890ff" name="Used" />
-                <Bar dataKey="plannedCapacity" stackId="a" fill="#faad14" name="Planned" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false}
+                  tickLine={false}
+                  height={20}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  width={35}
+                  tick={{ fontSize: 11 }}
+                />
+                <RechartsTooltip 
+                  cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
+                  contentStyle={{ 
+                    background: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    fontSize: '12px',
+                    padding: '4px 8px'
+                  }}
+                />
+                <Legend 
+                  verticalAlign="top"
+                  height={20}
+                  iconType="circle"
+                  iconSize={6}
+                  wrapperStyle={{ fontSize: '11px' }}
+                />
+                <Bar 
+                  dataKey="usedCapacity" 
+                  stackId="a" 
+                  fill="#1890ff" 
+                  name="Used"
+                  radius={[2, 2, 0, 0]} 
+                />
+                <Bar 
+                  dataKey="plannedCapacity" 
+                  stackId="a" 
+                  fill="#faad14" 
+                  name="Planned"
+                  radius={[2, 2, 0, 0]} 
+                />
                 <Bar 
                   dataKey={(data) => (data.totalCapacity || 0) - (data.usedCapacity || 0) - (data.plannedCapacity || 0)} 
                   stackId="a" 
                   fill="#52c41a" 
-                  name="Available" 
+                  name="Available"
+                  radius={[2, 2, 0, 0]} 
                 />
               </BarChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <Empty description="No machine data available" />
+          <Empty 
+            description="No machine data available" 
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
         )}
       </Card>
 
-      {/* Machine Details Table */}
-      <Card 
-        title={<Title level={5}>Machine Details</Title>}
-        className="shadow-sm"
-      >
-        <Table 
-          columns={columns} 
-          dataSource={machines}
-          pagination={false}
-          scroll={{ x: 1000 }}
-          loading={loading}
-          rowKey="id"
-        />
-      </Card>
-
-      {/* Selected Job Alert if applicable */}
+      {/* Selected Job Alert */}
       {selectedJob && selectedJob.machineTypes && (
         <Alert
-          message="Selected Job Resource Requirements"
-          description={
-            <Space direction="vertical">
-              <Text>Required Machine Types: {selectedJob.machineTypes.join(', ')}</Text>
-              <Text>Estimated Total Time: {(selectedJob.cycleTime || 0) + (selectedJob.setupTime || 0)} minutes</Text>
-            </Space>
+          message={
+            <div className="flex justify-between items-center">
+              <Space size={4}>
+                <ToolOutlined className="text-blue-500" />
+                <Text strong className="text-sm">Job Requirements</Text>
+              </Space>
+              <Space>
+                {selectedJob.machineTypes.map(type => (
+                  <Tag key={type} color="blue" className="text-xs">{type}</Tag>
+                ))}
+                <Tag color="green" className="text-xs">
+                  {(selectedJob.cycleTime || 0) + (selectedJob.setupTime || 0)} min
+                </Tag>
+              </Space>
+            </div>
           }
           type="info"
-          showIcon
-          className="shadow-sm"
+          showIcon={false}
+          className="shadow-sm rounded-lg border-blue-100"
         />
       )}
     </div>
   );
 };
 
-export default ResourceUtilization; 
+export default ResourceUtilization;

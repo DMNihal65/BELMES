@@ -45,6 +45,7 @@ const OrderStats = ({ orders }) => {
         <Card bordered={false} className="hover:shadow-md transition-shadow">
           <Statistic
             title="Delayed"
+
             value={stats.delayed}
             prefix={<AlertCircle size={20} />}
             valueStyle={{ color: '#ff4d4f' }}

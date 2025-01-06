@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Tabs, Select, Button, Statistic, Space, Alert, DatePicker,Badge } from 'antd';
+import React, { useState } from 'react';
+import { Card, Row, Col, Tabs, Select, Button, Statistic, Space, Alert, DatePicker, Badge } from 'antd';
 import { ReloadOutlined, CalendarOutlined } from '@ant-design/icons';
 import { Activity, AlertTriangle, Clock } from 'lucide-react';
 import ProductionGantt from '../../components/ProductionMonitoring/ganttchart';
@@ -69,7 +69,7 @@ const ProductionMonitoring = () => {
       efficiency: filtered.reduce((acc, m) => acc + m.efficiency, 0) / filtered.length,
       activeMachines: filtered.filter(m => m.status === 'running').length,
       totalAlerts: filtered.reduce((acc, m) => acc + m.alerts, 0),
-      productionRate: filtered.reduce((acc, m) => acc + m.actualUnits, 0) / 8 // 8 hours shift
+      productionRate: filtered.reduce((acc, m) => acc + m.actualUnits, 0) / 8, // 8 hours shift
     };
   };
 
@@ -90,7 +90,7 @@ const ProductionMonitoring = () => {
             onChange={setSelectedMachines}
             options={[
               { value: 'all', label: 'All Machines' },
-              ...machineData.map(m => ({ value: m.id, label: `${m.name} (${m.id})` }))
+              ...machineData.map(m => ({ value: m.id, label: `${m.name} (${m.id})` })),
             ]}
           />
         </div>
@@ -107,13 +107,13 @@ const ProductionMonitoring = () => {
             ]}
           />
           {timeRange === 'custom' && (
-            <RangePicker 
+            <RangePicker
               showTime
               format="YYYY-MM-DD HH:mm"
               onChange={setDateRange}
             />
           )}
-          <Button 
+          <Button
             type="primary"
             icon={<ReloadOutlined />}
             loading={loading}
@@ -174,29 +174,30 @@ const ProductionMonitoring = () => {
 
       {/* Main Content Tabs */}
       <Card className="shadow-lg">
-        <Tabs 
-          activeKey={activeTab} 
+        <Tabs
+          activeKey={activeTab}
           onChange={setActiveTab}
           className="production-tabs"
         >
           <TabPane tab="Real-time Monitoring" key="realtime">
-            <ProductionGantt 
+            <ProductionGantt
               machineData={getFilteredMachines()}
               timeRange={timeRange}
               dateRange={dateRange}
             />
           </TabPane>
-          <TabPane 
+          <TabPane
             tab={
               <span>
-                Alerts {stats.totalAlerts > 0 && 
+                Alerts{' '}
+                {stats.totalAlerts > 0 && (
                   <Badge count={stats.totalAlerts} style={{ marginLeft: 8 }} />
-                }
+                )}
               </span>
-            } 
+            }
             key="alerts"
           >
-            <ProductionAlerts 
+            <ProductionAlerts
               machineData={getFilteredMachines()}
               timeRange={timeRange}
               dateRange={dateRange}

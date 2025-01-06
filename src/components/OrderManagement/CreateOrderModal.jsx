@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import { 
   InboxOutlined, FileTextOutlined, LoadingOutlined,
-  CloudUploadOutlined, SaveOutlined 
+  CloudUploadOutlined, SaveOutlined, ArrowLeftOutlined 
 } from '@ant-design/icons';
 
 const { Dragger } = Upload;
@@ -104,151 +104,167 @@ const CreateOrderModal = ({ visible, onCancel }) => {
     {
       title: 'Order Details',
       content: (
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          className="p-4"
-        >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="orderNumber"
-                label="Order Number"
-                rules={[{ required: true, message: 'Please enter order number' }]}
-              >
-                <Input placeholder="Enter order number" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="materialNumber"
-                label="Material Number"
-                rules={[{ required: true, message: 'Please enter material number' }]}
-              >
-                <Input placeholder="Enter material number" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            name="materialDescription"
-            label="Material Description"
-            rules={[{ required: true, message: 'Please enter material description' }]}
+        <div>
+          <div style={{ marginBottom: '16px' }}>
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => {
+                setCurrentStep(0);
+                setFileList([]);
+                form.resetFields();
+              }}
+              style={{ marginLeft: '-8px' }}
+            >
+              Back to Upload
+            </Button>
+          </div>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+            className="p-4"
           >
-            <TextArea rows={3} placeholder="Enter material description" />
-          </Form.Item>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="orderNumber"
+                  label="Order Number"
+                  rules={[{ required: true, message: 'Please enter order number' }]}
+                >
+                  <Input placeholder="Enter order number" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="materialNumber"
+                  label="Material Number"
+                  rules={[{ required: true, message: 'Please enter material number' }]}
+                >
+                  <Input placeholder="Enter material number" />
+                </Form.Item>
+              </Col>
+            </Row>
 
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                name="targetQuantity"
-                label="Target Quantity"
-                rules={[{ required: true, message: 'Please enter target quantity' }]}
-              >
-                <InputNumber 
-                  style={{ width: '100%' }} 
-                  min={1}
-                  placeholder="Enter quantity"
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="plant"
-                label="Plant"
-                rules={[{ required: true, message: 'Please select plant' }]}
-              >
-                <Select placeholder="Select plant">
-                  <Select.Option value="Plant-01">Plant 01</Select.Option>
-                  <Select.Option value="Plant-02">Plant 02</Select.Option>
-                  <Select.Option value="Plant-03">Plant 03</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="priority"
-                label="Priority"
-                rules={[{ required: true, message: 'Please select priority' }]}
-              >
-                <Select placeholder="Select priority">
-                  <Select.Option value="high">High</Select.Option>
-                  <Select.Option value="medium">Medium</Select.Option>
-                  <Select.Option value="low">Low</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
+            <Form.Item
+              name="materialDescription"
+              label="Material Description"
+              rules={[{ required: true, message: 'Please enter material description' }]}
+            >
+              <TextArea rows={3} placeholder="Enter material description" />
+            </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="wbsElement"
-                label="WBS Element"
-                rules={[{ required: true, message: 'Please enter WBS element' }]}
-              >
-                <Input placeholder="Enter WBS element" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="salesOrderNumber"
-                label="Sales Order Number"
-                rules={[{ required: true, message: 'Please enter sales order number' }]}
-              >
-                <Input placeholder="Enter sales order number" />
-              </Form.Item>
-            </Col>
-          </Row>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item
+                  name="targetQuantity"
+                  label="Target Quantity"
+                  rules={[{ required: true, message: 'Please enter target quantity' }]}
+                >
+                  <InputNumber 
+                    style={{ width: '100%' }} 
+                    min={1}
+                    placeholder="Enter quantity"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="plant"
+                  label="Plant"
+                  rules={[{ required: true, message: 'Please select plant' }]}
+                >
+                  <Select placeholder="Select plant">
+                    <Select.Option value="Plant-01">Plant 01</Select.Option>
+                    <Select.Option value="Plant-02">Plant 02</Select.Option>
+                    <Select.Option value="Plant-03">Plant 03</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="priority"
+                  label="Priority"
+                  rules={[{ required: true, message: 'Please select priority' }]}
+                >
+                  <Select placeholder="Select priority">
+                    <Select.Option value="high">High</Select.Option>
+                    <Select.Option value="medium">Medium</Select.Option>
+                    <Select.Option value="low">Low</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="partNumber"
-                label="Part Number"
-                rules={[{ required: true, message: 'Please enter part number' }]}
-              >
-                <Input placeholder="Enter part number" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="deliveryDate"
-                label="Delivery Date"
-                rules={[{ required: true, message: 'Please select delivery date' }]}
-              >
-                <DatePicker 
-                  style={{ width: '100%' }} 
-                  placeholder="Select delivery date"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="wbsElement"
+                  label="WBS Element"
+                  rules={[{ required: true, message: 'Please enter WBS element' }]}
+                >
+                  <Input placeholder="Enter WBS element" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="salesOrderNumber"
+                  label="Sales Order Number"
+                  rules={[{ required: true, message: 'Please enter sales order number' }]}
+                >
+                  <Input placeholder="Enter sales order number" />
+                </Form.Item>
+              </Col>
+            </Row>
 
-          <Form.Item
-            name="additionalNotes"
-            label="Additional Notes"
-          >
-            <TextArea rows={4} placeholder="Enter any additional notes or requirements" />
-          </Form.Item>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="partNumber"
+                  label="Part Number"
+                  rules={[{ required: true, message: 'Please enter part number' }]}
+                >
+                  <Input placeholder="Enter part number" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="deliveryDate"
+                  label="Delivery Date"
+                  rules={[{ required: true, message: 'Please select delivery date' }]}
+                >
+                  <DatePicker 
+                    style={{ width: '100%' }} 
+                    placeholder="Select delivery date"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
-          <Form.Item className="mb-0">
-            <Space className="w-full justify-end">
-              <Button onClick={onCancel}>
-                Cancel
-              </Button>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
-                loading={loading}
-                icon={<SaveOutlined />}
-              >
-                Create Order
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+            <Form.Item
+              name="additionalNotes"
+              label="Additional Notes"
+            >
+              <TextArea rows={4} placeholder="Enter any additional notes or requirements" />
+            </Form.Item>
+
+            <Form.Item className="mb-0">
+              <Space className="w-full justify-end">
+                <Button onClick={onCancel}>
+                  Cancel
+                </Button>
+                <Button 
+                  type="primary" 
+                  htmlType="submit" 
+                  loading={loading}
+                  icon={<SaveOutlined />}
+                >
+                  Create Order
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </div>
       ),
     },
   ];
@@ -277,4 +293,4 @@ const CreateOrderModal = ({ visible, onCancel }) => {
   );
 };
 
-export default CreateOrderModal; 
+export default CreateOrderModal;

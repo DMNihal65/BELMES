@@ -22,6 +22,20 @@ const OrderTable = ({ orders }) => {
 
   const columns = [
     {
+      title: 'SI.No',
+      key: 'serialNumber',
+      render: (_, __, index) => index + 1,
+      width: 70,
+      fixed: 'left',
+    },
+    {
+      title: 'Part.No',
+      dataIndex: 'partNumber',
+      key: 'partNumber',
+      sorter: (a, b) => a.partNumber.localeCompare(b.partNumber),
+      searchable: true,
+    },
+    {
       title: 'Order Number',
       dataIndex: 'orderNumber',
       key: 'orderNumber',
@@ -52,8 +66,8 @@ const OrderTable = ({ orders }) => {
           <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
             <div
               className="bg-blue-600 h-1.5 rounded-full"
-              style={{ 
-                width: `${(record.launchedQuantity / record.targetQuantity) * 100}%` 
+              style={{
+                width: `${(record.launchedQuantity / record.targetQuantity) * 100}%`
               }}
             />
           </div>
@@ -99,9 +113,9 @@ const OrderTable = ({ orders }) => {
           delayed: 'error',
         };
         return (
-          <Badge 
-            status={statusColors[record.status]} 
-            text={record.status.replace('_', ' ').toUpperCase()} 
+          <Badge
+            status={statusColors[record.status]}
+            text={record.status.replace('_', ' ').toUpperCase()}
           />
         );
       },
@@ -135,22 +149,22 @@ const OrderTable = ({ orders }) => {
       render: (_, record) => (
         <Space>
           <Tooltip title="View Details">
-            <Button 
-              icon={<EyeOutlined />} 
+            <Button
+              icon={<EyeOutlined />}
               size="small"
               onClick={() => handleViewDetails(record)}
             />
           </Tooltip>
           <Tooltip title="Edit Order">
-            <Button 
-              icon={<EditOutlined />} 
+            <Button
+              icon={<EditOutlined />}
               size="small"
               onClick={() => handleEditOrder(record)}
             />
           </Tooltip>
           <Tooltip title="Delete Order">
-            <Button 
-              icon={<DeleteOutlined />} 
+            <Button
+              icon={<DeleteOutlined />}
               size="small"
               danger
               onClick={() => handleDeleteOrder(record)}
@@ -162,12 +176,12 @@ const OrderTable = ({ orders }) => {
   ];
 
   return (
-    <Table 
-      columns={columns} 
+    <Table
+      columns={columns}
       dataSource={orders}
       rowKey="key"
       scroll={{ x: 1300 }}
-      rowClassName={(record) => 
+      rowClassName={(record) =>
         record.priority === 'high' ? 'bg-red-50' : ''
       }
       pagination={{
@@ -180,4 +194,4 @@ const OrderTable = ({ orders }) => {
   );
 };
 
-export default OrderTable; 
+export default OrderTable;

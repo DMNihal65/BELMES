@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card, Row, Col, Table, Progress, Space, Tag, 
   DatePicker, Select, Button, Statistic, Alert,
@@ -12,13 +13,15 @@ import {
 import { 
   ClockCircleOutlined, ToolOutlined, 
   AlertOutlined, CheckCircleOutlined,
-  FilterOutlined, ReloadOutlined
+  FilterOutlined, ReloadOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
 
 const { RangePicker } = DatePicker;
 const { Text, Title } = Typography;
 
 const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -141,42 +144,54 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
     <div className="space-y-6">
       {/* Filters */}
       <Card className="shadow-sm">
-        <Space size="large" wrap>
-          <RangePicker 
-            onChange={setDateRange}
-            value={dateRange}
-            placeholder={['Start Date', 'End Date']}
-            className="w-64"
-          />
-          <Select
-            placeholder="Select Machine"
-            style={{ width: 200 }}
-            onChange={setSelectedMachine}
-            value={selectedMachine}
-            allowClear
-          >
-            {machines.map(machine => (
-              <Select.Option key={machine.id} value={machine.id}>
-                {machine.name}
-              </Select.Option>
-            ))}
-          </Select>
-          <Space>
-            <Button 
-              type="primary" 
-              icon={<FilterOutlined />}
-              onClick={handleFilter}
-              loading={loading}
+        <Space size="large" wrap className="flex justify-between">
+          <Space size="large" wrap>
+            <RangePicker 
+              onChange={setDateRange}
+              value={dateRange}
+              placeholder={['Start Date', 'End Date']}
+              className="w-64"
+            />
+            <Select
+              placeholder="Select Machine"
+              style={{ width: 200 }}
+              onChange={setSelectedMachine}
+              value={selectedMachine}
+              allowClear
             >
-              Apply Filters
-            </Button>
-            <Button 
-              icon={<ReloadOutlined />}
-              onClick={handleReset}
-            >
-              Reset
-            </Button>
+              {machines.map(machine => (
+                <Select.Option key={machine.id} value={machine.id}>
+                  {machine.name}
+                </Select.Option>
+              ))}
+            </Select>
+            <Space>
+              <Button 
+                type="primary" 
+                icon={<FilterOutlined />}
+                onClick={handleFilter}
+                loading={loading}
+              >
+                Apply Filters
+              </Button>
+              <Button 
+                icon={<ReloadOutlined />}
+                onClick={handleReset}
+              >
+                Reset
+              </Button>
+            </Space>
           </Space>
+          
+          <Button 
+            type="primary"
+            size="large"
+            icon={<CalendarOutlined />}
+            onClick={() => navigate('/supervisor/production-planning/scheduling')}
+            className="bg-blue-600 hover:bg-blue-700 shadow-md"
+          >
+            Open Scheduler
+          </Button>
         </Space>
       </Card>
 
@@ -258,7 +273,7 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
       </Card>
 
       {/* Machine Details Table */}
-      <Card 
+      {/* <Card 
         title={<Title level={5}>Machine Details</Title>}
         className="shadow-sm"
       >
@@ -270,7 +285,7 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
           loading={loading}
           rowKey="id"
         />
-      </Card>
+      </Card> */}
 
       {/* Selected Job Alert if applicable */}
       {selectedJob && selectedJob.machineTypes && (

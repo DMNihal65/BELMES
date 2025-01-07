@@ -159,7 +159,7 @@ const Planning = () => {
                 onChange={handleUpload}
                 customRequest={({ onSuccess }) => setTimeout(() => onSuccess("ok"), 0)}
               >
-                <Button icon={<UploadOutlined />}>Upload OARC</Button>
+                {/* <Button icon={<UploadOutlined />}>Upload OARC</Button> */}
               </Upload>
             </Space>
           </Col>
@@ -185,9 +185,9 @@ const Planning = () => {
               onChange={setActiveTab}
               tabBarExtraContent={
                 <Link to="/scheduling">
-                  <Button type="primary" icon={<CalendarOutlined />}>
+                  {/* <Button type="primary" icon={<CalendarOutlined />}>
                     Open Scheduler
-                  </Button>
+                  </Button> */}
                 </Link>
               }
             >
@@ -200,45 +200,39 @@ const Planning = () => {
                 }
                 key="jobDetails"
               >
-                <Row gutter={[24, 24]}>
-                  <Col span={8}>
-                    <Card 
-                      title="Project Information" 
-                      size="small"
-                      className="h-full"
-                    >
-                      <Descriptions column={1}>
-                        <Descriptions.Item label="Project">
-                          {selectedJob.project}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Customer">
-                          {selectedJob.customer}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Material">
-                          {selectedJob.material}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Quantity">
-                          {selectedJob.quantity}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Due Date">
-                          {selectedJob.dueDate}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Priority">
-                          <Tag color={selectedJob.priority === 'high' ? 'red' : 'blue'}>
-                            {selectedJob.priority.toUpperCase()}
-                          </Tag>
-                        </Descriptions.Item>
-                      </Descriptions>
-                    </Card>
-                  </Col>
-                  <Col span={16}>
-                    <JobOperationsTable 
-                      jobId={selectedJob.id}
-                      onOperationEdit={handleOperationEdit}
-                      operations={selectedJob.operations}
-                    />
-                  </Col>
-                </Row>
+                <Card 
+                  className="shadow-sm mb-6 hover:shadow-md transition-shadow"
+                  size="small"
+                >
+                  <Descriptions column={3}>
+                    <Descriptions.Item label="Project">
+                      {selectedJob.project}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Customer">
+                      {selectedJob.customer}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Material">
+                      {selectedJob.material}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Quantity">
+                      {selectedJob.quantity}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Due Date">
+                      {selectedJob.dueDate}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Priority">
+                      <Tag color={selectedJob.priority === 'high' ? 'red' : 'blue'}>
+                        {selectedJob.priority.toUpperCase()}
+                      </Tag>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+
+                <JobOperationsTable 
+                  jobId={selectedJob.id}
+                  onOperationEdit={handleOperationEdit}
+                  operations={selectedJob.operations}
+                />
               </TabPane>
 
               <TabPane 
@@ -273,12 +267,24 @@ const Planning = () => {
                   >
                     <Steps.Step 
                       title="Plan Operations" 
-                      description="Define all operations and their requirements"
+                      description={
+                        <div className="text-sm text-gray-600 space-y-2">
+                          <p>1. Define all manufacturing operations in sequence</p>
+                          <p>2. Specify required tools and fixtures</p>
+                          <p>3. Set up operation parameters and instructions</p>
+                        </div>
+                      }
                       icon={<ToolOutlined size={16} />}
                     />
                     <Steps.Step 
                       title="Check Resources" 
-                      description="Verify machine and tool availability"
+                      description={
+                        <div className="text-sm text-gray-600 space-y-2">
+                          <p>1. Review machine availability in Resources tab</p>
+                          <p>2. Verify tool and fixture availability</p>
+                          <p>3. Check operator skill requirements</p>
+                        </div>
+                      }
                       icon={<Gauge size={16} />}
                     />
                     <Steps.Step 
@@ -292,6 +298,21 @@ const Planning = () => {
                       icon={<Users size={16} />}
                     />
                   </Steps>
+
+                  <Alert
+                    className="mt-6 max-w-3xl mx-auto"
+                    message="Scheduling Tips"
+                    description={
+                      <ul className="list-disc pl-4">
+                        <li>Consider machine maintenance schedules</li>
+                        <li>Account for setup and changeover times</li>
+                        <li>Plan for potential bottlenecks</li>
+                        <li>Leave buffer time for unexpected delays</li>
+                      </ul>
+                    }
+                    type="info"
+                    showIcon
+                  />
                 </Card>
               </TabPane>
             </Tabs>

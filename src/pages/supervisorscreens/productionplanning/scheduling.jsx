@@ -653,9 +653,9 @@ const Scheduling = () => {
                 ref={timelineContainerRef} 
                 className="schedule-timeline"
                 style={{ 
-                  height: '500px',
+                  height: '600px',
                   backgroundColor: '#fff',
-                  padding: '20px',
+                  padding: '20px',  
                   borderRadius: '8px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}
@@ -1099,7 +1099,7 @@ const ScheduleComparison = () => {
   const timelineOptions = {
     chart: {
       type: 'rangeBar',
-      height: 400,
+      height: '100%',
       toolbar: {
         show: true,
         tools: {
@@ -1114,7 +1114,7 @@ const ScheduleComparison = () => {
     plotOptions: {
       bar: {
         horizontal: true,
-        barHeight: '80%',
+        barHeight: '15%',
         rangeBarGroupRows: true
       }
     },
@@ -1132,8 +1132,27 @@ const ScheduleComparison = () => {
     yaxis: {
       labels: {
         style: {
-          fontSize: '12px'
+          fontSize: '10px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto'
+        },
+        show: true,
+        formatter: (value) => {
+          return value.length > 20 ? value.substring(0, 17) + '...' : value;
         }
+      },
+      axisBorder: {
+        show: true
+      },
+      axisTicks: {
+        show: true
+      }
+    },
+    grid: {
+      padding: {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0
       }
     },
     colors: ['#1890ff', '#52c41a', '#faad14'],
@@ -1341,12 +1360,11 @@ const ScheduleComparison = () => {
       </div>
 
       {selectedView === 'timeline' && (
-        <div className="mb-8">
+        <div className="mb-8" style={{ height: '400px', overflowY: 'auto' }}>
           <ReactApexChart
             options={timelineOptions}
             series={timelineSeries}
             type="rangeBar"
-            height={400}
           />
         </div>
       )}

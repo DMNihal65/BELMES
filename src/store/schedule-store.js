@@ -94,7 +94,7 @@ const useScheduleStore = create((set, get) => ({
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:7722/schedule/');
+      const response = await fetch('http://172.18.7.88:7721/schedule-batch/');
       const data = await response.json();
       
       // Transform the data for Gantt chart

@@ -1,222 +1,337 @@
 import React, { useState } from 'react';
 import {
   Card,
-  Table,
+  Row,
+  Col,
   Button,
-  Upload,
-  Modal,
-  Form,
   Input,
-  Select,
-  Space,
-  Typography,
-  message,
-  Tooltip,
+  Tree,
+  Table,
   Tag,
+  Space,
+  Dropdown,
+  Menu,
+  Typography,
+  Badge,
+  Avatar,
+  Tooltip,
+  Modal,
+  message,
+  Progress,
+  Divider,
+  Upload
 } from 'antd';
 import {
-  UploadOutlined,
-  FileAddOutlined,
-  EditOutlined,
-  DeleteOutlined,
+  FolderOutlined,
+  FileTextOutlined,
+  FilePdfOutlined,
+  FileExcelOutlined,
+  FileWordOutlined,
+  CloudUploadOutlined,
   EyeOutlined,
-  SearchOutlined ,
-  ExclamationCircleOutlined,
+  DownloadOutlined,
+  ShareAltOutlined,
+  DeleteOutlined,
+  StarOutlined,
+  StarFilled,
+  FilterOutlined,
+  SearchOutlined,
+  PlusOutlined,
+  HistoryOutlined,
+  FileImageOutlined,
+  FileDoneOutlined,
+  FolderViewOutlined,
+  TeamOutlined,
+  SettingOutlined,
+  InfoCircleOutlined,
+  InboxOutlined
 } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
-const { Option } = Select;
-const { confirm } = Modal;
+const { Search } = Input;
 
 const DocumentManagement = () => {
-  const [uploadModalVisible, setUploadModalVisible] = useState(false);
-  const [viewModalVisible, setViewModalVisible] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFolder, setSelectedFolder] = useState('all');
+  const [searchText, setSearchText] = useState('');
+  const [favorites, setFavorites] = useState(['DOC001']);
+  const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
   const [documents, setDocuments] = useState([
     {
-      key: 'DOC-001',
-      documentId: 'DOC-001',
-      type: 'MPP',
-      linkedJob: 'JOB-123',
-      uploadedBy: 'John Doe',
-      version: 'v2',
-      timestamp: '2024-01-19 10:30 AM',
+      id: 'DOC001',
+      name: 'Assembly Line SOP Rev 2.3',
+      type: 'pdf',
+      size: '2.3 MB',
+      modified: '2024-01-20',
+      modifiedBy: 'Hajira',
+      status: 'active',
+      category: 'sops',
+      version: '2.3',
+      lastReviewed: '2024-01-15',
+      reviewedBy: 'Quality Team',
+      accessLevel: 'Restricted',
+      folder: 'assembly-sops'
     },
     {
-      key: 'DOC-002',
-      documentId: 'DOC-002',
-      type: 'OARC',
-      linkedJob: 'JOB-456',
-      uploadedBy: 'Jane Smith',
-      version: 'v1',
-      timestamp: '2024-01-19 11:45 AM',
+      id: 'DOC002',
+      name: 'Quality Control Checklist',
+      type: 'excel',
+      size: '1.8 MB',
+      modified: '2024-01-18',
+      modifiedBy: 'Nihal',
+      status: 'under_review',
+      category: 'quality',
+      version: '1.5',
+      lastReviewed: '2024-01-17',
+      reviewedBy: 'Process Team',
+      accessLevel: 'Public'
     },
+    {
+      id: 'DOC003',
+      name: 'Machine Maintenance Guide',
+      type: 'word',
+      size: '3.5 MB',
+      modified: '2024-01-15',
+      modifiedBy: 'Yadushree',
+      status: 'archived',
+      category: 'maintenance',
+      version: '4.0',
+      lastReviewed: '2024-01-10',
+      reviewedBy: 'Engineering Team',
+      accessLevel: 'Confidential'
+    }
   ]);
-  const [currentDocument, setCurrentDocument] = useState(null); // For view/edit
-  const [form] = Form.useForm();
+  const [isPreviewModalVisible, setIsPreviewModalVisible] = useState(false);
+
+  // Enhanced folder structure
+  const treeData = [
+    {
+      title: 'All Documents',
+      key: 'all',
+      icon: <FolderOutlined />,
+      children: [
+        {
+          title: 'Manufacturing',
+          key: 'manufacturing',
+          icon: <FolderOutlined />,
+          children: [
+            { 
+              title: 'SOPs',
+              key: 'sops',
+              icon: <FolderOutlined />,
+              children: [
+                { title: 'Assembly', key: 'assembly-sops', icon: <FileDoneOutlined /> },
+                { title: 'Quality Control', key: 'qc-sops', icon: <FileDoneOutlined /> }
+              ]
+            },
+            { 
+              title: 'Work Instructions',
+              key: 'work-instructions',
+              icon: <FolderOutlined />,
+              children: [
+                { title: 'Machine Setup', key: 'machine-setup', icon: <FileTextOutlined /> },
+                { title: 'Maintenance', key: 'maintenance', icon: <FileTextOutlined /> }
+              ]
+            },
+            { title: 'Quality Procedures', key: 'quality', icon: <FolderOutlined /> }
+          ]
+        },
+        {
+          title: 'Technical Documentation',
+          key: 'technical',
+          icon: <FolderOutlined />,
+          children: [
+            { 
+              title: 'Drawings',
+              key: 'drawings',
+              icon: <FolderOutlined />,
+              children: [
+                { title: '2D Drawings', key: '2d-drawings', icon: <FileImageOutlined /> },
+                { title: '3D Models', key: '3d-models', icon: <FileImageOutlined /> }
+              ]
+            },
+            { title: 'Specifications', key: 'specs', icon: <FolderOutlined /> }
+          ]
+        },
+        {
+          title: 'Reports & Analytics',
+          key: 'reports',
+          icon: <FolderOutlined />,
+          children: [
+            { title: 'Quality Reports', key: 'quality-reports', icon: <FolderOutlined /> },
+            { title: 'Production Reports', key: 'production-reports', icon: <FolderOutlined /> },
+            { title: 'Audit Reports', key: 'audit-reports', icon: <FolderOutlined /> }
+          ]
+        },
+        {
+          title: 'Training Materials',
+          key: 'training',
+          icon: <FolderOutlined />,
+          children: [
+            { title: 'Safety Training', key: 'safety-training', icon: <TeamOutlined /> },
+            { title: 'Process Training', key: 'process-training', icon: <TeamOutlined /> }
+          ]
+        }
+      ]
+    }
+  ];
 
   // Handle file upload
-  const handleFileUpload = ({ file }) => {
-    setSelectedFile(file); // This should set the selected file
-    setUploadModalVisible(true); // This should trigger the upload modal
-  };
-
-  // Add document
-  const onFinishUpload = (values) => {
-    if (selectedFile) {
-      const newDocument = {
-        key: `DOC-${Date.now()}`,
-        documentId: values.documentId,
-        type: values.type,
-        linkedJob: values.linkedJob,
-        uploadedBy: values.uploadedBy || 'Anonymous',
-        version: values.version,
-        timestamp: new Date().toLocaleString(),
-      };
-
-      setDocuments((prevDocuments) => [...prevDocuments, newDocument]);
-      message.success('Document added successfully');
-      setUploadModalVisible(false);
-      form.resetFields();
-      setSelectedFile(null);
-    } else {
-      message.error('No file selected');
+  const handleUpload = (fileList) => {
+    if (!selectedFolder || selectedFolder === 'all') {
+      message.error('Please select a specific folder first');
+      return;
     }
+
+    const newFiles = fileList.map((file) => ({
+      id: `DOC${Date.now()}`,
+      name: file.name,
+      type: file.name.split('.').pop().toLowerCase(),
+      size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      modified: new Date().toISOString().split('T')[0],
+      modifiedBy: 'Current User',
+      status: 'active',
+      category: selectedFolder,
+      version: '1.0',
+      lastReviewed: new Date().toISOString().split('T')[0],
+      reviewedBy: 'System',
+      accessLevel: 'Public',
+      folder: selectedFolder
+    }));
+
+    setDocuments(prev => [...prev, ...newFiles]);
+    setIsUploadModalVisible(false);
+    message.success(`${fileList.length} file(s) uploaded successfully`);
   };
 
-  // Delete document
+  // Handle delete
   const handleDelete = (record) => {
-    confirm({
-      title: 'Are you sure you want to delete this document?',
-      icon: <ExclamationCircleOutlined />,
-      onOk: () => {
-        setDocuments((prevDocuments) =>
-          prevDocuments.filter((doc) => doc.key !== record.key)
-        );
+    Modal.confirm({
+      title: 'Delete Document',
+      content: `Are you sure you want to delete "${record.name}"?`,
+      okText: 'Yes',
+      okType: 'danger',
+      cancelText: 'No',
+      onOk() {
+        setDocuments(prev => prev.filter(doc => doc.id !== record.id));
         message.success('Document deleted successfully');
-      },
+      }
     });
   };
 
-  // View document
-  const handleView = (record) => {
-    setCurrentDocument(record);
-    setViewModalVisible(true);
-  };
-
-  // Edit document
-  const handleEdit = (record) => {
-    setCurrentDocument(record);
-    setEditModalVisible(true);
-    form.setFieldsValue(record); // Pre-fill form with document details
-  };
-
-  const onFinishEdit = (values) => {
-    setDocuments((prevDocuments) =>
-      prevDocuments.map((doc) =>
-        doc.key === currentDocument.key ? { ...doc, ...values } : doc
-      )
-    );
-    message.success('Document updated successfully');
-    setEditModalVisible(false);
-  };
-
-  const getColumnSearchProps = (dataIndex) => ({
-    filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-      <div style={{ padding: 8 }}>
-        <Input
-          autoFocus
-          placeholder={`Search ${dataIndex}`}
-          value={selectedKeys[0]}
-          onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-          onPressEnter={() => confirm()}
-          style={{ marginBottom: 8, display: 'block' }}
-        />
-        <Space>
-          <Button
-            type="primary"
-            onClick={() => confirm()}
-            icon={<SearchOutlined />}
-            size="small"
-            style={{ width: 90 }}
-          >
-            Search
-          </Button>
-          <Button
-            onClick={() => clearFilters && clearFilters()}
-            size="small"
-            style={{ width: 90 }}
-          >
-            Reset
-          </Button>
-        </Space>
-      </div>
-    ),
-    filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-    onFilter: (value, record) => record[dataIndex].toString().toLowerCase().includes(value.toLowerCase()),
+  // Filter documents based on search and selected folder
+  const filteredDocuments = documents.filter(doc => {
+    const matchesSearch = doc.name.toLowerCase().includes(searchText.toLowerCase());
+    const matchesFolder = selectedFolder === 'all' || doc.folder === selectedFolder;
+    return matchesSearch && matchesFolder;
   });
 
+  const getFileIcon = (type) => {
+    switch (type) {
+      case 'pdf':
+        return <FilePdfOutlined style={{ color: '#ff4d4f' }} />;
+      case 'excel':
+        return <FileExcelOutlined style={{ color: '#52c41a' }} />;
+      case 'word':
+        return <FileWordOutlined style={{ color: '#1890ff' }} />;
+      default:
+        return <FileTextOutlined />;
+    }
+  };
+
+  const handleDownload = (record) => {
+    message.success(`Downloading ${record.name}`);
+  };
+
+  const handleShare = (record) => {
+    Modal.confirm({
+      title: 'Share Document',
+      content: (
+        <div>
+          <p>Share "{record.name}" with:</p>
+          <Input placeholder="Enter email addresses" />
+        </div>
+      ),
+      onOk() {
+        message.success('Document shared successfully');
+      }
+    });
+  };
+
+  const toggleFavorite = (docId) => {
+    setFavorites(prev => 
+      prev.includes(docId) 
+        ? prev.filter(id => id !== docId)
+        : [...prev, docId]
+    );
+    message.success('Favorites updated');
+  };
 
   const columns = [
     {
-      title: 'Document ID',
-      dataIndex: 'documentId',
-      key: 'documentId',
-      sorter: (a, b) => a.documentId.localeCompare(b.documentId),
-      ...getColumnSearchProps('documentId'),
-    },
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
-      sorter: (a, b) => a.type.localeCompare(b.type),
-      filters: [
-        { text: 'MPP', value: 'MPP' },
-        { text: 'OARC', value: 'OARC' },
-        { text: 'IPID', value: 'IPID' },
-      ],
-      onFilter: (value, record) => record.type.includes(value),
-      render: (type) => (
-        <Tag color="blue" style={{ padding: '4px 8px', borderRadius: '4px' }}>
-          {type}
-        </Tag>
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text, record) => (
+        <Space>
+          {getFileIcon(record.type)}
+          <div>
+            <Text strong className="cursor-pointer hover:text-blue-500" 
+                  onClick={() => setIsPreviewModalVisible(true)}>
+              {text}
+            </Text>
+            <br />
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {record.size} • {record.accessLevel}
+            </Text>
+          </div>
+          {favorites.includes(record.id) && (
+            <StarFilled style={{ color: '#faad14' }} />
+          )}
+        </Space>
       ),
-    },
-    {
-      title: 'Linked Job',
-      dataIndex: 'linkedJob',
-      key: 'linkedJob',
-      sorter: (a, b) => a.linkedJob.localeCompare(b.linkedJob),
-      ...getColumnSearchProps('linkedJob'),
-    },
-    {
-      title: 'Uploaded By',
-      dataIndex: 'uploadedBy',
-      key: 'uploadedBy',
-      sorter: (a, b) => a.uploadedBy.localeCompare(b.uploadedBy),
-      ...getColumnSearchProps('uploadedBy'),
     },
     {
       title: 'Version',
       dataIndex: 'version',
       key: 'version',
-      sorter: (a, b) => a.version.localeCompare(b.version),
-      filters: [
-        { text: 'v1', value: 'v1' },
-        { text: 'v2', value: 'v2' },
-      ],
-      onFilter: (value, record) => record.version.includes(value),
+      render: (version, record) => (
+        <Space direction="vertical" size={0}>
+          <Tag color="blue">v{version}</Tag>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            Last reviewed: {record.lastReviewed}
+          </Text>
+        </Space>
+      ),
     },
     {
-      title: 'Timestamp',
-      dataIndex: 'timestamp',
-      key: 'timestamp',
-      sorter: (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
-      render: (timestamp) => (
-        <Tooltip title={new Date(timestamp).toLocaleString()}>{timestamp}</Tooltip>
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => {
+        const statusConfig = {
+          active: { color: 'success', text: 'ACTIVE' },
+          under_review: { color: 'processing', text: 'UNDER REVIEW' },
+          archived: { color: 'default', text: 'ARCHIVED' }
+        };
+        return (
+          <Tag color={statusConfig[status].color}>
+            {statusConfig[status].text}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Modified',
+      dataIndex: 'modified',
+      key: 'modified',
+      render: (date, record) => (
+        <Space direction="vertical" size={0}>
+          <Text>{date}</Text>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            by {record.modifiedBy}
+          </Text>
+        </Space>
       ),
-      ...getColumnSearchProps('timestamp'),
     },
     {
       title: 'Actions',
@@ -224,206 +339,199 @@ const DocumentManagement = () => {
       render: (_, record) => (
         <Space>
           <Tooltip title="View">
-            <Button icon={<EyeOutlined />} onClick={() => handleView(record)} />
-          </Tooltip>
-          <Tooltip title="Edit">
-            <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
-          </Tooltip>
-          <Tooltip title="Delete">
-            <Button
-              icon={<DeleteOutlined />}
-              danger
-              onClick={() => handleDelete(record)}
+            <Button 
+              icon={<EyeOutlined />} 
+              size="small"
+              onClick={() => setIsPreviewModalVisible(true)}
             />
           </Tooltip>
+          <Tooltip title="Download">
+            <Button 
+              icon={<DownloadOutlined />} 
+              size="small"
+              onClick={() => handleDownload(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Share">
+            <Button 
+              icon={<ShareAltOutlined />} 
+              size="small"
+              onClick={() => handleShare(record)}
+            />
+          </Tooltip>
+          <Dropdown
+            overlay={
+              <Menu>
+                <Menu.Item 
+                  key="1" 
+                  icon={favorites.includes(record.id) ? <StarFilled /> : <StarOutlined />}
+                  onClick={() => toggleFavorite(record.id)}
+                >
+                  {favorites.includes(record.id) ? 'Remove from Favorites' : 'Add to Favorites'}
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item 
+                  key="2" 
+                  icon={<DeleteOutlined />} 
+                  danger
+                  onClick={() => handleDelete(record)}
+                >
+                  Delete
+                </Menu.Item>
+              </Menu>
+            }
+          >
+            <Button size="small">More</Button>
+          </Dropdown>
         </Space>
       ),
     },
   ];
-  
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <Card bordered={false} className="mb-6 hover:shadow-md transition-shadow">
-        <div className="mb-6">
-          <Title level={4}>Document Management</Title>
-          <Text type="secondary">Upload, manage, and track all your documents</Text>
-        </div>
+    <div className="p-6">
+      <Card bordered={false} className="shadow-sm">
+        <Row gutter={[24, 24]}>
+          {/* Left Sidebar */}
+          <Col span={6}>
+            <Card className="h-full" bodyStyle={{ padding: '12px' }}>
+              <div className="mb-4 space-y-4">
+                <Button 
+                  type="primary" 
+                  icon={<CloudUploadOutlined />}
+                  block
+                  onClick={() => setIsUploadModalVisible(true)}
+                >
+                  Upload Document
+                </Button>
+                <Button 
+                  type="default" 
+                  icon={<StarOutlined />}
+                  block
+                >
+                  Favorites
+                </Button>
+              </div>
+              <Tree
+                treeData={treeData}
+                selectedKeys={[selectedFolder]}
+                onSelect={(keys) => setSelectedFolder(keys[0])}
+                className="document-tree"
+                defaultExpandAll
+                showIcon
+              />
+            </Card>
+          </Col>
 
-        {/* Drag and Drop Upload */}
-        <Upload.Dragger
-  beforeUpload={() => false}
-  onChange={handleFileUpload} // Ensure this is correctly triggering
-  showUploadList={false}
-  className="mb-4"
->
-          <p className="ant-upload-drag-icon">
-            <FileAddOutlined />
-          </p>
-          <p className="ant-upload-text">Click or drag file to upload</p>
-          <p className="ant-upload-hint">Supports single file uploads only</p>
-        </Upload.Dragger>
+          {/* Main Content */}
+          <Col span={18}>
+            <div className="mb-4">
+              <Row gutter={16} align="middle">
+                <Col flex="auto">
+                  <Search
+                    placeholder="Search documents..."
+                    allowClear
+                    onChange={(e) => setSearchText(e.target.value)}
+                    prefix={<SearchOutlined />}
+                  />
+                </Col>
+                
+              </Row>
+            </div>
 
-        <Table
-          columns={columns}
-          dataSource={documents}
-          pagination={{
-            total: documents.length,
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-          }}
-          rowClassName="hover:bg-gray-100"
-        />
+            <Card 
+              className="document-table"
+              bodyStyle={{ padding: '0' }}
+            >
+              <Table
+                columns={columns}
+                dataSource={filteredDocuments}
+                rowKey="id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showQuickJumper: true
+                }}
+              />
+            </Card>
+          </Col>
+        </Row>
       </Card>
 
+      {/* Upload Modal */}
       <Modal
-  title="Upload Document"
-  open={uploadModalVisible} // Controls the visibility
-  onCancel={() => setUploadModalVisible(false)} // Closes the modal
-  footer={null}
->
-  <Form form={form} layout="vertical" onFinish={onFinishUpload}>
-    <Form.Item
-      name="documentId"
-      label="Document ID"
-      rules={[{ required: true, message: 'Please enter document ID' }]}
-    >
-      <Input />
-    </Form.Item>
-    <Form.Item
-      name="type"
-      label="Type"
-      rules={[{ required: true, message: 'Please select document type' }]}
-    >
-      <Select>
-        <Option value="MPP">MPP</Option>
-        <Option value="OARC">OARC</Option>
-        <Option value="IPID">IPID</Option>
-      </Select>
-    </Form.Item>
-    <Form.Item
-      name="linkedJob"
-      label="Linked Job"
-      rules={[{ required: true, message: 'Please enter linked job' }]}
-    >
-      <Input />
-    </Form.Item>
-    <Form.Item
-      name="uploadedBy"
-      label="Uploaded By"
-      rules={[{ required: true, message: 'Please enter uploader name' }]}
-    >
-      <Input />
-    </Form.Item>
-    <Form.Item
-      name="version"
-      label="Version"
-      rules={[{ required: true, message: 'Please enter version' }]}
-    >
-      <Input />
-    </Form.Item>
-    <Form.Item>
-      <Space className="w-full justify-end">
-        <Button onClick={() => setUploadModalVisible(false)}>Cancel</Button>
-        <Button type="primary" htmlType="submit">
-          Upload
-        </Button>
-      </Space>
-    </Form.Item>
-  </Form>
-</Modal>
-
-      {/* View Modal */}
-      <Modal
-        title="View Document"
-        open={viewModalVisible}
-        onCancel={() => setViewModalVisible(false)}
+        title="Upload Document"
+        visible={isUploadModalVisible}
+        onCancel={() => setIsUploadModalVisible(false)}
         footer={null}
       >
-        {currentDocument && (
-          <div>
-            <p>
-              <Text strong>Document ID:</Text> {currentDocument.documentId}
+        <div className="text-center p-8">
+          <Upload.Dragger
+            multiple
+            beforeUpload={() => false}
+            onChange={(info) => {
+              handleUpload(info.fileList.map(f => f.originFileObj));
+            }}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined />
             </p>
-            <p>
-              <Text strong>Type:</Text> {currentDocument.type}
+            <p className="ant-upload-text">
+              Click or drag file to this area to upload
             </p>
-            <p>
-              <Text strong>Linked Job:</Text> {currentDocument.linkedJob}
+            <p className="ant-upload-hint">
+              Selected folder: {selectedFolder === 'all' ? 'Please select a folder' : selectedFolder}
             </p>
-            <p>
-              <Text strong>Uploaded By:</Text> {currentDocument.uploadedBy}
-            </p>
-            <p>
-              <Text strong>Version:</Text> {currentDocument.version}
-            </p>
-            <p>
-              <Text strong>Timestamp:</Text> {currentDocument.timestamp}
-            </p>
-          </div>
-        )}
+          </Upload.Dragger>
+        </div>
       </Modal>
 
-      {/* Edit Modal */}
+      {/* Document Preview Modal */}
       <Modal
-        title="Edit Document"
-        open={editModalVisible}
-        onCancel={() => setEditModalVisible(false)}
-        footer={null}
+        title="Document Preview"
+        visible={isPreviewModalVisible}
+        onCancel={() => setIsPreviewModalVisible(false)}
+        width={800}
+        footer={[
+          <Button key="close" onClick={() => setIsPreviewModalVisible(false)}>
+            Close
+          </Button>,
+          <Button key="download" type="primary" icon={<DownloadOutlined />}>
+            Download
+          </Button>
+        ]}
       >
-        <Form form={form} layout="vertical" onFinish={onFinishEdit}>
-          <Form.Item
-            name="documentId"
-            label="Document ID"
-            rules={[{ required: true, message: 'Please enter document ID' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="type"
-            label="Type"
-            rules={[{ required: true, message: 'Please select document type' }]}
-          >
-            <Select>
-              <Option value="MPP">MPP</Option>
-              <Option value="OARC">OARC</Option>
-              <Option value="IPID">IPID</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="linkedJob"
-            label="Linked Job"
-            rules={[{ required: true, message: 'Please enter linked job' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="uploadedBy"
-            label="Uploaded By"
-            rules={[{ required: true, message: 'Please enter uploader name' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="version"
-            label="Version"
-            rules={[{ required: true, message: 'Please enter version' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item>
-            <Space className="w-full justify-end">
-              <Button onClick={() => setEditModalVisible(false)}>Cancel</Button>
-              <Button type="primary" htmlType="submit">
-                Save
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+        {/* Add document preview content here */}
       </Modal>
     </div>
   );
 };
+
+// Add these styles
+const styles = `
+  .document-tree .ant-tree-node-content-wrapper {
+    padding: 4px 8px;
+  }
+
+  .document-tree .ant-tree-node-content-wrapper:hover {
+    background-color: #f5f5f5;
+  }
+
+  .document-table .ant-table-thead > tr > th {
+    background-color: #fafafa;
+  }
+
+  .document-table .ant-table-tbody > tr:hover > td {
+    background-color: #f0f7ff;
+  }
+
+  .document-card {
+    transition: all 0.3s;
+  }
+
+  .document-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+`;
 
 export default DocumentManagement;

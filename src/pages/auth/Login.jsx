@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, message, Steps, Select, Radio } from 'antd';
-import { LockOutlined, UserOutlined, NumberOutlined, DesktopOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, message, Steps, Select, Radio, Typography } from 'antd';
+import { LockOutlined, UserOutlined, NumberOutlined, DesktopOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-// import bgImage from '../../assets/bg.jpg'
+import shopFloorBg from '../../../public/images/shop3.jpg';
+import { motion } from 'framer-motion';
+import belLogo from '../../../public/images/BEL_Logo.png';
+import cmtiLogo from '../../../public/images/CMTI_Logo2.png';
 
 const { Option } = Select;
+const { Title, Text } = Typography;
 
 const Login = () => {
   const navigate = useNavigate();
@@ -190,97 +194,209 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-       {/* <div  className="min-h-screen flex items-center justify-center p-4"
-    style={{
-      backgroundImage: `url(${bgImage})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-    }}></div> */}
-      <Card className="w-full max-w-md shadow-2xl bg-white rounded-xl">
-        {/* Header */}
-        <div className="text-center">
-          <div className="bg-blue-600 text-white py-6 -mt-6 -mx-6 rounded-t-xl mb-8">
-            <h1 className="text-3xl font-bold mb-2">BELMES</h1>
-            <p className="text-blue-100">Bharat Electronics Limited - MES</p>
-          </div>
-        </div>
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 relative"
+      style={{
+        backgroundImage: `url(${shopFloorBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
 
-        {/* Login Type Selection */}
-        <div className="mb-8">
-          <Radio.Group
-            onChange={handleLoginTypeChange}
-            value={loginType}
-            className="w-full"
-            size="large"
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md relative z-10"
+      >
+        <Card 
+          className="backdrop-blur-md bg-blue-200 shadow-2xl rounded-2xl overflow-hidden border-0"
+          bordered={false}
+        >
+          {/* Header with Logos */}
+          <motion.div 
+            initial={{ y: -20 }}
+            animate={{ y: 0 }}
+            className="text-center"
           >
-            <div className="grid grid-cols-2 gap-4 ">
-              <Radio.Button
-                value="operator"
-                className="text-center h-20 flex items-center justify-center"
-              >
-                <div className="flex justify-center items-center gap-2">
-                  <DesktopOutlined className="text-xl  block" />
-                  <span>Operator Login</span>
+            <div className="bg-blue-100  text-white py-6 -mt-6 -mx-6 rounded-t-xl">
+              {/* BEL Logo and Title */}
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <img 
+                  src={belLogo} 
+                  alt="BEL Logo" 
+                  className="h-12 object-contain"
+                />
+               
+              </div>
+              <div className="flex items-center justify-center text-left">
+                  {/* <Title level={2} className="text-white mb-0 font-bold"></Title> */}
+                  <Text className="text-slate-700 text-xl font-bold">Manufacturing Execution System</Text>
                 </div>
-              </Radio.Button>
-              <Radio.Button
-                value="supervisor"
-                className="text-center h-20 flex items-center justify-center"
-              >
-                <div className="flex justify-center items-center gap-2" >
-                  <UserOutlined className="text-xl  block" />
-                  <span>Supervisor Login</span>
-                </div>
-              </Radio.Button>
-            </div>
-          </Radio.Group>
-        </div>
 
-        {loginType && (
-          <>
-            {/* Progress Steps */}
-            <Steps
-              current={currentStep}
-              items={loginType === 'operator' ? [
-                { title: 'Machine', description: 'Select & Verify' },
-                { title: 'Operator', description: 'Credentials' }
-              ] : [
-                { title: 'Verify', description: 'Supervisor PIN' },
-                { title: 'Login', description: 'Credentials' }
-              ]}
+              {/* Divider */}
+              <div className="w-3/4 mx-auto border-t border-blue-400/30 my-4" />
+
+              {/* Powered By Section */}
+              <div className="flex items-center justify-center gap-2">
+                <Text className="text-slate-700 text-sm">Powered by</Text>
+                <img 
+                  src={cmtiLogo} 
+                  alt="CMTI Logo" 
+                  className="h-8 object-contain"
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Login Type Selection */}
+          <div className="mt-8">
+            <motion.div 
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
               className="mb-8"
-            />
-
-            {/* Login Form */}
-            <Form
-              form={form}
-              name="login"
-              onFinish={onFinish}
-              layout="vertical"
-              requiredMark={false}
-              className="space-y-4"
             >
-              {loginType === 'operator' ? renderOperatorSteps() : renderSupervisorSteps()}
+              <Radio.Group
+                onChange={handleLoginTypeChange}
+                value={loginType}
+                className="w-full"
+                size="large"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <motion.div 
+                    whileHover={{ scale: 1.02 }} 
+                    whileTap={{ scale: 0.98 }}
+                    className="shadow-sm"
+                  >
+                    <Radio.Button
+                      value="operator"
+                      className="text-center h-24 flex items-center justify-center w-full rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 border-2 border-transparent hover:border-blue-500"
+                    >
+                      <div className="flex  justify-center items-center gap-2">
+                        <DesktopOutlined className="text-2xl text-blue-600" />
+                        <span className="font-medium">Operator Login</span>
+                      </div>
+                    </Radio.Button>
+                  </motion.div>
+                  
+                  <motion.div 
+                    whileHover={{ scale: 1.02 }} 
+                    whileTap={{ scale: 0.98 }}
+                    className="shadow-sm"
+                  >
+                    <Radio.Button
+                      value="supervisor"
+                      className="text-center h-24 flex items-center justify-center w-full rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 border-2 border-transparent hover:border-blue-500"
+                    >
+                      <div className="flex justify-center items-center gap-2">
+                        <UserOutlined className="text-xl text-blue-600" />
+                        <span className=" font-medium">Supervisor Login</span>
+                      </div>
+                    </Radio.Button>
+                  </motion.div>
+                </div>
+              </Radio.Group>
+            </motion.div>
 
-              <Form.Item className="mb-0">
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-lg font-medium"
+            {loginType && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                {/* Progress Steps */}
+                <Steps
+                  current={currentStep}
+                  items={loginType === 'operator' ? [
+                    { 
+                      title: 'Machine', 
+                      description: 'Select & Verify',
+                      icon: <DesktopOutlined /> 
+                    },
+                    { 
+                      title: 'Operator', 
+                      description: 'Credentials',
+                      icon: <SafetyCertificateOutlined />
+                    }
+                  ] : [
+                    { 
+                      title: 'Verify', 
+                      description: 'Supervisor PIN',
+                      icon: <NumberOutlined />
+                    },
+                    { 
+                      title: 'Login', 
+                      description: 'Credentials',
+                      icon: <SafetyCertificateOutlined />
+                    }
+                  ]}
+                  className="mb-8"
+                />
+
+                {/* Login Form */}
+                <motion.div
+                  initial={{ x: 50, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.3 }}
                 >
-                  {currentStep === 0 ? 'Next' : 'Login'}
-                </Button>
-              </Form.Item>
-            </Form>
+                  <Form
+                    form={form}
+                    name="login"
+                    onFinish={onFinish}
+                    layout="vertical"
+                    requiredMark={false}
+                    className="space-y-4"
+                  >
+                    {loginType === 'operator' ? renderOperatorSteps() : renderSupervisorSteps()}
 
-            {/* Help Text */}
-            <div className="text-center text-gray-500 text-sm mt-6">
-              <p>Please contact your supervisor if you cannot access the system</p>
+                    <Form.Item className="mb-0">
+                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                        <Button
+                          type="primary"
+                          htmlType="submit"
+                          className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-lg font-medium rounded-lg"
+                        >
+                          {currentStep === 0 ? 'Next' : 'Login'}
+                        </Button>
+                      </motion.div>
+                    </Form.Item>
+                  </Form>
+                </motion.div>
+
+                {/* Help Text */}
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-center mt-6"
+                >
+                  <Text type="secondary" className="text-sm">
+                    Please contact your Admin if you cannot access the system
+                  </Text>
+                </motion.div>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-center mt-6 pt-4 border-t border-gray-200"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Text type="secondary" className="text-xs">
+                © 2025 Bharat Electronics Limited. All rights reserved.
+              </Text>
+              <Text type="secondary" className="text-xs">
+                Developed and maintained by CMTI
+              </Text>
             </div>
-          </>
-        )}
-      </Card>
+          </motion.div>
+        </Card>
+      </motion.div>
     </div>
   );
 };

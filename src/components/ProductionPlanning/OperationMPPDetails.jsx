@@ -1,376 +1,250 @@
 import React, { useState } from 'react';
-import { Card, Typography, Space, Tag, Divider, Image, Collapse, Button, Input, Form, message, Upload } from 'antd';
-import { ToolOutlined, ExpandAltOutlined, RightOutlined, EditOutlined, SaveOutlined, CloseOutlined, UploadOutlined, PlusOutlined } from '@ant-design/icons';
-import jobLoading from '../../assets/job.png';
-import postMachining from '../../assets/job2.png';
+import {
+  Form, Input, Upload, Button, Card, Row, Col, 
+  Modal, Typography, Space, Divider, Collapse
+} from 'antd';
+import {
+  UploadOutlined, SaveOutlined, PlusOutlined,
+  EyeOutlined
+} from '@ant-design/icons';
+import ReactQuill from 'react-quill'; // Rich text editor
+import 'react-quill/dist/quill.snow.css';
 
-const { Text, Title } = Typography;
+const { Title, Text } = Typography;
 const { Panel } = Collapse;
-
-const getDefaultSteps = (section) => {
-  switch(section) {
-    case 'fixtureSetup':
-      return [
-        'Hold the fixture in vise with around 3 to 5 mm projection over jaws.',
-        'Clamp the job on fixture with (M4) M5 screws while ensuring longest edge to be parallel to X axis within +/-0.1 mm through dialing.',
-        'Check fixture alignment using dial indicator',
-        'Verify all clamps are properly tightened'
-      ];
-    case 'jobPreparation':
-      return [
-        'Clean the job surface thoroughly',
-        'Check for any burrs or damage',
-        'Mark reference points if necessary',
-        'Verify material specifications',
-        'Check surface finish requirements'
-      ];
-    case 'postMachining':
-      return [
-        'Remove the job carefully from fixture',
-        'Clean any coolant or chips',
-        'Perform quality checks as per specifications',
-        'Check critical dimensions',
-        'Document any deviations'
-      ];
-    default:
-      return [];
-  }
-};
 
 const OperationMPPDetails = ({ operation, onUpdate }) => {
   const [form] = Form.useForm();
-  const [editingSection, setEditingSection] = useState(null);
-  const [editingTitles, setEditingTitles] = useState({
-    fixture: false,
-    datum: false,
-    workHolding: false,
-  });
-  const [cardTitles, setCardTitles] = useState({
-    fixture: 'Fixture & IPID Details',
-    datum: 'Datum Information',
-    workHolding: 'Work Holding Instructions',
-  });
-  const [fileList, setFileList] = useState([]);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewTitle, setPreviewTitle] = useState('');
 
-  const handleUpload = async (file) => {
-    try {
-      // Here you would typically upload the file to your server
-      // For now, we'll just show a success message
-      message.success(`${file.name} file uploaded successfully`);
-      return false; // Prevent default upload behavior
-    } catch (error) {
-      message.error(`${file.name} file upload failed.`);
-      return false;
+  const [instructions, setInstructions] = useState([
+    { id: 1, title: 'Fixture Setup', content: '' },
+    { id: 2, title: 'Job Preparation', content: '' },
+    { id: 3, title: 'Post-Machining Steps', content: '' }
+  ]);
+
+  const [expandedKeys, setExpandedKeys] = useState(['1']);
+
+  const handlePreview = async (file) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj);
     }
+    setPreviewImage(file.url || file.preview);
+    setPreviewVisible(true);
+    setPreviewTitle(file.name || file.url.substring(file.url.lastIndexOf('/') + 1));
   };
 
-  const handleEdit = (section) => {
-    setEditingSection(section);
-    form.setFieldsValue({
-      fixtureNo: operation?.fixtureNo || '', // Empty input field for Fixture No
-      ipidNo: operation?.ipidNo || '', // Empty input field for IPID No
-      fixtureSetup: operation?.fixtureSetup || getDefaultSteps('fixtureSetup'),
-      jobPreparation: operation?.jobPreparation || getDefaultSteps('jobPreparation'),
-      postMachining: operation?.postMachining || getDefaultSteps('postMachining')
+  const getBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
     });
   };
 
-  const handleSave = async () => {
-    try {
-      const values = await form.validateFields();
-      onUpdate({ ...operation, ...values });
-      setEditingSection(null);
-      message.success('Changes saved successfully');
-    } catch (error) {
-      message.error('Please check the form fields');
-    }
-  };
-
-  const handleCancel = () => {
-    setEditingSection(null);
-    form.resetFields();
-  };
-
-  const handleTitleEdit = (section) => {
-    setEditingTitles((prev) => ({ ...prev, [section]: true }));
-  };
-
-  const handleTitleSave = (section) => {
-    setEditingTitles((prev) => ({ ...prev, [section]: false }));
-    message.success('Title updated successfully');
-  };
-
-  const handleTitleCancel = (section) => {
-    setEditingTitles((prev) => ({ ...prev, [section]: false }));
-  };
-
-  const EditableTitle = ({ section }) => (
-    <div className="flex items-center gap-2">
-      {editingTitles[section] ? (
-        <>
-          <Input
-            defaultValue={cardTitles[section]}
-            onChange={(e) =>
-              setCardTitles((prev) => ({ ...prev, [section]: e.target.value }))
-            }
-            style={{ width: '200px' }}
-          />
-          <Button 
-            type="primary" 
-            icon={<SaveOutlined />} 
-            size="small"
-            onClick={() => handleTitleSave(section)}
-          >
-            Save
-          </Button>
-          <Button 
-            icon={<CloseOutlined />} 
-            size="small"
-            onClick={() => handleTitleCancel(section)}
-          >
-            Cancel
-          </Button>
-        </>
-      ) : (
-        <>
-          <Text>{cardTitles[section]}</Text>
-          <Button 
-            type="link" 
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => handleTitleEdit(section)}
-          >
-            Edit
-          </Button>
-        </>
-      )}
-    </div>
-  );
-
   return (
-    <div className="space-y-6">
-      <Form form={form} layout="vertical">
-        {/* Operation Header */}
-        <div className="flex items-center space-x-2">
-          <Title level={4} style={{ margin: 0 }}>Operation {operation?.opNo}</Title>
-          <Tag color="blue">{operation?.description || 'Face Milling'}</Tag>
-        </div>
-
+    <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <Form form={form} layout="vertical" initialValues={operation}>
         {/* Fixture & IPID Details */}
         <Card 
-          title={<EditableTitle section="fixture" />}
+          title={<Title level={5}>Fixture & IPID Details</Title>} 
           className="shadow-sm"
         >
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              {/* Fixture No with Rev. */}
-              <div>
-                <Text type="secondary">Fixture No with Rev.</Text>
-                <div className="mt-1">
-                  {editingSection === 'fixture' ? (
-                    <Form.Item name="fixtureNo" rules={[{ required: true, message: 'Fixture No is required' }]}>
-                      <Input placeholder="Enter Fixture No with Rev." />
-                    </Form.Item>
-                  ) : (
-                    <div className="p-2 bg-gray-50 rounded">
-                      <Text>{operation?.fixtureNo || 'No Fixture No entered'}</Text>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* IPID No with Rev. */}
-              <div>
-                <Text type="secondary">IPID No with Rev.</Text>
-                <div className="mt-1">
-                  {editingSection === 'fixture' ? (
-                    <Form.Item name="ipidNo" rules={[{ required: true, message: 'IPID No is required' }]}>
-                      <Input placeholder="Enter IPID No with Rev." />
-                    </Form.Item>
-                  ) : (
-                    <div className="p-2 bg-gray-50 rounded">
-                      <Text>{operation?.ipidNo || 'No IPID No entered'}</Text>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <Row gutter={[24, 16]}>
+            <Col span={12}>
+              <Form.Item
+                name="fixtureNo"
+                label={<Text strong>Fixture No with Rev.</Text>}
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="Ex: Fx-62805080AA-70.80-Rev.01" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="ipidNo"
+                label={<Text strong>IPID No with Rev.</Text>}
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="Ex: IPID-62805080AA-80-Rev.01" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Card>
 
         {/* Datum Information */}
         <Card 
-          title={<EditableTitle section="datum" />}
+          title={<Title level={5}>Datum Information</Title>}
           className="shadow-sm"
         >
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              {['X', 'Y', 'Z'].map((axis) => (
-                <div key={axis} className="grid grid-cols-2 gap-4">
-                  <Text type="secondary">Datum {axis} Axis</Text>
-                  {editingSection === 'datum' ? (
-                    <Form.Item name={`datum${axis}`} rules={[{ required: true }]}>
-                      <Input />
-                    </Form.Item>
-                  ) : (
-                    <Text>{operation?.[`datum${axis}`] || (axis === 'Z' ? '+0.25mm at top of the job' : '0 at the job center')}</Text>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <Row gutter={[24, 16]}>
+            <Col span={8}>
+              <Form.Item
+                name="datumX"
+                label={<Text strong>Datum X Axis</Text>}
+              >
+                <Input placeholder="Ex: 0 at the job center" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="datumY"
+                label={<Text strong>Datum Y Axis</Text>}
+              >
+                <Input placeholder="Ex: 0 at the job center" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="datumZ"
+                label={<Text strong>Datum Z Axis</Text>}
+              >
+                <Input placeholder="Ex: +0.25mm at top of the job" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Card>
 
         {/* Work Holding Instructions */}
         <Card 
-          title={<EditableTitle section="workHolding" />}
+          title={<Title level={5}>Work Holding Instructions</Title>}
           className="shadow-sm"
         >
-          <Collapse 
-            ghost
-            expandIcon={({ isActive }) => (
-              <RightOutlined rotate={isActive ? 90 : 0} className="text-blue-600" />
-            )}
-          >
-            {['fixtureSetup', 'jobPreparation', 'postMachining'].map((section, index) => (
-              <Panel 
-                header={
-                  <div className="flex justify-between items-center w-full pr-4">
-                    <Text strong className="text-blue-600">
-                      {section === 'fixtureSetup' ? 'Fixture Setup' : 
-                       section === 'jobPreparation' ? 'Job Preparation' : 
-                       'Post-Machining Steps'}
-                    </Text>
-                  </div>
-                } 
-                key={index + 1}
+          <div className="space-y-4">
+            {instructions.map((instruction) => (
+              <Card 
+                key={instruction.id}
+                size="small"
+                className="border-l-4 border-l-blue-500"
               >
-                <div className="pl-6">
-                  {editingSection === section ? (
-                    <Form.List name={section}>
-                      {(fields, { add, remove }) => (
-                        <div className="space-y-2">
-                          {fields.map((field, index) => (
-                            <Form.Item {...field} key={field.key} className="mb-2">
-                              <div className="flex gap-2">
-                                <Input.TextArea 
-                                  autoSize 
-                                  placeholder="Enter instruction step..."
-                                />
-                                <Button 
-                                  type="text" 
-                                  danger
-                                  icon={<CloseOutlined />}
-                                  onClick={() => remove(field.name)}
-                                />
-                              </div>
-                            </Form.Item>
-                          ))}
-                          <Button 
-                            type="dashed" 
-                            onClick={() => add()} 
-                            block 
-                            className="mt-2"
-                          >
-                            Add Step
-                          </Button>
-                        </div>
-                      )}
-                    </Form.List>
-                  ) : (
-                    <ul className="space-y-2 list-disc">
-                      {(operation?.[section] || getDefaultSteps(section)).map((step, idx) => (
-                        <li key={idx}>
-                          <Text>{step}</Text>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                <div className="mb-3">
+                  <Form.Item
+                    name={['instructions', instruction.id, 'title']}
+                    initialValue={instruction.title}
+                  >
+                    <Input 
+                      placeholder="Enter section title"
+                      className="font-medium text-lg"
+                      bordered={false}
+                      style={{ paddingLeft: 0 }}
+                    />
+                  </Form.Item>
                 </div>
-              </Panel>
+                <Form.Item
+                  name={['instructions', instruction.id, 'content']}
+                >
+                  <ReactQuill 
+                    theme="snow"
+                    style={{ 
+                      height: '150px',
+                      marginBottom: '40px'
+                    }}
+                    modules={{
+                      toolbar: [
+                        ['bold', 'italic', 'underline'],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['clean']
+                      ]
+                    }}
+                    placeholder="Enter instructions points here..."
+                  />
+                </Form.Item>
+              </Card>
             ))}
-          </Collapse>
-        </Card>
 
-        {/* Reference Images */}
-        <Card 
-          title={
-            <Space>
-              <ExpandAltOutlined />
-              <span>Reference Images</span>
-            </Space>
-          } 
-          className="shadow-sm"
-        >
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
-              <div className="bg-gray-50 p-4 rounded-lg" style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Image
-                  src={operation?.jobLoadingImage || jobLoading}
-                  alt="Job Loading"
-                  style={{ 
-                    width: '300px',
-                    height: '250px',
-                    objectFit: 'contain'
-                  }}
-                  preview={{
-                    mask: <div className="text-sm">Click to view</div>
-                  }}
-                />
-              </div>
-              <div className="mt-2 flex justify-center items-center gap-2">
-                <Text>Job Loading</Text>
-                <Upload
-                  accept="image/*"
-                  showUploadList={false}
-                  beforeUpload={handleUpload}
-                >
-                  <Button 
-                    size="small" 
-                    icon={<UploadOutlined />}
-                    type="link"
-                  >
-                    Change Image
-                  </Button>
-                </Upload>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-gray-50 p-4 rounded-lg" style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Image
-                  src={operation?.postMachiningImage || postMachining}
-                  alt="Post Machining"
-                  style={{ 
-                    width: '300px',
-                    height: '250px',
-                    objectFit: 'contain'
-                  }}
-                  preview={{
-                    mask: <div className="text-sm">Click to view</div>
-                  }}
-                />
-              </div>
-              <div className="mt-2 flex justify-center items-center gap-2">
-                <Text>Post Machining</Text>
-                <Upload
-                  accept="image/*"
-                  showUploadList={false}
-                  beforeUpload={handleUpload}
-                >
-                  <Button 
-                    size="small" 
-                    icon={<UploadOutlined />}
-                    type="link"
-                  >
-                    Change Image
-                  </Button>
-                </Upload>
-              </div>
-            </div>
+            {/* Add New Section Button */}
+            <Button 
+              type="dashed" 
+              block
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setInstructions([
+                  ...instructions,
+                  {
+                    id: instructions.length + 1,
+                    title: '',
+                    content: ''
+                  }
+                ]);
+              }}
+            >
+              Add New Section
+            </Button>
           </div>
         </Card>
+
+        {/* Operation Images */}
+        <Card 
+          title={<Title level={5}>Operation Images</Title>}
+          className="shadow-sm"
+        >
+          <Form.Item name="images">
+            <Upload
+              listType="picture-card"
+              multiple
+              maxCount={4}
+              onPreview={handlePreview}
+              beforeUpload={(file) => {
+                // Add name input before upload
+                return new Promise((resolve, reject) => {
+                  Modal.confirm({
+                    title: 'Image Name',
+                    content: (
+                      <Input 
+                        placeholder="Enter image name"
+                        onChange={(e) => file.customName = e.target.value}
+                      />
+                    ),
+                    onOk: () => {
+                      if (file.customName) {
+                        resolve(file);
+                      } else {
+                        message.error('Please enter an image name');
+                        reject();
+                      }
+                    },
+                    onCancel: () => reject(),
+                  });
+                });
+              }}
+            >
+              <div>
+                <PlusOutlined />
+                <div style={{ marginTop: 8 }}>Upload</div>
+              </div>
+            </Upload>
+          </Form.Item>
+        </Card>
+
+        {/* Save Button */}
+        <div className="flex justify-end mt-6">
+          <Button 
+            type="primary"
+            icon={<SaveOutlined />}
+            size="large"
+            onClick={() => form.submit()}
+          >
+            Save Changes
+          </Button>
+        </div>
       </Form>
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={previewVisible}
+        title={previewTitle}
+        footer={null}
+        onCancel={() => setPreviewVisible(false)}
+      >
+        <img
+          alt="preview"
+          style={{ width: '100%' }}
+          src={previewImage}
+        />
+      </Modal>
     </div>
   );
 };

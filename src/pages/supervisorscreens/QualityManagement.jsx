@@ -1,24 +1,63 @@
 import React, { useState } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
-  Table, Modal, Tabs, Form, Statistic,
-  Typography, Tag, Badge, message
+  Table, Modal, Steps, Tabs, Form, Statistic,
+  Typography, Tag, Badge, Alert, DatePicker, TimePicker, message,
+  Tree, Radio, Upload
 } from 'antd';
 import {
-  FileTextOutlined, CheckCircleOutlined, 
-  CloseCircleOutlined, WarningOutlined,
-  PieChartOutlined, FileOutlined
+  FileTextOutlined, 
+  CheckCircleOutlined, 
+  CloseCircleOutlined, 
+  WarningOutlined,
+  PieChartOutlined, 
+  FolderOpenOutlined, 
+  FileSearchOutlined, 
+  FormOutlined,
+  FolderOutlined, 
+  DownloadOutlined, 
+  FilterOutlined,
+  FileExcelOutlined, 
+  FilePdfOutlined,
+  InfoCircleOutlined,
+  DeleteOutlined, 
+  StarOutlined, 
+  StarFilled,
+  UploadOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 
 const { Option } = Select;
 const { TabPane } = Tabs;
+const { Step } = Steps;
+const { RangePicker } = DatePicker;
 
 const QualityManagementDashboard = () => {
   const [selectedPart, setSelectedPart] = useState(null);
   const [activeTab, setActiveTab] = useState('qualityOverview');
   const [isIPIDModalVisible, setIsIPIDModalVisible] = useState(false);
   const [selectedIPID, setSelectedIPID] = useState(null);
+  const [selectedReportType, setSelectedReportType] = useState('all');
+  const [dateRange, setDateRange] = useState(null);
+  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [searchText, setSearchText] = useState('');
+  const [favorites, setFavorites] = useState([]);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [reportsData, setReportsData] = useState([
+    {
+      key: '1',
+      name: 'Quality Metrics Report Q1',
+      type: 'metrics',
+      date: '2024-01-15',
+      status: 'Completed',
+      size: '2.3 MB',
+      folder: 'ipid-jan',
+      favorite: false
+    },
+    // ... more mock data
+  ]);
 
   // Stats data
   const qualityStats = {
@@ -74,12 +113,11 @@ const QualityManagementDashboard = () => {
   // Quality Overview table columns
   const qualityOverviewColumns = [
     { title: 'IPID No.', dataIndex: 'ipidNo', key: 'ipidNo' },
+    { title: 'Part No.', dataIndex: 'partNo', key: 'partNo' },
     { title: 'Date', dataIndex: 'date', key: 'date' },
     { title: 'Time', dataIndex: 'time', key: 'time' },
-    { title: 'Job No.', dataIndex: 'jobNo', key: 'jobNo' },
+    { title: 'Opeartion No.', dataIndex: 'jobNo', key: 'jobNo' },
     { title: 'Order No. - Batch No.', dataIndex: 'orderNo', key: 'orderNo' },
-    { title: 'Part Number', dataIndex: 'partNumber', key: 'partNumber' },
-    { title: 'Operation Number', dataIndex: 'operationNumber', key: 'operationNumber' },
     { title: 'Inspected By', dataIndex: 'inspectedBy', key: 'inspectedBy' },
     {
       title: 'Actions',
@@ -95,12 +133,12 @@ const QualityManagementDashboard = () => {
           >
             View
           </Button>
-          {/* <Button 
+          <Button 
             type="link" 
             onClick={() => handleDownload(record)}
           >
-            Download
-          </Button> */}
+            Download Excel
+          </Button>
         </Space>
       ),
     }
@@ -111,56 +149,51 @@ const QualityManagementDashboard = () => {
     {
       key: '1',
       ipidNo: 'IPID-21340184011',
+      partNo: 'PART-001',
       date: '20-02-2023',
       time: '09:30 AM',
       jobNo: '1',
       orderNo: '10548862',
-      partNumber: 'PART-001',
-      operationNumber: '10',
       inspectedBy: 'Manjunath'
     },
     {
       key: '2',
       ipidNo: 'IPID-21340184012',
+      partNo: 'PART-002',
       date: '21-02-2023',
       time: '10:15 AM',
       jobNo: '2',
       orderNo: '10548863',
-      partNumber: 'PART-002',
-      operationNumber: '20',
       inspectedBy: 'Ramesh'
     },
     {
       key: '3',
       ipidNo: 'IPID-21340184013',
+      partNo: 'PART-003',
       date: '22-02-2023',
       time: '02:45 PM',
       jobNo: '3',
       orderNo: '10548864',
-      partNumber: 'PART-003',
-      operationNumber: '30',
       inspectedBy: 'Suresh'
     },
     {
       key: '4',
       ipidNo: 'IPID-21340184014',
+      partNo: 'PART-001',
       date: '23-02-2023',
       time: '11:20 AM',
       jobNo: '4',
       orderNo: '10548865',
-      partNumber: 'PART-001',
-      operationNumber: '40',
       inspectedBy: 'Manjunath'
     },
     {
       key: '5',
       ipidNo: 'IPID-21340184015',
+      partNo: 'PART-002',
       date: '24-02-2023',
       time: '03:15 PM',
       jobNo: '5',
       orderNo: '10548866',
-      partNumber: 'PART-002',
-      operationNumber: '50',
       inspectedBy: 'Kumar'
     }
   ];
@@ -233,6 +266,10 @@ const QualityManagementDashboard = () => {
               <div>{ipid.ipidNo}</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
+              <div className="font-semibold">Part No.:</div>
+              <div>{ipid.ipidNo}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
               <div className="font-semibold">Date:</div>
               <div>{ipid.date}</div>
             </div>
@@ -247,7 +284,7 @@ const QualityManagementDashboard = () => {
               <div>{ipid.orderNo}</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="font-semibold">Job No.:</div>
+              <div className="font-semibold">Operation No.:</div>
               <div>{ipid.jobNo}</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -309,19 +346,31 @@ const QualityManagementDashboard = () => {
     </div>
   );
 
-  // Handle download function
+  // Handle download function for Excel export
   const handleDownload = (record) => {
-    // Create data for export
-    const exportData = mockMeasurements.map(item => ({
+    // Create header information for the IPID document
+    const headerData = [{
+      'IPID No.': record.ipidNo,
+      'Part No.': record.partNo,
+      'Date': record.date,
+      'Time': record.time,
+      'Operation No.': record.jobNo,
+      'Order No. - Batch No.': record.orderNo,
+      'Sheet No.': '1',
+      'Inspected By': record.inspectedBy
+    }];
+
+    // Add the measurements data with formatting
+    const measurementsData = mockMeasurements.map(item => ({
       'Sl. No.': item.slNo,
       'Description': item.description,
       'Nominal': item.nominal,
-      'Upper Tolerance': item.upperTol,
-      'Lower Tolerance': item.lowerTol,
+      'Upper Tol': item.upperTol,
+      'Lower Tol': item.lowerTol,
       'Max Value': item.maxValue,
       'Min Value': item.minValue,
       'UOM': item.uom,
-      'Drawing Zone': item.drgZone,
+      'Drg. Zone': item.drgZone,
       'Instrument/Template/Gauge': item.instrument,
       'Instrument Details': item.instrumentDetails,
       'Measurement': item.measurement,
@@ -329,50 +378,217 @@ const QualityManagementDashboard = () => {
       'Calibration Due Date': item.calibrationDue
     }));
 
-    // Add header information
-    const headerData = [
-      ['FABRICATION COMPONENTS'],
-      ['IN PROCESS INSPECTION DOCUMENT (IPID)'],
-      [''],
-      [`IPID No.: ${record.ipidNo}`, `Date: ${record.date}`, `Time: ${record.time}`],
-      [`Order No. - Batch No.: ${record.orderNo}`, `Job No.: ${record.jobNo}`],
-      [`Part Number: ${record.partNumber}`, `Operation Number: ${record.operationNumber}`],
-      [`Inspected By: ${record.inspectedBy}`],
-      ['']
-    ];
-
-    // Create worksheet
-    const ws = XLSX.utils.json_to_sheet(exportData, { origin: 'A10' });
-    XLSX.utils.sheet_add_aoa(ws, headerData, { origin: 'A1' });
-
     // Create workbook
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'IPID Report');
-
-    // Generate Excel file
-    XLSX.writeFile(wb, `IPID_${record.ipidNo}.xlsx`);
     
-    message.success(`IPID ${record.ipidNo} downloaded successfully`);
+    // Create worksheet for the IPID document
+    const ws = XLSX.utils.json_to_sheet([
+      { 'FABRICATION COMPONENTS': '' },
+      { 'IN PROCESS INSPECTION DOCUMENT (IPID)': '' },
+      {},  // Empty row for spacing
+      ...headerData,
+      {},  // Empty row for spacing
+      { 'MEASUREMENTS': '' },
+      ...measurementsData,
+      {},  // Empty row for spacing
+      { 'Additional Observations': '' },
+      { 'Review Date': record.date },
+      { 'Review By': record.inspectedBy }
+    ], { skipHeader: true });
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, "IPID Report");
+
+    // Save file
+    XLSX.writeFile(wb, `IPID_${record.ipidNo}.xlsx`);
+    message.success(`Downloaded IPID ${record.ipidNo} as Excel`);
   };
 
-  // Replace handleOpenQMSFile function with this
-  const handleOpenQMSFile = async () => {
+  // Function to check if GDNT file exists
+  const checkGDNTFile = () => {
+    return true; // Mock implementation
+  };
+
+  // Function to open GDNT file
+  const openGDNTFile = () => {
     try {
-      // Call your backend API endpoint
-      const response = await fetch('/api/open-gdnt-file', {
-        method: 'POST',
-      });
-      
-      if (response.ok) {
-        message.success('Opening GDNT Updates application');
-      } else {
-        throw new Error('Failed to open application');
-      }
+      window.open('file:///D:/HAJU/BEL/GDNT_updates2[1]', '_blank');
+      message.success('Opening GDNT file');
     } catch (error) {
-      message.error('Failed to open GDNT Updates application');
-      console.error('Error opening file:', error);
+      message.error('Failed to open GDNT file');
     }
   };
+
+  // Function to open QMS software
+  const openQMSSoftware = () => {
+    try {
+      window.open('file:///D:/HAJU/BEL/QMS', '_blank');
+      message.success('Opening QMS Software');
+    } catch (error) {
+      message.error('Failed to open QMS Software');
+    }
+  };
+
+  // Mock folder structure
+  const treeData = [
+    {
+      title: 'Quality Reports',
+      key: 'quality',
+      icon: <FolderOutlined />,
+      children: [
+        {
+          title: 'IPID Reports',
+          key: 'ipid',
+          icon: <FolderOutlined />,
+          children: [
+            { title: 'January 2024', key: 'ipid-jan', icon: <FileTextOutlined /> },
+            { title: 'February 2024', key: 'ipid-feb', icon: <FileTextOutlined /> },
+          ],
+        },
+        {
+          title: 'VMS Reports',
+          key: 'vms',
+          icon: <FolderOutlined />,
+          children: [
+            { title: 'Machine Performance', key: 'vms-perf', icon: <FileTextOutlined /> },
+            { title: 'Calibration Reports', key: 'vms-cal', icon: <FileTextOutlined /> },
+          ],
+        },
+        {
+          title: 'CMM Reports',
+          key: 'cmm',
+          icon: <FolderOutlined />,
+          children: [
+            { title: 'Measurement Reports', key: 'cmm-meas', icon: <FileTextOutlined /> },
+            { title: 'Analysis Reports', key: 'cmm-analysis', icon: <FileTextOutlined /> },
+          ],
+        },
+      ],
+    },
+  ];
+
+  // Report columns
+  const reportColumns = [
+    {
+      title: 'Report Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text) => <a>{text}</a>,
+    },
+    {
+      title: 'Type',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type) => (
+        <Tag color={type === 'metrics' ? 'blue' : type === 'nonconformance' ? 'red' : 'green'}>
+          {type.toUpperCase()}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Date',
+      dataIndex: 'date',
+      key: 'date',
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button
+            icon={record.favorite ? <StarFilled /> : <StarOutlined />}
+            onClick={() => handleFavoriteToggle(record)}
+            type={record.favorite ? 'primary' : 'default'}
+          />
+          <Button
+            icon={<DeleteOutlined />}
+            danger
+            onClick={() => handleDelete(record)}
+          />
+          <Button 
+            icon={<FilePdfOutlined />} 
+            size="small"
+            onClick={() => handleDownload(record, 'pdf')}
+          >
+            PDF
+          </Button>
+          <Button 
+            icon={<FileExcelOutlined />} 
+            size="small"
+            onClick={() => handleDownload(record, 'excel')}
+          >
+            Excel
+          </Button>
+        </Space>
+      ),
+    },
+  ];
+
+  // Handle folder selection
+  const handleFolderSelect = (selectedKeys) => {
+    setSelectedFolder(selectedKeys[0]);
+  };
+
+  // Handle file deletion
+  const handleDelete = (record) => {
+    Modal.confirm({
+      title: 'Are you sure you want to delete this file?',
+      content: `This will permanently delete "${record.name}"`,
+      okText: 'Yes',
+      okType: 'danger',
+      cancelText: 'No',
+      onOk: () => {
+        setReportsData(prev => prev.filter(item => item.key !== record.key));
+        message.success('File deleted successfully');
+      }
+    });
+  };
+
+  // Handle favorite toggle
+  const handleFavoriteToggle = (record) => {
+    setReportsData(prev => prev.map(item => {
+      if (item.key === record.key) {
+        return { ...item, favorite: !item.favorite };
+      }
+      return item;
+    }));
+  };
+
+  // Handle file upload
+  const handleUpload = (files) => {
+    if (!selectedFolder) {
+      message.error('Please select a folder first');
+      return;
+    }
+
+    const newFiles = Array.from(files).map((file, index) => ({
+      key: `new-${Date.now()}-${index}`,
+      name: file.name,
+      type: file.name.split('.').pop(),
+      date: new Date().toISOString().split('T')[0],
+      status: 'Uploaded',
+      size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      folder: selectedFolder,
+      favorite: false
+    }));
+
+    setReportsData(prev => [...prev, ...newFiles]);
+    message.success(`${files.length} file(s) uploaded successfully`);
+    setUploadModalVisible(false);
+  };
+
+  // Filter reports based on selected folder and search text
+  const filteredReports = reportsData.filter(report => {
+    const matchesFolder = !selectedFolder || report.folder === selectedFolder;
+    const matchesSearch = !searchText || 
+      report.name.toLowerCase().includes(searchText.toLowerCase());
+    return matchesFolder && matchesSearch;
+  });
 
   return (
     <div className="space-y-6 p-6">
@@ -471,48 +687,214 @@ const QualityManagementDashboard = () => {
             </TabPane>
 
             <TabPane tab="Create New IPID" key="ipidManagement">
-              <Card title="IPID Management" className="mb-4">
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <Card title="Create New IPID" className="h-full">
-                      <Form layout="vertical">
-                        <Form.Item label="Part Number">
-                          <Select
-                            showSearch
-                            placeholder="Select Part Number"
-                            options={partOptions}
-                          />
-                        </Form.Item>
-                        <Form.Item label="Operation Number">
-                          <Input placeholder="Enter Operation Number" />
-                        </Form.Item>
-                        <Button type="primary" block>
-                          Create IPID
-                        </Button>
-                      </Form>
-                    </Card>
-                  </Col>
-                  <Col span={12}>
-                    <Card title="Software" className="h-full">
-                      <div className="flex justify-center items-center h-full">
-                        <Button 
-                          type="primary" 
-                          icon={<FileOutlined />}
-                          onClick={handleOpenQMSFile}
-                          className="bg-blue-600"
-                          size="large"
+              <div className="grid grid-cols-2 gap-6">
+                {/* Left Column */}
+                <Card className="shadow-sm">
+                  <div className="mb-6">
+                    <Alert
+                      message="Important Pre-requisite"
+                      description={
+                        <div>
+                          <p>Before creating a new IPID, please ensure:</p>
+                          <ul className="list-disc pl-5 mt-2">
+                            <li>You have the latest GDNT_updates2[1] file in your system</li>
+                            <li>Location: D:\HAJU\BEL</li>
+                            <li>File is accessible and up to date</li>
+                            <li>You have knowledge of auto-ballooning process in QMS software</li>
+                          </ul>
+                        </div>
+                      }
+                      type="warning"
+                      showIcon
+                    />
+                  </div>
+
+                  <Card title="File Verification" className="bg-gray-50 mb-6">
+                    <Space direction="vertical" size="middle" className="w-full">
+                      <div className="flex items-center justify-between">
+                        <span>Check GDNT File Availability:</span>
+                        <Button
+                          type="primary"
+                          icon={<FileSearchOutlined />}
+                          onClick={() => {
+                            const exists = checkGDNTFile();
+                            if (exists) {
+                              message.success('GDNT file found at D:\\HAJU\\BEL\\GDNT_updates2[1]');
+                            } else {
+                              message.error('GDNT file not found. Please check the location.');
+                            }
+                          }}
                         >
-                          Open GDNT Updates
+                          Click to Check File
                         </Button>
                       </div>
+                      {/* <div className="flex items-center justify-between">
+                        <span>Open GDNT File:</span>
+                        <Button
+                          type="primary"
+                          icon={<FolderOpenOutlined />}
+                          onClick={openGDNTFile}
+                        >
+                          Open GDNT File
+                        </Button>
+                      </div> */}
+                    </Space>
+                  </Card>
+
+                  <div className="flex justify-center">
+                    <Button
+                      type="primary"
+                      size="large"
+                      icon={<FileTextOutlined />}
+                      onClick={openQMSSoftware}
+                      className="px-8"
+                    >
+                      Open QMS Software
+                    </Button>
+                  </div>
+                </Card>
+
+                {/* Right Column */}
+                <Card 
+                  title="IPID Creation Guide" 
+                  className="shadow-sm"
+                  extra={
+                    <Tag color="blue" icon={<InfoCircleOutlined />}>
+                      Step by Step Guide
+                    </Tag>
+                  }
+                >
+                  <div className="space-y-6">
+                    <Card className="bg-gray-50">
+                      <h4 className="font-semibold mb-2 flex items-center">
+                        <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2">1</span>
+                        Auto Ballooning
+                      </h4>
+                      <ul className="list-disc pl-5 ml-8">
+                        <li>Open QMS software using the button on the left</li>
+                        <li>Use auto ballooning feature to mark dimensions</li>
+                        <li>Ensure all critical dimensions are properly marked</li>
+                      </ul>
+                    </Card>
+
+                    <Card className="bg-gray-50">
+                      <h4 className="font-semibold mb-2 flex items-center">
+                        <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2">2</span>
+                        Operation Setup
+                      </h4>
+                      <ul className="list-disc pl-5 ml-8">
+                        <li>Drag the part for the first operation</li>
+                        <li>Set up operation parameters as required</li>
+                        <li>Define measurement points and tolerances</li>
+                      </ul>
+                    </Card>
+
+                    <Card className="bg-gray-50">
+                      <h4 className="font-semibold mb-2 flex items-center">
+                        <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2">3</span>
+                        IPID Creation
+                      </h4>
+                      <ul className="list-disc pl-5 ml-8">
+                        <li>Create individual IPIDs for each operation</li>
+                        <li>Verify all measurements and parameters</li>
+                        <li>Use the Save/Create IPID button in QMS software</li>
+                      </ul>
+                    </Card>
+
+                    <Alert
+                      message="Note"
+                      description="All IPID creation and editing operations must be performed within the QMS software. This guide is for reference only."
+                      type="info"
+                      showIcon
+                    />
+                  </div>
+                </Card>
+              </div>
+            </TabPane>
+
+            <TabPane tab="Quality Reports" key="qualityReports">
+              <Card className="shadow-sm">
+                {/* Filters Section */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <Row gutter={[16, 16]} align="middle">
+                    <Col span={8}>
+                      <div className="font-semibold mb-2">Date Range</div>
+                      <RangePicker 
+                        className="w-full" 
+                        onChange={(dates) => setDateRange(dates)}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <div className="font-semibold mb-2">Report Type</div>
+                      <Select
+                        className="w-full"
+                        defaultValue="all"
+                        onChange={(value) => setSelectedReportType(value)}
+                        options={[
+                          { value: 'all', label: 'All Reports' },
+                          { value: 'metrics', label: 'Quality Metrics' },
+                          { value: 'nonconformance', label: 'Non-conformance' },
+                          { value: 'yield', label: 'Yield Analysis' },
+                        ]}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <div className="font-semibold mb-2">Export Options</div>
+                      <Radio.Group defaultValue="pdf">
+                        <Radio.Button value="pdf">PDF</Radio.Button>
+                        <Radio.Button value="excel">Excel</Radio.Button>
+                        <Radio.Button value="csv">CSV</Radio.Button>
+                      </Radio.Group>
+                    </Col>
+                  </Row>
+                </div>
+
+                {/* Content Section */}
+                <Row gutter={16}>
+                  {/* Folder Tree */}
+                  <Col span={6}>
+                    <Card title="Report Categories" className="h-full">
+                      <Tree
+                        treeData={treeData}
+                        showIcon
+                        defaultExpandAll
+                        onSelect={(selectedKeys) => setSelectedFolder(selectedKeys[0])}
+                      />
+                    </Card>
+                  </Col>
+
+                  {/* Reports Table */}
+                  <Col span={18}>
+                    <Card 
+                      title="Reports List"
+                      extra={
+                        <Space>
+                          <Input
+                            placeholder="Search files..."
+                            prefix={<SearchOutlined />}
+                            onChange={(e) => setSearchText(e.target.value)}
+                            style={{ width: 200 }}
+                          />
+                          <Button 
+                            icon={<UploadOutlined />} 
+                            type="primary"
+                            onClick={() => setUploadModalVisible(true)}
+                            disabled={!selectedFolder}
+                          >
+                            Upload
+                          </Button>
+                        </Space>
+                      }
+                    >
+                      <Table
+                        columns={reportColumns}
+                        dataSource={filteredReports}
+                        size="middle"
+                      />
                     </Card>
                   </Col>
                 </Row>
               </Card>
-            </TabPane>
-
-            <TabPane tab="Quality Reports" key="qualityReports">
-              {/* Quality Reports content */}
             </TabPane>
           </Tabs>
         </Card>
@@ -541,6 +923,32 @@ const QualityManagementDashboard = () => {
       >
         {selectedIPID && <IPIDModalContent ipid={selectedIPID} />}
       </Modal>
+
+      {/* Add Upload Modal */}
+      <Modal
+        title="Upload Files"
+        visible={uploadModalVisible}
+        onCancel={() => setUploadModalVisible(false)}
+        footer={null}
+      >
+        <Upload.Dragger
+          multiple
+          beforeUpload={(file) => {
+            return false; // Prevent automatic upload
+          }}
+          onChange={(info) => {
+            handleUpload(info.fileList.map(f => f.originFileObj));
+          }}
+        >
+          <p className="ant-upload-drag-icon">
+            <UploadOutlined />
+          </p>
+          <p className="ant-upload-text">Click or drag files to upload</p>
+          <p className="ant-upload-hint">
+            Files will be uploaded to folder: {selectedFolder}
+          </p>
+        </Upload.Dragger>
+      </Modal>
     </div>
   );
 };
@@ -564,6 +972,28 @@ const styles = `
   .ipid-container {
     max-width: 100%;
     margin: 0 auto;
+  }
+
+  .ant-steps-item-description {
+    padding-bottom: 16px;
+  }
+
+  .file-check-section {
+    background-color: #f5f5f5;
+    padding: 16px;
+    border-radius: 4px;
+    margin-bottom: 24px;
+  }
+
+  .ant-tree {
+    background: transparent;
+  }
+  
+  .report-filters {
+    background: #f5f5f5;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 24px;
   }
 `;
 

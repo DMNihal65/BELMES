@@ -1,13 +1,13 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { 
-  Table, Select, Button, Space, Tag, Tooltip, 
-  InputNumber, TimePicker, Popconfirm, Typography, Input, Form 
+  Table, Button, Space, Tooltip, Form, Input, 
+  Popconfirm, Select, Tag, TimePicker 
 } from 'antd';
-import {
-  EditOutlined, DeleteOutlined, SaveOutlined,
-  CloseOutlined, FileTextOutlined, PlusOutlined
+import { 
+  EditOutlined, DeleteOutlined, FileTextOutlined, 
+  SaveOutlined, PlusOutlined 
 } from '@ant-design/icons';
-import { mockMachines } from '../../data/mockPlanningData';
+import EditableCell from './EditableCell';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,161 +15,30 @@ import { v4 as uuidv4 } from 'uuid';
 dayjs.extend(customParseFormat);
 
 const { Option } = Select;
-const { Text } = Typography;
 
-const EditableCell = ({
-  editing,
-  dataIndex,
-  title,
-  inputType,
-  record,
-  index,
-  children,
-  ...restProps
-}) => {
-  const inputNode = inputType === 'number' ? (
-    <InputNumber style={{ width: '100%' }} />
-  ) : inputType === 'time' ? (
-    <TimePicker format="HH:mm:ss" style={{ width: '100%' }} />
-  ) : inputType === 'select' ? (
-    <Select style={{ width: '100%' }}>
-      {mockMachines.map(machine => (
-        <Option 
-          key={machine.id} 
-          value={machine.id}
-          disabled={machine.status === 'maintenance'}
-        >
-          <Space>
-            {machine.name}
-            <Tag color={machine.status === 'available' ? 'success' : 'warning'}>
-              {machine.status}
-            </Tag>
-          </Space>
-        </Option>
-      ))}
-    </Select>
-  ) : inputType === 'multiSelect' ? (
-    <Select
-      mode="multiple"
-      style={{ width: '100%' }}
-      placeholder={`Select ${title}`}
-      options={
-        title === 'Tools' ? 
-        [
-          { label: 'End Mill Ø10', value: 'end_mill_10' },
-          { label: 'Face Mill Ø50', value: 'face_mill_50' },
-          { label: 'Drill Ø8', value: 'drill_8' },
-          { label: 'Boring Tool', value: 'boring_tool' },
-        ] :
-        [
-          { label: 'Vise', value: 'vise' },
-          { label: 'Clamps', value: 'clamps' },
-          { label: 'Chuck', value: 'chuck' },
-          { label: 'Angle Plate', value: 'angle_plate' },
-        ]
-      }
-    />
-  ) : (
-    <Input style={{ width: '100%' }} />
-  );
+// Mock data for machines
+const mockMachines = [
+  { id: 'M1', name: 'Machine 1', status: 'available' },
+  { id: 'M2', name: 'Machine 2', status: 'maintenance' },
+  { id: 'M3', name: 'Machine 3', status: 'available' },
+];
 
-  return (
-    <td {...restProps}>
-      {editing ? (
-        <Form.Item
-          name={dataIndex}
-          style={{ margin: 0 }}
-          rules={[
-            {
-              required: true,
-              message: `Please Input ${title}!`,
-            },
-          ]}
-        >
-          {inputNode}
-        </Form.Item>
-      ) : (
-        children
-      )}
-    </td>
-  );
-};
+// Mock data for tools
+const mockTools = [
+  { id: 'T1', name: 'Tool 1' },
+  { id: 'T2', name: 'Tool 2' },
+  { id: 'T3', name: 'Tool 3' },
+];
 
-const JobOperationsTable = forwardRef(({ jobId, operations, onOperationsChange, onMPPClick }, ref) => {
+const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperations }) => {
   const [form] = Form.useForm();
+  const [operations, setOperations] = useState(initialOperations || []);
   const [editingKey, setEditingKey] = useState('');
-  const [data, setData] = useState([]);
-
-  useEffect(() => {
-    setData(operations);
-  }, [operations]);
-
-  useImperativeHandle(ref, () => ({
-    handleAddOperation: () => {
-      const newOperation = {
-        key: uuidv4(),
-        opNo: `OP${(data.length + 1) * 10}`,
-        description: '',
-        machine: '',
-        cycleTime: null,
-        setupTime: null,
-        tools: [],
-        fixtures: [],
-        status: 'pending',
-        setupInformation: {
-          machineSetup: {},
-          toolingSetup: {},
-          fixtureSetup: {}
-        },
-        processParameters: {
-          cutting: {},
-          feeding: {},
-          other: {}
-        },
-        qualityParameters: {
-          measurements: [],
-          inspections: []
-        },
-        documentation: {
-          drawings: [],
-          instructions: []
-        }
-      };
-      
-      const newData = [...data, newOperation];
-      setData(newData);
-      setEditingKey(newOperation.key);
-      onOperationsChange(newData);
-    }
-  }));
 
   const isEditing = (record) => record.key === editingKey;
 
   const edit = (record) => {
-    const formValues = {
-      opNo: record.opNo,
-      description: record.description,
-      machine: record.machine,
-      tools: record.tools || [],
-      fixtures: record.fixtures || [],
-    };
-
-    // Handle time values
-    if (record.cycleTime) {
-      const cycleTime = dayjs(record.cycleTime, 'HH:mm:ss', true);
-      if (cycleTime.isValid()) {
-        formValues.cycleTime = cycleTime;
-      }
-    }
-
-    if (record.setupTime) {
-      const setupTime = dayjs(record.setupTime, 'HH:mm:ss', true);
-      if (setupTime.isValid()) {
-        formValues.setupTime = setupTime;
-      }
-    }
-
-    form.setFieldsValue(formValues);
+    form.setFieldsValue({ ...record });
     setEditingKey(record.key);
   };
 
@@ -180,34 +49,20 @@ const JobOperationsTable = forwardRef(({ jobId, operations, onOperationsChange, 
   const save = async (key) => {
     try {
       const row = await form.validateFields();
-      const newData = [...data];
-      const index = newData.findIndex((item) => key === item.key);
-      
+      const newData = [...operations];
+      const index = newData.findIndex(item => key === item.key);
       if (index > -1) {
         const item = newData[index];
-        const updatedItem = { ...item, ...row };
-        
-        // Format time values
-        if (row.cycleTime) {
-          updatedItem.cycleTime = row.cycleTime.format('HH:mm:ss');
-        }
-        if (row.setupTime) {
-          updatedItem.setupTime = row.setupTime.format('HH:mm:ss');
-        }
-        
-        newData.splice(index, 1, updatedItem);
-        setData(newData);
+        newData.splice(index, 1, {
+          ...item,
+          ...row,
+        });
+        setOperations(newData);
         setEditingKey('');
       }
     } catch (errInfo) {
       console.log('Validate Failed:', errInfo);
     }
-  };
-
-  const handleDelete = (record) => {
-    const newOperations = data.filter(item => item.key !== record.key);
-    setData(newOperations);
-    onOperationsChange(newOperations);
   };
 
   const columns = [
@@ -216,8 +71,7 @@ const JobOperationsTable = forwardRef(({ jobId, operations, onOperationsChange, 
       dataIndex: 'opNo',
       width: 80,
       fixed: 'left',
-      editable: true,
-      render: (text) => <Text strong>{text}</Text>,
+      editable: false,
     },
     {
       title: 'Description',
@@ -230,37 +84,106 @@ const JobOperationsTable = forwardRef(({ jobId, operations, onOperationsChange, 
       dataIndex: 'machine',
       width: 180,
       editable: true,
-      inputType: 'select',
+      render: (text, record) => {
+        const editable = isEditing(record);
+        return editable ? (
+          <Form.Item
+            name="machine"
+            style={{ margin: 0 }}
+          >
+            <Select style={{ width: '100%' }}>
+              {mockMachines.map(machine => (
+                <Option 
+                  key={machine.id} 
+                  value={machine.id}
+                  disabled={machine.status === 'maintenance'}
+                >
+                  <Space>
+                    {machine.name}
+                    <Tag color={machine.status === 'available' ? 'green' : 'orange'}>
+                      {machine.status}
+                    </Tag>
+                  </Space>
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+        ) : (
+          text
+        );
+      }
     },
     {
       title: 'Cycle Time',
       dataIndex: 'cycleTime',
       width: 120,
       editable: true,
-      inputType: 'time',
-      render: (text) => text || '-',
+      render: (text, record) => {
+        const editable = isEditing(record);
+        return editable ? (
+          <Form.Item
+            name="cycleTime"
+            style={{ margin: 0 }}
+          >
+            <TimePicker format="HH:mm:ss" />
+          </Form.Item>
+        ) : (
+          text ? dayjs(text).format('HH:mm:ss') : ''
+        );
+      }
     },
     {
       title: 'Setup Time',
       dataIndex: 'setupTime',
       width: 120,
       editable: true,
-      inputType: 'time',
-      render: (text) => text || '-',
+      render: (text, record) => {
+        const editable = isEditing(record);
+        return editable ? (
+          <Form.Item
+            name="setupTime"
+            style={{ margin: 0 }}
+          >
+            <TimePicker format="HH:mm:ss" />
+          </Form.Item>
+        ) : (
+          text ? dayjs(text).format('HH:mm:ss') : ''
+        );
+      }
     },
     {
       title: 'Tools',
       dataIndex: 'tools',
-      width: 200,
+      width: 150,
       editable: true,
-      inputType: 'multiSelect',
-      render: (tools) => (
-        <Space wrap>
-          {(tools || []).map(tool => (
-            <Tag key={tool} color="blue">{tool}</Tag>
-          ))}
-        </Space>
-      ),
+      render: (tools, record) => {
+        const editable = isEditing(record);
+        return editable ? (
+          <Form.Item
+            name="tools"
+            style={{ margin: 0 }}
+          >
+            <Select
+              mode="multiple"
+              style={{ width: '100%' }}
+              placeholder="Select tools"
+              maxTagCount="responsive"
+            >
+              {mockTools.map(tool => (
+                <Option key={tool.id} value={tool.id}>
+                  {tool.name}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+        ) : (
+          <Space>
+            {(tools || []).map(tool => (
+              <Tag key={tool}>{tool}</Tag>
+            ))}
+          </Space>
+        );
+      }
     },
     {
       title: 'Fixtures',
@@ -281,67 +204,68 @@ const JobOperationsTable = forwardRef(({ jobId, operations, onOperationsChange, 
       dataIndex: 'actions',
       width: 180,
       fixed: 'right',
+      width: 150,
       render: (_, record) => {
         const editable = isEditing(record);
-        return editable ? (
+        return (
           <Space>
-            <Button
-              type="primary"
-              icon={<SaveOutlined />}
-              onClick={() => save(record.key)}
-              style={{ marginRight: 8 }}
-            >
-              Save
-            </Button>
-            <Button
-              icon={<CloseOutlined />}
-              onClick={cancel}
-            >
-              Cancel
-            </Button>
-          </Space>
-        ) : (
-          <Space>
-            <Tooltip title="View MPP Details">
-              <Button
-                type="text"
-                icon={<FileTextOutlined />}
-                onClick={() => onMPPClick(record)}
-                className="text-blue-600 hover:text-blue-800"
+            {/* MPP Details button always first */}
+            <Tooltip title="Edit MPP Details">
+              <Button 
+                type="link" 
+                icon={<FileTextOutlined />} 
+                onClick={() => onOperationEdit(record)}
               />
             </Tooltip>
-            <Tooltip title="Edit Operation">
-              <Button
-                type="text"
-                disabled={editingKey !== ''}
-                icon={<EditOutlined />}
-                onClick={() => edit(record)}
-                className="text-green-600 hover:text-green-800"
-              />
-            </Tooltip>
-            <Tooltip title="Delete Operation">
+            
+            {/* Edit/Save button */}
+            {editable ? (
+              <Space>
+                <Button 
+                  type="link" 
+                  icon={<SaveOutlined />}
+                  onClick={() => save(record.key)}
+                />
+                <Button 
+                  type="link"
+                  onClick={cancel}
+                >
+                  Cancel
+                </Button>
+              </Space>
+            ) : (
+              <Tooltip title="Edit Operation">
+                <Button 
+                  type="link" 
+                  icon={<EditOutlined />}
+                  onClick={() => edit(record)}
+                />
+              </Tooltip>
+            )}
+
+            {/* Delete button only shown when not editing */}
+            {!editable && (
               <Popconfirm
-                title="Delete Operation"
-                description="Are you sure you want to delete this operation?"
-                onConfirm={() => handleDelete(record)}
-                okText="Yes"
-                cancelText="No"
-                placement="left"
+                title="Delete this operation?"
+                onConfirm={() => {
+                  const updatedOperations = operations.filter(op => op.key !== record.key);
+                  setOperations(updatedOperations);
+                }}
               >
-                <Button
-                  type="text"
-                  danger
+                <Button 
+                  type="link" 
+                  danger 
                   icon={<DeleteOutlined />}
                 />
               </Popconfirm>
-            </Tooltip>
+            )}
           </Space>
         );
       },
     },
   ];
 
-  const mergedColumns = columns.map((col) => {
+  const mergedColumns = columns.map(col => {
     if (!col.editable) {
       return col;
     }
@@ -349,7 +273,6 @@ const JobOperationsTable = forwardRef(({ jobId, operations, onOperationsChange, 
       ...col,
       onCell: (record) => ({
         record,
-        inputType: col.inputType || 'text',
         dataIndex: col.dataIndex,
         title: col.title,
         editing: isEditing(record),
@@ -359,31 +282,48 @@ const JobOperationsTable = forwardRef(({ jobId, operations, onOperationsChange, 
 
   return (
     <Form form={form} component={false}>
-      <Table
-        components={{
-          body: {
-            cell: EditableCell,
-          },
-        }}
-        bordered
-        dataSource={data}
-        columns={mergedColumns}
-        rowClassName="editable-row"
-        pagination={{
-          onChange: cancel,
-          pageSize: 5,
-          total: data.length,
-          showTotal: (total) => `Total ${total} operations`,
-          showSizeChanger: false,
-          showQuickJumper: true,
-          position: ['bottomRight']
-        }}
-        scroll={{ x: 'max-content' }}
-      />
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium">Operations Sequence</h3>
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />}
+            onClick={() => {
+              const newOperation = {
+                key: `${operations.length + 1}`,
+                opNo: `OP${(operations.length + 1) * 10}`,
+                description: '',
+                machine: '',
+                cycleTime: null,
+                setupTime: null,
+                tools: [],
+                fixtures: [],
+                status: 'planned',
+                precedingOps: []
+              };
+              setOperations([...operations, newOperation]);
+              edit(newOperation); // Make new operation editable immediately
+            }}
+          >
+            Add Operation
+          </Button>
+        </div>
+
+        <Table 
+          components={{
+            body: {
+              cell: EditableCell,
+            },
+          }}
+          columns={mergedColumns} 
+          dataSource={operations}
+          scroll={{ x: 1500 }}
+          pagination={false}
+          size="middle"
+        />
+      </div>
     </Form>
   );
-});
-
-JobOperationsTable.displayName = 'JobOperationsTable';
+};
 
 export default JobOperationsTable;

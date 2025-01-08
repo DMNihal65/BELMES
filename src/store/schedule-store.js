@@ -110,7 +110,7 @@ const useScheduleStore = create((set, get) => ({
         quantity: op.quantity,
         styles: getTaskStyles(op, data.component_status[op.component])
       }));
-
+//check 
       set({ 
         scheduleData: {
           ...data,

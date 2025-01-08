@@ -1,3 +1,55 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@font-face {
+  font-family: 'CustomFont';
+  src: url('/fonts/Rubik-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Apply the custom font to all elements */
+@layer base {
+  html {
+    font-family: 'CustomFont', system-ui, sans-serif;
+  }
+
+  /* Override all text elements to use the custom font */
+  h1, h2, h3, h4, h5, h6, p, span, div, button, input, select, textarea {
+    font-family: 'CustomFont', system-ui, sans-serif !important;
+  }
+}
+
+/* Global Ant Design overrides */
+:root {
+  --font-family: 'CustomFont', system-ui, sans-serif;
+}
+
+/* Force Ant Design components to use the custom font */
+.ant-typography,
+.ant-btn,
+.ant-input,
+.ant-select,
+.ant-dropdown-menu-item,
+.ant-menu-item,
+.ant-modal-title,
+.ant-modal-content,
+.ant-table,
+.ant-form-item-label,
+.ant-form-item,
+.ant-tabs-tab,
+.ant-card-head-title,
+.ant-card-meta-title,
+.ant-card-meta-description,
+.ant-statistic-title,
+.ant-statistic-content,
+.ant-list-item,
+.ant-descriptions-item,
+.ant-tag,
+.ant-message,
+.ant-notification,
+.ant-alert {
+  font-family: var(--font-family) !important;
+}

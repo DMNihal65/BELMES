@@ -1,146 +1,206 @@
-// src/pages/supervisorscreens/inventory/RawMaterials.jsx
 import React, { useState } from 'react';
-import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, DatePicker } from 'antd';
-import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'; // Import the icons
-import dayjs from 'dayjs'; // Import dayjs
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col } from 'antd';
+import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
 
 const RawMaterials = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
-  const [rawMaterialsData, setRawMaterialsData] = useState([
+  const [editingKey, setEditingKey] = useState(null);
+  const [RawMaterialsData, setRawMaterialsData] = useState([
     {
       key: '1',
-      type_name: 'Steel',
-      description: 'High carbon steel',
-      bel_part_number: 'RM-001',
-      quantity: 100,
-      status_id: 'Available',
-      available_from: '2023-01-01',
+      id: '001',
+      order_id: 'ORD001', // Added order_id
+      part_number: 'PART001', // Added part_number
+      description: 'High precision end mill',
+      quantity: 10,
+      unit_id: 'UNIT001', // Added unit_id
+      status: 'Available',
+      available_from: dayjs().subtract(1, 'month').format('YYYY-MM-DD'), // Added available_from
     },
-    // Add more raw materials as needed
+    // ... other existing data ...
   ]);
 
   const showModal = () => {
+    form.resetFields(); // Reset form fields when opening the modal
     setIsModalVisible(true);
+    setEditingKey(null); // Reset editing key for adding new tool
   };
 
   const handleCancel = () => {
     form.resetFields();
     setIsModalVisible(false);
+    setEditingKey(null); // Reset editing key
   };
 
   const handleSubmit = (values) => {
-    const newMaterial = {
-      key: `RM${rawMaterialsData.length + 1}`,
-      type_name: values.type_name,
-      description: values.description,
-      bel_part_number: values.bel_part_number,
-      quantity: values.quantity,
-      status_id: values.status_id,
-      available_from: values.available_from.format('YYYY-MM-DD'), // Format date
-    };
+    if (editingKey) { // Check if we are editing an existing row
+      const updatedData = RawMaterialsData.map(item => 
+        item.key === editingKey ? { ...item, ...values } : item // Update the specific item
+      );
+      setRawMaterialsData(updatedData);
+      message.success('Tool updated successfully');
+    } else {
+      const newTool = {
+        key: `T${RawMaterialsData.length + 1}`, // Generate a new key
+        ...values, // Spread the form values
+      };
+      setRawMaterialsData([...RawMaterialsData, newTool]); // Add new tool to the list
+      message.success('Tool added successfully');
+    }
+    handleCancel(); // Close the modal
+  };
 
-    setRawMaterialsData([...rawMaterialsData, newMaterial]);
-    message.success('Raw Material added successfully');
-    handleCancel();
+  const handleEditOrder = (record) => {
+    form.setFieldsValue(record); // Set the form fields with the selected record's data
+    setIsModalVisible(true); // Show the modal for editing
+    setEditingKey(record.key); // Set the editing key
+  };
+
+  const handleDeleteOrder = (record) => {
+    Modal.confirm({
+      title: 'Are you sure you want to delete this tool?',
+      onOk: () => {
+        setRawMaterialsData(RawMaterialsData.filter(item => item.key !== record.key)); // Remove the selected item
+        message.success('Tool deleted successfully');
+      },
+    });
   };
 
   const handleDownloadData = () => {
-    const ws = XLSX.utils.json_to_sheet(rawMaterialsData);
+    const ws = XLSX.utils.json_to_sheet(RawMaterialsData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Raw Materials Data");
-    XLSX.writeFile(wb, "raw_materials_template.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "RawMaterials Data");
+    XLSX.writeFile(wb, "RawMaterials_template.xlsx");
   };
 
   const handleFileUpload = (file) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      try {
-        const workbook = XLSX.read(e.target.result, { type: 'binary' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        try {
+            const workbook = XLSX.read(e.target.result, { type: 'binary' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const data = XLSX.utils.sheet_to_json(worksheet);
 
-        const formattedData = data.map((item, index) => ({
-          key: `RM${rawMaterialsData.length + index + 1}`,
-          type_name: item.type_name || '',
-          description: item.description || '',
-          bel_part_number: item.bel_part_number || '',
-          quantity: parseInt(item.quantity) || 0,
-          status_id: 'Available',
-          available_from: item.available_from || '', // Ensure available_from is included
-        }));
+            const formattedData = data.map((item) => ({
+                key: item.key || `T${RawMaterialsData.length + 1}`, // Generate a new key if not present
+                id: item.id || '',
+                order_id: item.order_id || '',
+                part_number: item.part_number || '',
+                description: item.description || '',
+                quantity: parseInt(item.quantity) || 0,
+                unit_id: item.unit_id || '',
+                status: item.status || '',
+                available_from: item.available_from || dayjs().format('YYYY-MM-DD'), // Default to today if not present
+            }));
 
-        setRawMaterialsData([...rawMaterialsData, ...formattedData]);
-        message.success(`Successfully added ${formattedData.length} raw materials`);
-      } catch (error) {
-        message.error('Error processing file');
-        console.error(error);
-      }
+            setRawMaterialsData([...RawMaterialsData, ...formattedData]);
+            message.success(`Successfully added ${formattedData.length} RawMaterials`);
+        } catch (error) {
+            message.error('Error processing file');
+            console.error(error);
+        }
     };
     reader.readAsBinaryString(file);
     return false; // Prevent automatic upload
-  };
+};
 
-  const columns = [
+const columns = [
+  {
+    title: 'ID',
+    dataIndex: 'id',
+    key: 'id',
+    sorter: (a, b) => a.id.localeCompare(b.id),
+    onFilter: (value, record) => record.id.includes(value),
+  },
+  {
+    title: 'Order ID',
+    dataIndex: 'order_id',
+    key: 'order_id',
+    sorter: (a, b) => a.order_id.localeCompare(b.description),
+    filterSearch: true,
+    filters: [...new Set(RawMaterialsData.map(item => item.order_id))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.order_id.includes(value),
+  },
+  {
+    title: 'Part Number',
+    dataIndex: 'part_number',
+    key: 'part_number',
+    sorter: (a, b) => a.part_number.localeCompare(b.description),
+    filterSearch: true,
+    filters: [...new Set(RawMaterialsData.map(item => item.part_number))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.part_number.includes(value),
+  },
+  {
+    title: 'Description',
+    dataIndex: 'description',
+    key: 'description',
+    sorter: (a, b) => a.description.localeCompare(b.description),
+    filterSearch: true,
+    filters: [...new Set(RawMaterialsData.map(item => item.description))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.description.includes(value),
+  },
+  {
+    title: 'Quantity',
+    dataIndex: 'quantity',
+    key: 'quantity',
+    sorter: (a, b) => a.quantity.localeCompare(b.description),
+    filterSearch: true,
+    filters: [...new Set(RawMaterialsData.map(item => item.quantity))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.quantity.includes(value),
+  },
+  {
+    title: 'Unit ID',
+    dataIndex: 'unit_id',
+    key: 'unit_id',
+    sorter: (a, b) => a.unit_id.localeCompare(b.description),
+    filterSearch: true,
+    filters: [...new Set(RawMaterialsData.map(item => item.unit_id))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.unit_id.includes(value),
+  },
+  {
+    title: 'Status',
+    dataIndex: 'status',
+    key: 'status',
+    sorter: (a, b) => a.status.localeCompare(b.description),
+    filterSearch: true,
+    filters: [...new Set(RawMaterialsData.map(item => item.status))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.status.includes(value),
+  },
+  {
+    title: 'Available From',
+    dataIndex: 'available_from',
+    key: 'available_from',
+    sorter: (a, b) => a.available_from.localeCompare(b.description),
+    filterSearch: true,
+    filters: [...new Set(RawMaterialsData.map(item => item.available_from))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.available_from.includes(value),
+  },
     {
-      title: 'ID',
-      dataIndex: 'key',
-      key: 'key',
-      sorter: (a, b) => a.key - b.key,
-    },
-    {
-      title: 'Material Type',
-      dataIndex: 'type_name',
-      key: 'type_name',
-      sorter: (a, b) => a.type_name.localeCompare(b.type_name),
-    },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-      sorter: (a, b) => a.description.localeCompare(b.description),
-    },
-    {
-      title: 'BEL Part Number',
-      dataIndex: 'bel_part_number',
-      key: 'bel_part_number',
-      sorter: (a, b) => a.bel_part_number.localeCompare(b.bel_part_number),
-    },
-    {
-      title: 'Quantity',
-      dataIndex: 'quantity',
-      key: 'quantity',
-      sorter: (a, b) => a.quantity - b.quantity,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status_id',
-      key: 'status_id',
-      filters: [
-        { text: 'Available', value: 'Available' },
-        { text: 'In Use', value: 'In Use' },
-      ],
-      onFilter: (value, record) => record.status_id === value,
-    },
-    {
-      title: 'Available From',
-      dataIndex: 'available_from',
-      key: 'available_from',
-      sorter: (a, b) => new Date(a.available_from) - new Date(b.available_from),
-      render: (date) => <span>{dayjs(date).format('YYYY-MM-DD')}</span>, // Format the date
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button icon={<EditOutlined />} onClick={() => handleEditOrder(record)} />
+          <Button icon={<DeleteOutlined />} danger onClick={() => handleDeleteOrder(record)} />
+        </Space>
+      ),
     },
   ];
 
   return (
     <div>
       <Card 
-        title="Raw Materials"
+        title="RawMaterials Data"
         extra={
           <Space>
-            <Button className='bg-sky-500' style={{ color: '#FFFFFF'}} onMouseEnter={(e) => e.currentTarget.style.color = '#0EA5E9'} 
-                    onMouseLeave={(e) => e.currentTarget.style.color = '#FFFFFF'} onClick={showModal}>Add New Material</Button>
+            <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
+          onClick={showModal}>
+          Add New Tool
+      </Button>
             <Button icon={<DownloadOutlined />} onClick={handleDownloadData}>
               Download
             </Button>
@@ -158,7 +218,7 @@ const RawMaterials = () => {
       >
         <Table 
           columns={columns} 
-          dataSource={rawMaterialsData}
+          dataSource={RawMaterialsData}
           pagination={{ 
             pageSize: 8,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
@@ -168,7 +228,7 @@ const RawMaterials = () => {
       </Card>
 
       <Modal
-        title="Add New Raw Material"
+        title={editingKey ? "Edit Tool" : "Add New Tool"}
         open={isModalVisible}
         onCancel={handleCancel}
         footer={null}
@@ -179,49 +239,87 @@ const RawMaterials = () => {
           onFinish={handleSubmit}
           initialValues={{
             available_from: dayjs(),
-            status_id: 'Available'
+            status: 'Available'
           }}
         >
-          <Form.Item
-            name="type_name"
-            label="Material Type"
-            rules={[{ required: true, message: 'Please input the Material Type!' }]}
-          >
-            <Input />
-          </Form.Item>
-          
-          <Form.Item
-            name="description"
-            label="Description"
-            rules={[{ required: true, message: 'Please input the Description!' }]}
-          >
-            <Input />
-          </Form.Item>
-
-          <Form.Item
-            name="bel_part_number"
-            label="Part Number"
-            rules={[{ required: true, message: 'Please input the Part Number!' }]}
-          >
-            <Input />
-          </Form.Item>
-          
-          <Form.Item
-            name="quantity"
-            label="Quantity"
-            rules={[{ required: true, message: 'Please input the Quantity!' }]}
-          >
-            <Input type="number" min={0} />
-          </Form.Item>
-
-          <Form.Item
-            name="available_from"
-            label="Available From"
-            rules={[{ required: true, message: 'Please select the Available From date!' }]}
-          >
-            <DatePicker className="w-full" />
-          </Form.Item>
-
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="id"
+                label="ID"
+                rules={[{ required: true, message: 'Please input the ID!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="order_id" // New field
+                label="Order ID"
+                rules={[{ required: true, message: 'Please input the Order ID!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="part_number" // New field
+                label="Part Number"
+                rules={[{ required: true, message: 'Please input the Part Number!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="description"
+                label="Description"
+                rules={[{ required: true, message: 'Please input the Description!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="quantity"
+                label="Quantity"
+                rules={[{ required: true, message: 'Please input the Quantity!' }]}
+              >
+                <Input type="number" min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="unit_id" // New field
+                label="Unit ID"
+                rules={[{ required: true, message: 'Please input the Unit ID!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="status"
+                label="Status"
+                rules={[{ required: true, message: 'Please input the Status!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="available_from" // New field
+                label="Available From"
+                rules={[{ required: true, message: 'Please input the Available From date!' }]}
+              >
+                <Input type="date" />
+              </Form.Item>
+            </Col>
+          </Row>
           <Form.Item>
             <Space className="w-full justify-end">
               <Button onClick={handleCancel}>Cancel</Button>

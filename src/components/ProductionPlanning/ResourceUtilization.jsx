@@ -187,84 +187,81 @@ const ResourceUtilization = ({ machines = [] }) => {
     <div className="space-y-6">
       {/* Stats Overview */}
       <Row gutter={[16, 16]}>
-  <Col xs={24} sm={12} md={6}>
-    <Card bordered={false} className="hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-center">
-        <Space>
-          <div className="p-3 rounded-full bg-blue-100">
-            <ClockCircleOutlined className="text-blue-500 text-xl" />
+      <Col xs={24} sm={12} md={6}>
+        <Card bordered={false} className="hover:shadow-md transition-shadow bg-sky-50">
+          <div className="flex justify-between items-center ">
+            <Space>
+              <div className="p-3 rounded-full bg-sky-100">
+                <ClockCircleOutlined className="text-sky-900 text-xl" />
+              </div>
+              <Text strong className="text-lg">Total Capacity</Text>
+            </Space>
+            <Text strong className="text-blue-500 text-xl">{`${stats.totalCapacity}h`}</Text>
           </div>
-          <Text strong className="text-lg">Total Capacity</Text>
-        </Space>
-        <Text strong className="text-blue-500 text-xl">{`${stats.totalCapacity}h`}</Text>
-      </div>
-      <div className="mt-4">
-        <Progress percent={100} showInfo={false} strokeColor="#1890ff" />
-      </div>
-    </Card>
-  </Col>
-
-  <Col xs={24} sm={12} md={6}>
-    <Card bordered={false} className="hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-center">
-        <Space>
-          <div className="p-3 rounded-full bg-blue-100">
-            <ToolOutlined className="text-blue-500 text-xl" />
+          <div className="mt-4">
+            <Progress percent={100} showInfo={false} strokeColor="#1890ff" />
           </div>
-          <Text strong className="text-lg">Used Capacity</Text>
-        </Space>
-        <Text strong className="text-blue-500 text-xl">{`${stats.usedCapacity}h`}</Text>
-      </div>
-      <div className="mt-4">
-        <Progress
-          percent={Math.round((stats.usedCapacity / stats.totalCapacity) * 100)}
-          strokeColor="#faad14"
-        />
-      </div>
-    </Card>
-  </Col>
+        </Card>
+      </Col>
 
-  <Col xs={24} sm={12} md={6}>
-    <Card bordered={false} className="hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-center">
-        <Space>
-          <div className="p-3 rounded-full bg-orange-100">
-            <AlertOutlined className="text-orange-500 text-xl" />
+      <Col xs={24} sm={12} md={6}>
+        <Card bordered={false} className="hover:shadow-md transition-shadow bg-sky-50">
+          <div className="flex justify-between items-center">
+            <Space>
+              <div className="p-3 rounded-full bg-sky-100">
+                <ToolOutlined className="text-blue-500 text-xl" />
+              </div>
+              <Text strong className="text-lg">Used Capacity</Text>
+            </Space>
+            <Text strong className="text-blue-500 text-xl">{`${stats.usedCapacity}h`}</Text>
           </div>
-          <Text strong className="text-lg">Planned Capacity</Text>
-        </Space>
-        <Text strong className="text-orange-500 text-xl">{`${stats.plannedCapacity}h`}</Text>
-      </div>
-      <div className="mt-4">
-        <Progress
-          percent={Math.round((stats.plannedCapacity / stats.totalCapacity) * 100)}
-          strokeColor="#1890ff"
-        />
-      </div>
-    </Card>
-  </Col>
-
-  <Col xs={24} sm={12} md={6}>
-    <Card bordered={false} className="hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-center">
-        <Space>
-          <div className="p-3 rounded-full bg-green-100">
-            <CheckCircleOutlined className="text-green-500 text-xl" />
+          <div className="mt-4">
+            <Progress
+              percent={Math.round((stats.usedCapacity / stats.totalCapacity) * 100)}
+              strokeColor="#faad14"
+            />
           </div>
-          <Text strong className="text-lg">Average Efficiency</Text>
-        </Space>
-        <Text strong className="text-green-500 text-xl">{`${stats.averageEfficiency}%`}</Text>
-      </div>
-      <div className="mt-4">
-        <Progress percent={stats.averageEfficiency} strokeColor="#52c41a" />
-      </div>
-    </Card>
-  </Col>
-</Row>
+        </Card>
+      </Col>
 
+      <Col xs={24} sm={12} md={6}>
+        <Card bordered={false} className="hover:shadow-md transition-shadow bg-sky-50">
+          <div className="flex justify-between items-center">
+            <Space>
+              <div className="p-3 rounded-full bg-orange-100">
+                <AlertOutlined className="text-orange-500 text-xl" />
+              </div>
+              <Text strong className="text-lg">Planned Capacity</Text>
+            </Space>
+            <Text strong className="text-orange-500 text-xl">{`${stats.plannedCapacity}h`}</Text>
+          </div>
+          <div className="mt-4">
+            <Progress
+              percent={Math.round((stats.plannedCapacity / stats.totalCapacity) * 100)}
+              strokeColor="#1890ff"
+            />
+          </div>
+        </Card>
+      </Col>
 
+      <Col xs={24} sm={12} md={6}>
+        <Card bordered={false} className="hover:shadow-md transition-shadow bg-sky-50">
+          <div className="flex justify-between items-center">
+            <Space>
+              <div className="p-3 rounded-full bg-green-100">
+                <CheckCircleOutlined className="text-green-500 text-xl" />
+              </div>
+              <Text strong className="text-lg">Average Efficiency</Text>
+            </Space>
+            <Text strong className="text-green-500 text-xl">{`${stats.averageEfficiency}%`}</Text>
+          </div>
+          <div className="mt-4">
+            <Progress percent={stats.averageEfficiency} strokeColor="#52c41a" />
+          </div>
+        </Card>
+      </Col>
+    </Row>
 
-      
       {/* Filters */}
       <Card className="shadow-sm">
         <Space size="large" wrap>
@@ -281,6 +278,7 @@ const ResourceUtilization = ({ machines = [] }) => {
             value={selectedMachine}
             allowClear
           >
+            <Select.Option value={null}>All Machines</Select.Option> {/* Default option */}
             {machines.map(machine => (
               <Select.Option key={machine.id} value={machine.id}>
                 {machine.name}

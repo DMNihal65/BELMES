@@ -3,7 +3,7 @@ import { ArrowUpIcon } from 'lucide-react';
 
 const MetricCard = ({ title, value, trend, trendPeriod, icon: Icon }) => {
   return (
-    <div className="bg-[#FFFFFF] rounded-xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.1)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] transition-all duration-300 ease-in-out  w-3/4">
+    <div className="bg-sky-200 rounded-xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.1)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] transition-all duration-300 ease-in-out  w-3/4">
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <h3 className="text-gray-500 text-sm font-medium">{title}</h3>

@@ -1,122 +1,166 @@
-// src/pages/supervisorscreens/inventory/Consumables.jsx
 import React, { useState } from 'react';
-import { Card, Table, Button, Space, Upload, message, Modal, Form, Input } from 'antd';
-import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'; // Import the icons
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col } from 'antd';
+import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
 
 const Consumables = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
-  const [consumablesData, setConsumablesData] = useState([
+  const [editingKey, setEditingKey] = useState(null);
+  const [ConsumablesData, setConsumablesData] = useState([
     {
       key: '1',
-      type: 'Cleaning Supplies',
-      description: 'Multi-surface cleaner',
-      unit: 'Bottle',
-      quantity: 50,
+      id: '001',
+      order_id: 'ORD001', // Added order_id
+      part_number: 'PART001', // Added part_number
+      description: 'High precision end mill',
+      quantity: 10,
+      unit_id: 'UNIT001', // Added unit_id
+      status: 'Available',
+      available_from: dayjs().subtract(1, 'month').format('YYYY-MM-DD'), // Added available_from
     },
-    // Add more consumables as needed
+    // ... other existing data ...
   ]);
 
   const showModal = () => {
+    form.resetFields(); // Reset form fields when opening the modal
     setIsModalVisible(true);
+    setEditingKey(null); // Reset editing key for adding new tool
   };
 
   const handleCancel = () => {
     form.resetFields();
     setIsModalVisible(false);
+    setEditingKey(null); // Reset editing key
   };
 
   const handleSubmit = (values) => {
-    const newConsumable = {
-      key: `C${consumablesData.length + 1}`,
-      type: values.type,
-      description: values.description,
-      unit: values.unit,
-      quantity: values.quantity,
-    };
+    if (editingKey) { // Check if we are editing an existing row
+      const updatedData = ConsumablesData.map(item => 
+        item.key === editingKey ? { ...item, ...values } : item // Update the specific item
+      );
+      setConsumablesData(updatedData);
+      message.success('Tool updated successfully');
+    } else {
+      const newTool = {
+        key: `T${ConsumablesData.length + 1}`, // Generate a new key
+        ...values, // Spread the form values
+      };
+      setConsumablesData([...ConsumablesData, newTool]); // Add new tool to the list
+      message.success('Tool added successfully');
+    }
+    handleCancel(); // Close the modal
+  };
 
-    setConsumablesData([...consumablesData, newConsumable]);
-    message.success('Consumable added successfully');
-    handleCancel();
+  const handleEditOrder = (record) => {
+    form.setFieldsValue(record); // Set the form fields with the selected record's data
+    setIsModalVisible(true); // Show the modal for editing
+    setEditingKey(record.key); // Set the editing key
+  };
+
+  const handleDeleteOrder = (record) => {
+    Modal.confirm({
+      title: 'Are you sure you want to delete this tool?',
+      onOk: () => {
+        setConsumablesData(ConsumablesData.filter(item => item.key !== record.key)); // Remove the selected item
+        message.success('Tool deleted successfully');
+      },
+    });
   };
 
   const handleDownloadData = () => {
-    const ws = XLSX.utils.json_to_sheet(consumablesData);
+    const ws = XLSX.utils.json_to_sheet(ConsumablesData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Consumables Data");
-    XLSX.writeFile(wb, "consumables_template.xlsx");
+    XLSX.writeFile(wb, "Consumables_template.xlsx");
   };
 
   const handleFileUpload = (file) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      try {
-        const workbook = XLSX.read(e.target.result, { type: 'binary' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        try {
+            const workbook = XLSX.read(e.target.result, { type: 'binary' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const data = XLSX.utils.sheet_to_json(worksheet);
 
-        const formattedData = data.map((item, index) => ({
-          key: `C${consumablesData.length + index + 1}`,
-          type: item.type || '',
-          description: item.description || '',
-          unit: item.unit || '',
-          quantity: parseInt(item.quantity) || 0,
-        }));
+            const formattedData = data.map((item) => ({
+                key: item.key || `T${ConsumablesData.length + 1}`, // Generate a new key if not present
+                id: item.id || '',
+                description: item.description || '',
+                unit_id: item.unit_id || '',
+                quantity: parseInt(item.quantity) || 0,
+            }));
 
-        setConsumablesData([...consumablesData, ...formattedData]);
-        message.success(`Successfully added ${formattedData.length} consumables`);
-      } catch (error) {
-        message.error('Error processing file');
-        console.error(error);
-      }
+            setConsumablesData([...ConsumablesData, ...formattedData]);
+            message.success(`Successfully added ${formattedData.length} Consumables`);
+        } catch (error) {
+            message.error('Error processing file');
+            console.error(error);
+        }
     };
     reader.readAsBinaryString(file);
     return false; // Prevent automatic upload
-  };
+};
 
-  const columns = [
+const columns = [
+  {
+    title: 'ID',
+    dataIndex: 'id',
+    key: 'id',
+    sorter: (a, b) => a.id.localeCompare(b.id),
+    onFilter: (value, record) => record.id.includes(value),
+  },
+  {
+    title: 'Description',
+    dataIndex: 'description',
+    key: 'description',
+    sorter: (a, b) => a.description.localeCompare(b.type),
+      filterSearch: true,
+      filters: [...new Set(ConsumablesData.map(item => item.description))].map(item => ({ text: item, value: item })),
+      onFilter: (value, record) => record.description.includes(value),
+  },
+  {
+    title: 'Unit ID',
+    dataIndex: 'unit_id',
+    key: 'unit_id',
+    sorter: (a, b) => a.unit_id.localeCompare(b.type),
+    filterSearch: true,
+    filters: [...new Set(ConsumablesData.map(item => item.unit_id))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.unit_id.includes(value),
+  },
+  {
+    title: 'Quantity',
+    dataIndex: 'quantity',
+    key: 'quantity',
+    sorter: (a, b) => a.quantity.localeCompare(b.type),
+    filterSearch: true,
+    filters: [...new Set(ConsumablesData.map(item => item.quantity))].map(item => ({ text: item, value: item })),
+    onFilter: (value, record) => record.unit_id.includes(value),
+  },
     {
-      title: 'ID',
-      dataIndex: 'key',
-      key: 'key',
-      sorter: (a, b) => a.key - b.key,
-    },
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
-      sorter: (a, b) => a.type.localeCompare(b.type),
-    },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-      sorter: (a, b) => a.description.localeCompare(b.description),
-    },
-    {
-      title: 'Unit',
-      dataIndex: 'unit',
-      key: 'unit',
-      sorter: (a, b) => a.unit.localeCompare(b.unit),
-    },
-    {
-      title: 'Quantity',
-      dataIndex: 'quantity',
-      key: 'quantity',
-      sorter: (a, b) => a.quantity - b.quantity,
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button icon={<EditOutlined />} onClick={() => handleEditOrder(record)} />
+          <Button icon={<DeleteOutlined />} danger onClick={() => handleDeleteOrder(record)} />
+        </Space>
+      ),
     },
   ];
 
   return (
     <div>
       <Card 
-        title="Consumables"
+        title="Consumables Data"
         extra={
           <Space>
-            <Button className='bg-sky-500' style={{ color: '#FFFFFF'}} onMouseEnter={(e) => e.currentTarget.style.color = '#0EA5E9'} 
-                    onMouseLeave={(e) => e.currentTarget.style.color = '#FFFFFF'} onClick={showModal}>Add New Consumable</Button>
+              <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
+          onClick={showModal}>
+          Add New Tool
+      </Button>
             <Button icon={<DownloadOutlined />} onClick={handleDownloadData}>
               Download
             </Button>
@@ -134,7 +178,7 @@ const Consumables = () => {
       >
         <Table 
           columns={columns} 
-          dataSource={consumablesData}
+          dataSource={ConsumablesData}
           pagination={{ 
             pageSize: 8,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
@@ -144,7 +188,7 @@ const Consumables = () => {
       </Card>
 
       <Modal
-        title="Add New Consumable"
+        title={editingKey ? "Edit Tool" : "Add New Tool"}
         open={isModalVisible}
         onCancel={handleCancel}
         footer={null}
@@ -154,41 +198,51 @@ const Consumables = () => {
           layout="vertical"
           onFinish={handleSubmit}
           initialValues={{
-            quantity: 0,
+            available_from: dayjs(),
+            status: 'Available'
           }}
         >
-          <Form.Item
-            name="type"
-            label="Type"
-            rules={[{ required: true, message: 'Please input the Type!' }]}
-          >
-            <Input />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="id"
+                label="ID"
+                rules={[{ required: true, message: 'Please input the ID!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="description"
+                label="Description"
+                rules={[{ required: true, message: 'Please input the Description!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="unit_id" // New field
+                label="Unit ID"
+                rules={[{ required: true, message: 'Please input the Unit ID!' }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="quantity"
+                label="Quantity"
+                rules={[{ required: true, message: 'Please input the Quantity!' }]}
+              >
+                <Input type="number" min={0} />
+              </Form.Item>
+            </Col>
+          </Row>
           
-          <Form.Item
-            name="description"
-            label="Description"
-            rules={[{ required: true, message: 'Please input the Description!' }]}
-          >
-            <Input />
-          </Form.Item>
-
-          <Form.Item
-            name="unit"
-            label="Unit"
-            rules={[{ required: true, message: 'Please input the Unit!' }]}
-          >
-            <Input />
-          </Form.Item>
-          
-          <Form.Item
-            name="quantity"
-            label="Quantity"
-            rules={[{ required: true, message: 'Please input the Quantity!' }]}
-          >
-            <Input type="number" min={0} />
-          </Form.Item>
-
           <Form.Item>
             <Space className="w-full justify-end">
               <Button onClick={handleCancel}>Cancel</Button>

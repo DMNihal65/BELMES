@@ -8,12 +8,13 @@ import {
 import {
   UploadOutlined, FileTextOutlined, EditOutlined,
   SaveOutlined, PlusOutlined, ClockCircleOutlined,
-  CalendarOutlined, BarChartOutlined,
+  CalendarOutlined, BarChartOutlined, UserOutlined,
   ToolOutlined
 } from '@ant-design/icons';
 import {
   Timer, AlertTriangle, CheckCircle2, 
-  Gauge, Settings, Users, Calendar
+  Gauge, Settings, Users, Calendar, Wrench,
+  FileStack, FilePenLine, CircleCheckBig, Clock, FileSliders, BrickWall, CalendarX, Siren, User, LandPlot
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import JobOperationsTable from '../../../components/ProductionPlanning/JobOperationsTable';
@@ -67,67 +68,75 @@ const Planning = () => {
 
   return (
     <div className="space-y-3 p-1">
-      {/* Stats Overview */}
-      <Row gutter={[16, 16]}>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic 
-              title="Total Jobs"
-              value={planningStats.totalJobs}
-              prefix={<FileTextOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic 
-              title="In Planning"
-              value={planningStats.inPlanning}
-              prefix={<EditOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic 
-              title="Scheduled"
-              value={planningStats.scheduled}
-              prefix={<CheckCircle2 size={16} />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic 
-              title="Delayed"
-              value={planningStats.delayed}
-              prefix={<AlertTriangle size={16} />}
-              valueStyle={{ color: '#ff4d4f' }}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic 
-              title="Machine Utilization"
-              value={planningStats.machineUtilization}
-              prefix={<Gauge size={16} />}
-              suffix="%"
-            />
-          </Card>
-        </Col>
-        {/* <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic 
-              title="Upcoming Maintenance"
-              value={planningStats.upcomingMaintenance}
-              prefix={<Settings size={16} />}
-            />
-          </Card>
-        </Col> */}
-      </Row>
+
+      <div className="flex flex-wrap gap-4">
+        {/* Stats Overview */}
+        {/* Total Jobs Card */}
+        <div className="w-64 bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="h-16 px-4 py-3 border-b border-gray-100 flex bg-sky-200 justify-between items-center">
+            <div className="flex items-center gap-2 bg-sky-100 p-1 px-2 rounded-lg">
+              <FileStack className="text-blue-500" />
+              <span className="font-semibold">Total Jobs</span>
+            </div>
+            <span className="bg-blue-500 text-white text-sm font-semibold rounded-full px-3 py-1">
+                {planningStats.totalJobs}
+            </span>
+          </div>
+        </div>
+
+        {/* In Planning Card */}
+        <div className="w-64 bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="h-16 px-4 py-3 border-b border-gray-100 flex bg-sky-200 justify-between items-center">
+            <div className="flex items-center gap-2 bg-sky-100 p-1 px-2 rounded-lg">
+              <FilePenLine className="text-blue-500" />
+              <span className="font-semibold">In Planning</span>
+            </div>
+            <span className="bg-blue-500 text-white text-sm font-semibold rounded-full px-3 py-1">
+                {planningStats.inPlanning}
+            </span>
+          </div>
+        </div>
+
+      {/* Scheduled Card */}
+      <div className="w-64 bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="h-16 px-4 py-3 border-b border-gray-100 flex bg-sky-200 justify-between items-center">
+            <div className="flex items-center gap-2 bg-sky-100 p-1 px-2 rounded-lg">
+              <CircleCheckBig className="text-blue-500" />
+              <span className="font-semibold">Scheduled</span>
+            </div>
+            <span className="bg-green-500 text-white text-sm font-semibold rounded-full px-3 py-1">
+                {planningStats.scheduled}
+            </span>
+          </div>
+        </div>
+
+        {/* Delayed Card */}
+        <div className="w-64 bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="h-16 px-4 py-3 border-b border-gray-100 flex bg-sky-200 justify-between items-center">
+            <div className="flex items-center gap-2 bg-sky-100 p-1 px-2 rounded-lg">
+              <AlertTriangle className="text-blue-500" />
+              <span className="font-semibold">Delayed</span>
+            </div>
+            <span className="bg-red-500 text-white text-sm font-semibold rounded-full px-3 py-1">
+                {planningStats.delayed}
+            </span>
+          </div>
+        </div>
+
+        {/* Machine Utilization Card */}
+        <div className="w-72 bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="h-16 px-4 py-3 border-b border-gray-100 flex bg-sky-200 justify-between items-center">
+            <div className="flex items-center gap-2 bg-sky-100 p-1 px-2 rounded-lg">
+              <Gauge className="text-blue-500" />
+              <span className="font-semibold">Machine Utilization</span>
+            </div>
+            <span className="bg-blue-500 text-white text-sm font-semibold rounded-full px-3 py-1">
+                {planningStats.machineUtilization}%
+            </span>
+          </div>
+        </div>
+
+      </div>
 
       {/* Job Selection Section with improved layout */}
       <Card className="shadow-sm">
@@ -163,22 +172,12 @@ const Planning = () => {
               </Upload> */}
             </Space>
           </Col>
-          <Col span={8} className="text-right">
-            <Space>
-              <Button type="primary" icon={<SaveOutlined />}>
-                Save Plan
-              </Button>
-              <Button type="primary" icon={<PlusOutlined />}>
-                New Job
-              </Button>
-            </Space>
-          </Col>
-        </Row>
-        <Alert 
+          <Alert 
           message="You can also modify details such as the MPP and order management number." 
           type="info" 
           className="mt-2 max-w-xl" 
         />
+        </Row>
       </Card>
 
       {selectedJob && (
@@ -188,13 +187,13 @@ const Planning = () => {
             <Tabs 
               activeKey={activeTab} 
               onChange={setActiveTab}
-              tabBarExtraContent={
-                <Link to="/supervisor/production-planning/scheduling">
-                  <Button type="primary" icon={<CalendarOutlined />}>
-                    Open Scheduler
-                  </Button>
-                </Link>
-              }
+              // tabBarExtraContent={
+              //   <Link to="/supervisor/production-planning/scheduling">
+              //     <Button type="primary" icon={<CalendarOutlined />}>
+              //       Open Scheduler
+              //     </Button>
+              //   </Link>
+              // }
             >
              <TabPane 
                 tab={
@@ -205,29 +204,59 @@ const Planning = () => {
                 }
                 key="jobDetails"
               >
-                <Row gutter={[24, 24]}>
-                  <Col span={4}>
-                    <strong>Project:</strong> {selectedJob.project}
-                  </Col>
-                  <Col span={4}>
-                    <strong>Customer:</strong> {selectedJob.customer}
-                  </Col>
-                  <Col span={4}>
-                    <strong>Material:</strong> {selectedJob.material}
-                  </Col>
-                  <Col span={4}>
-                    <strong>Quantity:</strong> {selectedJob.quantity}
-                  </Col>
-                  <Col span={4}>
-                    <strong>Due Date:</strong> {selectedJob.dueDate}
-                  </Col>
-                  <Col span={4}>
-                    <strong>Priority:</strong> 
-                    <Tag color={selectedJob.priority === 'high' ? 'red' : 'blue'}>
-                      {selectedJob.priority.toUpperCase()}
-                    </Tag>
-                  </Col>
-                </Row>
+
+
+              <div className="bg-sky-100/50 rounded-lg p-3 mb-4">
+                <div className="grid grid-cols-6 gap-20">
+                  <div className="flex items-center bg-white p-2 rounded">
+                    <FileSliders className="w-7 h-7 text-blue-600" />
+                    <div className="ml-2">
+                      <div className="text-base text-gray-500">Project</div>
+                      <div className="font-bold">Project 1</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center bg-white p-2 rounded">
+                    <User className="w-7 h-7 text-blue-600" />
+                    <div className="ml-2">
+                      <div className="text-base text-gray-500">Customer</div>
+                      <div className="font-bold">Naveesh</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center bg-white p-2 rounded">
+                    <LandPlot className="w-7 h-7 text-blue-600" />
+                    <div className="ml-2">
+                      <div className="text-base text-gray-500">Material</div>
+                      <div className="font-bold">Raw material</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-white p-2 rounded">
+                    <BrickWall className="w-7 h-7 text-blue-600" />
+                    <div className="ml-2">
+                      <div className="text-base text-gray-500">Quantity</div>
+                      <div className="font-bold">20</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-white p-2 rounded">
+                    <CalendarX className="w-7 h-7 text-red-600" />
+                    <div className="ml-2">
+                      <div className="text-base text-gray-500">Due Date</div>
+                      <div className="font-bold">22/01/2025</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-white p-2 rounded">
+                    <Siren className="w-7 h-7 text-red-600" />
+                    <div className="ml-2">
+                      <div className="text-base text-gray-500">Priority</div>
+                      <Tag color={selectedJob.priority === 'high' ? 'red' : 'blue'}>
+                        {selectedJob.priority.toUpperCase()}
+                      </Tag>
+                    </div>
+                  </div>
+                </div>
+              </div>
+                
                 <Divider style={{ margin: '16px 0' }} />
                 <Row gutter={[24, 24]}>
                   <Col span={24}>
@@ -265,6 +294,13 @@ const Planning = () => {
                 key="schedule"
               >
                 <Card className="bg-gray-50">
+                <div className="flex justify-center mb-4"> {/* Center the button */}
+                  <Link to="/supervisor/production-planning/scheduling">
+                    <Button type="primary" icon={<CalendarOutlined />}>
+                      Open Scheduler
+                    </Button>
+                  </Link>
+                </div>
                   <Steps 
                     direction="vertical" 
                     current={1}

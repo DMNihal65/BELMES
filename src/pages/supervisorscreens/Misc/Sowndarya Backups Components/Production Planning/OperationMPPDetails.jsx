@@ -141,7 +141,7 @@ const OperationMPPDetails = ({ operation, onSave }) => {
                               name={[name, 'description']}
                               rules={[{ required: true, message: 'Missing step' }]}
                             >
-                              <Input placeholder="Setup step" />
+                              <Input placeholder="Enter program name" />
                             </Form.Item>
                             </Col>
                             </Row>
@@ -155,7 +155,7 @@ const OperationMPPDetails = ({ operation, onSave }) => {
                             block 
                             icon={<PlusOutlined />}
                           >
-                            Add Setup Step
+                            Add Program Name
                           </Button>
                         </Form.Item>
                       </>

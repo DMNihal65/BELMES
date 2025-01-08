@@ -1,6 +1,45 @@
 import React from 'react';
-import { ToolOutlined, CheckCircleOutlined, DownloadOutlined, BarChartOutlined, PieChartOutlined, LineChartOutlined, DashboardOutlined } from '@ant-design/icons';
-import MetricCard from './cards/MetricCard'; // Import MetricCard component
+import { 
+  Wrench, 
+  Package, 
+  ShoppingCart,
+  CheckCircle, 
+  Activity,
+  BarChart3,
+  TrendingUp,
+  TrendingDown
+} from "lucide-react";
+
+const MetricCard = ({ title, value, trend, trendPeriod, Icon }) => {
+  const isPositive = trend >= 0;
+  
+  return (
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden transition-all hover:shadow-lg p-6 border border-gray-200">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Icon className="w-5 h-5 text-gray-500" />
+          <h3 className="text-sm font-medium text-gray-600">{title}</h3>
+        </div>
+      </div>
+      <div className="mt-4">
+        <div className="text-2xl font-bold">{value}</div>
+        <div className="flex items-center mt-2 space-x-2">
+          {isPositive ? (
+            <TrendingUp className="w-4 h-4 text-green-500" />
+          ) : (
+            <TrendingDown className="w-4 h-4 text-red-500" />
+          )}
+          <span className={`text-sm font-medium ${
+            isPositive ? 'text-green-600' : 'text-red-600'
+          }`}>
+            {Math.abs(trend)}%
+          </span>
+          <span className="text-sm text-gray-500">{trendPeriod}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Analytics = () => {
   const summaryData = {
@@ -30,49 +69,52 @@ const Analytics = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
-      <MetricCard
-        title="Total Tools"
-        value={summaryData.totalTools.toLocaleString()}
-        trend={summaryData.totalToolsChange}
-        trendPeriod={summaryData.totalToolsPeriod}
-        icon={ToolOutlined}
-      />
-      <MetricCard
-        title="Raw Materials"
-        value={summaryData.rawMaterials.toLocaleString()}
-        trend={summaryData.rawMaterialsChange}
-        trendPeriod={summaryData.rawMaterialsPeriod}
-        icon={BarChartOutlined}
-      />
-      <MetricCard
-        title="Consumables"
-        value={summaryData.consumables.toLocaleString()}
-        trend={summaryData.consumablesChange}
-        trendPeriod={summaryData.consumablesPeriod}
-        icon={PieChartOutlined}
-      />
-      <MetricCard
-        title="Available Tools"
-        value={summaryData.availableTools.toLocaleString()}
-        trend={summaryData.availableToolsChange}
-        trendPeriod={summaryData.availableToolsPeriod}
-        icon={CheckCircleOutlined}
-      />
-      <MetricCard
-        title="In Use Tools"
-        value={summaryData.inUseTools.toLocaleString()}
-        trend={summaryData.inUseToolsChange}
-        trendPeriod={summaryData.inUseToolsPeriod}
-        icon={LineChartOutlined}
-      />
-      <MetricCard
-        title="Total Requests"
-        value={summaryData.totalRequests.toLocaleString()}
-        trend={summaryData.totalRequestsChange}
-        trendPeriod={summaryData.totalRequestsPeriod}
-        icon={DashboardOutlined}
-      />
+    <div className="p-6 space-y-6">
+    
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <MetricCard
+          title="Total Tools"
+          value={summaryData.totalTools.toLocaleString()}
+          trend={summaryData.totalToolsChange}
+          trendPeriod={summaryData.totalToolsPeriod}
+          Icon={Wrench}
+        />
+        <MetricCard
+          title="Raw Materials"
+          value={summaryData.rawMaterials.toLocaleString()}
+          trend={summaryData.rawMaterialsChange}
+          trendPeriod={summaryData.rawMaterialsPeriod}
+          Icon={Package}
+        />
+        <MetricCard
+          title="Consumables"
+          value={summaryData.consumables.toLocaleString()}
+          trend={summaryData.consumablesChange}
+          trendPeriod={summaryData.consumablesPeriod}
+          Icon={ShoppingCart}
+        />
+        <MetricCard
+          title="Available Tools"
+          value={summaryData.availableTools.toLocaleString()}
+          trend={summaryData.availableToolsChange}
+          trendPeriod={summaryData.availableToolsPeriod}
+          Icon={CheckCircle}
+        />
+        <MetricCard
+          title="In Use Tools"
+          value={summaryData.inUseTools.toLocaleString()}
+          trend={summaryData.inUseToolsChange}
+          trendPeriod={summaryData.inUseToolsPeriod}
+          Icon={Activity}
+        />
+        <MetricCard
+          title="Total Requests"
+          value={summaryData.totalRequests.toLocaleString()}
+          trend={summaryData.totalRequestsChange}
+          trendPeriod={summaryData.totalRequestsPeriod}
+          Icon={BarChart3}
+        />
+      </div>
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Select, DatePicker } from 'antd';
-import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'; // Import the icons
+import { DownloadOutlined, UploadOutlined, PlusOutlined } from '@ant-design/icons'; // Import the icons
 import dayjs from 'dayjs'; // Import dayjs
 import * as XLSX from 'xlsx';
+import '../../../styles/inventory.css';
 
 const Tools = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -244,14 +245,8 @@ const columns = [
       title: 'Status',
       dataIndex: 'status_id',
       key: 'status_id',
-      filters: [
-        { text: 'Available', value: 'Available' },
-        { text: 'In Use', value: 'In Use' },
-      ],
-      onFilter: (value, record) => record.status_id === value,
-      filterSearch: true,
       render: (status) => (
-        <span style={{ color: status === 'Available' ? '#52c41a' : '#faad14' }}>
+        <span className={status === 'Available' ? 'status-available' : 'status-in-use'}>
           {status}
         </span>
       ),
@@ -260,53 +255,62 @@ const columns = [
   ];
 
   return (
-    <div>
-      <Card 
-        title="Tools"
-        extra={
-          <Space>
-            <Button className='bg-sky-500 ' style={{ color: '#FFFFFF'}} onMouseEnter={(e) => e.currentTarget.style.color = '#0EA5E9'} 
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#FFFFFF'}   onClick={showModal}>Add New Tool</Button>
-           <Button icon={<DownloadOutlined />} onClick={handleDownloadData}>
-                  Download
-                </Button>
-            <Upload
-              accept=".xlsx,.xls"
-              showUploadList={false}
-              beforeUpload={handleFileUpload}
-            >
-              <Button icon={<UploadOutlined />}>
-                Upload Excel
-              </Button>
-            </Upload>
-          </Space>
-        }
-      >
-        <Table 
-          columns={columns} 
-          dataSource={toolsData}
-          pagination={{ 
-            pageSize: 8,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-          }}
-          scroll={{ x: 1000 }}
-        />
-      </Card>
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="inventory-title">Tools Inventory</h2>
+        <Space size="middle">
+          <Button
+            icon={<PlusOutlined />}
+            className="primary-button"
+            onClick={showModal}
+          >
+            Add Tool
+          </Button>
+          <Button
+            icon={<DownloadOutlined />}
+            className="download-button"
+            onClick={handleDownloadData}
+          >
+            Export
+          </Button>
+          <Upload
+            accept=".xlsx,.xls"
+            showUploadList={false}
+            beforeUpload={handleFileUpload}
+          >
+            <Button icon={<UploadOutlined />} className="upload-button">
+              Import
+            </Button>
+          </Upload>
+        </Space>
+      </div>
+
+      <Table 
+        columns={columns} 
+        dataSource={toolsData}
+        className="inventory-table"
+        pagination={{ 
+          pageSize: 10,
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          className: "pagination-custom"
+        }}
+        scroll={{ x: 'max-content' }}
+        rowClassName="hover:bg-gray-50"
+      />
 
       <Modal
-        title="Add New Tool"
+        title={<span className="text-lg font-semibold">Add New Tool</span>}
         open={isModalVisible}
         onCancel={handleCancel}
         footer={null}
+        width={600}
+        className="custom-modal"
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          initialValues={{
-            lastUpdated: dayjs(),
-            status: 'Available'
-          }}
+          className="p-4"
         >
           <Form.Item
             name="type_name" // Changed from toolId to toolName
@@ -349,8 +353,12 @@ const columns = [
 
           <Form.Item>
             <Space className="w-full justify-end">
-              <Button onClick={handleCancel}>Cancel</Button>
-              <Button type="primary" htmlType="submit">Submit</Button>
+              <Button className="secondary-button" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button className="primary-button" htmlType="submit">
+                Add Tool
+              </Button>
             </Space>
           </Form.Item>
         </Form>

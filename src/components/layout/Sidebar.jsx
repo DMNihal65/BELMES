@@ -1,95 +1,160 @@
-import { Image, Menu } from 'antd'
-import { BarChart2, FileText, Home, Settings, User, Users } from 'lucide-react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import useStore from '../../store/useStore'
+import { Image, Menu } from 'antd';
+import {
+  BarChart2,
+  FileText,
+  Home,
+  AlertTriangle,
+  Wrench,
+  HelpCircle,
+  ClipboardList,
+  Package,
+  Calendar,
+  Activity,
+  CheckSquare,
+  Archive,
+  Files,
+  Box
+} from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import useStore from '../../store/useStore';
+import belLogo from '../../assets/cmti.png';
+import useAuthStore from '../../store/auth-store';
 
 function Sidebar() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const isCollapsed = useStore((state) => state.isSidebarCollapsed)
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isCollapsed = useStore((state) => state.isSidebarCollapsed);
 
-  const menuItems = [
+  const operatorMenuItems = [
     {
-      key: '/',
+      key: '/operator/dashboard',
       icon: <Home size={20} />,
       label: 'Dashboard',
     },
     {
-      key: 'reports',
-      icon: <BarChart2 size={20} />,
-      label: 'Reports',
+      key: '/operator/job-details',
+      icon: <ClipboardList size={20} />,
+      label: 'Job Details',
+    },
+    {
+      key: '/operator/alerts',
+      icon: <AlertTriangle size={20} />,
+      label: 'Alert Screen',
+    },
+    {
+      key: '/operator/maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Maintenance Guide',
+    },
+    {
+      key: '/operator/inspection',
+      icon: <CheckSquare size={20} />,
+      label: 'Inspection Results',
+    },
+    {
+      key: '/operator/inventory',
+      icon: <Archive size={20} />,
+      label: 'Inventory Data',
+    },
+    {
+      key: '/operator/help',
+      icon: <HelpCircle size={20} />,
+      label: 'Help and Support',
+    },
+  ];
+
+  const supervisorMenuItems = [
+    {
+      key: '/supervisor/dashboard',
+      icon: <Home size={20} />,
+      label: 'Dashboard',
+    },
+    {
+      key: '/supervisor/order-management',
+      icon: <Package size={20} />,
+      label: 'Order Management',
+    },
+    
+    {
+      key: 'production-planning',
+      icon: <Calendar size={20} />,
+      label: 'Production Planning',
       children: [
         {
-          key: '/reports/sales',
-          label: 'Sales Report',
+          key: '/supervisor/production-planning/planning',
+          label: 'Planning',
         },
         {
-          key: '/reports/users',
-          label: 'User Analytics',
-        },
-        {
-          key: '/reports/inventory',
-          label: 'Inventory',
+          key: '/supervisor/production-planning/scheduling',
+          label: 'Scheduling',
         },
       ],
     },
     {
-      key: 'users',
-      icon: <Users size={20} />,
-      label: 'User Management',
+      key: '/supervisor/production-monitoring',
+      icon: <Activity size={20} />,
+      label: 'Production Monitoring',
+    },
+    {
+      key: '/supervisor/quality-management',
+      icon: <CheckSquare size={20} />,
+      label: 'Quality Management',
+    },
+    // {
+    //   key: '/supervisor/inventory_master',
+    //   icon: <Archive size={20} />,
+    //   label: 'Inventory Management',
+    // },
+    {
+
+
+      key: 'inventory_master',
+      icon: <Archive size={20} />,
+      label: 'Inventory Management',
       children: [
         {
-          key: '/users/list',
-          label: 'User List',
+          key: '/supervisor/inventory_master/inventory_usage_and_analytics',
+          label: 'Master Data',
         },
         {
-          key: '/users/roles',
-          label: 'Roles & Permissions',
+          key: '/supervisor/inventory_master/requests_calibration_history',
+          label: 'Overview ',
         },
       ],
     },
     {
-      key: '/profile',
-      icon: <User size={20} />,
-      label: 'Profile',
+      key: '/supervisor/documents',
+
+      icon: <Files size={20} />,
+      label: 'Document Management',
     },
-    {
-      key: '/settings',
-      icon: <Settings size={20} />,
-      label: 'Settings',
-    },
-  ]
+  ];
+
+  const menuItems = user?.role === 'operator' ? operatorMenuItems : supervisorMenuItems;
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="h-screen flex flex-col">
       <div className="p-4 flex justify-center">
-        {isCollapsed ? (
-          <Image
-            src="/logo-small.png" // Add your small logo
-            alt="Logo"
-            preview={false}
-            width={32}
-          />
-        ) : (
-          <Image
-            src="/logo.png" // Add your full logo
-            alt="Logo"
-            preview={false}
-            height={32}
-          />
-        )}
+        <Image
+          src={belLogo}
+          alt="BEL Logo"
+          preview={false}
+          width={isCollapsed ? 40 : 100}
+          className="transition-all duration-300"
+        />
       </div>
       <Menu
+        theme="light"
         mode="inline"
-        className="flex-1 border-r"
         selectedKeys={[location.pathname]}
-        defaultOpenKeys={['reports', 'users']}
-        collapsed={isCollapsed}
+        defaultOpenKeys={[location.pathname.split('/').slice(0, 3).join('/')]}
         items={menuItems}
         onClick={({ key }) => navigate(key)}
+        inlineCollapsed={isCollapsed}
       />
     </div>
-  )
+  );
 }
 
-export default Sidebar 
+export default Sidebar;

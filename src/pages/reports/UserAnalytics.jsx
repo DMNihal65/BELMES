@@ -18,6 +18,17 @@ function UserAnalytics() {
           ]}
           // Add your data here
         />
+
+        <Table 
+          columns={[
+            { title: 'Date', dataIndex: 'date' },
+            { title: 'Product', dataIndex: 'product' },
+            { title: 'Amount', dataIndex: 'amount' },
+            { title: 'Status', dataIndex: 'status' },
+          ]}
+          // Add your data here
+        />
+        
       </Card>
     </div>
   )

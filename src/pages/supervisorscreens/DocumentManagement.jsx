@@ -1,0 +1,537 @@
+import React, { useState } from 'react';
+import {
+  Card,
+  Row,
+  Col,
+  Button,
+  Input,
+  Tree,
+  Table,
+  Tag,
+  Space,
+  Dropdown,
+  Menu,
+  Typography,
+  Badge,
+  Avatar,
+  Tooltip,
+  Modal,
+  message,
+  Progress,
+  Divider,
+  Upload
+} from 'antd';
+import {
+  FolderOutlined,
+  FileTextOutlined,
+  FilePdfOutlined,
+  FileExcelOutlined,
+  FileWordOutlined,
+  CloudUploadOutlined,
+  EyeOutlined,
+  DownloadOutlined,
+  ShareAltOutlined,
+  DeleteOutlined,
+  StarOutlined,
+  StarFilled,
+  FilterOutlined,
+  SearchOutlined,
+  PlusOutlined,
+  HistoryOutlined,
+  FileImageOutlined,
+  FileDoneOutlined,
+  FolderViewOutlined,
+  TeamOutlined,
+  SettingOutlined,
+  InfoCircleOutlined,
+  InboxOutlined
+} from '@ant-design/icons';
+
+const { Title, Text } = Typography;
+const { Search } = Input;
+
+const DocumentManagement = () => {
+  const [selectedFolder, setSelectedFolder] = useState('all');
+  const [searchText, setSearchText] = useState('');
+  const [favorites, setFavorites] = useState(['DOC001']);
+  const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
+  const [documents, setDocuments] = useState([
+    {
+      id: 'DOC001',
+      name: 'Assembly Line SOP Rev 2.3',
+      type: 'pdf',
+      size: '2.3 MB',
+      modified: '2024-01-20',
+      modifiedBy: 'Hajira',
+      status: 'active',
+      category: 'sops',
+      version: '2.3',
+      lastReviewed: '2024-01-15',
+      reviewedBy: 'Quality Team',
+      accessLevel: 'Restricted',
+      folder: 'assembly-sops'
+    },
+    {
+      id: 'DOC002',
+      name: 'Quality Control Checklist',
+      type: 'excel',
+      size: '1.8 MB',
+      modified: '2024-01-18',
+      modifiedBy: 'Nihal',
+      status: 'under_review',
+      category: 'quality',
+      version: '1.5',
+      lastReviewed: '2024-01-17',
+      reviewedBy: 'Process Team',
+      accessLevel: 'Public'
+    },
+    {
+      id: 'DOC003',
+      name: 'Machine Maintenance Guide',
+      type: 'word',
+      size: '3.5 MB',
+      modified: '2024-01-15',
+      modifiedBy: 'Yadushree',
+      status: 'archived',
+      category: 'maintenance',
+      version: '4.0',
+      lastReviewed: '2024-01-10',
+      reviewedBy: 'Engineering Team',
+      accessLevel: 'Confidential'
+    }
+  ]);
+  const [isPreviewModalVisible, setIsPreviewModalVisible] = useState(false);
+
+  // Enhanced folder structure
+  const treeData = [
+    {
+      title: 'All Documents',
+      key: 'all',
+      icon: <FolderOutlined />,
+      children: [
+        {
+          title: 'Manufacturing',
+          key: 'manufacturing',
+          icon: <FolderOutlined />,
+          children: [
+            { 
+              title: 'SOPs',
+              key: 'sops',
+              icon: <FolderOutlined />,
+              children: [
+                { title: 'Assembly', key: 'assembly-sops', icon: <FileDoneOutlined /> },
+                { title: 'Quality Control', key: 'qc-sops', icon: <FileDoneOutlined /> }
+              ]
+            },
+            { 
+              title: 'Work Instructions',
+              key: 'work-instructions',
+              icon: <FolderOutlined />,
+              children: [
+                { title: 'Machine Setup', key: 'machine-setup', icon: <FileTextOutlined /> },
+                { title: 'Maintenance', key: 'maintenance', icon: <FileTextOutlined /> }
+              ]
+            },
+            { title: 'Quality Procedures', key: 'quality', icon: <FolderOutlined /> }
+          ]
+        },
+        {
+          title: 'Technical Documentation',
+          key: 'technical',
+          icon: <FolderOutlined />,
+          children: [
+            { 
+              title: 'Drawings',
+              key: 'drawings',
+              icon: <FolderOutlined />,
+              children: [
+                { title: '2D Drawings', key: '2d-drawings', icon: <FileImageOutlined /> },
+                { title: '3D Models', key: '3d-models', icon: <FileImageOutlined /> }
+              ]
+            },
+            { title: 'Specifications', key: 'specs', icon: <FolderOutlined /> }
+          ]
+        },
+        {
+          title: 'Reports & Analytics',
+          key: 'reports',
+          icon: <FolderOutlined />,
+          children: [
+            { title: 'Quality Reports', key: 'quality-reports', icon: <FolderOutlined /> },
+            { title: 'Production Reports', key: 'production-reports', icon: <FolderOutlined /> },
+            { title: 'Audit Reports', key: 'audit-reports', icon: <FolderOutlined /> }
+          ]
+        },
+        {
+          title: 'Training Materials',
+          key: 'training',
+          icon: <FolderOutlined />,
+          children: [
+            { title: 'Safety Training', key: 'safety-training', icon: <TeamOutlined /> },
+            { title: 'Process Training', key: 'process-training', icon: <TeamOutlined /> }
+          ]
+        }
+      ]
+    }
+  ];
+
+  // Handle file upload
+  const handleUpload = (fileList) => {
+    if (!selectedFolder || selectedFolder === 'all') {
+      message.error('Please select a specific folder first');
+      return;
+    }
+
+    const newFiles = fileList.map((file) => ({
+      id: `DOC${Date.now()}`,
+      name: file.name,
+      type: file.name.split('.').pop().toLowerCase(),
+      size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      modified: new Date().toISOString().split('T')[0],
+      modifiedBy: 'Current User',
+      status: 'active',
+      category: selectedFolder,
+      version: '1.0',
+      lastReviewed: new Date().toISOString().split('T')[0],
+      reviewedBy: 'System',
+      accessLevel: 'Public',
+      folder: selectedFolder
+    }));
+
+    setDocuments(prev => [...prev, ...newFiles]);
+    setIsUploadModalVisible(false);
+    message.success(`${fileList.length} file(s) uploaded successfully`);
+  };
+
+  // Handle delete
+  const handleDelete = (record) => {
+    Modal.confirm({
+      title: 'Delete Document',
+      content: `Are you sure you want to delete "${record.name}"?`,
+      okText: 'Yes',
+      okType: 'danger',
+      cancelText: 'No',
+      onOk() {
+        setDocuments(prev => prev.filter(doc => doc.id !== record.id));
+        message.success('Document deleted successfully');
+      }
+    });
+  };
+
+  // Filter documents based on search and selected folder
+  const filteredDocuments = documents.filter(doc => {
+    const matchesSearch = doc.name.toLowerCase().includes(searchText.toLowerCase());
+    const matchesFolder = selectedFolder === 'all' || doc.folder === selectedFolder;
+    return matchesSearch && matchesFolder;
+  });
+
+  const getFileIcon = (type) => {
+    switch (type) {
+      case 'pdf':
+        return <FilePdfOutlined style={{ color: '#ff4d4f' }} />;
+      case 'excel':
+        return <FileExcelOutlined style={{ color: '#52c41a' }} />;
+      case 'word':
+        return <FileWordOutlined style={{ color: '#1890ff' }} />;
+      default:
+        return <FileTextOutlined />;
+    }
+  };
+
+  const handleDownload = (record) => {
+    message.success(`Downloading ${record.name}`);
+  };
+
+  const handleShare = (record) => {
+    Modal.confirm({
+      title: 'Share Document',
+      content: (
+        <div>
+          <p>Share "{record.name}" with:</p>
+          <Input placeholder="Enter email addresses" />
+        </div>
+      ),
+      onOk() {
+        message.success('Document shared successfully');
+      }
+    });
+  };
+
+  const toggleFavorite = (docId) => {
+    setFavorites(prev => 
+      prev.includes(docId) 
+        ? prev.filter(id => id !== docId)
+        : [...prev, docId]
+    );
+    message.success('Favorites updated');
+  };
+
+  const columns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text, record) => (
+        <Space>
+          {getFileIcon(record.type)}
+          <div>
+            <Text strong className="cursor-pointer hover:text-blue-500" 
+                  onClick={() => setIsPreviewModalVisible(true)}>
+              {text}
+            </Text>
+            <br />
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {record.size} • {record.accessLevel}
+            </Text>
+          </div>
+          {favorites.includes(record.id) && (
+            <StarFilled style={{ color: '#faad14' }} />
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: 'Version',
+      dataIndex: 'version',
+      key: 'version',
+      render: (version, record) => (
+        <Space direction="vertical" size={0}>
+          <Tag color="blue">v{version}</Tag>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            Last reviewed: {record.lastReviewed}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => {
+        const statusConfig = {
+          active: { color: 'success', text: 'ACTIVE' },
+          under_review: { color: 'processing', text: 'UNDER REVIEW' },
+          archived: { color: 'default', text: 'ARCHIVED' }
+        };
+        return (
+          <Tag color={statusConfig[status].color}>
+            {statusConfig[status].text}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Modified',
+      dataIndex: 'modified',
+      key: 'modified',
+      render: (date, record) => (
+        <Space direction="vertical" size={0}>
+          <Text>{date}</Text>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            by {record.modifiedBy}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="View">
+            <Button 
+              icon={<EyeOutlined />} 
+              size="small"
+              onClick={() => setIsPreviewModalVisible(true)}
+            />
+          </Tooltip>
+          <Tooltip title="Download">
+            <Button 
+              icon={<DownloadOutlined />} 
+              size="small"
+              onClick={() => handleDownload(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Share">
+            <Button 
+              icon={<ShareAltOutlined />} 
+              size="small"
+              onClick={() => handleShare(record)}
+            />
+          </Tooltip>
+          <Dropdown
+            overlay={
+              <Menu>
+                <Menu.Item 
+                  key="1" 
+                  icon={favorites.includes(record.id) ? <StarFilled /> : <StarOutlined />}
+                  onClick={() => toggleFavorite(record.id)}
+                >
+                  {favorites.includes(record.id) ? 'Remove from Favorites' : 'Add to Favorites'}
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item 
+                  key="2" 
+                  icon={<DeleteOutlined />} 
+                  danger
+                  onClick={() => handleDelete(record)}
+                >
+                  Delete
+                </Menu.Item>
+              </Menu>
+            }
+          >
+            <Button size="small">More</Button>
+          </Dropdown>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div className="p-6">
+      <Card bordered={false} className="shadow-sm">
+        <Row gutter={[24, 24]}>
+          {/* Left Sidebar */}
+          <Col span={6}>
+            <Card className="h-full" bodyStyle={{ padding: '12px' }}>
+              <div className="mb-4 space-y-4">
+                <Button 
+                  type="primary" 
+                  icon={<CloudUploadOutlined />}
+                  block
+                  onClick={() => setIsUploadModalVisible(true)}
+                >
+                  Upload Document
+                </Button>
+                <Button 
+                  type="default" 
+                  icon={<StarOutlined />}
+                  block
+                >
+                  Favorites
+                </Button>
+              </div>
+              <Tree
+                treeData={treeData}
+                selectedKeys={[selectedFolder]}
+                onSelect={(keys) => setSelectedFolder(keys[0])}
+                className="document-tree"
+                defaultExpandAll
+                showIcon
+              />
+            </Card>
+          </Col>
+
+          {/* Main Content */}
+          <Col span={18}>
+            <div className="mb-4">
+              <Row gutter={16} align="middle">
+                <Col flex="auto">
+                  <Search
+                    placeholder="Search documents..."
+                    allowClear
+                    onChange={(e) => setSearchText(e.target.value)}
+                    prefix={<SearchOutlined />}
+                  />
+                </Col>
+                
+              </Row>
+            </div>
+
+            <Card 
+              className="document-table"
+              bodyStyle={{ padding: '0' }}
+            >
+              <Table
+                columns={columns}
+                dataSource={filteredDocuments}
+                rowKey="id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showQuickJumper: true
+                }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* Upload Modal */}
+      <Modal
+        title="Upload Document"
+        visible={isUploadModalVisible}
+        onCancel={() => setIsUploadModalVisible(false)}
+        footer={null}
+      >
+        <div className="text-center p-8">
+          <Upload.Dragger
+            multiple
+            beforeUpload={() => false}
+            onChange={(info) => {
+              handleUpload(info.fileList.map(f => f.originFileObj));
+            }}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined />
+            </p>
+            <p className="ant-upload-text">
+              Click or drag file to this area to upload
+            </p>
+            <p className="ant-upload-hint">
+              Selected folder: {selectedFolder === 'all' ? 'Please select a folder' : selectedFolder}
+            </p>
+          </Upload.Dragger>
+        </div>
+      </Modal>
+
+      {/* Document Preview Modal */}
+      <Modal
+        title="Document Preview"
+        visible={isPreviewModalVisible}
+        onCancel={() => setIsPreviewModalVisible(false)}
+        width={800}
+        footer={[
+          <Button key="close" onClick={() => setIsPreviewModalVisible(false)}>
+            Close
+          </Button>,
+          <Button key="download" type="primary" icon={<DownloadOutlined />}>
+            Download
+          </Button>
+        ]}
+      >
+        {/* Add document preview content here */}
+      </Modal>
+    </div>
+  );
+};
+
+// Add these styles
+const styles = `
+  .document-tree .ant-tree-node-content-wrapper {
+    padding: 4px 8px;
+  }
+
+  .document-tree .ant-tree-node-content-wrapper:hover {
+    background-color: #f5f5f5;
+  }
+
+  .document-table .ant-table-thead > tr > th {
+    background-color: #fafafa;
+  }
+
+  .document-table .ant-table-tbody > tr:hover > td {
+    background-color: #f0f7ff;
+  }
+
+  .document-card {
+    transition: all 0.3s;
+  }
+
+  .document-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+`;
+
+export default DocumentManagement;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, message, Modal, Row, Col , InputNumber, Alert } from 'antd';
+import { Card, Table, Button, message, Modal, Row, Col , InputNumber, Alert, Input as AntInput  } from 'antd';
 
 
 const Inserts = () => {
@@ -7,7 +7,7 @@ const Inserts = () => {
   const [selectedTool, setSelectedTool] = useState(null);
   const [requestStock, setRequestStock] = useState(1);
   const [stockError, setStockError] = useState(false);
-
+  const [searchText, setSearchText] = useState('');
   const [InsertsData, setInsertsData] = useState([
     {
       key: '1',
@@ -24,6 +24,22 @@ const Inserts = () => {
       project: 'Milling',
       stock: 10,
       status: 'Available',
+    },
+    {
+      key: '2',
+      bel_part_number: '3105 120 201 59',
+      bel_part_description: 'low precision end mill',
+      configuration: '', // Added new field
+      type: '', // Added new field
+      size: '', // Added new field
+      no_of_edges: 0, // Added new field
+      thickness: 0, // Added new field
+      corner_radius: 0, // Added new field
+      suitable_for: 'Aluminum',
+      tool_material: 'Carbide',
+      project: 'Milling',
+      stock: 10,
+      status: 'In Use',
     },
     // ... other existing data ...
   ]);
@@ -148,6 +164,22 @@ const columns = [
     },    
   ];
 
+  const handleGlobalSearch = (value) => {
+    setSearchText(value);
+  };
+
+  // Modify the columns array to work with global search
+  const getFilteredData = () => {
+    if (!searchText) return InsertsData;
+
+    return InsertsData.filter(item => {
+      return Object.keys(item).some(key => {
+        const value = item[key]?.toString().toLowerCase();
+        return value?.includes(searchText.toLowerCase());
+      });
+    });
+  };
+
   const handleRequest = (record) => {
     setSelectedTool(record);
     setRequestStock(1);
@@ -199,10 +231,18 @@ const columns = [
     <div>
       <Card 
         title="Inserts Data"
+        extra={
+          <AntInput.Search
+            placeholder="Search across all columns..."
+            onChange={(e) => handleGlobalSearch(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+          />
+        }
       >
         <Table 
           columns={columns} 
-          dataSource={InsertsData}
+          dataSource={getFilteredData()}
           pagination={{ 
             pageSize: 8,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,

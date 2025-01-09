@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card, Row, Col, Space, 
   DatePicker, Select, Button, Statistic,
@@ -8,13 +9,15 @@ import ReactApexChart from 'react-apexcharts';
 import { 
   ClockCircleOutlined, ToolOutlined, 
   AlertOutlined, CheckCircleOutlined,
-  FilterOutlined, ReloadOutlined, 
+  FilterOutlined, ReloadOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
 
 const { RangePicker } = DatePicker;
 const { Text, Title } = Typography;
 
-const ResourceUtilization = ({ machines = [] }) => {
+const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -264,43 +267,54 @@ const ResourceUtilization = ({ machines = [] }) => {
 
       {/* Filters */}
       <Card className="shadow-sm">
-        <Space size="large" wrap>
-          <RangePicker 
-            onChange={setDateRange}
-            value={dateRange}
-            placeholder={['Start Date', 'End Date']}
-            className="w-64"
-          />
-          <Select
-            placeholder="Select Machine"
-            style={{ width: 200 }}
-            onChange={setSelectedMachine}
-            value={selectedMachine}
-            allowClear
-          >
-            <Select.Option value={null}>All Machines</Select.Option> {/* Default option */}
-            {machines.map(machine => (
-              <Select.Option key={machine.id} value={machine.id}>
-                {machine.name}
-              </Select.Option>
-            ))}
-          </Select>
-          <Space>
-            <Button 
-              type="primary" 
-              icon={<FilterOutlined />}
-              onClick={handleFilter}
-              loading={loading}
+        <Space size="large" wrap className="flex justify-between">
+          <Space size="large" wrap>
+            <RangePicker 
+              onChange={setDateRange}
+              value={dateRange}
+              placeholder={['Start Date', 'End Date']}
+              className="w-64"
+            />
+            <Select
+              placeholder="Select Machine"
+              style={{ width: 200 }}
+              onChange={setSelectedMachine}
+              value={selectedMachine}
+              allowClear
             >
-              Apply Filters
-            </Button>
-            <Button 
-              icon={<ReloadOutlined />}
-              onClick={handleReset}
-            >
-              Reset
-            </Button>
+              {machines.map(machine => (
+                <Select.Option key={machine.id} value={machine.id}>
+                  {machine.name}
+                </Select.Option>
+              ))}
+            </Select>
+            <Space>
+              <Button 
+                type="primary" 
+                icon={<FilterOutlined />}
+                onClick={handleFilter}
+                loading={loading}
+              >
+                Apply Filters
+              </Button>
+              <Button 
+                icon={<ReloadOutlined />}
+                onClick={handleReset}
+              >
+                Reset
+              </Button>
+            </Space>
           </Space>
+          
+          <Button 
+            type="primary"
+            size="large"
+            icon={<CalendarOutlined />}
+            onClick={() => navigate('/supervisor/production-planning/scheduling')}
+            className="bg-blue-600 hover:bg-blue-700 shadow-md"
+          >
+            Open Scheduler
+          </Button>
         </Space>
       </Card>
 
@@ -318,6 +332,37 @@ const ResourceUtilization = ({ machines = [] }) => {
           />
         </div>
       </Card>
+
+      {/* Machine Details Table */}
+      {/* <Card 
+        title={<Title level={5}>Machine Details</Title>}
+        className="shadow-sm"
+      >
+        <Table 
+          columns={columns} 
+          dataSource={machines}
+          pagination={false}
+          scroll={{ x: 1000 }}
+          loading={loading}
+          rowKey="id"
+        />
+      </Card> */}
+
+      {/* Selected Job Alert if applicable */}
+      {selectedJob && selectedJob.machineTypes && (
+        <Alert
+          message="Selected Job Resource Requirements"
+          description={
+            <Space direction="vertical">
+              <Text>Required Machine Types: {selectedJob.machineTypes.join(', ')}</Text>
+              <Text>Estimated Total Time: {(selectedJob.cycleTime || 0) + (selectedJob.setupTime || 0)} minutes</Text>
+            </Space>
+          }
+          type="info"
+          showIcon
+          className="shadow-sm"
+        />
+      )}
     </div>
   );
 };

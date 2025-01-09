@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col } from 'antd';
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col, Input as AntInput   } from 'antd';
 import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
@@ -8,6 +8,7 @@ const GaugesAndInstruments = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [editingKey, setEditingKey] = useState(null);
+  const [searchText, setSearchText] = useState('');
   const [GaugesAndInstrumentsData, setGaugesAndInstrumentsData] = useState([
     {
       key: '1',
@@ -22,11 +23,43 @@ const GaugesAndInstruments = () => {
       calibration_date: dayjs().subtract(1, 'month').format('YYYY-MM-DD'),
       calibration_due_date: dayjs().add(1, 'month').format('YYYY-MM-DD'),
       location: 'Warehouse 1',
-      quantity: 10,
+      stock: 10,
       status: 'Available',
+    },
+    {
+      key: '2',
+      id: '001',
+      type: 'Type A',
+      description: 'low precision end mill',
+      instrument_code: 'INST001',
+      size: '8mm',
+      equipment_number: 'EQ001',
+      maintenance_plan: 'Monthly',
+      notification_number: 'NOTIF001',
+      calibration_date: dayjs().subtract(1, 'month').format('YYYY-MM-DD'),
+      calibration_due_date: dayjs().add(1, 'month').format('YYYY-MM-DD'),
+      location: 'Warehouse 1',
+      stock: 10,
+      status: 'In Use',
     },
     // ... other existing data ...
   ]);
+
+  const handleGlobalSearch = (value) => {
+    setSearchText(value);
+  };
+
+  // Modify the columns array to work with global search
+  const getFilteredData = () => {
+    if (!searchText) return GaugesAndInstrumentsData;
+
+    return GaugesAndInstrumentsData.filter(item => {
+      return Object.keys(item).some(key => {
+        const value = item[key]?.toString().toLowerCase();
+        return value?.includes(searchText.toLowerCase());
+      });
+    });
+  };
 
   const showModal = () => {
     form.resetFields(); // Reset form fields when opening the modal
@@ -103,7 +136,7 @@ const GaugesAndInstruments = () => {
                 calibration_date: item.calibration_date || '',
                 calibration_due_date: item.calibration_due_date || '',
                 location: item.location || '',
-                quantity: parseInt(item.quantity) || 0,
+                stock: parseInt(item.stock) || 0,
                 status: item.status || '',
             }));
 
@@ -214,22 +247,29 @@ const GaugesAndInstruments = () => {
       onFilter: (value, record) => record.location.includes(value),
     },
     {
-      title: 'Quantity',
-      dataIndex: 'quantity',
-      key: 'quantity',
-      sorter: (a, b) => a.quantity.localeCompare(b.type),
+      title: 'Stock',
+      dataIndex: 'stock',
+      key: 'stock',
+      sorter: (a, b) => a.stock.localeCompare(b.type),
       filterSearch: true,
-      filters: [...new Set(GaugesAndInstrumentsData.map(item => item.quantity))].map(item => ({ text: item, value: item })),
-      onFilter: (value, record) => record.quantity.includes(value),
+      filters: [...new Set(GaugesAndInstrumentsData.map(item => item.stock))].map(item => ({ text: item, value: item })),
+      onFilter: (value, record) => record.stock.includes(value),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      sorter: (a, b) => a.status.localeCompare(b.type),
+      filters: [
+        { text: 'Available', value: 'Available' },
+        { text: 'In Use', value: 'In Use' },
+      ],
+      onFilter: (value, record) => record.status === value,
       filterSearch: true,
-      filters: [...new Set(GaugesAndInstrumentsData.map(item => item.status))].map(item => ({ text: item, value: item })),
-      onFilter: (value, record) => record.status.includes(value),
+      render: (status) => (
+        <span style={{ color: status === 'Available' ? '#52c41a' : '#faad14' }}>
+          {status}
+        </span>
+      ),
     },
     {
       title: 'Actions',
@@ -249,6 +289,12 @@ const GaugesAndInstruments = () => {
         title="GaugesAndInstruments Data"
         extra={
           <Space>
+              <AntInput.Search
+              placeholder="Search across all columns..."
+              onChange={(e) => handleGlobalSearch(e.target.value)}
+              style={{ width: 300 }}
+              allowClear
+            />
               <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
           onClick={showModal}>
           Add New Tool
@@ -270,7 +316,7 @@ const GaugesAndInstruments = () => {
       >
         <Table 
           columns={columns} 
-          dataSource={GaugesAndInstrumentsData}
+          dataSource={getFilteredData()}
           pagination={{ 
             pageSize: 8,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
@@ -403,9 +449,9 @@ const GaugesAndInstruments = () => {
             </Col>
             <Col span={8}>
               <Form.Item
-                name="quantity"
-                label="Quantity"
-                rules={[{ required: true, message: 'Please input the Quantity!' }]}
+                name="stock"
+                label="Stock"
+                rules={[{ required: true, message: 'Please input the Stock!' }]}
               >
                 <Input type="number" min={0} />
               </Form.Item>

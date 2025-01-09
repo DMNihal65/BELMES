@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col, } from 'antd';
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col,  Input as AntInput  } from 'antd';
 import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
@@ -8,11 +8,29 @@ const Drills = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [editingKey, setEditingKey] = useState(null);
+  const [searchText, setSearchText] = useState('');
   const [DrillsData, setDrillsData] = useState([
     {
       key: '1',
       bel_part_number: '3105 120 201 59',
       bel_part_description: 'High precision end mill',
+      tool_diameter: 8,
+      shank_diameter: 6,
+      no_of_flutes: 2,
+      flute_length: 50,
+      clearance_length: 50,
+      total_length: 100,
+      angle: 45, // Added new field
+      suitable_for: 'Aluminum',
+      tool_material: 'Carbide', // Added new field
+      project: 'Milling', // Added new field
+      stock: 10,
+      status: 'Available',
+    },
+    {
+      key: '2',
+      bel_part_number: '4104 120 201 49',
+      bel_part_description: 'LOW',
       tool_diameter: 8,
       shank_diameter: 6,
       no_of_flutes: 4,
@@ -24,9 +42,27 @@ const Drills = () => {
       tool_material: 'Carbide', // Added new field
       project: 'Milling', // Added new field
       stock: 10,
+      status: 'In Use',
     },
     // ... other existing data ...
   ]);
+
+
+    const handleGlobalSearch = (value) => {
+    setSearchText(value);
+  };
+
+  // Modify the columns array to work with global search
+  const getFilteredData = () => {
+    if (!searchText) return DrillsData;
+
+    return DrillsData.filter(item => {
+      return Object.keys(item).some(key => {
+        const value = item[key]?.toString().toLowerCase();
+        return value?.includes(searchText.toLowerCase());
+      });
+    });
+  };
 
   const showModal = () => {
     form.resetFields(); // Reset form fields when opening the modal
@@ -240,6 +276,22 @@ const columns = [
     filters: [...new Set(DrillsData.map(item => item.stock))].map(item => ({ text: item, value: item })),
     onFilter: (value, record) => record.stock === value,
   },
+  {
+    title: 'Status',
+    dataIndex: 'status',
+    key: 'status',
+    filters: [
+      { text: 'Available', value: 'Available' },
+      { text: 'In Use', value: 'In Use' },
+    ],
+    onFilter: (value, record) => record.status === value,
+    filterSearch: true,
+    render: (status) => (
+      <span style={{ color: status === 'Available' ? '#52c41a' : '#faad14' }}>
+        {status}
+      </span>
+    ),
+  },
     {
       title: 'Actions',
       key: 'actions',
@@ -258,10 +310,16 @@ const columns = [
         title="Drills Data"
         extra={
           <Space>
-       <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
-          onClick={showModal}>
-          Add New Tool
-      </Button>
+             <AntInput.Search
+              placeholder="Search across all columns..."
+              onChange={(e) => handleGlobalSearch(e.target.value)}
+              style={{ width: 300 }}
+              allowClear
+            />
+          <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
+              onClick={showModal}>
+              Add New Tool
+          </Button>
             <Button icon={<DownloadOutlined />} onClick={handleDownloadData}>
                       Download
             </Button>
@@ -279,7 +337,7 @@ const columns = [
       >
         <Table 
           columns={columns} 
-          dataSource={DrillsData}
+          dataSource={getFilteredData()}
           pagination={{ 
             pageSize: 8,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,

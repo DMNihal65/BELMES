@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, message, Modal, Form, Input, Row, Col, InputNumber, Alert } from 'antd';
+import { Card, Table, Button, message, Modal, Form, Input, Row, Col, InputNumber, Alert, Input as AntInput   } from 'antd';
 
 
 const EndMills = () => {
@@ -7,6 +7,7 @@ const EndMills = () => {
   const [selectedTool, setSelectedTool] = useState(null);
   const [requestStock, setRequestStock] = useState(1);
   const [stockError, setStockError] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const [EndMillsData, setEndMillsData] = useState([
     {
       key: '1',
@@ -24,6 +25,22 @@ const EndMills = () => {
       stock: 10,
       status: 'Available',
       // status: 'In Use',
+    },
+    {
+      key: '2',
+      bel_part_number: '3105 120 201 59',
+      bel_part_description: 'low precision end mill',
+      tool_diameter: 8,
+      shank_diameter: 6,
+      no_of_flutes: 4,
+      flute_length: 50,
+      clearance_length: 50,
+      total_length: 100,
+      corner_radius: 0.5,
+      suitable_for: 'Aluminum',
+      type_project: 'Milling',
+      stock: 10,
+      status: 'In Use',
     },
     // ... other existing data ...
   ]);
@@ -174,6 +191,22 @@ const EndMills = () => {
     
   ];
 
+  const handleGlobalSearch = (value) => {
+    setSearchText(value);
+  };
+
+  // Modify the columns array to work with global search
+  const getFilteredData = () => {
+    if (!searchText) return EndMillsData;
+
+    return EndMillsData.filter(item => {
+      return Object.keys(item).some(key => {
+        const value = item[key]?.toString().toLowerCase();
+        return value?.includes(searchText.toLowerCase());
+      });
+    });
+  };
+
   const handleRequest = (record) => {
     setSelectedTool(record);
     setRequestStock(1);
@@ -225,10 +258,19 @@ const EndMills = () => {
   return (
     <div>
       <Card 
-        title="EndMills Data">
+        title="EndMills Data"
+        extra={
+          <AntInput.Search
+            placeholder="Search across all columns..."
+            onChange={(e) => handleGlobalSearch(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+          />
+        }
+      >
         <Table 
           columns={columns} 
-          dataSource={EndMillsData}
+          dataSource={getFilteredData()}
           pagination={{ 
             pageSize: 8,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,

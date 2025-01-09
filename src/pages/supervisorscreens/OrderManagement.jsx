@@ -30,8 +30,13 @@ import {
   DeleteOutlined,
   SearchOutlined,
   FilterOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined
 } from '@ant-design/icons';
+import { motion } from 'framer-motion';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
+import ReorderableTable from '../../components/OrderManagement/ReorderableTable';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -42,6 +47,7 @@ function OrderManagement() {
   const [loading, setLoading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [form] = Form.useForm();
+  const [parent] = useAutoAnimate();
 
   // Mock data for orders
   const orders = [
@@ -69,6 +75,12 @@ function OrderManagement() {
     }
   ];
 
+  const fadeIn = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.5 }
+  };
+
   const columns = [
     {
       title: 'Order No',
@@ -76,7 +88,7 @@ function OrderManagement() {
       key: 'orderNo',
       sorter: (a, b) => a.orderNo.localeCompare(b.orderNo),
       render: (text) => (
-        <Button type="link" className="p-0" onClick={() => handleView({ orderNo: text })}>
+        <Button type="link" className="p-0">
           {text}
         </Button>
       ),
@@ -85,7 +97,6 @@ function OrderManagement() {
       title: 'Part No',
       dataIndex: 'partNo',
       key: 'partNo',
-      sorter: (a, b) => a.partNo.localeCompare(b.partNo),
     },
     {
       title: 'Customer',
@@ -93,344 +104,285 @@ function OrderManagement() {
       key: 'customer',
     },
     {
-      title: 'Start Date',
-      dataIndex: 'startDate',
-      key: 'startDate',
-      sorter: (a, b) => new Date(a.startDate) - new Date(b.startDate),
-    },
-    {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => {
-        const colors = {
-          'Completed': 'success',
-          'In Progress': 'processing',
-          'Pending': 'warning',
-          'Delayed': 'error'
-        };
-        return <Badge status={colors[status]} text={status} />;
-      },
-      filters: [
-        { text: 'Completed', value: 'Completed' },
-        { text: 'In Progress', value: 'In Progress' },
-        { text: 'Pending', value: 'Pending' },
-        { text: 'Delayed', value: 'Delayed' }
-      ],
-      onFilter: (value, record) => record.status === value,
+      render: (status) => (
+        <Tag color={
+          status === 'In Progress' ? 'processing' :
+          status === 'Completed' ? 'success' :
+          'default'
+        }>
+          {status}
+        </Tag>
+      ),
     },
     {
-      title: 'Priority',
-      dataIndex: 'priority',
-      key: 'priority',
-      render: (priority) => {
-        const colors = {
-          'High': 'red',
-          'Medium': 'orange',
-          'Low': 'green'
-        };
-        return <Tag color={colors[priority]}>{priority}</Tag>;
-      },
-      filters: [
-        { text: 'High', value: 'High' },
-        { text: 'Medium', value: 'Medium' },
-        { text: 'Low', value: 'Low' }
-      ],
-      onFilter: (value, record) => record.priority === value,
+      title: 'Progress',
+      dataIndex: 'completionRate',
+      key: 'completionRate',
+      render: (rate) => (
+        <div className="w-full">
+          <div className="flex justify-between mb-1">
+            <span className="text-xs font-semibold">{rate}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full"
+              style={{ width: `${rate}%` }}
+            />
+          </div>
+        </div>
+      ),
     },
     {
-      title: 'Action',
-      key: 'action',
+      title: 'Actions',
+      key: 'actions',
       render: (_, record) => (
-        <Space size="middle">
-          <Tooltip title="Edit Order">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title="View Details">
-            <Button 
-              type="text" 
-              icon={<EyeOutlined />} 
-              onClick={() => handleView(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Delete Order">
-            <Button 
-              type="text" 
-              danger 
-              icon={<DeleteOutlined />} 
-              onClick={() => handleDelete(record)}
-            />
-          </Tooltip>
+        <Space size="small">
+          <Button type="text" icon={<EyeOutlined />} size="small" />
+          <Button type="text" icon={<EditOutlined />} size="small" />
         </Space>
       ),
-    }
+    },
   ];
 
-  const handleNewOrder = () => {
-    setIsModalVisible(true);
-  };
-
-  const handleEdit = (record) => {
-    message.info(`Editing order ${record.orderNo}`);
-  };
-
-  const handleView = (record) => {
-    message.info(`Viewing order ${record.orderNo}`);
-  };
-
-  const handleDelete = (record) => {
-    Modal.confirm({
-      title: 'Delete Order',
-      content: `Are you sure you want to delete order ${record.orderNo}?`,
-      okText: 'Yes',
-      okType: 'danger',
-      cancelText: 'No',
-      onOk() {
-        message.success(`Order ${record.orderNo} deleted successfully`);
-      },
-    });
-  };
-
-  const handleModalOk = async () => {
-    try {
-      const values = await form.validateFields();
-      console.log('Form values:', values);
-      message.success('Order created successfully');
-      setIsModalVisible(false);
-      form.resetFields();
-    } catch (error) {
-      console.error('Validation failed:', error);
-    }
-  };
-
-  const handleModalCancel = () => {
-    setIsModalVisible(false);
-    form.resetFields();
-  };
-
-  const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      message.success('Data refreshed');
-    }, 1000);
-  };
-
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (keys) => setSelectedRowKeys(keys),
-  };
-
   return (
-    <div className="p-6">
-      {/* Header Cards */}
-      <Row gutter={[16, 16]} className="mb-6">
-        <Col xs={24} sm={8}>
-          <Card hoverable className="hover:shadow-md transition-shadow">
-            <Statistic
-              title={
-                <Space>
-                  <FileTextOutlined className="text-blue-500" />
-                  <Text>Total Orders</Text>
-                </Space>
-              }
-              value={156}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card hoverable className="hover:shadow-md transition-shadow">
-            <Statistic
-              title={
-                <Space>
-                  <ClockCircleOutlined className="text-orange-500" />
-                  <Text>In Progress</Text>
-                </Space>
-              }
-              value={42}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card hoverable className="hover:shadow-md transition-shadow">
-            <Statistic
-              title={
-                <Space>
-                  <BarChartOutlined className="text-green-500" />
-                  <Text>Completion Rate</Text>
-                </Space>
-              }
-              value={85}
-              suffix="%"
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+      <div className="flex-1 p-0 overflow-hidden">
+        {/* Quick Stats Row */}
+        <Row gutter={[8, 8]} className="mb-2 px-2" ref={parent}>
+          <Col span={6}>
+            <motion.div {...fadeIn}>
+              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
+                <Statistic
+                  title="Total Orders"
+                  value={orders.length}
+                  prefix={<FileTextOutlined />}
+                  valueStyle={{ color: '#3f8600' }}
+                />
+              </Card>
+            </motion.div>
+          </Col>
+          <Col span={6}>
+            <motion.div {...fadeIn}>
+              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
+                <Statistic
+                  title="In Progress"
+                  value={orders.filter(o => o.status === 'In Progress').length}
+                  prefix={<ClockCircleOutlined />}
+                  valueStyle={{ color: '#1890ff' }}
+                />
+              </Card>
+            </motion.div>
+          </Col>
+          <Col span={6}>
+            <motion.div {...fadeIn}>
+              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
+                <Statistic
+                  title="Completion Rate"
+                  value={75.5}
+                  precision={1}
+                  prefix={<BarChartOutlined />}
+                  suffix="%"
+                  valueStyle={{ color: '#cf1322' }}
+                />
+              </Card>
+            </motion.div>
+          </Col>
+          <Col span={6}>
+            <motion.div {...fadeIn}>
+              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
+                <Statistic
+                  title="On-Time Delivery"
+                  value={92}
+                  precision={1}
+                  prefix={<ArrowUpOutlined />}
+                  suffix="%"
+                  valueStyle={{ color: '#3f8600' }}
+                />
+              </Card>
+            </motion.div>
+          </Col>
+        </Row>
 
-      {/* Main Content */}
-      <Card
-        title={
-          <Space>
-            <FileTextOutlined />
-            <span>Orders Management</span>
-          </Space>
-        }
-        extra={
-          <Space>
-            <Tooltip title="Refresh Data">
-              <Button 
-                icon={<ReloadOutlined />} 
-                onClick={handleRefresh}
-                loading={loading}
-              />
-            </Tooltip>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
-              onClick={handleNewOrder}
+        {/* Main Content Area */}
+        <Row gutter={[8, 8]} className="px-2 h-[calc(100vh-160px)]">
+          {/* Order List */}
+          <Col span={16} className="h-full">
+            <Card
+              title={
+                <div className="flex justify-between items-center">
+                  <span className="text-base font-semibold">Order List</span>
+                  <Space>
+                    <Button icon={<FilterOutlined />} size="small">Filter</Button>
+                    <Button 
+                      type="primary" 
+                      icon={<PlusOutlined />} 
+                      size="small"
+                      onClick={() => setIsModalVisible(true)}
+                    >
+                      New Order
+                    </Button>
+                  </Space>
+                </div>
+              }
+              bordered={false}
+              className="hover:shadow-lg transition-shadow duration-300 h-full"
+              bodyStyle={{ padding: '12px', height: 'calc(100% - 48px)', overflow: 'hidden' }}
             >
-              New Order
-            </Button>
-          </Space>
-        }
-        className="shadow-sm"
-      >
-        <div className="mb-4">
-          <Row gutter={16} className="mb-4">
-            <Col span={8}>
-              <Input
-                placeholder="Search orders..."
-                prefix={<SearchOutlined />}
-              />
-            </Col>
-            <Col span={16}>
-              <Space>
-                <Select defaultValue="all" style={{ width: 120 }}>
-                  <Option value="all">All Status</Option>
-                  <Option value="completed">Completed</Option>
-                  <Option value="in-progress">In Progress</Option>
-                  <Option value="pending">Pending</Option>
-                </Select>
-                <Select defaultValue="all" style={{ width: 120 }}>
-                  <Option value="all">All Priority</Option>
-                  <Option value="high">High</Option>
-                  <Option value="medium">Medium</Option>
-                  <Option value="low">Low</Option>
-                </Select>
-                <Button icon={<FilterOutlined />}>More Filters</Button>
-              </Space>
-            </Col>
-          </Row>
-        </div>
+              <Tabs defaultActiveKey="all" className="h-full">
+                <TabPane tab="All Orders" key="all">
+                  <div className="h-full overflow-auto">
+                    <Table
+                      columns={columns}
+                      dataSource={orders}
+                      pagination={false}
+                      size="small"
+                      scroll={{ y: true }}
+                      className="h-full"
+                    />
+                  </div>
+                </TabPane>
+                <TabPane tab="In Progress" key="in_progress">
+                  <div className="h-full overflow-auto">
+                    <Table
+                      columns={columns}
+                      dataSource={orders.filter(order => order.status === 'In Progress')}
+                      pagination={false}
+                      size="small"
+                      scroll={{ y: true }}
+                      className="h-full"
+                    />
+                  </div>
+                </TabPane>
+                <TabPane tab="Completed" key="completed">
+                  <div className="h-full overflow-auto">
+                    <Table
+                      columns={columns}
+                      dataSource={orders.filter(order => order.status === 'Completed')}
+                      pagination={false}
+                      size="small"
+                      scroll={{ y: true }}
+                      className="h-full"
+                    />
+                  </div>
+                </TabPane>
+                <TabPane tab="Delayed" key="delayed">
+                  <div className="h-full overflow-auto">
+                    <Table
+                      columns={columns}
+                      dataSource={orders.filter(order => order.status === 'Delayed')}
+                      pagination={false}
+                      size="small"
+                      scroll={{ y: true }}
+                      className="h-full"
+                    />
+                  </div>
+                </TabPane>
+                <TabPane tab="Reorder" key="reorder">
+                  <div className="h-full overflow-auto">
+                    <ReorderableTable 
+                      orders={orders} 
+                      onOrdersReorder={(newOrders) => {
+                        // Handle the reordered list here
+                        console.log('Orders reordered:', newOrders);
+                        message.success('Order sequence updated successfully');
+                      }} 
+                    />
+                  </div>
+                </TabPane>
+              </Tabs>
+            </Card>
+          </Col>
 
-        <Table 
-          columns={columns} 
-          dataSource={orders}
-          rowSelection={rowSelection}
-          loading={loading}
-          pagination={{ 
-            total: orders.length,
-            pageSize: 10,
-            showTotal: (total) => `Total ${total} orders`,
-            showSizeChanger: true,
-            showQuickJumper: true
-          }}
-        />
-      </Card>
+          {/* Order Details and Analytics */}
+          <Col span={8} className="h-full">
+            <Row gutter={[8, 8]} className="h-full">
+              <Col span={24} style={{ height: '50%' }}>
+                <Card
+                  title={
+                    <div className="flex justify-between items-center">
+                      <span className="text-base font-semibold">Order Analytics</span>
+                      <Select defaultValue="month" size="small" style={{ width: 100 }}>
+                        <Option value="week">Week</Option>
+                        <Option value="month">Month</Option>
+                        <Option value="year">Year</Option>
+                      </Select>
+                    </div>
+                  }
+                  bordered={false}
+                  className="hover:shadow-lg transition-shadow duration-300 h-full"
+                  bodyStyle={{ padding: '12px', height: 'calc(100% - 48px)' }}
+                >
+                </Card>
+              </Col>
+              <Col span={24} style={{ height: '50%' }}>
+                <Card
+                  title={
+                    <div className="flex justify-between items-center">
+                      <span className="text-base font-semibold">Recent Activities</span>
+                      <Button icon={<ReloadOutlined />} size="small" />
+                    </div>
+                  }
+                  bordered={false}
+                  className="hover:shadow-lg transition-shadow duration-300 h-full"
+                  bodyStyle={{ padding: '12px', height: 'calc(100% - 48px)', overflow: 'hidden' }}
+                >
+                  <div className="h-full overflow-auto">
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          </Col>
+        </Row>
+      </div>
 
       {/* New Order Modal */}
       <Modal
-        title={
-          <Space>
-            <PlusOutlined />
-            <span>Create New Order</span>
-          </Space>
-        }
+        title="Create New Order"
         open={isModalVisible}
-        onOk={handleModalOk}
-        onCancel={handleModalCancel}
-        width={700}
+        onCancel={() => setIsModalVisible(false)}
+        footer={[
+          <Button key="back" onClick={() => setIsModalVisible(false)}>
+            Cancel
+          </Button>,
+          <Button key="submit" type="primary" loading={loading}>
+            Create
+          </Button>,
+        ]}
       >
-        <Form
-          form={form}
-          layout="vertical"
-        >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="orderNo"
-                label="Order Number"
-                rules={[{ required: true, message: 'Please enter order number' }]}
-              >
-                <Input placeholder="Enter order number" prefix={<FileTextOutlined />} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="partNo"
-                label="Part Number"
-                rules={[{ required: true, message: 'Please enter part number' }]}
-              >
-                <Input placeholder="Enter part number" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="startDate"
-                label="Start Date"
-                rules={[{ required: true, message: 'Please select start date' }]}
-              >
-                <DatePicker className="w-full" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="quantity"
-                label="Quantity"
-                rules={[{ required: true, message: 'Please enter quantity' }]}
-              >
-                <Input type="number" placeholder="Enter quantity" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="priority"
-                label="Priority"
-                rules={[{ required: true, message: 'Please select priority' }]}
-              >
-                <Select placeholder="Select priority">
-                  <Option value="High">High</Option>
-                  <Option value="Medium">Medium</Option>
-                  <Option value="Low">Low</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="customer"
-                label="Customer"
-                rules={[{ required: true, message: 'Please enter customer name' }]}
-              >
-                <Input placeholder="Enter customer name" />
-              </Form.Item>
-            </Col>
-          </Row>
+        <Form form={form} layout="vertical">
           <Form.Item
-            name="description"
-            label="Description"
+            name="partNo"
+            label="Part Number"
+            rules={[{ required: true, message: 'Please input the part number!' }]}
           >
-            <Input.TextArea rows={4} placeholder="Enter order description" />
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="customer"
+            label="Customer"
+            rules={[{ required: true, message: 'Please select the customer!' }]}
+          >
+            <Select>
+              <Option value="aerospace">Aerospace Corp</Option>
+              <Option value="defense">Defense Systems</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="quantity"
+            label="Quantity"
+            rules={[{ required: true, message: 'Please input the quantity!' }]}
+          >
+            <Input type="number" />
+          </Form.Item>
+          <Form.Item
+            name="startDate"
+            label="Start Date"
+            rules={[{ required: true, message: 'Please select the start date!' }]}
+          >
+            <DatePicker className="w-full" />
           </Form.Item>
         </Form>
       </Modal>

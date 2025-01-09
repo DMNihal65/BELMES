@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col } from 'antd';
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col,  Input as AntInput  } from 'antd';
 import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
@@ -8,6 +8,7 @@ const Consumables = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [editingKey, setEditingKey] = useState(null);
+  const [searchText, setSearchText] = useState('');
   const [ConsumablesData, setConsumablesData] = useState([
     {
       key: '1',
@@ -15,13 +16,40 @@ const Consumables = () => {
       order_id: 'ORD001', // Added order_id
       part_number: 'PART001', // Added part_number
       description: 'High precision end mill',
-      quantity: 10,
       unit_id: 'UNIT001', // Added unit_id
+      available_from: dayjs().subtract(1, 'month').format('YYYY-MM-DD'), 
+      stock: 10,
       status: 'Available',
+    },
+    {
+      key: '2',
+      id: '001',
+      order_id: 'ORD001', // Added order_id
+      part_number: 'PART001', // Added part_number
+      description: 'Low precision end mill',
+      unit_id: 'UNIT001', // Added unit_id
       available_from: dayjs().subtract(1, 'month').format('YYYY-MM-DD'), // Added available_from
+      stock: 10,
+      status: 'In Use',
     },
     // ... other existing data ...
   ]);
+
+  const handleGlobalSearch = (value) => {
+    setSearchText(value);
+  };
+
+  // Modify the columns array to work with global search
+  const getFilteredData = () => {
+    if (!searchText) return ConsumablesData;
+
+    return ConsumablesData.filter(item => {
+      return Object.keys(item).some(key => {
+        const value = item[key]?.toString().toLowerCase();
+        return value?.includes(searchText.toLowerCase());
+      });
+    });
+  };
 
   const showModal = () => {
     form.resetFields(); // Reset form fields when opening the modal
@@ -90,7 +118,7 @@ const Consumables = () => {
                 id: item.id || '',
                 description: item.description || '',
                 unit_id: item.unit_id || '',
-                quantity: parseInt(item.quantity) || 0,
+                stock: parseInt(item.stock) || 0,
             }));
 
             setConsumablesData([...ConsumablesData, ...formattedData]);
@@ -131,13 +159,29 @@ const columns = [
     onFilter: (value, record) => record.unit_id.includes(value),
   },
   {
-    title: 'Quantity',
-    dataIndex: 'quantity',
-    key: 'quantity',
-    sorter: (a, b) => a.quantity.localeCompare(b.type),
+    title: 'Stock',
+    dataIndex: 'stock',
+    key: 'stock',
+    sorter: (a, b) => a.stock.localeCompare(b.type),
     filterSearch: true,
-    filters: [...new Set(ConsumablesData.map(item => item.quantity))].map(item => ({ text: item, value: item })),
+    filters: [...new Set(ConsumablesData.map(item => item.stock))].map(item => ({ text: item, value: item })),
     onFilter: (value, record) => record.unit_id.includes(value),
+  },
+  {
+    title: 'Status',
+    dataIndex: 'status',
+    key: 'status',
+    filters: [
+      { text: 'Available', value: 'Available' },
+      { text: 'In Use', value: 'In Use' },
+    ],
+    onFilter: (value, record) => record.status === value,
+    filterSearch: true,
+    render: (status) => (
+      <span style={{ color: status === 'Available' ? '#52c41a' : '#faad14' }}>
+        {status}
+      </span>
+    ),
   },
     {
       title: 'Actions',
@@ -157,6 +201,12 @@ const columns = [
         title="Consumables Data"
         extra={
           <Space>
+             <AntInput.Search
+              placeholder="Search across all columns..."
+              onChange={(e) => handleGlobalSearch(e.target.value)}
+              style={{ width: 300 }}
+              allowClear
+            />
               <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
           onClick={showModal}>
           Add New Tool
@@ -178,7 +228,7 @@ const columns = [
       >
         <Table 
           columns={columns} 
-          dataSource={ConsumablesData}
+          dataSource={getFilteredData()}
           pagination={{ 
             pageSize: 8,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
@@ -234,9 +284,9 @@ const columns = [
             </Col>
             <Col span={8}>
               <Form.Item
-                name="quantity"
-                label="Quantity"
-                rules={[{ required: true, message: 'Please input the Quantity!' }]}
+                name="stock"
+                label="Stock"
+                rules={[{ required: true, message: 'Please input the Stock!' }]}
               >
                 <Input type="number" min={0} />
               </Form.Item>

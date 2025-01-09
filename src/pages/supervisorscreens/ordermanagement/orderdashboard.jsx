@@ -1,150 +1,176 @@
-import React, { useState } from 'react';
-import { Card, Row, Col, Tabs, Button, Space } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
-import OrderStats from '../../../components/OrderManagement/OrderStats';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
+import { motion } from 'framer-motion';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import OrderTable from '../../../components/OrderManagement/OrderTable';
-import ReorderTable from '../../../components/OrderManagement/ReorderTable';
+import ReorderableTable from '../../../components/OrderManagement/ReorderableTable';
 import CreateOrderModal from '../../../components/OrderManagement/CreateOrderModal';
-import OrderFilters from '../../../components/OrderManagement/OrderFilters';
-import { mockOrders } from '../../../data/mockOrders';
-import { InfoCircleOutlined } from '@ant-design/icons'; 
-import { Modal } from 'antd';
+import useOrderStore from '../../../store/order-store';
 
 const { TabPane } = Tabs;
 
 const OrderDashboard = () => {
+  const { orders, fetchAllOrders, isLoading, error } = useOrderStore();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState('1');
-  const [selectedMachines, setSelectedMachines] = useState(['all']);
-  const [dateRange, setDateRange] = useState(null);
-  const [searchText, setSearchText] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
+  const [parent] = useAutoAnimate();
+  
+  const handleRefresh = useCallback(() => {
+    fetchAllOrders();
+  }, [fetchAllOrders]);
 
-   // Function to show info modal
-   const showInfoModal = () => {
-    setIsInfoModalVisible(true);
-  };
+  useEffect(() => {
+    fetchAllOrders();
+  }, [fetchAllOrders]);
 
-  // Function to handle modal close
-  const handleInfoModalClose = () => {
-    setIsInfoModalVisible(false);
-  };
-
-  // Filter orders based on selected filters
-  const getFilteredOrders = () => {
-    let filtered = [...mockOrders];
-
-    // Apply status filter
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(order => order.status === filterStatus);
-    }
-
-    // Apply search filter
-    if (searchText) {
-      filtered = filtered.filter(order => 
-        order.orderNumber.toLowerCase().includes(searchText.toLowerCase()) ||
-        order.materialNumber.toLowerCase().includes(searchText.toLowerCase()) ||
-        order.materialDescription.toLowerCase().includes(searchText.toLowerCase())
-      );
-    }
-
-    // Apply date range filter
-    if (dateRange) {
-      const [start, end] = dateRange;
-      filtered = filtered.filter(order => {
-        const orderDate = new Date(order.deliveryDate);
-        return orderDate >= start && orderDate <= end;
-      });
-    }
-
-    return filtered;
+  const fadeIn = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.5 }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header with Stats */}
-      <OrderStats orders={getFilteredOrders()} />
-
-      {/* Main Content */}
-      <Card>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Order Management</h2>
-          <Space>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />}
-              onClick={() => setIsModalVisible(true)}
-              className="bg-blue-500"
-            >
-              Create New Order
-            </Button>
-          </Space>
-        </div>
-
-        {/* Filters Section */}
-        <OrderFilters 
-          searchText={searchText}
-          setSearchText={setSearchText}
-          dateRange={dateRange}
-          setDateRange={setDateRange}
-          filterStatus={filterStatus}
-          setFilterStatus={setFilterStatus}
+    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+      {error && (
+        <Alert
+          message="Error"
+          description={error}
+          type="error"
+          showIcon
+          className="m-4"
         />
+      )}
+      
+      <div className="flex-1 p-4 overflow-hidden">
+        {/* Quick Stats Row */}
+        <Row gutter={[16, 16]} className="mb-6" ref={parent}>
+          <Col xs={24} sm={12} lg={6}>
+            <motion.div {...fadeIn}>
+              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
+                <Statistic
+                  title="Total Orders"
+                  value={orders.length}
+                  prefix={<MenuOutlined />}
+                  valueStyle={{ color: '#3f8600' }}
+                />
+              </Card>
+            </motion.div>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <motion.div {...fadeIn}>
+              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
+                <Statistic
+                  title="In Progress"
+                  value={orders.filter(o => o.status === 'in_progress').length}
+                  prefix={<ArrowUpOutlined />}
+                  valueStyle={{ color: '#1890ff' }}
+                />
+              </Card>
+            </motion.div>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <motion.div {...fadeIn}>
+              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
+                <Statistic
+                  title="Revenue"
+                  value={orders.reduce((acc, curr) => acc + curr.revenue, 0)}
+                  prefix="$"
+                  precision={2}
+                  valueStyle={{ color: '#cf1322' }}
+                />
+              </Card>
+            </motion.div>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <motion.div {...fadeIn}>
+              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
+                <Statistic
+                  title="On-Time Delivery"
+                  value={92}
+                  suffix="%"
+                  prefix={<ArrowUpOutlined />}
+                  valueStyle={{ color: '#3f8600' }}
+                />
+              </Card>
+            </motion.div>
+          </Col>
+        </Row>
 
-         <Button 
-            type="link" 
-            icon={<InfoCircleOutlined />} 
-            onClick={showInfoModal}
-          >
-            Info
-          </Button>
-        {/* Orders Table with Tabs */}
-        <Tabs 
-          activeKey={activeTab} 
-          onChange={setActiveTab}
-          className="production-tabs mt-4"
-        >
-          <TabPane tab="All Orders" key="1">
-            <OrderTable orders={getFilteredOrders()} />
-          </TabPane>
-          <TabPane tab="In Progress" key="2">
-            <OrderTable 
-              orders={getFilteredOrders().filter(o => o.status === 'in_progress')} 
-            />
-          </TabPane>
-          <TabPane tab="Completed" key="3">
-            <OrderTable 
-              orders={getFilteredOrders().filter(o => o.status === 'completed')} 
-            />
-          </TabPane>
-          <TabPane tab="Delayed" key="4">
-            <OrderTable 
-              orders={getFilteredOrders().filter(o => o.status === 'delayed')} 
-            />
-          </TabPane>
-          <TabPane tab="Reorder" key="5">
-            <ReorderTable orders={getFilteredOrders()} />
-          </TabPane>
-        </Tabs>
-        
-      </Card>
-
-      {/* Create Order Modal */}
+        {/* Main Content Area - Full Width Order Management */}
+        <Row className="h-[calc(100vh-240px)]">
+          <Col span={24} className="h-full">
+            <Card
+              title={
+                <div className="flex justify-between items-center">
+                  <span className="text-base font-semibold">Order Management</span>
+                  <Space>
+                    <Button icon={<FilterOutlined />} size="small">Filter</Button>
+                    <Button 
+                      type="primary" 
+                      icon={<PlusOutlined />} 
+                      size="small"
+                      onClick={() => setIsModalVisible(true)}
+                    >
+                      New Order
+                    </Button>
+                  </Space>
+                </div>
+              }
+              bordered={false}
+              className="hover:shadow-lg transition-shadow duration-300 h-full"
+              bodyStyle={{ padding: '12px', height: 'calc(100% - 48px)', overflow: 'hidden' }}
+            >
+              <div className="flex-1 overflow-hidden">
+                <Tabs defaultActiveKey="all" className="h-full">
+                  <TabPane tab="All Orders" key="all">
+                    <div className="h-full overflow-auto">
+                      <OrderTable orders={orders} onRefresh={handleRefresh} />
+                    </div>
+                  </TabPane>
+                  <TabPane tab="In Progress" key="in_progress">
+                    <div className="h-full overflow-auto">
+                      <OrderTable orders={orders.filter(order => order.status === 'in_progress')} onRefresh={handleRefresh} />
+                    </div>
+                  </TabPane>
+                  <TabPane tab="Completed" key="completed">
+                    <div className="h-full overflow-auto">
+                      <OrderTable orders={orders.filter(order => order.status === 'completed')} onRefresh={handleRefresh} />
+                    </div>
+                  </TabPane>
+                  <TabPane tab="Delayed" key="delayed">
+                    <div className="h-full overflow-auto">
+                      <OrderTable orders={orders.filter(order => order.status === 'delayed')} onRefresh={handleRefresh}/>
+                    </div>
+                  </TabPane>
+                  <TabPane tab="Reorder" key="reorder">
+                    <div className="h-full overflow-auto">
+                      <ReorderableTable 
+                        orders={orders.map(order => ({
+                          ...order,
+                          id: order.key
+                        }))} 
+                        onOrdersReorder={(newOrders) => {
+                          console.log('Orders reordered:', newOrders);
+                          message.success('Order sequence updated successfully');
+                        }} 
+                      />
+                    </div>
+                  </TabPane>
+                </Tabs>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </div>
       <CreateOrderModal 
-        visible={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
+        visible={isModalVisible} 
+        onCancel={() => setIsModalVisible(false)} 
+        onCreate={(newOrder) => {
+          console.log('New order created:', newOrder);
+          setIsModalVisible(false);
+        }} 
+         onRefresh={handleRefresh} 
       />
-
-       {/* Info Modal */}
-       <Modal
-        title="Reordering Information"
-        visible={isInfoModalVisible}
-        onOk={handleInfoModalClose}
-        onCancel={handleInfoModalClose}
-      >
-        <p>You can reorder using drag and drop in the Reorder tab.</p>
-      </Modal>
     </div>
   );
 };

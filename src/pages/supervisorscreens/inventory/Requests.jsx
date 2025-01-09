@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Tag, Button, Space, Tooltip, Modal, Input, message, Card, Form, Row, Col } from 'antd';
+import { Table, Tag, Button, Space, Tooltip, Modal, Input, message, Card, Form, Row, Col,   Input as AntInput  } from 'antd';
 import { EyeOutlined, CheckOutlined } from '@ant-design/icons';
 import 'tailwindcss/tailwind.css';
 
@@ -7,7 +7,7 @@ const RequestTable = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [searchText, setSearchText] = useState('');
-  const [data, setData] = useState([
+  const [RequestData, setRequestData] = useState([
     {
       key: '1',
       requestId: 'REQ001',
@@ -54,13 +54,29 @@ const RequestTable = () => {
     },
   ]);
 
+  const handleGlobalSearch = (value) => {
+    setSearchText(value);
+  };
+
+  // Modify the columns array to work with global search
+  const getFilteredData = () => {
+    if (!searchText) return RequestData;
+
+    return RequestData.filter(item => {
+      return Object.keys(item).some(key => {
+        const value = item[key]?.toString().toLowerCase();
+        return value?.includes(searchText.toLowerCase());
+      });
+    });
+  };
+
   const handleDetails = (record) => {
     setSelectedRecord(record);
     setIsModalVisible(true);
   };
 
   const handleApprove = (key) => {
-    setData((prevData) =>
+    setRequestData((prevData) =>
       prevData.map((item) =>
         item.key === key ? { ...item, status: 'approved' } : item
       )
@@ -72,7 +88,7 @@ const RequestTable = () => {
     setSearchText(e.target.value.toLowerCase());
   };
 
-  const filteredData = data.filter(
+  const filteredData = RequestData.filter(
     (item) =>
       item.requestId.toLowerCase().includes(searchText) ||
       item.operatorName.toLowerCase().includes(searchText) ||
@@ -129,18 +145,19 @@ const RequestTable = () => {
 
   return (
     <div className="p-4">
-        <Card title="Requests Table" bordered={false} className="shadow-lg">
-      <div className="flex justify-end mb-4">
-        <Input.Search
-          placeholder="Search Requests"
-          onChange={handleSearch}
-          className="w-60"
-        />
-      </div>
+        <Card title="Requests Table" extra={
+          <AntInput.Search
+            placeholder="Search across all columns..."
+            onChange={(e) => handleGlobalSearch(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+          />
+        }
+        bordered={false} className="shadow-lg">
 
       <Table
         columns={columns}
-        dataSource={filteredData}
+        dataSource={getFilteredData()}
         rowClassName={(record) => (record.status === 'pending' ? 'bg-red-50' : '')}
         pagination={{
           defaultPageSize: 5,

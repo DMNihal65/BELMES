@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, message, Modal, Row, Col , InputNumber, Alert } from 'antd';
+import { Card, Table, Button, message, Modal, Row, Col , InputNumber, Alert,  Input as AntInput  } from 'antd';
 import dayjs from 'dayjs';
 
 const RawMaterials = () => {
@@ -7,6 +7,7 @@ const RawMaterials = () => {
   const [selectedTool, setSelectedTool] = useState(null);
   const [requestStock, setRequestStock] = useState(1);
   const [stockError, setStockError] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const [RawMaterialsData, setRawMaterialsData] = useState([
     {
       key: '1',
@@ -19,8 +20,35 @@ const RawMaterials = () => {
       available_from: dayjs().subtract(1, 'month').format('YYYY-MM-DD'), 
       status: 'Available',
     },
+    {
+      key: '2',
+      id: '001',
+      order_id: 'ORD001', // Added order_id
+      part_number: 'PART001', // Added part_number
+      description: 'low precision end mill',
+      unit_id: 'UNIT001', 
+      available_from: dayjs().subtract(1, 'month').format('YYYY-MM-DD'), // Added available_from
+      stock: 10,
+      status: 'In Use',
+    },
     // ... other existing data ...
   ]);
+
+  const handleGlobalSearch = (value) => {
+    setSearchText(value);
+  };
+
+  // Modify the columns array to work with global search
+  const getFilteredData = () => {
+    if (!searchText) return RawMaterialsData;
+
+    return RawMaterialsData.filter(item => {
+      return Object.keys(item).some(key => {
+        const value = item[key]?.toString().toLowerCase();
+        return value?.includes(searchText.toLowerCase());
+      });
+    });
+  };
 
   const handleRequest = (record) => {
     setSelectedTool(record);
@@ -48,12 +76,12 @@ const RawMaterials = () => {
     // Update the handleSubmit function
     const handleSubmit = () => {
       if (!requestStock || requestStock <= 0) {
-        message.error('Please enter a valid quantity');
+        message.error('Please enter a valid stock');
         return;
       }
       
       if (requestStock > selectedTool.stock) {
-        message.error('Please enter a lower quantity');
+        message.error('Please enter a lower stock');
         return;
       }
 
@@ -175,10 +203,18 @@ const columns = [
     <div>
       <Card 
         title="RawMaterials Data"
+        extra={
+          <AntInput.Search
+            placeholder="Search across all columns..."
+            onChange={(e) => handleGlobalSearch(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+          />
+        }
       >
         <Table 
           columns={columns} 
-          dataSource={RawMaterialsData}
+          dataSource={getFilteredData()}
           pagination={{ 
             pageSize: 8,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
@@ -256,10 +292,10 @@ const columns = [
             <Row gutter={[0, 16]}>
               <Col span={24}>
                 <div className="text-gray-500 mb-2">
-                  Enter Stock Quantity
+                  Enter Stock 
                 </div>
                 <InputNumber
-                  placeholder="Enter quantity"
+                  placeholder="Enter stock"
                   value={requestStock}
                   onChange={handleStockChange}
                   className="w-full"
@@ -270,8 +306,8 @@ const columns = [
               <Col span={24}>
                 {stockError && (
                   <Alert
-                    message="Please Enter Lower Stock Quantity"
-                    description={`Maximum available stock is ${selectedTool.stock}. Please enter a lower quantity.`}
+                    message="Please Enter Lower Stock "
+                    description={`Maximum available stock is ${selectedTool.stock}. Please enter a lower stock.`}
                     type="error"
                     showIcon
                   />

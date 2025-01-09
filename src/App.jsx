@@ -1,11 +1,68 @@
-import { ConfigProvider } from 'antd'
-import { RouterProvider } from 'react-router-dom'
-import { router } from './routes'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
+import ProtectedRoute from './components/ProtectedRoute';
+import MainLayout from './components/layout/MainLayout';
+import Login from './pages/auth/Login';
+import SupervisorDashboard from './pages/supervisorscreens/dashboard';
+import OperatorDashboard from './pages/operatorscreens/dashboard';
+import OrderDashboard from './pages/supervisorscreens/ordermanagement/orderdashboard';
+import Planning from './pages/supervisorscreens/productionplanning/planning';
+import Scheduling from './pages/supervisorscreens/productionplanning/scheduling';
+import ProductionMonitoring from './pages/supervisorscreens/ProductionMon';
+import DocumentManagement from './pages/supervisorscreens/DocumentManagement';
+import InventoryUsageAndAnalytics from './pages/supervisorscreens/inventory/inventoryMaster';
+import RequestsCalibrationHistory from './pages/supervisorscreens/inventory/requestsCalibrationHistory';
+import JobDetails from './pages/operatorscreens/jobdetails';
+import Inventory from './pages/operatorscreens/inventory/inventoryRequest';
+import HelpAndSupport from './pages/operatorscreens/HelpAndSupport';
+import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagement';
+import AlertScreens from './pages/operatorscreens/AlertScreens';
+import MaintenanceScreen from './pages/operatorscreens/MaintenanceScreen';
+import InspectionResult from './pages/operatorscreens/InspectionResult';
 
-function App() {
+const App = () => {
   return (
     <ConfigProvider>
-      <RouterProvider router={router} />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          
+          {/* Supervisor Routes */}
+          <Route path="/supervisor" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="dashboard" element={<SupervisorDashboard />} />
+            <Route path="order-management" element={<OrderDashboard />} />
+            <Route path="production-planning/planning" element={<Planning />} />
+            <Route path="production-planning/scheduling" element={<Scheduling />} />
+            <Route path="production-monitoring" element={<ProductionMonitoring />} />
+            <Route path="documents" element={<DocumentManagement />} />
+            <Route path="quality-management" element={<QualityManagementDashboard />} />
+            <Route path="inventory_master/inventory_usage_and_analytics" element={<InventoryUsageAndAnalytics />} />
+            <Route path="inventory_master/requests_calibration_history" element={<RequestsCalibrationHistory />} />
+          </Route>
+
+          {/* Operator Routes */}
+          <Route path="/operator" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="dashboard" element={<OperatorDashboard />} />
+            <Route path="job-details" element={<JobDetails />} />
+            <Route path="alerts" element={<AlertScreens />} />
+            <Route path="maintenance" element={<MaintenanceScreen />} />
+            <Route path="inspection" element={<InspectionResult />} />
+            <Route path="inventory" element={<Inventory />} />
+            <Route path="help" element={<HelpAndSupport />} />
+          </Route>
+
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </BrowserRouter>
+
       <style jsx global>{`
         * {
           font-family: 'CustomFont', system-ui, sans-serif;
@@ -30,20 +87,9 @@ function App() {
         .ant-typography {
           font-family: 'CustomFont', system-ui, sans-serif !important;
         }
-
-        /* Variable font weight classes */
-        .font-thin { font-variation-settings: 'wght' 100; }
-        .font-extralight { font-variation-settings: 'wght' 200; }
-        .font-light { font-variation-settings: 'wght' 300; }
-        .font-normal { font-variation-settings: 'wght' 400; }
-        .font-medium { font-variation-settings: 'wght' 500; }
-        .font-semibold { font-variation-settings: 'wght' 600; }
-        .font-bold { font-variation-settings: 'wght' 700; }
-        .font-extrabold { font-variation-settings: 'wght' 800; }
-        .font-black { font-variation-settings: 'wght' 900; }
       `}</style>
     </ConfigProvider>
-  )
-}
+  );
+};
 
-export default App
+export default App;

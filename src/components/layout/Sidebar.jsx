@@ -18,18 +18,13 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
 import belLogo from '../../assets/cmti.png';
-import { useEffect, useState } from 'react';
+import useAuthStore from '../../store/auth-store';
 
 function Sidebar() {
+  const { user } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const isCollapsed = useStore((state) => state.isSidebarCollapsed);
-  const [userRole, setUserRole] = useState('');
-
-  useEffect(() => {
-    const role = localStorage.getItem('userRole');
-    setUserRole(role || '');
-  }, []);
 
   const operatorMenuItems = [
     {
@@ -136,12 +131,7 @@ function Sidebar() {
     },
   ];
 
-  const handleMenuClick = (item) => {
-    navigate(item.key);
-  };
-
-  const selectedKey = location.pathname;
-  const openKey = selectedKey.split('/').slice(0, 3).join('/');
+  const menuItems = user?.role === 'operator' ? operatorMenuItems : supervisorMenuItems;
 
   return (
     <div className="h-screen flex flex-col">
@@ -151,15 +141,17 @@ function Sidebar() {
           alt="BEL Logo"
           preview={false}
           width={isCollapsed ? 40 : 100}
+          className="transition-all duration-300"
         />
       </div>
       <Menu
         theme="light"
         mode="inline"
-        selectedKeys={[selectedKey]}
-        defaultOpenKeys={[openKey]}
-        items={userRole === 'operator' ? operatorMenuItems : supervisorMenuItems}
-        onClick={handleMenuClick}
+        selectedKeys={[location.pathname]}
+        defaultOpenKeys={[location.pathname.split('/').slice(0, 3).join('/')]}
+        items={menuItems}
+        onClick={({ key }) => navigate(key)}
+        inlineCollapsed={isCollapsed}
       />
     </div>
   );

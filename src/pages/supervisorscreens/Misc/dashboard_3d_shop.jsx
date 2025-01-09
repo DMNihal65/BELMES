@@ -5,6 +5,7 @@ import ReactECharts from 'echarts-for-react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, Grid, Box, Environment, PerspectiveCamera,useGLTF  } from '@react-three/drei';
 import * as THREE from 'three';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 
 // Enhanced machine data with more detailed positioning
 const machineData = [
@@ -22,9 +23,9 @@ const machineData = [
     estimatedCompletion: '04:30 PM',
     cycleTime: '45 min',
     downtime: '2%',
-    position: [-7, 2, 1],
-    rotation: [0, Math.PI / 6, 0],
-    scale: 4,
+    position: [20, 2.5, -15],
+    rotation: [0, Math.PI / 20, 0],
+    scale: 5.0,
   },
   {
     id: 'DMG-002',
@@ -40,9 +41,9 @@ const machineData = [
     estimatedCompletion: '05:00 PM',
     cycleTime: '30 min',
     downtime: '5%',
-    position: [2, 2, -2],
-    rotation: [0, -Math.PI / 6, 0],
-    scale: 4,
+    position: [8, 2.5, -15],
+    rotation: [0, Math.PI / 15, 0],
+    scale: 5.0,
   },
   // ... other machines with similar enhanced data
 ];
@@ -131,32 +132,58 @@ const MachineModel = ({ position, rotation, status, onClick, isSelected, scale =
 
 // Shop floor environment
 const ShopFloor = () => {
+  const [shopFloorModel, setShopFloorModel] = useState(null);
+  
+  useEffect(() => {
+    const loader = new OBJLoader();
+    loader.load(
+      '/BEL_v2.obj',
+      (object) => {
+        object.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            child.material = new THREE.MeshStandardMaterial({
+              color: '#e0e0e0',
+              metalness: 0.6,
+              roughness: 0.4,
+              envMapIntensity: 2,
+            });
+          }
+        });
+        object.rotation.x = -Math.PI / 2;
+        setShopFloorModel(object);
+      },
+      (xhr) => {
+        console.log((xhr.loaded / xhr.total) * 100 + '% loaded');
+      },
+      (error) => {
+        console.error('Error loading model:', error);
+      }
+    );
+  }, []);
+
   return (
     <>
+      {shopFloorModel && (
+        <primitive 
+          object={shopFloorModel} 
+          scale={[2, 2, 2]}
+          position={[0, -0.5, 0]}
+        />
+      )}
+      
       <Grid
-        args={[50, 50]}
-        cellSize={0}
-        cellThickness={0}
-        // cellColor="#6e6e6e"
-        sectionSize={10}
-        fadeDistance={50}
+        args={[100, 100]}
+        cellSize={1}
+        cellThickness={0.5}
+        cellColor="#6e6e6e"
+        sectionSize={5}
+        fadeDistance={100}
         fadeStrength={1}
         followCamera={false}
         position={[0, -0.01, 0]}
       />
-      
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[100, 100]} />
-        <shadowMaterial transparent opacity={0.4} />
-      </mesh>
-
-      {/* {[1, 2, 3, 4, 5].map((num, i) => (
-        <Html key={num} position={[-20 + (i * 10), 0.1, -15]}>
-          <div className="bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold">
-            {num}
-          </div>
-        </Html>
-      ))} */}
     </>
   );
 };
@@ -308,7 +335,7 @@ const SupervisorDashboard = () => {
               }}
               shadows="soft"
               camera={{ 
-                position: [-10, 20, 20],
+                position: [-20, 30, 30],
                 fov: 45,
                 near: 0.1,
                 far: 1000
@@ -316,26 +343,52 @@ const SupervisorDashboard = () => {
               gl={{ 
                 antialias: true,
                 toneMapping: THREE.ACESFilmicToneMapping,
-                toneMappingExposure: 1
+                toneMappingExposure: 1.2
               }}
             >
-              <PerspectiveCamera makeDefault position={[-10, 20, 20]} />
+              <PerspectiveCamera makeDefault position={[60, 40, 30]} />
               
-              <ambientLight intensity={0.4} />
+              <ambientLight intensity={0.5} />
               <directionalLight 
                 position={[10, 20, 15]} 
-                intensity={1}
+                intensity={5.0}
                 castShadow
-                shadow-mapSize-width={2048}
-                shadow-mapSize-height={2048}
-                shadow-camera-far={50}
-                shadow-camera-left={-20}
-                shadow-camera-right={20}
-                shadow-camera-top={20}
-                shadow-camera-bottom={-20}
+                shadow-mapSize={[4096, 4096]}
+                shadow-camera-far={100}
+                shadow-camera-left={-50}
+                shadow-camera-right={50}
+                shadow-camera-top={50}
+                shadow-camera-bottom={-50}
               />
 
-              <Suspense fallback={null}>
+              <directionalLight position={[-10, 20, -15]} intensity={0.8} />
+              <directionalLight position={[15, 10, -10]} intensity={0.5} />
+
+              {[
+                [-15, 15, -15],
+                [15, 15, -15],
+                [-15, 15, 15],
+                [15, 15, 15]
+              ].map((pos, i) => (
+                <spotLight
+                  key={i}
+                  position={pos}
+                  angle={0.5}
+                  penumbra={1}
+                  intensity={0.8}
+                  castShadow
+                  color="#ffffff"
+                  distance={35}
+                />
+              ))}
+
+              <hemisphereLight
+                skyColor="#ffffff"
+                groundColor="#444444"
+                intensity={0.5}
+              />
+
+              <Suspense fallback={<Html center>Loading 3D Environment...</Html>}>
                 <ShopFloor />
                 {machineData.map((machine) => (
                   <MachineModel
@@ -345,30 +398,30 @@ const SupervisorDashboard = () => {
                     isSelected={selectedMachine?.id === machine.id}
                   />
                 ))}
-                <Environment 
-                  files="/machine_shop_02_4k.hdr"
-                  background={true}
-                  blur={0.5}
-                  // preset="forest"
-                  intensity={0.8}
-                  ground={{
-                    height: 15,
-                    radius: 40,
-                    scale: 20
-                  }}
-                />
               </Suspense>
 
               <OrbitControls
-                target={[0, 0, 0]}
-                maxPolarAngle={Math.PI / 2.5}
-                minDistance={10}
-                maxDistance={50}
+                target={[4, 2, -15]}
+                maxPolarAngle={Math.PI / 2.1}
+                minDistance={15}
+                maxDistance={100}
                 enableDamping={true}
                 dampingFactor={0.05}
               />
 
-              <fog attach="fog" args={['#f0f0f0', 30, 100]} />
+              {/* Controls overlay */}
+              <Html position={[-18, 0, 0]} style={{ pointerEvents: 'none' }}>
+                <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-lg">
+                  <div className="text-sm font-semibold mb-2">View Controls</div>
+                  <div className="text-xs text-gray-600">
+                    <div>🖱️ Left Click + Drag: Rotate</div>
+                    <div>🖱️ Right Click + Drag: Pan</div>
+                    <div>🖱️ Scroll: Zoom</div>
+                  </div>
+                </div>
+              </Html>
+
+              <fog attach="fog" args={['#f0f0f0', 50, 150]} />
             </Canvas>
           </Card>
         </Col>

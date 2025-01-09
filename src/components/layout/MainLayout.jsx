@@ -1,32 +1,48 @@
-import { Layout } from 'antd'
-import { Outlet } from 'react-router-dom'
-import Header from './Header'
-import Sidebar from './Sidebar'
-import useStore from '../../store/useStore'
+import { Layout } from 'antd';
+import { Outlet } from 'react-router-dom';
+import Header from './Header';
+import Sidebar from './Sidebar';
+import useStore from '../../store/useStore';
 
-const { Content, Sider } = Layout
+const { Content } = Layout;
 
 function MainLayout() {
-  const isCollapsed = useStore((state) => state.isSidebarCollapsed)
+  const isCollapsed = useStore((state) => state.isSidebarCollapsed);
 
   return (
-    <Layout>
-      <Sider 
-        trigger={null} 
-        collapsible 
+    <Layout style={{ minHeight: '100vh' }}>
+      <Layout.Sider
         collapsed={isCollapsed}
-        theme="light"
+        width={260}
+        style={{
+          background: '#fff',
+          height: '100vh',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          overflowY: 'auto',
+          transition: 'all 0.2s',
+        }}
       >
         <Sidebar />
-      </Sider>
-      <Layout>
+      </Layout.Sider>
+
+      <Layout style={{ 
+        marginLeft: isCollapsed ? 80 : 260,
+        transition: 'all 0.2s',
+      }}>
         <Header />
-        <Content className="p-6">
+        <Content style={{ 
+          padding: '24px',
+          minHeight: 280,
+          background: '#f5f5f5',
+        }}>
           <Outlet />
         </Content>
       </Layout>
     </Layout>
-  )
+  );
 }
 
-export default MainLayout 
+export default MainLayout; 

@@ -34,7 +34,7 @@
     "echarts-for-react": "^3.0.2",
     "express": "^4.21.2",
     "file-saver": "^2.0.5",
-    "framer-motion": "^11.16.0",
+    "framer-motion": "^11.16.1",
     "gantt-task-react": "^0.3.9",
     "jspdf": "^2.5.2",
     "keycharm": "^0.4.0",
@@ -62,7 +62,7 @@
     "vis-util": "^5.0.7",
     "xlsx": "^0.18.5",
     "xss": "^1.0.15",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

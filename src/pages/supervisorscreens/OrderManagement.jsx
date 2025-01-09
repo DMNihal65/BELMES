@@ -315,7 +315,6 @@ function OrderManagement() {
                   className="hover:shadow-lg transition-shadow duration-300 h-full"
                   bodyStyle={{ padding: '12px', height: 'calc(100% - 48px)' }}
                 >
-                  {/* Add chart here */}
                 </Card>
               </Col>
               <Col span={24} style={{ height: '50%' }}>
@@ -331,7 +330,6 @@ function OrderManagement() {
                   bodyStyle={{ padding: '12px', height: 'calc(100% - 48px)', overflow: 'hidden' }}
                 >
                   <div className="h-full overflow-auto">
-                    {/* Add activity timeline here */}
                   </div>
                 </Card>
               </Col>

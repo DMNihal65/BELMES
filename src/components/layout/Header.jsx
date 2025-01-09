@@ -1,38 +1,26 @@
 import { Avatar, Button, Dropdown, Input, Layout, Space } from 'antd';
 import { LogOut, Menu as MenuIcon, Search, User } from 'lucide-react';
+import useAuthStore from '../../store/auth-store';
 import useStore from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import cmtiLogo from '../../assets/bel.png';
-import { useEffect, useState } from 'react';
 
 const { Header: AntHeader } = Layout;
 
 function Header() {
+  const { user, logout } = useAuthStore();
   const { toggleSidebar } = useStore();
   const navigate = useNavigate();
-  const [operatorName, setOperatorName] = useState('');
-  const [role, setRole] = useState('');
-  
-
-  useEffect(() => {
-    // Get operator name from localStorage
-    const name = localStorage.getItem('operatorName');
-    setOperatorName(name || '');
-  }, []);
 
   const handleLogout = () => {
-    // Clear all auth-related data from localStorage
-    localStorage.removeItem('operatorName');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('isAuthenticated');
-    // Navigate to login page
+    logout();
     navigate('/login');
   };
 
   const profileMenuItems = [
     {
       key: 'role',
-      label: `Role: ${role}`,
+      label: `Role: ${user?.role || ''}`,
       disabled: true,
     },
     {
@@ -75,7 +63,6 @@ function Header() {
       />
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-        {/* CMTI Logo */}
         <img
           src={cmtiLogo}
           alt="CMTI Logo"
@@ -91,9 +78,9 @@ function Header() {
                 verticalAlign: 'middle',
               }}
             >
-              {operatorName?.charAt(0)?.toUpperCase()}
+              {user?.username?.[0]?.toUpperCase()}
             </Avatar>
-            <span className="font-medium">{operatorName}</span>
+            <span className="font-medium">{user?.username}</span>
           </Space>
         </Dropdown>
       </div>

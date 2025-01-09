@@ -1,5 +1,4 @@
-// src/pages/supervisorscreens/ordermanagement/orderdashboard.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
@@ -15,6 +14,10 @@ const OrderDashboard = () => {
   const { orders, fetchAllOrders, isLoading, error } = useOrderStore();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [parent] = useAutoAnimate();
+  
+  const handleRefresh = useCallback(() => {
+    fetchAllOrders();
+  }, [fetchAllOrders]);
 
   useEffect(() => {
     fetchAllOrders();
@@ -121,22 +124,22 @@ const OrderDashboard = () => {
                 <Tabs defaultActiveKey="all" className="h-full">
                   <TabPane tab="All Orders" key="all">
                     <div className="h-full overflow-auto">
-                      <OrderTable orders={orders} />
+                      <OrderTable orders={orders} onRefresh={handleRefresh} />
                     </div>
                   </TabPane>
                   <TabPane tab="In Progress" key="in_progress">
                     <div className="h-full overflow-auto">
-                      <OrderTable orders={orders.filter(order => order.status === 'in_progress')} />
+                      <OrderTable orders={orders.filter(order => order.status === 'in_progress')} onRefresh={handleRefresh} />
                     </div>
                   </TabPane>
                   <TabPane tab="Completed" key="completed">
                     <div className="h-full overflow-auto">
-                      <OrderTable orders={orders.filter(order => order.status === 'completed')} />
+                      <OrderTable orders={orders.filter(order => order.status === 'completed')} onRefresh={handleRefresh} />
                     </div>
                   </TabPane>
                   <TabPane tab="Delayed" key="delayed">
                     <div className="h-full overflow-auto">
-                      <OrderTable orders={orders.filter(order => order.status === 'delayed')} />
+                      <OrderTable orders={orders.filter(order => order.status === 'delayed')} onRefresh={handleRefresh}/>
                     </div>
                   </TabPane>
                   <TabPane tab="Reorder" key="reorder">
@@ -166,6 +169,7 @@ const OrderDashboard = () => {
           console.log('New order created:', newOrder);
           setIsModalVisible(false);
         }} 
+         onRefresh={handleRefresh} 
       />
     </div>
   );

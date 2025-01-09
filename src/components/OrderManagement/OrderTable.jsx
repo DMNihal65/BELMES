@@ -3,8 +3,27 @@ import React from 'react';
 import { Table, Tag, Badge, Button, Space, Tooltip } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { message } from 'antd';
+import dayjs from 'dayjs';
 
-const OrderTable = ({ orders }) => {
+const OrderTable = ({ orders, onRefresh }) => {
+
+    // Add useEffect for initial load and polling
+    React.useEffect(() => {
+      // Initial load
+      if (onRefresh) {
+        onRefresh();
+      }
+  
+      // Set up polling every 30 seconds
+      const intervalId = setInterval(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 10000);
+  
+      return () => clearInterval(intervalId);
+    }, [onRefresh]);
+
   // Handle view action
   const handleViewDetails = (record) => {
     message.info(`Viewing details for order ${record.orderNumber}`);
@@ -50,7 +69,6 @@ const OrderTable = ({ orders }) => {
           <div className="text-xs text-gray-500">
             Launched: {record.launched_quantity || 0}
           </div>
-         
         </div>
       ),
       sorter: (a, b) => a.required_quantity - b.required_quantity,
@@ -79,10 +97,14 @@ const OrderTable = ({ orders }) => {
     },
     {
       title: 'Delivery Date',
-      dataIndex: 'deliveryDate',
+      dataIndex: 'deliveryDate', // Ensure this matches the transformed field
       key: 'deliveryDate',
-      render: (date) => new Date(date).toLocaleDateString(),
-      sorter: (a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate),
+      render: (date) => date ? dayjs(date).format('MM/DD/YYYY') : 'N/A',
+      sorter: (a, b) => {
+        const dateA = a.deliveryDate ? dayjs(a.deliveryDate).unix() : 0;
+        const dateB = b.deliveryDate ? dayjs(b.deliveryDate).unix() : 0;
+        return dateA - dateB;
+      },
     },
     {
       title: 'Status',
@@ -109,38 +131,6 @@ const OrderTable = ({ orders }) => {
       ],
       onFilter: (value, record) => record.status === value,
     },
-    // {
-    //   title: 'Priority',
-    //   key: 'priority',
-    //   render: (_, record) => {
-    //     const priority = record.project?.priority;
-    //     let displayPriority = 'normal';
-    //     let tagColor = 'blue';
-
-    //     if (priority === 1) {
-    //       displayPriority = 'high';
-    //       tagColor = 'red';
-    //     } else if (priority === 2) {
-    //       displayPriority = 'medium';
-    //       tagColor = 'orange';
-    //     } else if (priority === 3) {
-    //       displayPriority = 'low';
-    //       tagColor = 'blue';
-    //     }
-
-    //     return (
-    //       <Tag color={tagColor}>
-    //         {displayPriority.toUpperCase()}
-    //       </Tag>
-    //     );
-    //   },
-    //   filters: [
-    //     { text: 'High', value: 1 },
-    //     { text: 'Medium', value: 2 },
-    //     { text: 'Low', value: 3 },
-    //   ],
-    //   onFilter: (value, record) => record.project?.priority === value,
-    // },
     {
       title: 'Actions',
       key: 'actions',
@@ -181,3 +171,4 @@ const OrderTable = ({ orders }) => {
 };
 
 export default OrderTable;
+

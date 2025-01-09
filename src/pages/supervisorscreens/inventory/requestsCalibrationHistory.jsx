@@ -1,17 +1,9 @@
 import React, { useState } from 'react';
-import { Tabs, Card, Row, Col, Typography } from 'antd';
-import { 
-  BarChartOutlined, 
-  ProfileOutlined, 
-  ToolOutlined, 
-  HistoryOutlined,
-  DashboardOutlined
-} from '@ant-design/icons';
-import Analytics from './Analytics';
-import Requests from './Requests';
-import Calibration from './Calibration';
-import History from './History';
-
+import { Tabs } from 'antd'; 
+import Analytics from './Analytics/Analytics'; // Import Analytics component
+import Requests from './Requests'; // Import Requests component
+import Calibration from './Calibration'; // Import Calibration component
+import History from './History'; // Import History component
 const { TabPane } = Tabs;
 const { Title } = Typography;
 

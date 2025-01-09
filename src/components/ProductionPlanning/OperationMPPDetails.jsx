@@ -1,112 +1,51 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import ReactQuill from 'react-quill'; // Import ReactQuill
+import 'react-quill/dist/quill.snow.css'; // Import Quill's default styles
 import {
-  Form, 
-  Input, 
-  Card, 
-  Row, 
-  Col, 
-  Typography, 
-  Spin,
-  Button, 
-  Space,
-  Upload,
-  message
+  Tabs, Form, Input, Select, Space, Button, Upload,
+  Table, Card, Row, Col, Divider, message, Descriptions, Typography, 
 } from 'antd';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import { PlusOutlined } from '@ant-design/icons';
-import usePlanningStore from '../../store/planning-store';
+import {
+  UploadOutlined, SaveOutlined, PlusOutlined,
+  MinusCircleOutlined
+} from '@ant-design/icons';
 
+const { TabPane } = Tabs;
+const { Option } = Select;
 const { Title, Text } = Typography;
 
-const defaultInstructions = [
-  { id: 1, title: 'Fixture Setup', content: '' },
-  { id: 2, title: 'Job Preparation', content: '' },
-  { id: 3, title: 'Post-Machining Steps', content: '' }
-];
 
-const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
+const OperationMPPDetails = ({ operation, onSave }) => {
   const [form] = Form.useForm();
-  const { fetchMPPDetails, saveMPPDetails, mppDetails, isLoading } = usePlanningStore();
-  const [workInstructions, setWorkInstructions] = useState(defaultInstructions);
-  const [editableCardTitles, setEditableCardTitles] = useState({
-    fixture: 'Fixture & IPID Details',
-    datum: 'Datum Information',
-    workInstructions: 'Work Holding Instructions',
-    images: 'Operation Images'
-  });
-
-  useEffect(() => {
-    if (partNumber && operation?.operation_number) {
-      fetchMPPDetails(partNumber, operation.operation_number);
-    }
-  }, [partNumber, operation, fetchMPPDetails]);
-
-  useEffect(() => {
-    if (mppDetails) {
-      form.setFieldsValue({
-        fixture_number: mppDetails.fixture_number,
-        ipid_number: mppDetails.ipid_number,
-        datum_x: mppDetails.datum_x,
-        datum_y: mppDetails.datum_y,
-        datum_z: mppDetails.datum_z,
-      });
-
-      if (mppDetails.work_instructions?.sections) {
-        setWorkInstructions(mppDetails.work_instructions.sections.map((section, index) => ({
-          id: index + 1,
-          title: section.title,
-          content: section.instructions
-        })));
-      }
-    }
-  }, [mppDetails, form]);
+  const [activeTab, setActiveTab] = useState('setup');
+  const [fileList, setFileList] = useState([]);
+  const [editorContent, setEditorContent] = useState(''); // Store the rich text content
+  const [workHolding, setWorkHolding] = useState('');
+  const [workHoldingDetails, setWorkHoldingDetails] = useState('');
+  const [ipidNoRev, setIpidNoRev] = useState('');
+  const [freq, setFreq] = useState('');
+  const [datumXAxis, setDatumXAxis] = useState('');
+  const [datumYAxis, setDatumYAxis] = useState('');
+  const [datumZAxis, setDatumZAxis] = useState('');
+  const [rev, setRev] = useState('');
 
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      
-      const mppData = {
-        order_id: operation?.order_id || null,
-        operation_id: operation?.id || null,
-        document_id: null,
-        fixture_number: values.fixture_number,
-        ipid_number: values.ipid_number,
-        datum_x: values.datum_x,
-        datum_y: values.datum_y,
-        datum_z: values.datum_z,
-        work_instructions: {
-          sections: workInstructions.map((instruction, index) => ({
-            title: instruction.title || '',
-            instructions: instruction.content || '',
-            sequence: index
-          }))
-        },
-        part_number: partNumber,
-        operation_number: Number(operation?.operation_number)
-      };
-
-      console.log('Saving MPP data:', mppData);
-
-      await saveMPPDetails(mppData);
-      message.success('MPP details saved successfully');
-      if (onSave) {
-        onSave();
-      }
+      onSave({ ...values, docs: { instructions: editorContent } }); // Pass the editor content
     } catch (error) {
-      console.error('Save error:', error);
-      message.error(
-        'Failed to save MPP details: ' + 
-        (typeof error === 'string' ? error : error.message || 'Unknown error')
-      );
+      console.error('Validation failed:', error);
     }
   };
 
-  const handleCardTitleChange = (key, value) => {
-    setEditableCardTitles(prev => ({
-      ...prev,
-      [key]: value
-    }));
+  const handleUploadChange = ({ fileList: newFileList }) => {
+    setFileList(newFileList); // Update file list on change
+  };
+
+  const handleFilenameChange = (index, value) => {
+    const newFileList = [...fileList];
+    newFileList[index].name = value; // Update the filename in the fileList
+    setFileList(newFileList); // Set the updated file list
   };
 
   if (isLoading) {
@@ -118,184 +57,380 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <Title level={4} editable>Operation Details - Operation Number: {operation?.operation_number}</Title>
-      
-      <Form form={form} layout="vertical">
-        {/* Fixture & IPID Details */}
-        <Card 
-          title={
-            <Input
-              value={editableCardTitles.fixture}
-              onChange={(e) => handleCardTitleChange('fixture', e.target.value)}
-              bordered={false}
-              className="text-lg font-medium"
-            />
-          }
-          className="shadow-sm"
-        >
-          <Row gutter={[24, 16]}>
-            <Col span={12}>
-              <Form.Item 
-                name="fixture_number"
-                label={<Text strong>Fixture No</Text>}
-                rules={[{ required: true, message: 'Please enter fixture number' }]}
-              >
-                <Input placeholder="Enter Fixture Number" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item 
-                name="ipid_number"
-                label={<Text strong>IPID No</Text>}
-                rules={[{ required: true, message: 'Please enter IPID number' }]}
-              >
-                <Input placeholder="Enter IPID Number" />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Card>
+    <div className="p-2 space-y-6">
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={operation}
+      >
+        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+          <TabPane tab="Setup Information" key="setup">
+            <Row gutter={24}>
+              <Col span={12}>
 
-        {/* Datum Information */}
-        <Card 
-          title={
-            <Input
-              value={editableCardTitles.datum}
-              onChange={(e) => handleCardTitleChange('datum', e.target.value)}
-              bordered={false}
-              className="text-lg font-medium"
-            />
-          }
-          className="shadow-sm"
-        >
-          <Row gutter={[24, 16]}>
-            <Col span={8}>
-              <Form.Item 
-                name="datum_x"
-                label={<Text strong>Datum X Axis</Text>}
-                rules={[{ required: true, message: 'Please enter Datum X' }]}
-              >
-                <Input placeholder="Enter Datum X" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item 
-                name="datum_y"
-                label={<Text strong>Datum Y Axis</Text>}
-                rules={[{ required: true, message: 'Please enter Datum Y' }]}
-              >
-                <Input placeholder="Enter Datum Y" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item 
-                name="datum_z"
-                label={<Text strong>Datum Z Axis</Text>}
-                rules={[{ required: true, message: 'Please enter Datum Z' }]}
-              >
-                <Input placeholder="Enter Datum Z" />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Card>
+              <Card title="Machine Setup" className="shadow-sm">
+                <Descriptions column={1} bordered>
+                  {/* Work Holding and Work Holding Details */}
+                  <Descriptions.Item label="Work Holding">
+                    <Input 
+                      placeholder="Enter Work Holding" 
+                      value={workHolding} 
+                      onChange={(e) => setWorkHolding(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Work Holding Details">
+                    <Input 
+                      placeholder="Enter Work Holding Details" 
+                      value={workHoldingDetails} 
+                      onChange={(e) => setWorkHoldingDetails(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+                  
+                  {/* IPID No with Rev */}
+                  <Descriptions.Item label="IPID No with Rev">
+                    <Input 
+                      placeholder="Enter IPID No with Rev" 
+                      value={ipidNoRev} 
+                      onChange={(e) => setIpidNoRev(e.target.value)} 
+                    />
+                  </Descriptions.Item>
 
-        {/* Work Instructions */}
-        <Card 
-          title={
-            <Input
-              value={editableCardTitles.workInstructions}
-              onChange={(e) => handleCardTitleChange('workInstructions', e.target.value)}
-              bordered={false}
-              className="text-lg font-medium"
-            />
-          }
-          className="shadow-sm"
-        >
-          <div className="space-y-4">
-            {workInstructions.map((instruction) => (
-              <div key={instruction.id} className="border rounded-lg p-4">
-                <Input
-                  value={instruction.title}
-                  onChange={(e) => {
-                    const newInstructions = workInstructions.map(inst =>
-                      inst.id === instruction.id ? { ...inst, title: e.target.value } : inst
-                    );
-                    setWorkInstructions(newInstructions);
-                  }}
-                  className="mb-2 font-medium"
-                />
-                <ReactQuill
-                  theme="snow"
-                  value={instruction.content}
-                  onChange={(content) => {
-                    const newInstructions = workInstructions.map(inst =>
-                      inst.id === instruction.id ? { ...inst, content } : inst
-                    );
-                    setWorkInstructions(newInstructions);
-                  }}
-                  modules={{
-                    toolbar: [
-                      ['bold', 'italic', 'underline'],
-                      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                      ['clean']
-                    ]
-                  }}
-                  placeholder="Enter instructions points here..."
-                />
-              </div>
-            ))}
-            <Button 
-              type="dashed" 
-              onClick={() => {
-                setWorkInstructions([
-                  ...workInstructions,
-                  {
-                    id: workInstructions.length + 1,
-                    title: `New Section ${workInstructions.length + 1}`,
-                    content: ''
-                  }
-                ]);
-              }} 
-              block
-              icon={<PlusOutlined />}
+                  {/* Frequency */}
+                  <Descriptions.Item label="Freq.">
+                    <Input 
+                      placeholder="Enter Frequency" 
+                      value={freq} 
+                      onChange={(e) => setFreq(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Datum X Axis */}
+                  <Descriptions.Item label="Datum X Axis">
+                    <Input 
+                      placeholder="Enter Datum X Axis" 
+                      value={datumXAxis} 
+                      onChange={(e) => setDatumXAxis(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Datum Y Axis */}
+                  <Descriptions.Item label="Datum Y Axis">
+                    <Input 
+                      placeholder="Enter Datum Y Axis" 
+                      value={datumYAxis} 
+                      onChange={(e) => setDatumYAxis(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Datum Z Axis */}
+                  <Descriptions.Item label="Datum Z Axis">
+                    <Input 
+                      placeholder="Enter Datum Z Axis" 
+                      value={datumZAxis} 
+                      onChange={(e) => setDatumZAxis(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Revision */}
+                  <Descriptions.Item label="Rev">
+                    <Input 
+                      placeholder="Enter Revision" 
+                      value={rev} 
+                      onChange={(e) => setRev(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+
+
+                {/* <Card title="Machine Setup" size="small">
+                  <Form.Item
+                    name={['setup', 'workHolding']}
+                    label="Work Holding"
+                  >
+                    <Input placeholder="Enter Work Holding" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name={['setup', 'workHoldingDetails']}
+                    label="Work Holding Details"
+                  >
+                    <Input placeholder="Enter Work Holding Details" />
+                  </Form.Item>
+
+                  <Row gutter={24}>
+                    <Col span={12}>
+                      <Form.Item
+                        name={['setup', 'ipidNoRev']}
+                        label="IPID No with Rev"
+                      >
+                        <Input placeholder="Enter IPID No with Rev" />
+                      </Form.Item>
+                    </Col>
+
+                    <Col span={12}>
+                      <Form.Item
+                        name={['setup', 'freq.']}
+                        label="Freq."
+                      >
+                        <Input placeholder="Enter Freq" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Form.Item
+                    name={['setup', 'datumXAxis']}
+                    label="Datum X Axis"
+                  >
+                    <Input placeholder="Enter Datum X Axis" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name={['setup', 'datumYAxis']}
+                    label="Datum Y Axis"
+                  >
+                    <Input placeholder="Enter Datum Y Axis" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name={['setup', 'datumZAxis']}
+                    label="Datum Z Axis"
+                  >
+                    <Input placeholder="Enter Datum Z Axis" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name={['setup', 'rev']}
+                    label="Rev"
+                  >
+                    <Input placeholder="Enter Rev" />
+                  </Form.Item>
+                </Card> */}
+              </Col>
+
+              <Col span={12}>
+                <Card title="Program Name" size="small">
+                  <Form.Item
+                    name={['setup', 'programName']}
+                    label="Program Name"
+                  >
+                    <Input placeholder="Enter Program Name" />
+                  </Form.Item>
+
+                  <Form.List name={['setup', 'steps']}>
+                    {(fields, { add, remove }) => (
+                      <>
+                        {fields.map(({ key, name, ...restField }) => (
+                          <Space
+                            key={key}
+                            style={{ display: 'flex', marginBottom: 8 }}
+                            align="baseline"
+                          >
+                            <Row gutter={24}>
+                              <Col span={40}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'description']}
+                                  rules={[{ required: true, message: 'Missing step' }]}
+                                >
+                                  <Input placeholder="Enter program name" />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                            <MinusCircleOutlined onClick={() => remove(name)} />
+                          </Space>
+                        ))}
+                        <Form.Item>
+                          <Button
+                            type="dashed"
+                            onClick={() => add()}
+                            block
+                            icon={<PlusOutlined />}
+                          >
+                            Add Program Name
+                          </Button>
+                        </Form.Item>
+                      </>
+                    )}
+                  </Form.List>
+                </Card>
+              </Col>
+            </Row>
+          </TabPane>
+
+          <TabPane tab="Upload Notes and Images" key="docs">
+            <Row gutter={24}>
+              <Col span={24}>
+                <Form.Item
+                  name={['docs', 'instructions']}
+                  label="Special Instructions"
+                >
+                  <ReactQuill
+                    value={editorContent}
+                    onChange={setEditorContent} // Update editor content
+                    theme="snow"
+                    placeholder="Enter special instructions here"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={24}>
+                <Form.Item
+                  name={['docs', 'headingPoints']}
+                  label="Notes"
+                >
+                  <Form.List
+                    name="headings"
+                    initialValue={[]}
+                    rules={[
+                      {
+                        validator: async(_, names) => {
+                          if (!names || names.length < 1) {
+                            return Promise.reject(new Error('At least one heading is required.'));
+                          }
+                        },
+                      },
+                    ]}
+                  >
+                    {(fields, { add, remove }) => (
+                      <>
+                        {fields.map(({ key, name, fieldKey, ...restField }) => (
+                          <div key={key} style={{ marginBottom: 20 }}>
+                            <Form.Item
+                              {...restField}
+                              name={[name, 'heading']}
+                              fieldKey={[fieldKey, 'heading']}
+                              label="Heading"
+                              rules={[{ required: true, message: 'Please enter a heading' }]}
+                            >
+                              <Input placeholder="Enter Heading" />
+                            </Form.Item>
+                            <Form.List
+                              name={[name, 'points']}
+                              initialValue={[]}
+                            >
+                              {(pointFields, { add: addPoint, remove: removePoint }) => (
+                                <>
+                                  {pointFields.map(({ key, name, fieldKey, ...restPointField }) => (
+                                    <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                                      <Form.Item
+                                        {...restPointField}
+                                        name={[name, 'point']}
+                                        fieldKey={[fieldKey, 'point']}
+                                        rules={[{ required: true, message: 'Missing point' }]}
+                                      >
+                                        <Input placeholder="Enter point" />
+                                      </Form.Item>
+                                      <MinusCircleOutlined onClick={() => removePoint(name)} />
+                                    </Space>
+                                  ))}
+                                  <Form.Item>
+                                    <Button
+                                      type="dashed"
+                                      onClick={() => addPoint()}
+                                      block
+                                      icon={<PlusOutlined />}
+                                    >
+                                      Add Point
+                                    </Button>
+                                  </Form.Item>
+                                </>
+                              )}
+                            </Form.List>
+                            <MinusCircleOutlined onClick={() => remove(name)} />
+                          </div>
+                        ))}
+                        <Form.Item>
+                          <Button
+                            type="dashed"
+                            onClick={() => add()}
+                            block
+                            icon={<PlusOutlined />}
+                          >
+                            Add Heading
+                          </Button>
+                        </Form.Item>
+                      </>
+                    )}
+                  </Form.List>
+                </Form.Item>
+              </Col>
+
+              <Col span={24}>
+                <Form.Item
+                  name={['docs', 'images']}
+                  label="Setup Images"
+                >
+                  <Upload
+                    listType="picture-card"
+                    maxCount={4}
+                    onChange={handleUploadChange}
+                    fileList={fileList}
+                    beforeUpload={(file) => {
+                      const isValidType = ['image/jpeg', 'image/png'].includes(file.type);
+                      const isSmallEnough = file.size / 1024 / 1024 < 2; // Less than 2 MB
+                      if (!isValidType) {
+                        message.error('You can only upload JPG/PNG files!');
+                        return Upload.LIST_IGNORE;
+                      }
+                      if (!isSmallEnough) {
+                        message.error('File size must be smaller than 2MB!');
+                        return Upload.LIST_IGNORE;
+                      }
+                      return true;
+                    }}
+                  >
+                    <div>
+                      <PlusOutlined />
+                      <div style={{ marginTop: 8 }}>Upload</div>
+                    </div>
+                  </Upload>
+                </Form.Item>
+
+                {fileList.map((file, index) => (
+                  <Row key={file.uid} gutter={16} style={{ marginBottom: 16, alignItems: 'center' }}>
+                    <Col span={6} style={{ textAlign: 'center' }}>
+                      <img
+                        src={file.thumbUrl || file.url}
+                        alt="Uploaded Image"
+                        style={{
+                          width: '100px',
+                          height: '100px',
+                          objectFit: 'cover',
+                          borderRadius: '4px',
+                          marginBottom: '8px',
+                        }}
+                      />
+                    </Col>
+
+                    <Col span={18}>
+                      <Input
+                        value={file.name}
+                        onChange={(e) => handleFilenameChange(index, e.target.value)}
+                        placeholder="Enter filename"
+                        style={{ width: '30%' }}
+                      />
+                    </Col>
+                  </Row>
+                ))}
+              </Col>
+            </Row>
+          </TabPane>
+        </Tabs>
+
+        <Divider />
+
+        <div className="flex justify-end">
+          <Space>
+            <Button onClick={() => form.resetFields()}>Reset</Button>
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              onClick={handleSave}
             >
-              Add New Section
+              Save Changes
             </Button>
-          </div>
-        </Card>
-
-        {/* Operation Images */}
-        <Card 
-          title={
-            <Input
-              value={editableCardTitles.images}
-              onChange={(e) => handleCardTitleChange('images', e.target.value)}
-              bordered={false}
-              className="text-lg font-medium"
-            />
-          }
-          className="shadow-sm"
-        >
-          <Upload
-            listType="picture-card"
-            showUploadList={{ showPreviewIcon: true, showRemoveIcon: true }}
-          >
-            <div>
-              <PlusOutlined />
-              <div style={{ marginTop: 8 }}>Upload</div>
-            </div>
-          </Upload>
-        </Card>
-
-        {/* Save Changes Button */}
-        <div className="flex justify-end mt-6">
-          <Button 
-            type="primary" 
-            onClick={handleSave}
-            loading={isLoading}
-          >
-            Save Changes
-          </Button>
+          </Space>
         </div>
       </Form>
     </div>

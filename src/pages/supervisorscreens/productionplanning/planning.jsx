@@ -20,6 +20,7 @@ import JobOperationsTable from '../../../components/ProductionPlanning/JobOperat
 import OperationMPPDetails from '../../../components/ProductionPlanning/OperationMPPDetails';
 import ResourceUtilization from '../../../components/ProductionPlanning/ResourceUtilization';
 import { mockJobData, mockPartNumbers, mockMachines } from '../../../data/mockPlanningData';
+import usePlanningStore from '../../../store/planning-store';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -30,16 +31,39 @@ const Planning = () => {
   const [showMPPDetails, setShowMPPDetails] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [activeTab, setActiveTab] = useState('jobDetails');
+  const { 
+    fetchAllOrders, 
+    searchOrders, 
+    partNumbers, 
+    searchResults,
+    isLoading 
+  } = usePlanningStore();
 
-  // Use mockJobData for available jobs
-  const availableJobs = [
-    mockJobData,
-    // Add more jobs if needed
-  ];
+  // Fetch part numbers on component mount
+  React.useEffect(() => {
+    fetchAllOrders();
+  }, [fetchAllOrders]);
 
-  const handleJobSelect = (jobId) => {
-    const job = availableJobs.find(j => j.id === jobId);
-    setSelectedJob(job);
+  const handleJobSelect = async (partNumber) => {
+    const results = await searchOrders(partNumber);
+    if (results.orders && results.orders.length > 0) {
+      const selectedJobData = results.orders[0];
+      // Ensure operations have the required format
+      const formattedOperations = selectedJobData.operations?.map(op => ({
+        ...op,
+        key: op.id.toString(),
+        operation_number: op.operation_number || op.opNo,
+        operation_description: op.operation_description || op.description,
+        setup_time: op.setup_time || 0,
+        ideal_cycle_time: op.ideal_cycle_time || 0,
+        work_center: op.work_center || ''
+      })) || [];
+
+      setSelectedJob({
+        ...selectedJobData,
+        operations: formattedOperations
+      });
+    }
   };
 
   const handleOperationEdit = (operation) => {
@@ -52,6 +76,14 @@ const Planning = () => {
       message.success(`${info.file.name} file uploaded successfully`);
     } else if (info.file.status === 'error') {
       message.error(`${info.file.name} file upload failed.`);
+    }
+  };
+
+  const handleReset = () => {
+    // Only reset the select input value
+    const select = document.querySelector('.ant-select-selector input');
+    if (select) {
+      select.value = '';
     }
   };
 
@@ -132,27 +164,28 @@ const Planning = () => {
       {/* Job Selection Section with improved layout */}
       <Card className="shadow-sm">
         <Row gutter={24} align="middle">
-          <Col span={16}>
+          <Col span={20}>
             <Space size="large" className="w-full">
-              <Form.Item label="Select Job/Part Number" className="mb-0 flex-1">
-                <Select
-                  showSearch
-                  placeholder="Search by Job ID or Part Number"
-                  onChange={handleJobSelect}
-                  optionFilterProp="children"
-                  className="w-full"
-                >
-                  {availableJobs.map(job => (
-                    <Option key={job.id} value={job.id}>
-                      <Space>
-                        {`${job.partNumber} - ${job.partName}`}
-                        <Tag color={job.priority === 'high' ? 'red' : 'blue'}>
-                          {job.priority.toUpperCase()}
-                        </Tag>
-                      </Space>
-                    </Option>
-                  ))}
-                </Select>
+              <Form.Item label="Select Job/Part Number" className="mb-0" style={{ flex: 1 }}>
+                <Space className="w-full">
+                  <Select
+                    className="job-select"
+                    showSearch
+                    loading={isLoading}
+                    placeholder="Search by Part Number"
+                    onChange={handleJobSelect}
+                    optionFilterProp="children"
+                    style={{ width: '500px' }}
+                    allowClear
+                  >
+                    {partNumbers.map(item => (
+                      <Option key={item.id} value={item.partNumber}>
+                        {item.partNumber}
+                      </Option>
+                    ))}
+                  </Select>
+                  <Button onClick={handleReset}>Reset</Button>
+                </Space>
               </Form.Item>
               <Upload 
                 accept=".pdf"
@@ -165,12 +198,12 @@ const Planning = () => {
           </Col>
           <Col span={8} className="text-right">
             <Space>
-              <Button type="primary" icon={<SaveOutlined />}>
+              {/* <Button type="primary" icon={<SaveOutlined />}>
                 Save Plan
               </Button>
               <Button type="primary" icon={<PlusOutlined />}>
                 New Job
-              </Button>
+              </Button> */}
             </Space>
           </Col>
         </Row>
@@ -205,25 +238,40 @@ const Planning = () => {
                   size="small"
                 >
                   <Descriptions column={3}>
-                    <Descriptions.Item label="Project">
-                      {selectedJob.project}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Customer">
-                      {selectedJob.customer}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Material">
-                      {selectedJob.material}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Quantity">
-                      {selectedJob.quantity}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Due Date">
-                      {selectedJob.dueDate}
+                    <Descriptions.Item label="Part Number">
+                      {selectedJob.part_number}
                     </Descriptions.Item>
                     <Descriptions.Item label="Priority">
-                      <Tag color={selectedJob.priority === 'high' ? 'red' : 'blue'}>
-                        {selectedJob.priority.toUpperCase()}
+                      <Tag color={selectedJob.project?.priority === 1 ? 'red' : 'blue'}>
+                        {selectedJob.project?.priority === 1 ? 'HIGH' : 'NORMAL'}
                       </Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Required Quantity">
+                      {selectedJob.required_quantity}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="End Date">
+                      {selectedJob.project?.end_date || 'N/A'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Production Order">
+                      {selectedJob.production_order}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Project Name">
+                      {selectedJob.project?.name}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Part Description">
+                      {selectedJob.part_description}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Launched Quantity">
+                      {selectedJob.launched_quantity}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Delivery Date">
+                      {selectedJob.project?.delivery_date || 'N/A'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Total Operations">
+                      {selectedJob.total_operations}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Start Date">
+                      {selectedJob.project?.start_date || 'N/A'}
                     </Descriptions.Item>
                   </Descriptions>
                 </Card>
@@ -232,6 +280,7 @@ const Planning = () => {
                   jobId={selectedJob.id}
                   onOperationEdit={handleOperationEdit}
                   operations={selectedJob.operations}
+                  partNumber={selectedJob.part_number}
                 />
               </TabPane>
 
@@ -320,7 +369,7 @@ const Planning = () => {
 
           {/* MPP Details Drawer */}
           <Drawer
-            title={`Operation Details - ${selectedOperation?.opNo}`}
+            title={`Operation Details - ${selectedOperation?.operation_number}`}
             width={1200}
             open={showMPPDetails}
             onClose={() => setShowMPPDetails(false)}
@@ -328,6 +377,7 @@ const Planning = () => {
           >
             <OperationMPPDetails 
               operation={selectedOperation}
+              partNumber={selectedJob?.part_number}
               onSave={() => {
                 setShowMPPDetails(false);
                 message.success('Operation details updated');
@@ -341,3 +391,7 @@ const Planning = () => {
 };
 
 export default Planning;
+
+
+
+

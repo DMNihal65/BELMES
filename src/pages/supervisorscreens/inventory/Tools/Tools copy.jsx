@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Select, DatePicker } from 'antd';
-import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'; // Import the icons
+import { DownloadOutlined, UploadOutlined, PlusOutlined } from '@ant-design/icons'; // Import the icons
 import dayjs from 'dayjs'; // Import dayjs
 import * as XLSX from 'xlsx';
+import '../../../styles/inventory.css';
 
 const Tools = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -244,14 +245,8 @@ const columns = [
       title: 'Status',
       dataIndex: 'status_id',
       key: 'status_id',
-      filters: [
-        { text: 'Available', value: 'Available' },
-        { text: 'In Use', value: 'In Use' },
-      ],
-      onFilter: (value, record) => record.status_id === value,
-      filterSearch: true,
       render: (status) => (
-        <span style={{ color: status === 'Available' ? '#52c41a' : '#faad14' }}>
+        <span className={status === 'Available' ? 'status-available' : 'status-in-use'}>
           {status}
         </span>
       ),
@@ -260,53 +255,66 @@ const columns = [
   ];
 
   return (
-    <div>
-      <Card 
-        title="Tools"
-        extra={
-          <Space>
-            <Button className='bg-sky-500 ' style={{ color: '#FFFFFF'}} onMouseEnter={(e) => e.currentTarget.style.color = '#0EA5E9'} 
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#FFFFFF'}   onClick={showModal}>Add New Tool</Button>
-           <Button icon={<DownloadOutlined />} onClick={handleDownloadData}>
-                  Download
-                </Button>
-            <Upload
-              accept=".xlsx,.xls"
-              showUploadList={false}
-              beforeUpload={handleFileUpload}
+    <div className="p-2">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-700">Tools Inventory</h2>
+        <Space size="small">
+          <Button
+            icon={<PlusOutlined />}
+            type="primary"
+            className="bg-blue-500 hover:bg-blue-600 border-none shadow-sm"
+            onClick={showModal}
+          >
+            Add Tool
+          </Button>
+          <Button
+            icon={<DownloadOutlined />}
+            className="border-blue-500 text-blue-500 hover:text-blue-600 hover:border-blue-600"
+            onClick={handleDownloadData}
+          >
+            Export
+          </Button>
+          <Upload
+            accept=".xlsx,.xls"
+            showUploadList={false}
+            beforeUpload={handleFileUpload}
+          >
+            <Button 
+              icon={<UploadOutlined />}
+              className="border-green-500 text-green-500 hover:text-green-600 hover:border-green-600"
             >
-              <Button icon={<UploadOutlined />}>
-                Upload Excel
-              </Button>
-            </Upload>
-          </Space>
-        }
-      >
-        <Table 
-          columns={columns} 
-          dataSource={toolsData}
-          pagination={{ 
-            pageSize: 8,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-          }}
-          scroll={{ x: 1000 }}
-        />
-      </Card>
+              Import
+            </Button>
+          </Upload>
+        </Space>
+      </div>
+
+      <Table 
+        columns={columns} 
+        dataSource={toolsData}
+        className="shadow-sm rounded-lg overflow-hidden"
+        pagination={{ 
+          pageSize: 10,
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          className: "bg-white px-4 py-2"
+        }}
+        scroll={{ x: 'max-content' }}
+        rowClassName="hover:bg-gray-50 transition-colors"
+      />
 
       <Modal
-        title="Add New Tool"
+        title={<span className="text-lg font-semibold text-gray-700">Add New Tool</span>}
         open={isModalVisible}
         onCancel={handleCancel}
         footer={null}
+        width={500}
+        className="custom-modal"
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          initialValues={{
-            lastUpdated: dayjs(),
-            status: 'Available'
-          }}
+          className="p-4"
         >
           <Form.Item
             name="type_name" // Changed from toolId to toolName
@@ -349,8 +357,19 @@ const columns = [
 
           <Form.Item>
             <Space className="w-full justify-end">
-              <Button onClick={handleCancel}>Cancel</Button>
-              <Button type="primary" htmlType="submit">Submit</Button>
+              <Button 
+                onClick={handleCancel}
+                className="hover:bg-gray-100"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="primary"
+                htmlType="submit"
+                className="bg-blue-500 hover:bg-blue-600 border-none"
+              >
+                Add Tool
+              </Button>
             </Space>
           </Form.Item>
         </Form>

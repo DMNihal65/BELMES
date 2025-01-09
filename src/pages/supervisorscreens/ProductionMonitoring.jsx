@@ -256,6 +256,7 @@ const ProductionMonitoring = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Statistics Cards */}
       <Row gutter={[16, 16]} className="mb-6">
+        
         <Col xs={24} sm={12} md={8} lg={4}>
           <Card bordered={false} className="hover:shadow-md transition-shadow">
             <Statistic

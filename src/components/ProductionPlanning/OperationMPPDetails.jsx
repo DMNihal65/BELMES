@@ -48,6 +48,14 @@ const OperationMPPDetails = ({ operation, onSave }) => {
     setFileList(newFileList); // Set the updated file list
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   return (
     <div className="p-2 space-y-6">
       <Form

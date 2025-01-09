@@ -527,7 +527,7 @@ const ProductionMonitoring = () => {
             onChange={setSelectedMachines}
             options={[
               { value: 'all', label: 'All Machines' },
-              ...machineData.map(m => ({ value: m.id, label: `${m.name} (${m.id})` }))
+              ...machineData.map(m => ({ value: m.id, label: `${m.name} (${m.id})` })),
             ]}
           />
         </div>
@@ -544,13 +544,13 @@ const ProductionMonitoring = () => {
             ]}
           />
           {timeRange === 'custom' && (
-            <RangePicker 
+            <RangePicker
               showTime
               format="YYYY-MM-DD HH:mm"
               onChange={setDateRange}
             />
           )}
-          <Button 
+          <Button
             type="primary"
             icon={<ReloadOutlined />}
             loading={loading}
@@ -612,8 +612,8 @@ const ProductionMonitoring = () => {
 
       {/* Main Content with Enhanced Tabs */}
       <Card className="shadow-lg">
-        <Tabs 
-          activeKey={activeTab} 
+        <Tabs
+          activeKey={activeTab}
           onChange={setActiveTab}
           className="production-tabs"
         >
@@ -659,11 +659,12 @@ const ProductionMonitoring = () => {
           <TabPane 
             tab={
               <span>
-                Alerts {stats.totalAlerts > 0 && 
+                Alerts{' '}
+                {stats.totalAlerts > 0 && (
                   <Badge count={stats.totalAlerts} style={{ marginLeft: 8 }} />
-                }
+                )}
               </span>
-            } 
+            }
             key="alerts"
           >
             <EnhancedAlerts machines={getFilteredMachines()} />

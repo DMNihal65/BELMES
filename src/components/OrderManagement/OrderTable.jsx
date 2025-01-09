@@ -1,23 +1,32 @@
 import React from 'react';
 import { Table, Tag, Badge, Button, Space, Tooltip } from 'antd';
-import { EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EyeOutlined } from '@ant-design/icons';
 import { message } from 'antd';
+import dayjs from 'dayjs';
 
-const OrderTable = ({ orders }) => {
-  // Handle actions
+const OrderTable = ({ orders, onRefresh }) => {
+
+    // Add useEffect for initial load and polling
+    React.useEffect(() => {
+      // Initial load
+      if (onRefresh) {
+        onRefresh();
+      }
+  
+      // Set up polling every 30 seconds
+      const intervalId = setInterval(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 10000);
+  
+      return () => clearInterval(intervalId);
+    }, [onRefresh]);
+
+  // Handle view action
   const handleViewDetails = (record) => {
     message.info(`Viewing details for order ${record.orderNumber}`);
     // Implement view logic
-  };
-
-  const handleEditOrder = (record) => {
-    message.info(`Editing order ${record.orderNumber}`);
-    // Implement edit logic
-  };
-
-  const handleDeleteOrder = (record) => {
-    message.warning(`Deleting order ${record.orderNumber}`);
-    // Implement delete logic
   };
 
   const columns = [
@@ -29,93 +38,88 @@ const OrderTable = ({ orders }) => {
       fixed: 'left',
     },
     {
-      title: 'Part.No',
-      dataIndex: 'partNumber',
-      key: 'partNumber',
-      sorter: (a, b) => a.partNumber.localeCompare(b.partNumber),
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+      sorter: (a, b) => a.part_number.localeCompare(b.part_number),
       searchable: true,
     },
     {
-      title: 'Order Number',
-      dataIndex: 'orderNumber',
-      key: 'orderNumber',
+      title: 'Production Order',
+      dataIndex: 'production_order',
+      key: 'production_order',
       render: (text) => <a>{text}</a>,
-      sorter: (a, b) => a.orderNumber.localeCompare(b.orderNumber),
+      sorter: (a, b) => a.production_order.localeCompare(b.production_order),
     },
     {
-      title: 'Material',
-      dataIndex: 'materialNumber',
-      key: 'materialNumber',
-      render: (text, record) => (
-        <div>
-          <div className="font-medium">{text}</div>
-          <div className="text-xs text-gray-500">{record.materialDescription}</div>
-        </div>
+      title: 'Material Description',
+      dataIndex: 'part_description',
+      key: 'part_description',
+      render: (text) => (
+        <div className="font-medium">{text}</div>
       ),
-      sorter: (a, b) => a.materialNumber.localeCompare(b.materialNumber),
     },
     {
       title: 'Quantity',
       key: 'quantity',
       render: (_, record) => (
         <div>
-          <div>Target: {record.targetQuantity}</div>
+          <div>Target: {record.required_quantity}</div>
           <div className="text-xs text-gray-500">
-            Launched: {record.launchedQuantity || 0}
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-            <div
-              className="bg-blue-600 h-1.5 rounded-full"
-              style={{
-                width: `${(record.launchedQuantity / record.targetQuantity) * 100}%`
-              }}
-            />
+            Launched: {record.launched_quantity || 0}
           </div>
         </div>
       ),
-      sorter: (a, b) => a.targetQuantity - b.targetQuantity,
-    },
-    {
-      title: 'Plant',
-      dataIndex: 'plant',
-      key: 'plant',
-      filters: [
-        { text: 'Plant-01', value: 'Plant-01' },
-        { text: 'Plant-02', value: 'Plant-02' },
-        { text: 'Plant-03', value: 'Plant-03' },
-      ],
-      onFilter: (value, record) => record.plant === value,
+      sorter: (a, b) => a.required_quantity - b.required_quantity,
     },
     {
       title: 'WBS Element',
-      dataIndex: 'wbsElement',
-      key: 'wbsElement',
+      dataIndex: 'wbs_element',
+      key: 'wbs_element',
     },
     {
       title: 'Sales Order',
-      dataIndex: 'salesOrderNumber',
-      key: 'salesOrderNumber',
+      dataIndex: 'sale_order',
+      key: 'sale_order',
+    },
+    {
+      title: 'Project',
+      key: 'project',
+      render: (_, record) => (
+        <div>
+          <div>{record.project?.name}</div>
+          <Tag color={record.project?.priority === 1 ? 'red' : 'blue'}>
+            Priority: {record.project?.priority}
+          </Tag>
+        </div>
+      ),
     },
     {
       title: 'Delivery Date',
-      dataIndex: 'deliveryDate',
+      dataIndex: 'deliveryDate', // Ensure this matches the transformed field
       key: 'deliveryDate',
-      render: (date) => new Date(date).toLocaleDateString(),
-      sorter: (a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate),
+      render: (date) => date ? dayjs(date).format('MM/DD/YYYY') : 'N/A',
+      sorter: (a, b) => {
+        const dateA = a.deliveryDate ? dayjs(a.deliveryDate).unix() : 0;
+        const dateB = b.deliveryDate ? dayjs(b.deliveryDate).unix() : 0;
+        return dateA - dateB;
+      },
     },
     {
       title: 'Status',
       key: 'status',
       render: (_, record) => {
+        const status = record.status || 'pending';
         const statusColors = {
           in_progress: 'processing',
           completed: 'success',
           delayed: 'error',
+          pending: 'default'
         };
         return (
           <Badge
-            status={statusColors[record.status]}
-            text={record.status.replace('_', ' ').toUpperCase()}
+            status={statusColors[status]}
+            text={status.replace('_', ' ').toUpperCase()}
           />
         );
       },
@@ -127,24 +131,9 @@ const OrderTable = ({ orders }) => {
       onFilter: (value, record) => record.status === value,
     },
     {
-      title: 'Priority',
-      key: 'priority',
-      render: (_, record) => (
-        <Tag color={record.priority === 'high' ? 'red' : 'blue'}>
-          {record.priority.toUpperCase()}
-        </Tag>
-      ),
-      filters: [
-        { text: 'High', value: 'high' },
-        { text: 'Medium', value: 'medium' },
-        { text: 'Low', value: 'low' },
-      ],
-      onFilter: (value, record) => record.priority === value,
-    },
-    {
       title: 'Actions',
       key: 'actions',
-      width: 150,
+      width: 100,
       fixed: 'right',
       render: (_, record) => (
         <Space>
@@ -153,21 +142,6 @@ const OrderTable = ({ orders }) => {
               icon={<EyeOutlined />}
               size="small"
               onClick={() => handleViewDetails(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Edit Order">
-            <Button
-              icon={<EditOutlined />}
-              size="small"
-              onClick={() => handleEditOrder(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Delete Order">
-            <Button
-              icon={<DeleteOutlined />}
-              size="small"
-              danger
-              onClick={() => handleDeleteOrder(record)}
             />
           </Tooltip>
         </Space>
@@ -179,19 +153,21 @@ const OrderTable = ({ orders }) => {
     <Table
       columns={columns}
       dataSource={orders}
-      rowKey="key"
-      scroll={{ x: 1300 }}
+      rowKey="id"
+      scroll={{ x: 1300, y: 'calc(100vh - 460px)' }}
       rowClassName={(record) =>
-        record.priority === 'high' ? 'bg-red-50' : ''
+        record.project?.priority === 1 ? 'bg-red-50' : ''
       }
       pagination={{
         defaultPageSize: 10,
         showSizeChanger: true,
         showQuickJumper: true,
         showTotal: (total) => `Total ${total} orders`,
+        position: ['bottomCenter']
       }}
     />
   );
 };
 
 export default OrderTable;
+

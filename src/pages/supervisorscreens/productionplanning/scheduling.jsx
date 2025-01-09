@@ -3,25 +3,26 @@ import {
   Layout, Card, Row, Col, Button, Space, Input, Select, 
   DatePicker, Table, Tag, Form, Modal, Typography, Divider,
   Tabs, Badge, Alert, Tooltip, Progress, Statistic,
-  message, Spin, Switch, Radio
+  message, Spin, Switch
 } from 'antd';
 import {
   ScheduleOutlined, SyncOutlined, SearchOutlined,
   HistoryOutlined, CalendarOutlined, ClockCircleOutlined,
   BarChartOutlined, WarningOutlined, SwapOutlined,
   ExclamationCircleOutlined, CheckCircleOutlined,
-  ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined,
-  
+  ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined
 } from '@ant-design/icons';
 import { Timeline } from "vis-timeline/esnext";
 import { DataSet } from "vis-data/esnext";
 import "vis-timeline/dist/vis-timeline-graph2d.css";
 import useScheduleStore from '../../../store/schedule-store';
 import ReactApexChart from 'react-apexcharts';
-import { GitCompare } from 'lucide-react';
+import moment from 'moment';
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
+
+
 const { Option } = Select;
 const { TabPane } = Tabs;
 
@@ -188,51 +189,6 @@ const ComponentLegend = ({ componentColors }) => {
   );
 };
 
-const getDelayColor = (hours) => {
-  if (hours <= 4) return '#1890ff'; // blue
-  if (hours <= 8) return '#faad14'; // orange
-  if (hours <= 16) return '#52c41a'; // green
-  if (hours <= 24) return '#fa8c16'; // darker orange
-  return '#ff4d4f'; // red
-};
-
-class ScheduleErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('Schedule error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <Card>
-          <Alert
-            message="Something went wrong"
-            description="There was an error loading the schedule comparison. Please try again."
-            type="error"
-            showIcon
-            action={
-              <Button type="primary" onClick={() => this.setState({ hasError: false })}>
-                Try Again
-              </Button>
-            }
-          />
-        </Card>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
 const Scheduling = () => {
   const [form] = Form.useForm();
   const { 
@@ -241,9 +197,7 @@ const Scheduling = () => {
     error, 
     fetchScheduleData,
     setViewMode,
-    setDateRange,
     viewMode,
-    dateRange,
     filterScheduleByMachines,
     filterScheduleByDateRange,
     getMachineUtilization,
@@ -251,18 +205,22 @@ const Scheduling = () => {
   } = useScheduleStore();
 
   const [selectedMachines, setSelectedMachines] = useState([]);
-  const [timelineData, setTimelineData] = useState(null);
+  const [selectedComponents, setSelectedComponents] = useState([]); 
   const [isRescheduleModalVisible, setIsRescheduleModalVisible] = useState(false);
   const [scheduleView, setScheduleView] = useState('timeline');
   const [filteredData, setFilteredData] = useState(null);
   const timelineRef = useRef(null);
   const timelineContainerRef = useRef(null);
-  const [viewType, setViewType] = useState('day');
+  const [viewType, setViewType] = useState('month');
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showCompleted, setShowCompleted] = useState(true);
   const [componentColors, setComponentColors] = useState(null);
   const styleElementRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('schedule');
+
+  const [dateRange, setDateRange] = useState([
+    moment().startOf('month'),
+    moment().endOf('month')
+  ]);
 
   useEffect(() => {
     fetchScheduleData();
@@ -287,6 +245,11 @@ const Scheduling = () => {
             const opEnd = new Date(op.end_time);
             return opStart >= dateRange[0] && opEnd <= dateRange[1];
           });
+        }
+
+         // Filter by selected components
+         if (selectedComponents.length > 0) {
+          operations = operations.filter(op => selectedComponents.includes(op.component));
         }
 
         // Generate and store component colors
@@ -341,12 +304,11 @@ const Scheduling = () => {
 
         // Create groups
         const groups = new DataSet(
-          [...new Set(operations.map(op => op.machine))].map(machine => ({
+          availableMachines.map(machine => ({
             id: machine,
             content: machine
           }))
         );
-
         // Get time range based on view type
         const timeRange = getTimeRange(viewType, dateRange);
 
@@ -356,7 +318,7 @@ const Scheduling = () => {
           horizontalScroll: true,
           zoomKey: 'ctrlKey',
           orientation: 'top',
-          height: '400px',
+          height: '450px',
           margin: {
             item: { horizontal: 10, vertical: 5 },
             axis: 5
@@ -465,7 +427,7 @@ const Scheduling = () => {
         styleElementRef.current = null;
       }
     };
-  }, [scheduleData, selectedMachines, dateRange, viewType]);
+  }, [scheduleData, selectedMachines, selectedComponents, dateRange, viewType]);
 
   // Helper function to get operation class name
   const getOperationClassName = (operation, status) => {
@@ -477,9 +439,23 @@ const Scheduling = () => {
   };
 
   // Get unique machines from schedule data
+  // const availableMachines = React.useMemo(() => {
+  //   if (!scheduleData) return [];
+  //   return [...new Set(scheduleData.scheduled_operations.map(op => op.machine))];
+  // }, [scheduleData]);
+
   const availableMachines = React.useMemo(() => {
     if (!scheduleData) return [];
-    return [...new Set(scheduleData.scheduled_operations.map(op => op.machine))];
+    // Use Set to get unique machines while preserving the order they first appear
+    return Array.from(new Set(scheduleData.scheduled_operations
+      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+      .map(op => op.machine)
+    ));
+  }, [scheduleData]);
+
+  const availableComponents = React.useMemo(() => {
+    if (!scheduleData) return [];
+    return [...new Set(scheduleData.scheduled_operations.map(op => op.component))];
   }, [scheduleData]);
 
   // Add this effect to handle filtering
@@ -494,10 +470,14 @@ const Scheduling = () => {
       if (dateRange) {
         filtered = filterScheduleByDateRange(dateRange[0], dateRange[1]);
       }
+
+      if (selectedComponents.length > 0) {
+        filtered = filtered.scheduled_operations.filter(op => selectedComponents.includes(op.component));
+      }
       
       setFilteredData(filtered);
     }
-  }, [scheduleData, selectedMachines, dateRange]);
+  }, [scheduleData, selectedMachines, selectedComponents, dateRange]);
 
   // Calculate schedule analytics
   const scheduleAnalytics = React.useMemo(() => {
@@ -576,24 +556,51 @@ const Scheduling = () => {
       />
     );
   }
+  
+  const handleViewTypeChange = (newViewType) => {
+    setViewType(newViewType);
+    const now = moment();
+    
+    switch (newViewType) {
+      case 'month':
+        setDateRange([
+          now.clone().startOf('month'),
+          now.clone().endOf('month')
+        ]);
+        break;
+      case 'week':
+        setDateRange([
+          now.clone().startOf('week'),
+          now.clone().endOf('week')
+        ]);
+        break;
+      default: // day
+        setDateRange([
+          now.clone().startOf('day'),
+          now.clone().endOf('day')
+        ]);
+    }
+  };
 
   return (
     <Layout className="min-h-screen bg-gray-50">
       <Content className="p-8">
-        <Tabs 
-          activeKey={activeTab} 
-          onChange={setActiveTab} 
-          type="card"
-          destroyInactiveTabPane={false}
-        >
-          <TabPane tab={<span><ScheduleOutlined /> Production Schedule</span>} key="schedule">
+        <Tabs defaultActiveKey="schedule" type="card">
+          <TabPane 
+            tab={ 
+              <span>
+                <ScheduleOutlined /> Production Schedule
+              </span>
+            } 
+            key="schedule"
+          >
             <Card>
               <div className="flex justify-between items-center mb-4">
                 <Space>
                   <Title level={4}>Production Schedule</Title>
                   <Select 
                     value={viewType}
-                    onChange={setViewType}
+                    onChange={handleViewTypeChange}
                     style={{ width: 120 }}
                   >
                     <Option value="day">Daily</Option>
@@ -607,7 +614,7 @@ const Scheduling = () => {
                     onChange={setDateRange}
                     placeholder={['Start Date', 'End Date']}
                   />
-                  <Select
+                  <Select 
                     mode="multiple" 
                     placeholder="Select Machines"
                     value={selectedMachines}
@@ -619,6 +626,20 @@ const Scheduling = () => {
                       <Option key={machine} value={machine}>{machine}</Option>
                     ))}
                   </Select>
+
+                  <Select
+                      mode="multiple"
+                      placeholder="Select Components"
+                      value={selectedComponents}
+                      onChange={setSelectedComponents}
+                      style={{ minWidth: 200 }}
+                      allowClear
+                    >
+                      {availableComponents.map(component => (
+                        <Option key={component} value={component}>{component}</Option>
+                      ))}
+                    </Select>
+                  
                   <Button.Group>
                     <Tooltip title="Zoom In">
                       <Button 
@@ -653,9 +674,9 @@ const Scheduling = () => {
                 ref={timelineContainerRef} 
                 className="schedule-timeline"
                 style={{ 
-                  height: '600px',
+                  height: '500px',
                   backgroundColor: '#fff',
-                  padding: '20px',  
+                  padding: '20px',
                   borderRadius: '8px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}
@@ -673,9 +694,9 @@ const Scheduling = () => {
               </style>
 
               {/* Machine Status Cards */}
-              <Row gutter={[16, 16]} className="mt-6">
+              <Row gutter={[20, 20]} className="mt-6" style={{ maxWidth: '1800px', gridTemplateColumns: 'repeat(5, 1fr)'}}>
                 {availableMachines.map(machine => (
-                  <Col span={8} key={machine}>
+                  <Col span={4.8} key={machine}>  {/* Changed to span={4.8} for 5 cards per row */}
                     <MachineStatusCard
                       machine={machine}
                       operations={scheduleData.scheduled_operations.filter(op => op.machine === machine)}
@@ -686,18 +707,15 @@ const Scheduling = () => {
               </Row>
             </Card>
           </TabPane>
-          
-          <TabPane tab={<span><GitCompare /> Schedule Comparison</span>} key="comparison">
-            <ScheduleErrorBoundary>
-              <ScheduleComparison />
-            </ScheduleErrorBoundary>
-          </TabPane>
-          
-          <TabPane tab={<span><WarningOutlined /> Delay Analysis</span>} key="delays">
-            <DelayAnalysis />
-          </TabPane>
-          
-          <TabPane tab={<span><HistoryOutlined /> Schedule History</span>} key="history">
+
+          <TabPane 
+            tab={ 
+              <span>
+                <HistoryOutlined /> Schedule History
+              </span>
+            } 
+            key="history"
+          >
             <ScheduleHistory />
           </TabPane>
         </Tabs>
@@ -821,11 +839,23 @@ const MachineStatusCard = ({ machine, operations, componentStatus }) => {
       className={`hover:shadow-md transition-shadow border-l-4 ${
         status === 'running' ? 'border-green-500' : 'border-yellow-500'
       }`}
+      style={{
+        height: '140px',
+        minWidth: '290px', // Increased from 240px to 280px for wider cards
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+      bodyStyle={{
+        flex: 1,
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
     >
       <div className="flex justify-between items-start">
         <div>
-          <div className="font-medium">{machine}</div>
-          <div className="text-sm text-gray-500">
+          <div className="font-medium text-base">{machine}</div>  {/* Increased font size */}
+          <div className="text-sm text-gray-500">  {/* Increased font size */}
             {currentOperation ? `Processing: ${currentOperation.component}` : 'No active operation'}
           </div>
         </div>
@@ -836,9 +866,11 @@ const MachineStatusCard = ({ machine, operations, componentStatus }) => {
       </div>
       
       {currentOperation && componentStatus && (
-        <div className="mt-2">
-          <div className="text-sm flex justify-between">
-            <span>{currentOperation.description}</span>
+        <div className="mt-auto">
+          <div className="text-sm flex justify-between mb-2">  {/* Increased spacing and font size */}
+            <span className="truncate" style={{ maxWidth: '75%' }}>  {/* Increased from 70% to 75% */}
+              {currentOperation.description}
+            </span>
             <Tag color={componentStatus.on_time ? 'success' : 'error'}>
               {Math.round((componentStatus.completed_quantity / componentStatus.total_quantity) * 100)}%
             </Tag>
@@ -1012,6 +1044,35 @@ const styles = {
 };
 
 // Add helper function for time range calculation
+// const getTimeRange = (viewType, dateRange) => {
+//   if (dateRange && dateRange[0] && dateRange[1]) {
+//     return {
+//       start: dateRange[0].toDate(),
+//       end: dateRange[1].toDate()
+//     };
+//   }
+
+//   const now = new Date();
+//   let start = new Date(now);
+//   let end = new Date(now);
+
+//   switch (viewType) {
+//     case 'month':
+//       start.setDate(1);
+//       end.setMonth(end.getMonth() + 1, 0);
+//       break;
+//     case 'week':
+//       start.setDate(start.getDate() - start.getDay());
+//       end.setDate(end.getDate() + (6 - end.getDay()));
+//       break;
+//     default: // day
+//       start.setHours(0, 0, 0, 0);
+//       end.setHours(23, 59, 59, 999);
+//   }
+
+//   return { start, end };
+// };
+
 const getTimeRange = (viewType, dateRange) => {
   if (dateRange && dateRange[0] && dateRange[1]) {
     return {
@@ -1020,587 +1081,25 @@ const getTimeRange = (viewType, dateRange) => {
     };
   }
 
-  const now = new Date();
-  let start = new Date(now);
-  let end = new Date(now);
+  const now = moment();
+  let start, end;
 
   switch (viewType) {
     case 'month':
-      start.setDate(1);
-      end.setMonth(end.getMonth() + 1, 0);
+      // Set to current month's start and end
+      start = now.clone().startOf('month');
+      end = now.clone().endOf('month');
       break;
     case 'week':
-      start.setDate(start.getDate() - start.getDay());
-      end.setDate(end.getDate() + (6 - end.getDay()));
+      start = now.clone().startOf('week');
+      end = now.clone().endOf('week');
       break;
     default: // day
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
+      start = now.clone().startOf('day');
+      end = now.clone().endOf('day');
   }
 
-  return { start, end };
-};
-
-const ScheduleComparison = () => {
-  const { 
-    fetchScheduleComparison, 
-    getScheduleComparison,
-    comparisonMetrics,
-    loading
-  } = useScheduleStore();
-  const [selectedView, setSelectedView] = useState('timeline');
-  const [selectedMachine, setSelectedMachine] = useState(null);
-  const [localLoading, setLocalLoading] = useState(true);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLocalLoading(true);
-      try {
-        await fetchScheduleComparison();
-      } catch (error) {
-        console.error('Error loading comparison data:', error);
-        message.error('Failed to load comparison data');
-      } finally {
-        setLocalLoading(false);
-      }
-    };
-
-    loadData();
-  }, [fetchScheduleComparison]);
-
-  const comparison = getScheduleComparison();
-
-  // Show loading state only during initial load
-  if (localLoading || loading) {
-    return (
-      <Card>
-        <div className="flex justify-center items-center h-64">
-          <Spin size="large" tip="Loading comparison data..." />
-        </div>
-      </Card>
-    );
-  }
-
-  // Show error state if no data
-  if (!comparison || !comparisonMetrics) {
-    return (
-      <Card>
-        <Alert
-          message="Data Not Available"
-          description="Unable to load comparison data. Please try again later."
-          type="error"
-          showIcon
-        />
-      </Card>
-    );
-  }
-
-  // Timeline chart options
-  const timelineOptions = {
-    chart: {
-      type: 'rangeBar',
-      height: '100%',
-      toolbar: {
-        show: true,
-        tools: {
-          download: true,
-          zoom: true,
-          zoomin: true,
-          zoomout: true,
-          pan: true,
-        }
-      }
-    },
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        barHeight: '15%',
-        rangeBarGroupRows: true
-      }
-    },
-    xaxis: {
-      type: 'datetime',
-      labels: {
-        datetimeFormatter: {
-          year: 'yyyy',
-          month: "MMM 'yy",
-          day: 'dd MMM',
-          hour: 'HH:mm'
-        }
-      }
-    },
-    yaxis: {
-      labels: {
-        style: {
-          fontSize: '10px',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto'
-        },
-        show: true,
-        formatter: (value) => {
-          return value.length > 20 ? value.substring(0, 17) + '...' : value;
-        }
-      },
-      axisBorder: {
-        show: true
-      },
-      axisTicks: {
-        show: true
-      }
-    },
-    grid: {
-      padding: {
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0
-      }
-    },
-    colors: ['#1890ff', '#52c41a', '#faad14'],
-    legend: {
-      position: 'top',
-      horizontalAlign: 'left'
-    },
-    tooltip: {
-      custom: function({ seriesIndex, dataPointIndex, w }) {
-        const series = w.config.series[seriesIndex];
-        const data = series.data[dataPointIndex];
-        return `
-          <div class="custom-tooltip p-2">
-            <div class="font-bold">${series.name}</div>
-            <div>${data.component}</div>
-            <div>${data.description}</div>
-            <div class="text-sm text-gray-500">
-              ${new Date(data.y[0]).toLocaleString()} - 
-              ${new Date(data.y[1]).toLocaleString()}
-            </div>
-          </div>
-        `;
-      }
-    }
-  };
-
-  // Timeline series data
-  const timelineSeries = comparison ? [
-    {
-      name: 'Actual',
-      data: comparison.actual.scheduled_operations.map(op => ({
-        x: op.machine,
-        y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()],
-        component: op.component,
-        description: op.description
-      }))
-    },
-    {
-      name: 'Planned',
-      data: comparison.planned.scheduled_operations.map(op => ({
-        x: op.machine,
-        y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()],
-        component: op.component,
-        description: op.description
-      }))
-    },
-    {
-      name: 'Forecast',
-      data: comparison.forecast.scheduled_operations.map(op => ({
-        x: op.machine,
-        y: [new Date(op.start_time).getTime(), new Date(op.end_time).getTime()],
-        component: op.component,
-        description: op.description
-      }))
-    }
-  ] : [];
-
-  // Bottleneck Analysis Component
-  const BottleneckAnalysis = () => (
-    <div>
-      <Title level={5}>Machine Bottleneck Analysis</Title>
-      <Row gutter={[16, 16]}>
-        {comparisonMetrics.bottlenecks.map(bottleneck => (
-          <Col span={8} key={bottleneck.machine}>
-            <Card>
-              <Statistic
-                title={`${bottleneck.machine} Utilization`}
-                value={bottleneck.utilizationRate}
-                suffix="%"
-                valueStyle={{ 
-                  color: bottleneck.utilizationRate > 90 ? '#ff4d4f' : '#52c41a'
-                }}
-              />
-              <div className="mt-4">
-                <div className="flex justify-between mb-2">
-                  <span>Queue Time:</span>
-                  <span>{bottleneck.queueTime}h</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span>Waiting Jobs:</span>
-                  <span>{bottleneck.waitingJobs}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Avg. Process Time:</span>
-                  <span>{bottleneck.avgProcessTime}h</span>
-                </div>
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-    </div>
-  );
-
-  // Resource Utilization Chart
-  const ResourceUtilizationChart = () => {
-    const options = {
-      chart: {
-        type: 'line',
-        toolbar: { show: true }
-      },
-      stroke: { curve: 'smooth', width: 2 },
-      xaxis: {
-        categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-      },
-      yaxis: {
-        title: { text: 'Utilization %' }
-      },
-      markers: { size: 4 },
-      tooltip: { shared: true }
-    };
-
-    const series = Object.entries(comparisonMetrics.resourceUtilization).map(([machine, data]) => ({
-      name: machine,
-      data: data
-    }));
-
-    return (
-      <div>
-        <Title level={5}>Weekly Resource Utilization</Title>
-        <ReactApexChart
-          options={options}
-          series={series}
-          type="line"
-          height={300}
-        />
-      </div>
-    );
-  };
-
-  // Workload Distribution Chart
-  const WorkloadDistribution = () => {
-    const data = Object.entries(comparisonMetrics.workloadDistribution).map(([machine, values]) => ({
-      machine,
-      planned: values.planned,
-      actual: values.actual,
-      difference: values.actual - values.planned
-    }));
-
-    return (
-      <div>
-        <Title level={5}>Workload Distribution Analysis</Title>
-        <Table
-          dataSource={data}
-          columns={[
-            {
-              title: 'Machine',
-              dataIndex: 'machine',
-              key: 'machine',
-            },
-            {
-              title: 'Planned Load (%)',
-              dataIndex: 'planned',
-              key: 'planned',
-            },
-            {
-              title: 'Actual Load (%)',
-              dataIndex: 'actual',
-              key: 'actual',
-            },
-            {
-              title: 'Variance',
-              dataIndex: 'difference',
-              key: 'difference',
-              render: (value) => (
-                <Tag color={value > 0 ? 'red' : 'green'}>
-                  {value > 0 ? `+${value}%` : `${value}%`}
-                </Tag>
-              )
-            }
-          ]}
-          pagination={false}
-        />
-      </div>
-    );
-  };
-
-  return (
-    <Card>
-      <div className="flex justify-between items-center mb-4">
-        <Title level={4}>Schedule Analysis Dashboard</Title>
-        <Space>
-          <Select
-            placeholder="Select Machine"
-            allowClear
-            style={{ width: 200 }}
-            onChange={setSelectedMachine}
-            value={selectedMachine}
-          >
-            {Object.keys(comparisonMetrics.resourceUtilization).map(machine => (
-              <Option key={machine} value={machine}>{machine}</Option>
-            ))}
-          </Select>
-          <Radio.Group 
-            value={selectedView} 
-            onChange={e => setSelectedView(e.target.value)}
-            buttonStyle="solid"
-          >
-            <Radio.Button value="timeline">Timeline</Radio.Button>
-            <Radio.Button value="metrics">Metrics</Radio.Button>
-            <Radio.Button value="bottlenecks">Bottlenecks</Radio.Button>
-            <Radio.Button value="utilization">Utilization</Radio.Button>
-          </Radio.Group>
-        </Space>
-      </div>
-
-      {selectedView === 'timeline' && (
-        <div className="mb-8" style={{ height: '400px', overflowY: 'auto' }}>
-          <ReactApexChart
-            options={timelineOptions}
-            series={timelineSeries}
-            type="rangeBar"
-          />
-        </div>
-      )}
-
-      {selectedView === 'metrics' && (
-        <div className="space-y-8">
-          <Row gutter={[16, 16]}>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Schedule Adherence"
-                  value={comparisonMetrics.adherence}
-                  suffix="%"
-                  precision={1}
-                  valueStyle={{ color: comparisonMetrics.adherence >= 85 ? '#52c41a' : '#ff4d4f' }}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Resource Utilization"
-                  value={comparisonMetrics.utilization}
-                  suffix="%"
-                  precision={1}
-                  valueStyle={{ color: '#1890ff' }}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="On-Time Completion"
-                  value={comparisonMetrics.onTime}
-                  suffix="%"
-                  precision={1}
-                  valueStyle={{ color: comparisonMetrics.onTime >= 80 ? '#52c41a' : '#ff4d4f' }}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Overall Efficiency"
-                  value={comparisonMetrics.efficiency}
-                  suffix="%"
-                  precision={1}
-                  valueStyle={{ color: '#faad14' }}
-                />
-              </Card>
-            </Col>
-          </Row>
-          <WorkloadDistribution />
-        </div>
-      )}
-
-      {selectedView === 'bottlenecks' && <BottleneckAnalysis />}
-      
-      {selectedView === 'utilization' && <ResourceUtilizationChart />}
-    </Card>
-  );
-};
-
-const DelayAnalysis = () => {
-  const { getDelayAnalysis } = useScheduleStore();
-  const delayData = getDelayAnalysis();
-
-  // Add local calculation function
-  const calculateLocalDelayDistribution = (delays) => {
-    if (!delays) return [0, 0, 0, 0, 0];
-    
-    const distribution = [0, 0, 0, 0, 0]; // [0-4h, 4-8h, 8-16h, 16-24h, >24h]
-    
-    delays.forEach(delay => {
-      const hours = delay.delay;
-      if (hours <= 4) distribution[0]++;
-      else if (hours <= 8) distribution[1]++;
-      else if (hours <= 16) distribution[2]++;
-      else if (hours <= 24) distribution[3]++;
-      else distribution[4]++;
-    });
-    
-    return distribution;
-  };
-
-  const chartOptions = {
-    chart: {
-      type: 'bar',
-      stacked: true,
-      toolbar: {
-        show: true
-      }
-    },
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        columnWidth: '55%',
-        endingShape: 'rounded'
-      },
-    },
-    dataLabels: {
-      enabled: true
-    },
-    xaxis: {
-      categories: ['0-4h', '4-8h', '8-16h', '16-24h', '>24h'],
-      title: {
-        text: 'Delay Duration'
-      }
-    },
-    yaxis: {
-      title: {
-        text: 'Number of Delays'
-      }
-    },
-    fill: {
-      opacity: 1
-    },
-    colors: ['#1890ff']
-  };
-
-  const series = [{
-    name: 'Delays',
-    data: calculateLocalDelayDistribution(delayData?.delays)
-  }];
-
-  if (!delayData) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Spin size="large" tip="Loading delay analysis..." />
-      </div>
-    );
-  }
-
-  return (
-    <Card title="Delay Analysis">
-      <Row gutter={[16, 16]} className="mb-4">
-        <Col span={8}>
-          <Card>
-            <Statistic
-              title="Total Delays"
-              value={delayData.totalDelays}
-              prefix={<WarningOutlined style={{ color: '#faad14' }} />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card>
-            <Statistic
-              title="Average Delay"
-              value={delayData.averageDelay}
-              suffix="hours"
-              precision={1}
-              prefix={<ClockCircleOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card>
-            <Statistic
-              title="Critical Delays"
-              value={delayData.criticalDelays.length}
-              prefix={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
-              valueStyle={{ color: '#ff4d4f' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Tabs>
-        <TabPane tab="Delay Distribution" key="distribution">
-          <ReactApexChart
-            options={chartOptions}
-            series={series}
-            type="bar"
-            height={300}
-          />
-        </TabPane>
-        <TabPane tab="Delay Details" key="details">
-          <Table
-            dataSource={delayData.delays}
-            columns={[
-              {
-                title: 'Component',
-                dataIndex: 'component',
-                key: 'component',
-                sorter: (a, b) => a.component.localeCompare(b.component)
-              },
-              {
-                title: 'Machine',
-                dataIndex: 'machine',
-                key: 'machine',
-                filters: [...new Set(delayData.delays.map(d => d.machine))].map(m => ({
-                  text: m,
-                  value: m,
-                })),
-                onFilter: (value, record) => record.machine === value,
-              },
-              {
-                title: 'Operation',
-                dataIndex: 'description',
-                key: 'description',
-              },
-              {
-                title: 'Delay Duration',
-                dataIndex: 'delay',
-                key: 'delay',
-                sorter: (a, b) => a.delay - b.delay,
-                render: (hours) => (
-                  <Tag color={getDelayColor(hours)}>
-                    {`${hours.toFixed(1)}h`}
-                  </Tag>
-                ),
-              },
-              {
-                title: 'Impact',
-                key: 'impact',
-                sorter: (a, b) => a.delay - b.delay,
-                render: (_, record) => (
-                  <Progress
-                    percent={Math.min((record.delay / 24) * 100, 100)}
-                    status={record.delay > 24 ? 'exception' : 'active'}
-                    size="small"
-                    strokeColor={getDelayColor(record.delay)}
-                  />
-                ),
-              },
-            ]}
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: true }}
-          />
-        </TabPane>
-      </Tabs>
-    </Card>
-  );
+  return { start: start.toDate(), end: end.toDate() };
 };
 
 export default Scheduling;

@@ -1,252 +1,432 @@
 import React, { useState } from 'react';
+import ReactQuill from 'react-quill'; // Import ReactQuill
+import 'react-quill/dist/quill.snow.css'; // Import Quill's default styles
 import {
-  Form, Input, Upload, Button, Card, Row, Col, 
-  Modal, Typography, Space, Divider, Collapse
+  Tabs, Form, Input, Select, Space, Button, Upload,
+  Table, Card, Row, Col, Divider, message, Descriptions, Typography, 
 } from 'antd';
 import {
   UploadOutlined, SaveOutlined, PlusOutlined,
-  EyeOutlined
+  MinusCircleOutlined
 } from '@ant-design/icons';
-import ReactQuill from 'react-quill'; // Rich text editor
-import 'react-quill/dist/quill.snow.css';
 
+const { TabPane } = Tabs;
+const { Option } = Select;
 const { Title, Text } = Typography;
-const { Panel } = Collapse;
+
 
 const OperationMPPDetails = ({ operation, onSave }) => {
   const [form] = Form.useForm();
-  const [previewImage, setPreviewImage] = useState(null);
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewTitle, setPreviewTitle] = useState('');
+  const [activeTab, setActiveTab] = useState('setup');
+  const [fileList, setFileList] = useState([]);
+  const [editorContent, setEditorContent] = useState(''); // Store the rich text content
+  const [workHolding, setWorkHolding] = useState('');
+  const [workHoldingDetails, setWorkHoldingDetails] = useState('');
+  const [ipidNoRev, setIpidNoRev] = useState('');
+  const [freq, setFreq] = useState('');
+  const [datumXAxis, setDatumXAxis] = useState('');
+  const [datumYAxis, setDatumYAxis] = useState('');
+  const [datumZAxis, setDatumZAxis] = useState('');
+  const [rev, setRev] = useState('');
 
-  const [instructions, setInstructions] = useState([
-    { id: 1, title: 'Fixture Setup', content: '' },
-    { id: 2, title: 'Job Preparation', content: '' },
-    { id: 3, title: 'Post-Machining Steps', content: '' }
-  ]);
-
-  const [expandedKeys, setExpandedKeys] = useState(['1']);
-
-  const handlePreview = async (file) => {
-    if (!file.url && !file.preview) {
-      file.preview = await getBase64(file.originFileObj);
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      onSave({ ...values, docs: { instructions: editorContent } }); // Pass the editor content
+    } catch (error) {
+      console.error('Validation failed:', error);
     }
-    setPreviewImage(file.url || file.preview);
-    setPreviewVisible(true);
-    setPreviewTitle(file.name || file.url.substring(file.url.lastIndexOf('/') + 1));
   };
 
-  const getBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = error => reject(error);
-    });
+  const handleUploadChange = ({ fileList: newFileList }) => {
+    setFileList(newFileList); // Update file list on change
+  };
+
+  const handleFilenameChange = (index, value) => {
+    const newFileList = [...fileList];
+    newFileList[index].name = value; // Update the filename in the fileList
+    setFileList(newFileList); // Set the updated file list
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <Form form={form} layout="vertical" initialValues={operation}>
-        {/* Fixture & IPID Details */}
-        <Card 
-          title={<Title level={5}>Fixture & IPID Details</Title>} 
-          className="shadow-sm"
-        >
-          <Row gutter={[24, 16]}>
-            <Col span={12}>
-              <Form.Item
-                name="fixtureNo"
-                label={<Text strong>Fixture No with Rev.</Text>}
-                rules={[{ required: true }]}
-              >
-                <Input placeholder="Ex: Fx-62805080AA-70.80-Rev.01" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="ipidNo"
-                label={<Text strong>IPID No with Rev.</Text>}
-                rules={[{ required: true }]}
-              >
-                <Input placeholder="Ex: IPID-62805080AA-80-Rev.01" />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Card>
+    <div className="p-2 space-y-6">
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={operation}
+      >
+        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+          <TabPane tab="Setup Information" key="setup">
+            <Row gutter={24}>
+              <Col span={12}>
 
-        {/* Datum Information */}
-        <Card 
-          title={<Title level={5}>Datum Information</Title>}
-          className="shadow-sm"
-        >
-          <Row gutter={[24, 16]}>
-            <Col span={8}>
-              <Form.Item
-                name="datumX"
-                label={<Text strong>Datum X Axis</Text>}
-              >
-                <Input placeholder="Ex: 0 at the job center" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="datumY"
-                label={<Text strong>Datum Y Axis</Text>}
-              >
-                <Input placeholder="Ex: 0 at the job center" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="datumZ"
-                label={<Text strong>Datum Z Axis</Text>}
-              >
-                <Input placeholder="Ex: +0.25mm at top of the job" />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Card>
-
-        {/* Work Holding Instructions */}
-        <Card 
-          title={<Title level={5}>Work Holding Instructions</Title>}
-          className="shadow-sm"
-        >
-          <div className="space-y-4">
-            {instructions.map((instruction) => (
-              <Card 
-                key={instruction.id}
-                size="small"
-                className="border-l-4 border-l-blue-500"
-              >
-                <div className="mb-3">
-                  <Form.Item
-                    name={['instructions', instruction.id, 'title']}
-                    initialValue={instruction.title}
-                  >
+              <Card title="Machine Setup" className="shadow-sm">
+                <Descriptions column={1} bordered>
+                  {/* Work Holding and Work Holding Details */}
+                  <Descriptions.Item label="Work Holding">
                     <Input 
-                      placeholder="Enter section title"
-                      className="font-medium text-lg"
-                      bordered={false}
-                      style={{ paddingLeft: 0 }}
+                      placeholder="Enter Work Holding" 
+                      value={workHolding} 
+                      onChange={(e) => setWorkHolding(e.target.value)} 
                     />
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Work Holding Details">
+                    <Input 
+                      placeholder="Enter Work Holding Details" 
+                      value={workHoldingDetails} 
+                      onChange={(e) => setWorkHoldingDetails(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+                  
+                  {/* IPID No with Rev */}
+                  <Descriptions.Item label="IPID No with Rev">
+                    <Input 
+                      placeholder="Enter IPID No with Rev" 
+                      value={ipidNoRev} 
+                      onChange={(e) => setIpidNoRev(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Frequency */}
+                  <Descriptions.Item label="Freq.">
+                    <Input 
+                      placeholder="Enter Frequency" 
+                      value={freq} 
+                      onChange={(e) => setFreq(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Datum X Axis */}
+                  <Descriptions.Item label="Datum X Axis">
+                    <Input 
+                      placeholder="Enter Datum X Axis" 
+                      value={datumXAxis} 
+                      onChange={(e) => setDatumXAxis(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Datum Y Axis */}
+                  <Descriptions.Item label="Datum Y Axis">
+                    <Input 
+                      placeholder="Enter Datum Y Axis" 
+                      value={datumYAxis} 
+                      onChange={(e) => setDatumYAxis(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Datum Z Axis */}
+                  <Descriptions.Item label="Datum Z Axis">
+                    <Input 
+                      placeholder="Enter Datum Z Axis" 
+                      value={datumZAxis} 
+                      onChange={(e) => setDatumZAxis(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+
+                  {/* Revision */}
+                  <Descriptions.Item label="Rev">
+                    <Input 
+                      placeholder="Enter Revision" 
+                      value={rev} 
+                      onChange={(e) => setRev(e.target.value)} 
+                    />
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+
+
+                {/* <Card title="Machine Setup" size="small">
+                  <Form.Item
+                    name={['setup', 'workHolding']}
+                    label="Work Holding"
+                  >
+                    <Input placeholder="Enter Work Holding" />
                   </Form.Item>
-                </div>
+
+                  <Form.Item
+                    name={['setup', 'workHoldingDetails']}
+                    label="Work Holding Details"
+                  >
+                    <Input placeholder="Enter Work Holding Details" />
+                  </Form.Item>
+
+                  <Row gutter={24}>
+                    <Col span={12}>
+                      <Form.Item
+                        name={['setup', 'ipidNoRev']}
+                        label="IPID No with Rev"
+                      >
+                        <Input placeholder="Enter IPID No with Rev" />
+                      </Form.Item>
+                    </Col>
+
+                    <Col span={12}>
+                      <Form.Item
+                        name={['setup', 'freq.']}
+                        label="Freq."
+                      >
+                        <Input placeholder="Enter Freq" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Form.Item
+                    name={['setup', 'datumXAxis']}
+                    label="Datum X Axis"
+                  >
+                    <Input placeholder="Enter Datum X Axis" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name={['setup', 'datumYAxis']}
+                    label="Datum Y Axis"
+                  >
+                    <Input placeholder="Enter Datum Y Axis" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name={['setup', 'datumZAxis']}
+                    label="Datum Z Axis"
+                  >
+                    <Input placeholder="Enter Datum Z Axis" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name={['setup', 'rev']}
+                    label="Rev"
+                  >
+                    <Input placeholder="Enter Rev" />
+                  </Form.Item>
+                </Card> */}
+              </Col>
+
+              <Col span={12}>
+                <Card title="Program Name" size="small">
+                  <Form.Item
+                    name={['setup', 'programName']}
+                    label="Program Name"
+                  >
+                    <Input placeholder="Enter Program Name" />
+                  </Form.Item>
+
+                  <Form.List name={['setup', 'steps']}>
+                    {(fields, { add, remove }) => (
+                      <>
+                        {fields.map(({ key, name, ...restField }) => (
+                          <Space
+                            key={key}
+                            style={{ display: 'flex', marginBottom: 8 }}
+                            align="baseline"
+                          >
+                            <Row gutter={24}>
+                              <Col span={40}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'description']}
+                                  rules={[{ required: true, message: 'Missing step' }]}
+                                >
+                                  <Input placeholder="Enter program name" />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                            <MinusCircleOutlined onClick={() => remove(name)} />
+                          </Space>
+                        ))}
+                        <Form.Item>
+                          <Button
+                            type="dashed"
+                            onClick={() => add()}
+                            block
+                            icon={<PlusOutlined />}
+                          >
+                            Add Program Name
+                          </Button>
+                        </Form.Item>
+                      </>
+                    )}
+                  </Form.List>
+                </Card>
+              </Col>
+            </Row>
+          </TabPane>
+
+          <TabPane tab="Upload Notes and Images" key="docs">
+            <Row gutter={24}>
+              <Col span={24}>
                 <Form.Item
-                  name={['instructions', instruction.id, 'content']}
+                  name={['docs', 'instructions']}
+                  label="Special Instructions"
                 >
-                  <ReactQuill 
+                  <ReactQuill
+                    value={editorContent}
+                    onChange={setEditorContent} // Update editor content
                     theme="snow"
-                    style={{ 
-                      height: '150px',
-                      marginBottom: '40px'
-                    }}
-                    modules={{
-                      toolbar: [
-                        ['bold', 'italic', 'underline'],
-                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        ['clean']
-                      ]
-                    }}
-                    placeholder="Enter instructions points here..."
+                    placeholder="Enter special instructions here"
                   />
                 </Form.Item>
-              </Card>
-            ))}
+              </Col>
 
-            {/* Add New Section Button */}
-            <Button 
-              type="dashed" 
-              block
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setInstructions([
-                  ...instructions,
-                  {
-                    id: instructions.length + 1,
-                    title: '',
-                    content: ''
-                  }
-                ]);
-              }}
-            >
-              Add New Section
-            </Button>
-          </div>
-        </Card>
+              <Col span={24}>
+                <Form.Item
+                  name={['docs', 'headingPoints']}
+                  label="Notes"
+                >
+                  <Form.List
+                    name="headings"
+                    initialValue={[]}
+                    rules={[
+                      {
+                        validator: async(_, names) => {
+                          if (!names || names.length < 1) {
+                            return Promise.reject(new Error('At least one heading is required.'));
+                          }
+                        },
+                      },
+                    ]}
+                  >
+                    {(fields, { add, remove }) => (
+                      <>
+                        {fields.map(({ key, name, fieldKey, ...restField }) => (
+                          <div key={key} style={{ marginBottom: 20 }}>
+                            <Form.Item
+                              {...restField}
+                              name={[name, 'heading']}
+                              fieldKey={[fieldKey, 'heading']}
+                              label="Heading"
+                              rules={[{ required: true, message: 'Please enter a heading' }]}
+                            >
+                              <Input placeholder="Enter Heading" />
+                            </Form.Item>
+                            <Form.List
+                              name={[name, 'points']}
+                              initialValue={[]}
+                            >
+                              {(pointFields, { add: addPoint, remove: removePoint }) => (
+                                <>
+                                  {pointFields.map(({ key, name, fieldKey, ...restPointField }) => (
+                                    <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                                      <Form.Item
+                                        {...restPointField}
+                                        name={[name, 'point']}
+                                        fieldKey={[fieldKey, 'point']}
+                                        rules={[{ required: true, message: 'Missing point' }]}
+                                      >
+                                        <Input placeholder="Enter point" />
+                                      </Form.Item>
+                                      <MinusCircleOutlined onClick={() => removePoint(name)} />
+                                    </Space>
+                                  ))}
+                                  <Form.Item>
+                                    <Button
+                                      type="dashed"
+                                      onClick={() => addPoint()}
+                                      block
+                                      icon={<PlusOutlined />}
+                                    >
+                                      Add Point
+                                    </Button>
+                                  </Form.Item>
+                                </>
+                              )}
+                            </Form.List>
+                            <MinusCircleOutlined onClick={() => remove(name)} />
+                          </div>
+                        ))}
+                        <Form.Item>
+                          <Button
+                            type="dashed"
+                            onClick={() => add()}
+                            block
+                            icon={<PlusOutlined />}
+                          >
+                            Add Heading
+                          </Button>
+                        </Form.Item>
+                      </>
+                    )}
+                  </Form.List>
+                </Form.Item>
+              </Col>
 
-        {/* Operation Images */}
-        <Card 
-          title={<Title level={5}>Operation Images</Title>}
-          className="shadow-sm"
-        >
-          <Form.Item name="images">
-            <Upload
-              listType="picture-card"
-              multiple
-              maxCount={4}
-              onPreview={handlePreview}
-              beforeUpload={(file) => {
-                // Add name input before upload
-                return new Promise((resolve, reject) => {
-                  Modal.confirm({
-                    title: 'Image Name',
-                    content: (
-                      <Input 
-                        placeholder="Enter image name"
-                        onChange={(e) => file.customName = e.target.value}
-                      />
-                    ),
-                    onOk: () => {
-                      if (file.customName) {
-                        resolve(file);
-                      } else {
-                        message.error('Please enter an image name');
-                        reject();
+              <Col span={24}>
+                <Form.Item
+                  name={['docs', 'images']}
+                  label="Setup Images"
+                >
+                  <Upload
+                    listType="picture-card"
+                    maxCount={4}
+                    onChange={handleUploadChange}
+                    fileList={fileList}
+                    beforeUpload={(file) => {
+                      const isValidType = ['image/jpeg', 'image/png'].includes(file.type);
+                      const isSmallEnough = file.size / 1024 / 1024 < 2; // Less than 2 MB
+                      if (!isValidType) {
+                        message.error('You can only upload JPG/PNG files!');
+                        return Upload.LIST_IGNORE;
                       }
-                    },
-                    onCancel: () => reject(),
-                  });
-                });
-              }}
-            >
-              <div>
-                <PlusOutlined />
-                <div style={{ marginTop: 8 }}>Upload</div>
-              </div>
-            </Upload>
-          </Form.Item>
-        </Card>
+                      if (!isSmallEnough) {
+                        message.error('File size must be smaller than 2MB!');
+                        return Upload.LIST_IGNORE;
+                      }
+                      return true;
+                    }}
+                  >
+                    <div>
+                      <PlusOutlined />
+                      <div style={{ marginTop: 8 }}>Upload</div>
+                    </div>
+                  </Upload>
+                </Form.Item>
 
-        {/* Save Button */}
-        <div className="flex justify-end mt-6">
-          <Button 
-            type="primary"
-            icon={<SaveOutlined />}
-            size="large"
-            onClick={() => form.submit()}
-          >
-            Save Changes
-          </Button>
+                {fileList.map((file, index) => (
+                  <Row key={file.uid} gutter={16} style={{ marginBottom: 16, alignItems: 'center' }}>
+                    <Col span={6} style={{ textAlign: 'center' }}>
+                      <img
+                        src={file.thumbUrl || file.url}
+                        alt="Uploaded Image"
+                        style={{
+                          width: '100px',
+                          height: '100px',
+                          objectFit: 'cover',
+                          borderRadius: '4px',
+                          marginBottom: '8px',
+                        }}
+                      />
+                    </Col>
+
+                    <Col span={18}>
+                      <Input
+                        value={file.name}
+                        onChange={(e) => handleFilenameChange(index, e.target.value)}
+                        placeholder="Enter filename"
+                        style={{ width: '30%' }}
+                      />
+                    </Col>
+                  </Row>
+                ))}
+              </Col>
+            </Row>
+          </TabPane>
+        </Tabs>
+
+        <Divider />
+
+        <div className="flex justify-end">
+          <Space>
+            <Button onClick={() => form.resetFields()}>Reset</Button>
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              onClick={handleSave}
+            >
+              Save Changes
+            </Button>
+          </Space>
         </div>
       </Form>
-
-      {/* Image Preview Modal */}
-      <Modal
-        visible={previewVisible}
-        title={previewTitle}
-        footer={null}
-        onCancel={() => setPreviewVisible(false)}
-      >
-        <img
-          alt="preview"
-          style={{ width: '100%' }}
-          src={previewImage}
-        />
-      </Modal>
     </div>
   );
 };
 
-export default OperationMPPDetails; 
+export default OperationMPPDetails;

@@ -1,6 +1,6 @@
 // src/pages/supervisorscreens/inventory/History.jsx
 import React, {useState} from 'react';
-import { Card, Button, DatePicker, Space, Upload, Table } from 'antd'; // Import necessary Ant Design components
+import { Card,Tag, Button, DatePicker, Space, Upload, Table } from 'antd'; // Import necessary Ant Design components
 import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'; // Import icons
 
 const toolsData = [
@@ -188,13 +188,19 @@ const columns = [
         title: 'ACTION',
         dataIndex: 'action',
         key: 'action',
-        render: (text) => (
-            <Button style={{ backgroundColor: '#4CAF50', color: '#FFFFFF' }}>
-                {text}
-            </Button>
-        ),
+        render: (_, record) => {
+            const { status, color } = getStatus(record.action);
+            return (
+              <Tag color={color} className="text-sm">{status}</Tag>
+            );
+          },
     },
 ];
+
+const getStatus = (action) => {
+
+    return { status: 'Approved', color: 'green' }; // Calibrated (green)
+  };
 
 const History = ({ showModal, handleDownloadData, handleFileUpload }) => {
     const [filteredInfo, setFilteredInfo] = useState({});

@@ -61,6 +61,53 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     }
   };
 
+  // Show Modal for Edit or Add Operation
+  const showEditModal = (record) => {
+    setIsAddOperation(false);
+    setCurrentOperation({ ...record });
+    setIsModalVisible(true);
+  };
+
+  // Show Modal for Add New Operation
+  const showAddModal = () => {
+    setIsAddOperation(true);
+    setCurrentOperation({
+      opNo: '',
+      description: '',
+      machine: '',
+      cycleTime: null,
+      setupTime: null,
+      tools: [],
+      fixtures: [],
+    });
+    setIsModalVisible(true);
+  };
+
+  // Handle Modal OK
+  const handleOk = () => {
+    if (isAddOperation) {
+      // Add New Operation
+      const newOperation = { 
+        ...currentOperation, 
+        key: `${operations.length + 1}`,
+      };
+      setOperations([...operations, newOperation]);
+    } else {
+      // Edit Existing Operation
+      const updatedOperations = operations.map(op =>
+        op.key === currentOperation.key ? currentOperation : op
+      );
+      setOperations(updatedOperations);
+    }
+    setIsModalVisible(false);
+  };
+
+  // Handle Modal Cancel
+  const handleCancel = () => {
+    setIsModalVisible(false);
+  };
+
+  // Define Columns for the Table
   const columns = [
     {
       title: 'Op. No',
@@ -323,4 +370,4 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   );
 };
 
-export default JobOperationsTable; 
+export default JobOperationsTable;

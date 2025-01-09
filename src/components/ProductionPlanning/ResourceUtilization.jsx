@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card, Row, Col, Table, Progress, Space, Tag, 
-  DatePicker, Select, Button, Statistic, Alert,
-  Typography, Empty
+  Card, Row, Col, Space, 
+  DatePicker, Select, Button, Statistic,
+  Typography,Progress
 } from 'antd';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip as RechartsTooltip, ResponsiveContainer,
-  Legend
-} from 'recharts';
+import ReactApexChart from 'react-apexcharts';
 import { 
   ClockCircleOutlined, ToolOutlined, 
   AlertOutlined, CheckCircleOutlined,
@@ -25,10 +21,123 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
   const [dateRange, setDateRange] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [loading, setLoading] = useState(false);
+  
+  // Initial chart state
+  const [chartState, setChartState] = useState({
+    series: [
+      {
+        name: 'Used Capacity',
+        data: machines.map(m => m.usedCapacity || 0)
+      },
+      {
+        name: 'Planned Capacity',
+        data: machines.map(m => m.plannedCapacity || 0)
+      },
+      {
+        name: 'Available Capacity',
+        data: machines.map(m => (
+          (m.totalCapacity || 0) - (m.usedCapacity || 0) - (m.plannedCapacity || 0)
+        ))
+      }
+    ],
+    options: {
+      chart: {
+        type: 'bar',
+        height: 350,
+        stacked: true,
+        toolbar: {
+          show: true
+        },
+        zoom: {
+          enabled: true
+        }
+      },
+      responsive: [{
+        breakpoint: 480,
+        options: {
+          legend: {
+            position: 'bottom',
+            offsetX: -10,
+            offsetY: 0
+          }
+        }
+      }],
+      plotOptions: {
+        bar: {
+          horizontal: false,
+          borderRadius: 10,
+          borderRadiusApplication: 'end',
+          borderRadiusWhenStacked: 'last',
+          dataLabels: {
+            total: {
+              enabled: true,
+              style: {
+                fontSize: '13px',
+                fontWeight: 900
+              }
+            }
+          }
+        },
+      },
+      xaxis: {
+        type: 'category',
+        categories: machines.map(m => m.name)
+      },
+      legend: {
+        position: 'right',
+        offsetY: 40
+      },
+      fill: {
+        opacity: 1
+      },
+      colors: ['#faad14', '#1890ff', '#52c41a']
+    },
+  });
 
   const handleFilter = () => {
     setLoading(true);
-    // Simulate API call
+    
+    // Filter the data based on selection
+    let filteredMachines = [...machines];
+    
+    if (selectedMachine) {
+      filteredMachines = filteredMachines.filter(m => m.id === selectedMachine);
+    }
+    
+    if (dateRange) {
+      // Add date filtering logic here
+      // This is a placeholder - you'll need to implement actual date filtering
+      // based on your data structure
+    }
+    
+    // Update chart data
+    setChartState(prev => ({
+      ...prev,
+      series: [
+        {
+          name: 'Used Capacity',
+          data: filteredMachines.map(m => m.usedCapacity || 0)
+        },
+        {
+          name: 'Planned Capacity',
+          data: filteredMachines.map(m => m.plannedCapacity || 0)
+        },
+        {
+          name: 'Available Capacity',
+          data: filteredMachines.map(m => (
+            (m.totalCapacity || 0) - (m.usedCapacity || 0) - (m.plannedCapacity || 0)
+          ))
+        }
+      ],
+      options: {
+        ...prev.options,
+        xaxis: {
+          ...prev.options.xaxis,
+          categories: filteredMachines.map(m => m.name)
+        }
+      }
+    }));
+
     setTimeout(() => {
       setLoading(false);
     }, 1000);
@@ -37,100 +146,37 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
   const handleReset = () => {
     setDateRange(null);
     setSelectedMachine(null);
+    
+    // Reset chart to show all machines
+    setChartState(prev => ({
+      ...prev,
+      series: [
+        {
+          name: 'Used Capacity',
+          data: machines.map(m => m.usedCapacity || 0)
+        },
+        {
+          name: 'Planned Capacity',
+          data: machines.map(m => m.plannedCapacity || 0)
+        },
+        {
+          name: 'Available Capacity',
+          data: machines.map(m => (
+            (m.totalCapacity || 0) - (m.usedCapacity || 0) - (m.plannedCapacity || 0)
+          ))
+        }
+      ],
+      options: {
+        ...prev.options,
+        xaxis: {
+          ...prev.options.xaxis,
+          categories: machines.map(m => m.name)
+        }
+      }
+    }));
   };
 
-  // Machine utilization table columns
-  const columns = [
-    {
-      title: 'Machine',
-      dataIndex: 'name',
-      key: 'name',
-      width: 200,
-      fixed: 'left',
-      render: (text, record) => (
-        <Space>
-          <Text strong>{text}</Text>
-          <Tag color={record.status === 'available' ? 'green' : 'orange'}>
-            {record.status}
-          </Tag>
-        </Space>
-      ),
-    },
-    {
-      title: 'Current Job',
-      dataIndex: 'currentJob',
-      key: 'currentJob',
-      width: 200,
-      render: (job) => job ? (
-        <Space direction="vertical" size="small">
-          <Text>{job.partNumber}</Text>
-          <Progress 
-            percent={Math.round((job.completed / job.quantity) * 100)} 
-            size="small"
-            status={job.completed === job.quantity ? 'success' : 'active'}
-          />
-        </Space>
-      ) : <Text type="secondary">No active job</Text>
-    },
-    {
-      title: 'Utilization',
-      key: 'utilization',
-      width: 250,
-      render: (_, record) => {
-        const used = record.usedCapacity || 0;
-        const planned = record.plannedCapacity || 0;
-        const total = record.totalCapacity || 0;
-        const available = total - used - planned;
-        
-        return (
-          <Space direction="vertical" size="small" className="w-full">
-            <Progress
-              percent={100}
-              success={{ percent: (used / total) * 100 }}
-              trailColor="#ffd591"
-              strokeColor="#1890ff"
-              showInfo={false}
-            />
-            <Space className="text-xs" wrap>
-              <Tag color="blue">{`Used: ${used}h`}</Tag>
-              <Tag color="orange">{`Planned: ${planned}h`}</Tag>
-              <Tag color="green">{`Available: ${available}h`}</Tag>
-            </Space>
-          </Space>
-        );
-      }
-    },
-    {
-      title: 'Efficiency',
-      dataIndex: 'efficiency',
-      key: 'efficiency',
-      width: 120,
-      render: (value = 0) => (
-        <Progress 
-          type="circle" 
-          percent={value} 
-          width={50}
-          format={(percent) => `${percent}%`}
-          status={value >= 80 ? 'success' : value >= 60 ? 'normal' : 'exception'}
-        />
-      ),
-    },
-    {
-      title: 'Next Maintenance',
-      dataIndex: 'nextMaintenance',
-      key: 'nextMaintenance',
-      width: 150,
-      render: (value) => value ? (
-        <Tag icon={<ClockCircleOutlined />} color="processing">
-          {value}
-        </Tag>
-      ) : (
-        <Tag color="success">No scheduled maintenance</Tag>
-      )
-    }
-  ];
-
-  // Stats cards data
+  // Stats calculations
   const stats = {
     totalCapacity: machines.reduce((acc, m) => acc + (m.totalCapacity || 0), 0),
     usedCapacity: machines.reduce((acc, m) => acc + (m.usedCapacity || 0), 0),
@@ -142,6 +188,83 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
 
   return (
     <div className="space-y-6">
+      {/* Stats Overview */}
+      <Row gutter={[16, 16]}>
+      <Col xs={24} sm={12} md={6}>
+        <Card bordered={false} className="hover:shadow-md transition-shadow bg-sky-50">
+          <div className="flex justify-between items-center ">
+            <Space>
+              <div className="p-3 rounded-full bg-sky-100">
+                <ClockCircleOutlined className="text-sky-900 text-xl" />
+              </div>
+              <Text strong className="text-lg">Total Capacity</Text>
+            </Space>
+            <Text strong className="text-blue-500 text-xl">{`${stats.totalCapacity}h`}</Text>
+          </div>
+          <div className="mt-4">
+            <Progress percent={100} showInfo={false} strokeColor="#1890ff" />
+          </div>
+        </Card>
+      </Col>
+
+      <Col xs={24} sm={12} md={6}>
+        <Card bordered={false} className="hover:shadow-md transition-shadow bg-sky-50">
+          <div className="flex justify-between items-center">
+            <Space>
+              <div className="p-3 rounded-full bg-sky-100">
+                <ToolOutlined className="text-blue-500 text-xl" />
+              </div>
+              <Text strong className="text-lg">Used Capacity</Text>
+            </Space>
+            <Text strong className="text-blue-500 text-xl">{`${stats.usedCapacity}h`}</Text>
+          </div>
+          <div className="mt-4">
+            <Progress
+              percent={Math.round((stats.usedCapacity / stats.totalCapacity) * 100)}
+              strokeColor="#faad14"
+            />
+          </div>
+        </Card>
+      </Col>
+
+      <Col xs={24} sm={12} md={6}>
+        <Card bordered={false} className="hover:shadow-md transition-shadow bg-sky-50">
+          <div className="flex justify-between items-center">
+            <Space>
+              <div className="p-3 rounded-full bg-orange-100">
+                <AlertOutlined className="text-orange-500 text-xl" />
+              </div>
+              <Text strong className="text-lg">Planned Capacity</Text>
+            </Space>
+            <Text strong className="text-orange-500 text-xl">{`${stats.plannedCapacity}h`}</Text>
+          </div>
+          <div className="mt-4">
+            <Progress
+              percent={Math.round((stats.plannedCapacity / stats.totalCapacity) * 100)}
+              strokeColor="#1890ff"
+            />
+          </div>
+        </Card>
+      </Col>
+
+      <Col xs={24} sm={12} md={6}>
+        <Card bordered={false} className="hover:shadow-md transition-shadow bg-sky-50">
+          <div className="flex justify-between items-center">
+            <Space>
+              <div className="p-3 rounded-full bg-green-100">
+                <CheckCircleOutlined className="text-green-500 text-xl" />
+              </div>
+              <Text strong className="text-lg">Average Efficiency</Text>
+            </Space>
+            <Text strong className="text-green-500 text-xl">{`${stats.averageEfficiency}%`}</Text>
+          </div>
+          <div className="mt-4">
+            <Progress percent={stats.averageEfficiency} strokeColor="#52c41a" />
+          </div>
+        </Card>
+      </Col>
+    </Row>
+
       {/* Filters */}
       <Card className="shadow-sm">
         <Space size="large" wrap className="flex justify-between">
@@ -195,81 +318,19 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
         </Space>
       </Card>
 
-      {/* Stats Overview */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic
-              title={<Text strong>Total Capacity</Text>}
-              value={`${stats.totalCapacity}h`}
-              prefix={<ClockCircleOutlined className="text-blue-500" />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic
-              title={<Text strong>Used Capacity</Text>}
-              value={`${stats.usedCapacity}h`}
-              prefix={<ToolOutlined className="text-blue-500" />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic
-              title={<Text strong>Planned Capacity</Text>}
-              value={`${stats.plannedCapacity}h`}
-              prefix={<AlertOutlined className="text-orange-500" />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
-            <Statistic
-              title={<Text strong>Average Efficiency</Text>}
-              value={stats.averageEfficiency}
-              prefix={<CheckCircleOutlined className="text-green-500" />}
-              suffix="%"
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Utilization Chart */}
+      {/* ApexCharts Graph */}
       <Card 
         title={<Title level={5}>Machine Utilization Overview</Title>}
         className="shadow-sm"
       >
-        {machines.length > 0 ? (
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={machines}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <RechartsTooltip />
-                <Legend />
-                <Bar dataKey="usedCapacity" stackId="a" fill="#1890ff" name="Used" />
-                <Bar dataKey="plannedCapacity" stackId="a" fill="#faad14" name="Planned" />
-                <Bar 
-                  dataKey={(data) => (data.totalCapacity || 0) - (data.usedCapacity || 0) - (data.plannedCapacity || 0)} 
-                  stackId="a" 
-                  fill="#52c41a" 
-                  name="Available" 
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <Empty description="No machine data available" />
-        )}
+        <div id="chart">
+          <ReactApexChart
+            options={chartState.options}
+            series={chartState.series}
+            type="bar"
+            height={350}
+          />
+        </div>
       </Card>
 
       {/* Machine Details Table */}
@@ -306,4 +367,4 @@ const ResourceUtilization = ({ machines = [], selectedJob = null }) => {
   );
 };
 
-export default ResourceUtilization; 
+export default ResourceUtilization;

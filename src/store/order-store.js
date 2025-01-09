@@ -1,9 +1,29 @@
 import { create } from 'zustand';
 
 const useOrderStore = create((set) => ({
-  orderDetails: null,
+  orders: [],
   isLoading: false,
   error: null,
+
+  fetchAllOrders: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('http://172.18.7.88:8010/all_orders');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch orders');
+      }
+
+      // Sort orders by priority
+      const sortedOrders = data.sort((a, b) => a.project.priority - b.project.priority);
+      set({ orders: sortedOrders, isLoading: false });
+      return sortedOrders;
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
 
   uploadPDF: async (file) => {
     set({ isLoading: true, error: null });
@@ -11,7 +31,7 @@ const useOrderStore = create((set) => ({
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://172.18.7.89:7010/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:8010/upload-pdf', {
         method: 'POST',
         body: formData,
       });

@@ -45,100 +45,99 @@ function Inventory() {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-      {/* Header Section */}
-      <div className="flex justify-between items-center mb-6">
+      {/* Header Section - Made more compact */}
+      <div className="flex justify-between items-center mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Inventory Management</h1>
-          <p className="text-gray-600">Last updated: {new Date().toLocaleDateString()}</p>
+          <h1 className="text-xl font-bold text-gray-800">Inventory Management</h1>
+          <p className="text-sm text-gray-600">Last updated: {new Date().toLocaleDateString()}</p>
         </div>
         <Space>
           <Badge count={getLowStockItems().length} offset={[-5, 5]}>
-            <AlertOutlined style={{ fontSize: '24px', color: '#ff4d4f' }} />
+            <AlertOutlined className="text-red-500 text-xl" />
           </Badge>
           <ReloadOutlined 
             spin={isLoading}
             onClick={handleRefresh} 
-            style={{ fontSize: '24px', cursor: 'pointer', marginLeft: '16px' }}
+            className="text-xl cursor-pointer text-gray-600 hover:text-blue-500 transition-colors"
           />
         </Space>
       </div>
       
-      {/* Analytics Section */}
-      <div className="mb-6">
-        {/* Summary Cards */}
-        <Row gutter={[16, 16]} className="mb-6">
+      {/* Analytics Section - Made cards smaller and more compact */}
+      <div className="mb-4">
+        <Row gutter={[12, 12]} className="mb-4">
           <Col xs={24} md={8}>
-            <Card hoverable className="transition-shadow duration-300 hover:shadow-lg">
+            <Card 
+              hoverable 
+              className="shadow-sm hover:shadow-md transition-shadow duration-300"
+              bodyStyle={{ padding: '12px' }}
+            >
               <Statistic
-                title={<span className="text-lg">Total Items in Stock</span>}
+                title={<span className="text-sm">Total Items</span>}
                 value={stockLevels.reduce((acc, curr) => acc + curr.current, 0)}
                 prefix={<InboxOutlined className="text-blue-500" />}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: '#1890ff', fontSize: '1.5rem' }}
               />
-              <p className="text-gray-500 mt-2">Across all categories</p>
             </Card>
           </Col>
 
           <Col xs={24} md={8}>
-            <Card hoverable className="transition-shadow duration-300 hover:shadow-lg">
+            <Card 
+              hoverable 
+              className="shadow-sm hover:shadow-md transition-shadow duration-300"
+              bodyStyle={{ padding: '12px' }}
+            >
               <Statistic
-                title={<span className="text-lg">Low Stock Alerts</span>}
+                title={<span className="text-sm">Low Stock</span>}
                 value={getLowStockItems().length}
                 prefix={<WarningOutlined className="text-red-500" />}
-                valueStyle={{ color: '#ff4d4f' }}
+                valueStyle={{ color: '#ff4d4f', fontSize: '1.5rem' }}
               />
-              <p className="text-gray-500 mt-2">Items below safety stock</p>
             </Card>
           </Col>
 
           <Col xs={24} md={8}>
-            <Card hoverable className="transition-shadow duration-300 hover:shadow-lg">
+            <Card 
+              hoverable 
+              className="shadow-sm hover:shadow-md transition-shadow duration-300"
+              bodyStyle={{ padding: '12px' }}
+            >
               <Statistic
-                title={<span className="text-lg">Monthly Usage Trend</span>}
+                title={<span className="text-sm">Monthly Usage</span>}
                 value={12}
                 prefix={<LineChartOutlined className="text-green-500" />}
                 suffix="%"
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: '#52c41a', fontSize: '1.5rem' }}
               />
-              <p className="text-gray-500 mt-2">Compared to last month</p>
             </Card>
           </Col>
         </Row>
 
-        {/* Low Stock Alerts Section */}
+        {/* Low Stock Alerts - Made more compact */}
         {getLowStockItems().length > 0 && (
           <Card 
-            className="mb-6"
+            className="mb-4 shadow-sm"
             title={
-              <span className="flex items-center">
+              <span className="flex items-center text-sm">
                 <WarningOutlined className="text-red-500 mr-2" />
                 Low Stock Alerts
               </span>
             }
+            bodyStyle={{ padding: '12px' }}
           >
-            <Row gutter={[16, 16]}>
+            <Row gutter={[12, 12]}>
               {getLowStockItems().map((item) => (
                 <Col xs={24} md={12} key={item.category}>
                   <Alert
-                    message={
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{item.category}</span>
-                        <Badge 
-                          status="error" 
-                          text="Reorder Required"
-                        />
-                      </div>
-                    }
+                    message={item.category}
                     description={
-                      <div className="mt-2">
-                        <Space size="large">
-                          <span>Current: {item.current}</span>
-                          <span>Minimum: {item.minimum}</span>
-                          <span className="text-red-500">
-                            {((item.current / item.minimum) * 100).toFixed(1)}% of minimum
-                          </span>
-                        </Space>
-                      </div>
+                      <Space size="small" className="text-xs">
+                        <span>Current: {item.current}</span>
+                        <span>Min: {item.minimum}</span>
+                        <span className="text-red-500">
+                          {((item.current / item.minimum) * 100).toFixed(0)}%
+                        </span>
+                      </Space>
                     }
                     type="warning"
                     showIcon
@@ -153,13 +152,14 @@ function Inventory() {
 
       {/* Inventory Tabs Section */}
       <Card 
-        className="shadow-md"
+        className="shadow-sm"
         title={
-          <span className="flex items-center">
+          <span className="flex items-center text-base">
             <DashboardOutlined className="mr-2" />
             Inventory Categories
           </span>
         }
+        bodyStyle={{ padding: '12px' }}
       >
         <Tabs 
           defaultActiveKey="tools"

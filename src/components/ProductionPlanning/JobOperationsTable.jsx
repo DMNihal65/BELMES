@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Table, Button, Space, Tooltip, Form, Input, 
   Popconfirm, Select, Tag, TimePicker 
@@ -9,10 +9,6 @@ import {
 } from '@ant-design/icons';
 import EditableCell from './EditableCell';
 import dayjs from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat';
-import { v4 as uuidv4 } from 'uuid';
-
-dayjs.extend(customParseFormat);
 
 const { Option } = Select;
 
@@ -30,10 +26,14 @@ const mockTools = [
   { id: 'T3', name: 'Tool 3' },
 ];
 
-const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperations }) => {
+const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperations, partNumber }) => {
   const [form] = Form.useForm();
   const [operations, setOperations] = useState(initialOperations || []);
   const [editingKey, setEditingKey] = useState('');
+
+  useEffect(() => {
+    setOperations(initialOperations || []);
+  }, [initialOperations]);
 
   const isEditing = (record) => record.key === editingKey;
 
@@ -67,46 +67,38 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
   const columns = [
     {
-      title: 'Op. No',
-      dataIndex: 'opNo',
+      title: 'ID',
+      dataIndex: 'id',
       width: 80,
       fixed: 'left',
       editable: false,
     },
     {
-      title: 'Description',
-      dataIndex: 'description',
+      title: 'Operation Number',
+      dataIndex: 'operation_number',
+      width: 150,
+      editable: true,
+    },
+    {
+      title: 'Operation Description',
+      dataIndex: 'operation_description',
       width: 200,
       editable: true,
     },
     {
-      title: 'Machine',
-      dataIndex: 'machine',
-      width: 180,
+      title: 'Setup Time [Hrs]',
+      dataIndex: 'setup_time',
+      width: 150,
       editable: true,
       render: (text, record) => {
         const editable = isEditing(record);
         return editable ? (
           <Form.Item
-            name="machine"
+            name="setup_time"
             style={{ margin: 0 }}
+            initialValue={text}
           >
-            <Select style={{ width: '100%' }}>
-              {mockMachines.map(machine => (
-                <Option 
-                  key={machine.id} 
-                  value={machine.id}
-                  disabled={machine.status === 'maintenance'}
-                >
-                  <Space>
-                    {machine.name}
-                    <Tag color={machine.status === 'available' ? 'green' : 'orange'}>
-                      {machine.status}
-                    </Tag>
-                  </Space>
-                </Option>
-              ))}
-            </Select>
+            <Input type="number" step="0.01" />
           </Form.Item>
         ) : (
           text
@@ -114,111 +106,54 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
     },
     {
-      title: 'Cycle Time',
-      dataIndex: 'cycleTime',
-      width: 120,
-      editable: true,
-      render: (text, record) => {
-        const editable = isEditing(record);
-        return editable ? (
-          <Form.Item
-            name="cycleTime"
-            style={{ margin: 0 }}
-          >
-            <TimePicker format="HH:mm:ss" />
-          </Form.Item>
-        ) : (
-          text ? dayjs(text).format('HH:mm:ss') : ''
-        );
-      }
-    },
-    {
-      title: 'Setup Time',
-      dataIndex: 'setupTime',
-      width: 120,
-      editable: true,
-      render: (text, record) => {
-        const editable = isEditing(record);
-        return editable ? (
-          <Form.Item
-            name="setupTime"
-            style={{ margin: 0 }}
-          >
-            <TimePicker format="HH:mm:ss" />
-          </Form.Item>
-        ) : (
-          text ? dayjs(text).format('HH:mm:ss') : ''
-        );
-      }
-    },
-    {
-      title: 'Tools',
-      dataIndex: 'tools',
+      title: 'Ideal Cycle Time [Hrs]',
+      dataIndex: 'ideal_cycle_time',
       width: 150,
       editable: true,
-      render: (tools, record) => {
+      render: (text, record) => {
         const editable = isEditing(record);
         return editable ? (
           <Form.Item
-            name="tools"
+            name="ideal_cycle_time"
             style={{ margin: 0 }}
+            initialValue={text}
           >
-            <Select
-              mode="multiple"
-              style={{ width: '100%' }}
-              placeholder="Select tools"
-              maxTagCount="responsive"
-            >
-              {mockTools.map(tool => (
-                <Option key={tool.id} value={tool.id}>
-                  {tool.name}
-                </Option>
-              ))}
-            </Select>
+            <Input type="number" step="0.01" />
           </Form.Item>
         ) : (
-          <Space>
-            {(tools || []).map(tool => (
-              <Tag key={tool}>{tool}</Tag>
-            ))}
-          </Space>
+          text
         );
       }
     },
     {
-      title: 'Fixtures',
-      dataIndex: 'fixtures',
-      width: 200,
+      title: 'Work Center',
+      dataIndex: 'work_center',
+      width: 150,
       editable: true,
-      inputType: 'multiSelect',
-      render: (fixtures) => (
-        <Space wrap>
-          {(fixtures || []).map(fixture => (
-            <Tag key={fixture} color="purple">{fixture}</Tag>
-          ))}
-        </Space>
-      ),
     },
     {
       title: 'Actions',
-      dataIndex: 'actions',
-      width: 180,
+      key: 'actions',
       fixed: 'right',
       width: 150,
       render: (_, record) => {
         const editable = isEditing(record);
         return (
           <Space>
-            {/* MPP Details button always first */}
-            <Tooltip title="Edit MPP Details">
+            {/* MPP Details button */}
+            <Tooltip title="View MPP Details">
               <Button 
                 type="link" 
                 icon={<FileTextOutlined />} 
-                onClick={() => onOperationEdit(record)}
+                onClick={() => onOperationEdit({
+                  ...record,
+                  operation_number: record.operation_number,
+                  partNumber: partNumber
+                })}
               />
             </Tooltip>
             
-            {/* Edit/Save button */}
+            {/* Edit/Save buttons */}
             {editable ? (
               <Space>
                 <Button 
@@ -243,7 +178,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
               </Tooltip>
             )}
 
-            {/* Delete button only shown when not editing */}
+            {/* Delete button */}
             {!editable && (
               <Popconfirm
                 title="Delete this operation?"
@@ -291,18 +226,15 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
             onClick={() => {
               const newOperation = {
                 key: `${operations.length + 1}`,
-                opNo: `OP${(operations.length + 1) * 10}`,
-                description: '',
-                machine: '',
-                cycleTime: null,
-                setupTime: null,
-                tools: [],
-                fixtures: [],
-                status: 'planned',
-                precedingOps: []
+                id: operations.length + 1,
+                operation_number: operations.length * 10 + 10,
+                operation_description: '',
+                setup_time: 0,
+                ideal_cycle_time: 0,
+                work_center: '',
               };
               setOperations([...operations, newOperation]);
-              edit(newOperation); // Make new operation editable immediately
+              edit(newOperation);
             }}
           >
             Add Operation
@@ -317,13 +249,18 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           }}
           columns={mergedColumns} 
           dataSource={operations}
-          scroll={{ x: 1500 }}
-          pagination={false}
+          scroll={{ x: 1200 }}
+          pagination={{
+            pageSize: 10,
+            total: operations.length,
+            showSizeChanger: false
+          }}
           size="middle"
+          rowKey="id"
         />
       </div>
     </Form>
   );
 };
 
-export default JobOperationsTable;
+export default JobOperationsTable; 

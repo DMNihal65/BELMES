@@ -1,75 +1,156 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Form, Input, Upload, Button, Card, Row, Col, 
-  Modal, Typography, Space, Divider, Collapse
+  Form, 
+  Input, 
+  Card, 
+  Row, 
+  Col, 
+  Typography, 
+  Spin,
+  Button, 
+  Space,
+  Upload,
+  message
 } from 'antd';
-import {
-  UploadOutlined, SaveOutlined, PlusOutlined,
-  EyeOutlined
-} from '@ant-design/icons';
-import ReactQuill from 'react-quill'; // Rich text editor
+import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { PlusOutlined } from '@ant-design/icons';
+import usePlanningStore from '../../store/planning-store';
 
 const { Title, Text } = Typography;
-const { Panel } = Collapse;
 
-const OperationMPPDetails = ({ operation, onUpdate }) => {
+const defaultInstructions = [
+  { id: 1, title: 'Fixture Setup', content: '' },
+  { id: 2, title: 'Job Preparation', content: '' },
+  { id: 3, title: 'Post-Machining Steps', content: '' }
+];
+
+const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
   const [form] = Form.useForm();
-  const [previewImage, setPreviewImage] = useState(null);
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewTitle, setPreviewTitle] = useState('');
+  const { fetchMPPDetails, saveMPPDetails, mppDetails, isLoading } = usePlanningStore();
+  const [workInstructions, setWorkInstructions] = useState(defaultInstructions);
+  const [editableCardTitles, setEditableCardTitles] = useState({
+    fixture: 'Fixture & IPID Details',
+    datum: 'Datum Information',
+    workInstructions: 'Work Holding Instructions',
+    images: 'Operation Images'
+  });
 
-  const [instructions, setInstructions] = useState([
-    { id: 1, title: 'Fixture Setup', content: '' },
-    { id: 2, title: 'Job Preparation', content: '' },
-    { id: 3, title: 'Post-Machining Steps', content: '' }
-  ]);
-
-  const [expandedKeys, setExpandedKeys] = useState(['1']);
-
-  const handlePreview = async (file) => {
-    if (!file.url && !file.preview) {
-      file.preview = await getBase64(file.originFileObj);
+  useEffect(() => {
+    if (partNumber && operation?.operation_number) {
+      fetchMPPDetails(partNumber, operation.operation_number);
     }
-    setPreviewImage(file.url || file.preview);
-    setPreviewVisible(true);
-    setPreviewTitle(file.name || file.url.substring(file.url.lastIndexOf('/') + 1));
+  }, [partNumber, operation, fetchMPPDetails]);
+
+  useEffect(() => {
+    if (mppDetails) {
+      form.setFieldsValue({
+        fixture_number: mppDetails.fixture_number,
+        ipid_number: mppDetails.ipid_number,
+        datum_x: mppDetails.datum_x,
+        datum_y: mppDetails.datum_y,
+        datum_z: mppDetails.datum_z,
+      });
+
+      if (mppDetails.work_instructions?.sections) {
+        setWorkInstructions(mppDetails.work_instructions.sections.map((section, index) => ({
+          id: index + 1,
+          title: section.title,
+          content: section.instructions
+        })));
+      }
+    }
+  }, [mppDetails, form]);
+
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      
+      const mppData = {
+        order_id: operation?.order_id || null,
+        operation_id: operation?.id || null,
+        document_id: null,
+        fixture_number: values.fixture_number,
+        ipid_number: values.ipid_number,
+        datum_x: values.datum_x,
+        datum_y: values.datum_y,
+        datum_z: values.datum_z,
+        work_instructions: {
+          sections: workInstructions.map((instruction, index) => ({
+            title: instruction.title || '',
+            instructions: instruction.content || '',
+            sequence: index
+          }))
+        },
+        part_number: partNumber,
+        operation_number: Number(operation?.operation_number)
+      };
+
+      console.log('Saving MPP data:', mppData);
+
+      await saveMPPDetails(mppData);
+      message.success('MPP details saved successfully');
+      if (onSave) {
+        onSave();
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      message.error(
+        'Failed to save MPP details: ' + 
+        (typeof error === 'string' ? error : error.message || 'Unknown error')
+      );
+    }
   };
 
-  const getBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = error => reject(error);
-    });
+  const handleCardTitleChange = (key, value) => {
+    setEditableCardTitles(prev => ({
+      ...prev,
+      [key]: value
+    }));
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <Form form={form} layout="vertical" initialValues={operation}>
+      <Title level={4} editable>Operation Details - Operation Number: {operation?.operation_number}</Title>
+      
+      <Form form={form} layout="vertical">
         {/* Fixture & IPID Details */}
         <Card 
-          title={<Title level={5}>Fixture & IPID Details</Title>} 
+          title={
+            <Input
+              value={editableCardTitles.fixture}
+              onChange={(e) => handleCardTitleChange('fixture', e.target.value)}
+              bordered={false}
+              className="text-lg font-medium"
+            />
+          }
           className="shadow-sm"
         >
           <Row gutter={[24, 16]}>
             <Col span={12}>
-              <Form.Item
-                name="fixtureNo"
-                label={<Text strong>Fixture No with Rev.</Text>}
-                rules={[{ required: true }]}
+              <Form.Item 
+                name="fixture_number"
+                label={<Text strong>Fixture No</Text>}
+                rules={[{ required: true, message: 'Please enter fixture number' }]}
               >
-                <Input placeholder="Ex: Fx-62805080AA-70.80-Rev.01" />
+                <Input placeholder="Enter Fixture Number" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item
-                name="ipidNo"
-                label={<Text strong>IPID No with Rev.</Text>}
-                rules={[{ required: true }]}
+              <Form.Item 
+                name="ipid_number"
+                label={<Text strong>IPID No</Text>}
+                rules={[{ required: true, message: 'Please enter IPID number' }]}
               >
-                <Input placeholder="Ex: IPID-62805080AA-80-Rev.01" />
+                <Input placeholder="Enter IPID Number" />
               </Form.Item>
             </Col>
           </Row>
@@ -77,99 +158,106 @@ const OperationMPPDetails = ({ operation, onUpdate }) => {
 
         {/* Datum Information */}
         <Card 
-          title={<Title level={5}>Datum Information</Title>}
+          title={
+            <Input
+              value={editableCardTitles.datum}
+              onChange={(e) => handleCardTitleChange('datum', e.target.value)}
+              bordered={false}
+              className="text-lg font-medium"
+            />
+          }
           className="shadow-sm"
         >
           <Row gutter={[24, 16]}>
             <Col span={8}>
-              <Form.Item
-                name="datumX"
+              <Form.Item 
+                name="datum_x"
                 label={<Text strong>Datum X Axis</Text>}
+                rules={[{ required: true, message: 'Please enter Datum X' }]}
               >
-                <Input placeholder="Ex: 0 at the job center" />
+                <Input placeholder="Enter Datum X" />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item
-                name="datumY"
+              <Form.Item 
+                name="datum_y"
                 label={<Text strong>Datum Y Axis</Text>}
+                rules={[{ required: true, message: 'Please enter Datum Y' }]}
               >
-                <Input placeholder="Ex: 0 at the job center" />
+                <Input placeholder="Enter Datum Y" />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item
-                name="datumZ"
+              <Form.Item 
+                name="datum_z"
                 label={<Text strong>Datum Z Axis</Text>}
+                rules={[{ required: true, message: 'Please enter Datum Z' }]}
               >
-                <Input placeholder="Ex: +0.25mm at top of the job" />
+                <Input placeholder="Enter Datum Z" />
               </Form.Item>
             </Col>
           </Row>
         </Card>
 
-        {/* Work Holding Instructions */}
+        {/* Work Instructions */}
         <Card 
-          title={<Title level={5}>Work Holding Instructions</Title>}
+          title={
+            <Input
+              value={editableCardTitles.workInstructions}
+              onChange={(e) => handleCardTitleChange('workInstructions', e.target.value)}
+              bordered={false}
+              className="text-lg font-medium"
+            />
+          }
           className="shadow-sm"
         >
           <div className="space-y-4">
-            {instructions.map((instruction) => (
-              <Card 
-                key={instruction.id}
-                size="small"
-                className="border-l-4 border-l-blue-500"
-              >
-                <div className="mb-3">
-                  <Form.Item
-                    name={['instructions', instruction.id, 'title']}
-                    initialValue={instruction.title}
-                  >
-                    <Input 
-                      placeholder="Enter section title"
-                      className="font-medium text-lg"
-                      bordered={false}
-                      style={{ paddingLeft: 0 }}
-                    />
-                  </Form.Item>
-                </div>
-                <Form.Item
-                  name={['instructions', instruction.id, 'content']}
-                >
-                  <ReactQuill 
-                    theme="snow"
-                    style={{ 
-                      height: '150px',
-                      marginBottom: '40px'
-                    }}
-                    modules={{
-                      toolbar: [
-                        ['bold', 'italic', 'underline'],
-                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        ['clean']
-                      ]
-                    }}
-                    placeholder="Enter instructions points here..."
-                  />
-                </Form.Item>
-              </Card>
+            {workInstructions.map((instruction) => (
+              <div key={instruction.id} className="border rounded-lg p-4">
+                <Input
+                  value={instruction.title}
+                  onChange={(e) => {
+                    const newInstructions = workInstructions.map(inst =>
+                      inst.id === instruction.id ? { ...inst, title: e.target.value } : inst
+                    );
+                    setWorkInstructions(newInstructions);
+                  }}
+                  className="mb-2 font-medium"
+                />
+                <ReactQuill
+                  theme="snow"
+                  value={instruction.content}
+                  onChange={(content) => {
+                    const newInstructions = workInstructions.map(inst =>
+                      inst.id === instruction.id ? { ...inst, content } : inst
+                    );
+                    setWorkInstructions(newInstructions);
+                  }}
+                  modules={{
+                    toolbar: [
+                      ['bold', 'italic', 'underline'],
+                      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                      ['clean']
+                    ]
+                  }}
+                  placeholder="Enter instructions points here..."
+                />
+              </div>
             ))}
-
-            {/* Add New Section Button */}
             <Button 
               type="dashed" 
-              block
-              icon={<PlusOutlined />}
               onClick={() => {
-                setInstructions([
-                  ...instructions,
+                setWorkInstructions([
+                  ...workInstructions,
                   {
-                    id: instructions.length + 1,
-                    title: '',
+                    id: workInstructions.length + 1,
+                    title: `New Section ${workInstructions.length + 1}`,
                     content: ''
                   }
                 ]);
-              }}
+              }} 
+              block
+              icon={<PlusOutlined />}
             >
               Add New Section
             </Button>
@@ -178,73 +266,38 @@ const OperationMPPDetails = ({ operation, onUpdate }) => {
 
         {/* Operation Images */}
         <Card 
-          title={<Title level={5}>Operation Images</Title>}
+          title={
+            <Input
+              value={editableCardTitles.images}
+              onChange={(e) => handleCardTitleChange('images', e.target.value)}
+              bordered={false}
+              className="text-lg font-medium"
+            />
+          }
           className="shadow-sm"
         >
-          <Form.Item name="images">
-            <Upload
-              listType="picture-card"
-              multiple
-              maxCount={4}
-              onPreview={handlePreview}
-              beforeUpload={(file) => {
-                // Add name input before upload
-                return new Promise((resolve, reject) => {
-                  Modal.confirm({
-                    title: 'Image Name',
-                    content: (
-                      <Input 
-                        placeholder="Enter image name"
-                        onChange={(e) => file.customName = e.target.value}
-                      />
-                    ),
-                    onOk: () => {
-                      if (file.customName) {
-                        resolve(file);
-                      } else {
-                        message.error('Please enter an image name');
-                        reject();
-                      }
-                    },
-                    onCancel: () => reject(),
-                  });
-                });
-              }}
-            >
-              <div>
-                <PlusOutlined />
-                <div style={{ marginTop: 8 }}>Upload</div>
-              </div>
-            </Upload>
-          </Form.Item>
+          <Upload
+            listType="picture-card"
+            showUploadList={{ showPreviewIcon: true, showRemoveIcon: true }}
+          >
+            <div>
+              <PlusOutlined />
+              <div style={{ marginTop: 8 }}>Upload</div>
+            </div>
+          </Upload>
         </Card>
 
-        {/* Save Button */}
+        {/* Save Changes Button */}
         <div className="flex justify-end mt-6">
           <Button 
-            type="primary"
-            icon={<SaveOutlined />}
-            size="large"
-            onClick={() => form.submit()}
+            type="primary" 
+            onClick={handleSave}
+            loading={isLoading}
           >
             Save Changes
           </Button>
         </div>
       </Form>
-
-      {/* Image Preview Modal */}
-      <Modal
-        visible={previewVisible}
-        title={previewTitle}
-        footer={null}
-        onCancel={() => setPreviewVisible(false)}
-      >
-        <img
-          alt="preview"
-          style={{ width: '100%' }}
-          src={previewImage}
-        />
-      </Modal>
     </div>
   );
 };

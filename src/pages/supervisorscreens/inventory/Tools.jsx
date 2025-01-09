@@ -255,20 +255,21 @@ const columns = [
   ];
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="inventory-title">Tools Inventory</h2>
-        <Space size="middle">
+    <div className="p-2">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-700">Tools Inventory</h2>
+        <Space size="small">
           <Button
             icon={<PlusOutlined />}
-            className="primary-button"
+            type="primary"
+            className="bg-blue-500 hover:bg-blue-600 border-none shadow-sm"
             onClick={showModal}
           >
             Add Tool
           </Button>
           <Button
             icon={<DownloadOutlined />}
-            className="download-button"
+            className="border-blue-500 text-blue-500 hover:text-blue-600 hover:border-blue-600"
             onClick={handleDownloadData}
           >
             Export
@@ -278,7 +279,10 @@ const columns = [
             showUploadList={false}
             beforeUpload={handleFileUpload}
           >
-            <Button icon={<UploadOutlined />} className="upload-button">
+            <Button 
+              icon={<UploadOutlined />}
+              className="border-green-500 text-green-500 hover:text-green-600 hover:border-green-600"
+            >
               Import
             </Button>
           </Upload>
@@ -288,22 +292,22 @@ const columns = [
       <Table 
         columns={columns} 
         dataSource={toolsData}
-        className="inventory-table"
+        className="shadow-sm rounded-lg overflow-hidden"
         pagination={{ 
           pageSize: 10,
           showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-          className: "pagination-custom"
+          className: "bg-white px-4 py-2"
         }}
         scroll={{ x: 'max-content' }}
-        rowClassName="hover:bg-gray-50"
+        rowClassName="hover:bg-gray-50 transition-colors"
       />
 
       <Modal
-        title={<span className="text-lg font-semibold">Add New Tool</span>}
+        title={<span className="text-lg font-semibold text-gray-700">Add New Tool</span>}
         open={isModalVisible}
         onCancel={handleCancel}
         footer={null}
-        width={600}
+        width={500}
         className="custom-modal"
       >
         <Form
@@ -353,10 +357,17 @@ const columns = [
 
           <Form.Item>
             <Space className="w-full justify-end">
-              <Button className="secondary-button" onClick={handleCancel}>
+              <Button 
+                onClick={handleCancel}
+                className="hover:bg-gray-100"
+              >
                 Cancel
               </Button>
-              <Button className="primary-button" htmlType="submit">
+              <Button 
+                type="primary"
+                htmlType="submit"
+                className="bg-blue-500 hover:bg-blue-600 border-none"
+              >
                 Add Tool
               </Button>
             </Space>

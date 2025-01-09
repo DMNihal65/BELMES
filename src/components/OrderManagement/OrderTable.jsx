@@ -1,24 +1,16 @@
+
 import React from 'react';
-import { Table, Button, Tag, Space } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Table, Tag, Badge, Button, Space, Tooltip } from 'antd';
+import { EyeOutlined } from '@ant-design/icons';
+import { message } from 'antd';
 
-const OrderTable = ({ orders, onReorder, showReorderButton = false, isReorderList = false }) => {
-  // Define status colors
-  const statusColors = {
-    in_progress: 'blue',
-    pending: 'orange',
-    completed: 'green',
-    delayed: 'red'
+const OrderTable = ({ orders }) => {
+  // Handle view action
+  const handleViewDetails = (record) => {
+    message.info(`Viewing details for order ${record.orderNumber}`);
+    // Implement view logic
   };
 
-  // Define priority colors
-  const priorityColors = {
-    high: 'red',
-    medium: 'orange',
-    low: 'green'
-  };
-
-  // Define columns before using them
   const columns = [
     {
       title: 'SI.No',
@@ -28,116 +20,161 @@ const OrderTable = ({ orders, onReorder, showReorderButton = false, isReorderLis
       fixed: 'left',
     },
     {
-      title: 'Order Number',
-      dataIndex: 'orderNumber',
-      key: 'orderNumber',
-      render: (text) => <a>{text}</a>,
-      sorter: (a, b) => a.orderNumber.localeCompare(b.orderNumber),
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+      sorter: (a, b) => a.part_number.localeCompare(b.part_number),
+      searchable: true,
     },
     {
-      title: 'Part Number',
-      dataIndex: 'partNumber',
-      key: 'partNumber',
-      sorter: (a, b) => a.partNumber.localeCompare(b.partNumber),
+      title: 'Production Order',
+      dataIndex: 'production_order',
+      key: 'production_order',
+      render: (text) => <a>{text}</a>,
+      sorter: (a, b) => a.production_order.localeCompare(b.production_order),
     },
     {
       title: 'Material Description',
-      dataIndex: 'materialDescription',
-      key: 'materialDescription',
-      ellipsis: true,
-    },
-    {
-      title: 'Target Qty',
-      dataIndex: 'targetQuantity',
-      key: 'targetQuantity',
-      sorter: (a, b) => a.targetQuantity - b.targetQuantity,
-    },
-    {
-      title: 'Launched Qty',
-      dataIndex: 'launchedQuantity',
-      key: 'launchedQuantity',
-      sorter: (a, b) => a.launchedQuantity - b.launchedQuantity,
-    },
-    {
-      title: 'Plant',
-      dataIndex: 'plant',
-      key: 'plant',
-      filters: [
-        { text: 'Plant-01', value: 'Plant-01' },
-        { text: 'Plant-02', value: 'Plant-02' },
-        { text: 'Plant-03', value: 'Plant-03' },
-      ],
-      onFilter: (value, record) => record.plant === value,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={statusColors[status]}>
-          {status.replace('_', ' ').toUpperCase()}
-        </Tag>
+      dataIndex: 'part_description',
+      key: 'part_description',
+      render: (text) => (
+        <div className="font-medium">{text}</div>
       ),
-      filters: [
-        { text: 'In Progress', value: 'in_progress' },
-        { text: 'Pending', value: 'pending' },
-        { text: 'Completed', value: 'completed' },
-        { text: 'Delayed', value: 'delayed' },
-      ],
-      onFilter: (value, record) => record.status === value,
     },
     {
-      title: 'Priority',
-      dataIndex: 'priority',
-      key: 'priority',
-      render: (priority) => (
-        <Tag color={priorityColors[priority]}>
-          {priority.toUpperCase()}
-        </Tag>
+      title: 'Quantity',
+      key: 'quantity',
+      render: (_, record) => (
+        <div>
+          <div>Target: {record.required_quantity}</div>
+          <div className="text-xs text-gray-500">
+            Launched: {record.launched_quantity || 0}
+          </div>
+         
+        </div>
       ),
-      filters: [
-        { text: 'High', value: 'high' },
-        { text: 'Medium', value: 'medium' },
-        { text: 'Low', value: 'low' },
-      ],
-      onFilter: (value, record) => record.priority === value,
+      sorter: (a, b) => a.required_quantity - b.required_quantity,
+    },
+    {
+      title: 'WBS Element',
+      dataIndex: 'wbs_element',
+      key: 'wbs_element',
+    },
+    {
+      title: 'Sales Order',
+      dataIndex: 'sale_order',
+      key: 'sale_order',
+    },
+    {
+      title: 'Project',
+      key: 'project',
+      render: (_, record) => (
+        <div>
+          <div>{record.project?.name}</div>
+          <Tag color={record.project?.priority === 1 ? 'red' : 'blue'}>
+            Priority: {record.project?.priority}
+          </Tag>
+        </div>
+      ),
     },
     {
       title: 'Delivery Date',
       dataIndex: 'deliveryDate',
       key: 'deliveryDate',
+      render: (date) => new Date(date).toLocaleDateString(),
       sorter: (a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate),
-    }
-  ];
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      render: (_, record) => {
+        const status = record.status || 'pending';
+        const statusColors = {
+          in_progress: 'processing',
+          completed: 'success',
+          delayed: 'error',
+          pending: 'default'
+        };
+        return (
+          <Badge
+            status={statusColors[status]}
+            text={status.replace('_', ' ').toUpperCase()}
+          />
+        );
+      },
+      filters: [
+        { text: 'In Progress', value: 'in_progress' },
+        { text: 'Completed', value: 'completed' },
+        { text: 'Delayed', value: 'delayed' },
+      ],
+      onFilter: (value, record) => record.status === value,
+    },
+    // {
+    //   title: 'Priority',
+    //   key: 'priority',
+    //   render: (_, record) => {
+    //     const priority = record.project?.priority;
+    //     let displayPriority = 'normal';
+    //     let tagColor = 'blue';
 
-  // Add reorder button column if needed
-  if (showReorderButton && !isReorderList) {
-    columns.push({
-      title: 'Action',
-      key: 'action',
+    //     if (priority === 1) {
+    //       displayPriority = 'high';
+    //       tagColor = 'red';
+    //     } else if (priority === 2) {
+    //       displayPriority = 'medium';
+    //       tagColor = 'orange';
+    //     } else if (priority === 3) {
+    //       displayPriority = 'low';
+    //       tagColor = 'blue';
+    //     }
+
+    //     return (
+    //       <Tag color={tagColor}>
+    //         {displayPriority.toUpperCase()}
+    //       </Tag>
+    //     );
+    //   },
+    //   filters: [
+    //     { text: 'High', value: 1 },
+    //     { text: 'Medium', value: 2 },
+    //     { text: 'Low', value: 3 },
+    //   ],
+    //   onFilter: (value, record) => record.project?.priority === value,
+    // },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 100,
+      fixed: 'right',
       render: (_, record) => (
-        <Space size="middle">
-          <Button 
-            icon={<ReloadOutlined />}
-            onClick={() => onReorder(record)}
-            type="primary"
-          >
-            Reorder
-          </Button>
+        <Space>
+          <Tooltip title="View Details">
+            <Button
+              icon={<EyeOutlined />}
+              size="small"
+              onClick={() => handleViewDetails(record)}
+            />
+          </Tooltip>
         </Space>
       ),
-    });
-  }
+    },
+  ];
 
   return (
     <Table
       columns={columns}
       dataSource={orders}
-      scroll={{ x: 1300 }}
+      rowKey="id"
+      scroll={{ x: 1300, y: 'calc(100vh - 460px)' }}
+      rowClassName={(record) =>
+        record.project?.priority === 1 ? 'bg-red-50' : ''
+      }
       pagination={{
-        pageSize: 10,
+        defaultPageSize: 10,
         showSizeChanger: true,
-        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+        showQuickJumper: true,
+        showTotal: (total) => `Total ${total} orders`,
+        position: ['bottomCenter']
       }}
     />
   );

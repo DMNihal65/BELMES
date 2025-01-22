@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Table, Tag, Badge, Card, Space, Button, Tooltip, Select, Timeline,Statistic } from 'antd';
-import { AlertTriangle, Bell, CheckCircle2, Clock, AlertOctagon } from 'lucide-react';
+import { Table, Tag, Badge, Card, Space, Button, Tooltip, Select, Timeline, Statistic } from 'antd';
+import { AlertTriangle, Bell, CheckCircle2, Clock, AlertOctagon, ReloadOutlined } from 'lucide-react';
 
 const ProductionAlerts = ({ machineData, timeRange, dateRange }) => {
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [selectedMachines, setSelectedMachines] = useState(['all']);
+  const [loading, setLoading] = useState(false);
 
   // Mock alerts data - In real app, this would come from an API
   const alerts = [
@@ -151,6 +153,52 @@ const ProductionAlerts = ({ machineData, timeRange, dateRange }) => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Machine Selection and Time Controls */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Production Alerts</h1>
+          <Select
+            mode="multiple"
+            style={{ width: '300px' }}
+            placeholder="Select Machines"
+            defaultValue={['all']}
+            onChange={setSelectedMachines}
+            options={[
+              { value: 'all', label: 'All Machines' },
+              ...machineData.map(m => ({ value: m.id, label: `${m.name} (${m.id})` })),
+            ]}
+          />
+        </div>
+        <Space size="large">
+          <Select
+            value={timeRange}
+            style={{ width: '120px' }}
+            onChange={setTimeRange}
+            options={[
+              { value: 'shift1', label: 'Shift 1' },
+              { value: 'shift2', label: 'Shift 2' },
+              { value: 'shift3', label: 'Shift 3' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+          />
+          {timeRange === 'custom' && (
+            <RangePicker
+              showTime
+              format="YYYY-MM-DD HH:mm"
+              onChange={setDateRange}
+            />
+          )}
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => window.location.reload()}
+          >
+            Refresh
+          </Button>
+        </Space>
+      </div>
+
       {/* Alert Summary Cards */}
       <div className="grid grid-cols-4 gap-4">
         <Card bordered={false} className="bg-red-50">

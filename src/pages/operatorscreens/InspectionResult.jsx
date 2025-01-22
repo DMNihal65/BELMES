@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin } from 'antd';
+import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -16,6 +16,121 @@ function InspectionResult() {
   const [loading, setLoading] = useState(false);
   const [timeRange, setTimeRange] = useState([]);
   const [view, setView] = useState('table');
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+
+  const showInspectionDetails = (record) => {
+    setSelectedRecord(record);
+    setIsDetailModalVisible(true);
+  };
+
+  const measurementColumns = [
+    { title: 'Sl. No.', dataIndex: 'slNo', key: 'slNo', width: 80 },
+    { title: 'Description', dataIndex: 'description', key: 'description' },
+    { title: 'Nominal', dataIndex: 'nominal', key: 'nominal' },
+    { title: 'Upper Tol', dataIndex: 'upperTol', key: 'upperTol' },
+    { title: 'Lower Tol', dataIndex: 'lowerTol', key: 'lowerTol' },
+    { title: 'Max Value', dataIndex: 'maxValue', key: 'maxValue' },
+    { title: 'Min Value', dataIndex: 'minValue', key: 'minValue' },
+    { title: 'UOM', dataIndex: 'uom', key: 'uom' },
+    { title: 'Drg. Zone', dataIndex: 'drgZone', key: 'drgZone' },
+    { 
+      title: 'Instrument/Template/Gauge to be used', 
+      dataIndex: 'instrument', 
+      key: 'instrument' 
+    },
+    { 
+      title: 'Instrument Least Count/Template No./Gauge No.', 
+      dataIndex: 'instrumentDetails', 
+      key: 'instrumentDetails' 
+    },
+    { title: 'Measurement', dataIndex: 'measurement', key: 'measurement' },
+    { 
+      title: 'Instrument No. used', 
+      dataIndex: 'instrumentNo', 
+      key: 'instrumentNo' 
+    },
+    { 
+      title: 'Calibration Due Date', 
+      dataIndex: 'calibrationDue', 
+      key: 'calibrationDue' 
+    },
+    { 
+      title: 'Status', 
+      key: 'status', 
+      render: (_, record) => {
+        const measurement = parseFloat(record.measurement);
+        const nominal = parseFloat(record.nominal);
+        const upperTol = parseFloat(record.upperTol);
+        const lowerTol = parseFloat(record.lowerTol);
+        
+        if (record.measurement === 'OK') return <Tag color="success">OK</Tag>;
+        if (!measurement || !nominal) return <Tag>N/A</Tag>;
+        
+        const isWithinTolerance = measurement >= (nominal + lowerTol) && 
+                                 measurement <= (nominal + upperTol);
+        
+        return isWithinTolerance ? 
+          <Tag color="success">Within Tolerance</Tag> : 
+          <Tag color="error">Out of Tolerance</Tag>;
+      }
+    }
+  ];
+
+  // Mock measurement data
+  const mockMeasurementData = [
+    {
+      key: '1',
+      slNo: '1',
+      description: 'Diameter',
+      nominal: '2.50',
+      upperTol: '0.10',
+      lowerTol: '-0.10',
+      maxValue: '2.60',
+      minValue: '2.40',
+      uom: 'mm',
+      drgZone: '-',
+      instrument: 'Digital Vernier',
+      instrumentDetails: '0.01',
+      measurement: '2.5005',
+      instrumentNo: 'L4-1367',
+      calibrationDue: '27-05-2023'
+    },
+    {
+      key: '2',
+      slNo: '2',
+      description: 'Depth',
+      nominal: '6.00',
+      upperTol: '0.10',
+      lowerTol: '-0.10',
+      maxValue: '6.10',
+      minValue: '5.90',
+      uom: 'mm',
+      drgZone: '-',
+      instrument: 'Digital Vernier',
+      instrumentDetails: '0.01',
+      measurement: '5.020',
+      instrumentNo: 'L4-1367',
+      calibrationDue: '27-05-2023'
+    },
+    {
+      key: '3',
+      slNo: '3',
+      description: 'Thread',
+      nominal: '4.00',
+      upperTol: '-',
+      lowerTol: '-',
+      maxValue: '-',
+      minValue: '-',
+      uom: 'mm',
+      drgZone: '-',
+      instrument: 'Thread Plug Gauge',
+      instrumentDetails: 'M4',
+      measurement: 'OK',
+      instrumentNo: 'L5-17255',
+      calibrationDue: '12-03-2023'
+    }
+  ];
 
   // Enhanced mock part numbers with "All Parts" option
   const partNumbers = [
@@ -100,6 +215,7 @@ function InspectionResult() {
       date: '2024-12-19',
       partNumber: 'PA-0678',
       operator: 'John Doe',
+      operationNumber: 'OP-101',
       result: 'Pass',
       deviations: 0,
       remarks: 'All parameters within specification',
@@ -109,6 +225,7 @@ function InspectionResult() {
       date: '2024-12-19',
       partNumber: 'PA-0678',
       operator: 'John Doe',
+      operationNumber: 'OP-102',
       result: 'Fail',
       deviations: 2,
       remarks: 'Dimension out of tolerance',
@@ -118,6 +235,7 @@ function InspectionResult() {
       date: '2024-12-18',
       partNumber: 'PA-0678',
       operator: 'Jane Smith',
+      operationNumber: 'OP-101',
       result: 'Pass',
       deviations: 1,
       remarks: 'Minor surface finish variation',
@@ -141,6 +259,11 @@ function InspectionResult() {
       title: 'Operator',
       dataIndex: 'operator',
       key: 'operator',
+    },
+    {
+      title: 'Operation Number',
+      dataIndex: 'operationNumber',
+      key: 'operationNumber',
     },
     {
       title: 'Result',
@@ -348,6 +471,69 @@ function InspectionResult() {
           />
         </Card>
       </div>
+
+      <Modal
+    title="Inspection Details"
+    visible={isDetailModalVisible}
+    onCancel={() => setIsDetailModalVisible(false)}
+    width={1200}
+    footer={[
+      <Button key="close" onClick={() => setIsDetailModalVisible(false)}>
+        Close
+      </Button>
+    ]}
+  >
+    {selectedRecord && (
+      <div className="space-y-6">
+        {/* Header Information Card */}
+        <Card className="bg-gray-50">
+          <Row gutter={[24, 16]}>
+            <Col span={6}>
+              <Text strong>Operator Number:</Text>
+              <div>{selectedRecord.operationNumber}</div>
+            </Col>
+            <Col span={6}>
+              <Text strong>Operator:</Text>
+              <div>{selectedRecord.operator}</div>
+            </Col>
+            <Col span={6}>
+              <Text strong>IPID:</Text>
+              <div>{selectedRecord.ipidNo || 'IPID-' + selectedRecord.key}</div>
+            </Col>
+            <Col span={6}>
+              <Text strong>Part Number:</Text>
+              <div>{selectedRecord.partNumber}</div>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* Measurements Table Card */}
+        <Card title="Measurements">
+          <Table
+            columns={measurementColumns}
+            dataSource={mockMeasurementData}
+            pagination={false}
+            bordered
+            size="middle"
+            scroll={{ x: 'max-content' }}
+            rowClassName={(record) => {
+              const measurement = parseFloat(record.measurement);
+              const maxValue = parseFloat(record.maxValue);
+              const minValue = parseFloat(record.minValue);
+              
+              // Only apply red background if measurement is numeric and out of range
+              if (!isNaN(measurement) && !isNaN(maxValue) && !isNaN(minValue)) {
+                if (measurement > maxValue || measurement < minValue) {
+                  return 'bg-red-100';
+                }
+              }
+              return '';
+            }}
+          />
+        </Card>
+      </div>
+    )}
+  </Modal>
     </div>
   );
 }

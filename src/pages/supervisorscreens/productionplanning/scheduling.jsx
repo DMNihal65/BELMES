@@ -37,6 +37,24 @@ const timelineStyles = {
     borderWidth: '1px',
     fontSize: '12px',
     color: '#fff',
+    height: '34px !important',
+  },
+  '.vis-item.single-machine': {
+    height: '80px !important', // Increased height when single machine selected
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  '.vis-item .timeline-item': {
+    padding: '4px 8px',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  '.vis-item .item-header': {
+    fontWeight: '500',
+    fontSize: '14px',
   },
   '.vis-item.vis-selected': {
     borderColor: '#1890ff',
@@ -238,6 +256,10 @@ const Scheduling = () => {
         if (selectedMachines.length > 0) {
           operations = operations.filter(op => selectedMachines.includes(op.machine));
         }
+
+        if (selectedComponents.length > 0) {
+          operations = operations.filter(op => selectedComponents.includes(op.component));
+        }
         
         if (dateRange && dateRange[0] && dateRange[1]) {
           operations = operations.filter(op => {
@@ -264,8 +286,8 @@ const Scheduling = () => {
             content: `
               <div class="timeline-item">
                 <div class="item-header">${op.component}</div>
-                <div class="item-desc">${op.description}</div>
-                <div class="item-qty">${op.quantity}</div>
+                <!-- <div class="item-desc">${op.description}</div> -->
+                <!-- <div class="item-qty">${op.quantity}</div> -->
               </div>
             `,
             start: new Date(op.start_time),
@@ -303,8 +325,14 @@ const Scheduling = () => {
         styleElementRef.current = styleElement;
 
         // Create groups
+        // const groups = new DataSet(
+        //   availableMachines.map(machine => ({
+        //     id: machine,
+        //     content: machine
+        //   }))
+        // );
         const groups = new DataSet(
-          availableMachines.map(machine => ({
+          (selectedMachines.length > 0 ? selectedMachines : availableMachines).map(machine => ({
             id: machine,
             content: machine
           }))
@@ -318,9 +346,9 @@ const Scheduling = () => {
           horizontalScroll: true,
           zoomKey: 'ctrlKey',
           orientation: 'top',
-          height: '450px',
+          height: '560px',
           margin: {
-            item: { horizontal: 10, vertical: 5 },
+            item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
             axis: 5
           },
           start: timeRange.start,
@@ -582,9 +610,22 @@ const Scheduling = () => {
     }
   };
 
+  const handleRefresh = () => {
+    // Reset all filters
+    setSelectedMachines([]);
+    setSelectedComponents([]);
+    setDateRange([
+      moment().startOf('month'),
+      moment().endOf('month')
+    ]);
+    // Fetch fresh data
+    fetchScheduleData();
+  };
+  
+
   return (
     <Layout className="min-h-screen bg-gray-50">
-      <Content className="p-8">
+      <Content className="p-3">
         <Tabs defaultActiveKey="schedule" type="card">
           <TabPane 
             tab={ 
@@ -609,11 +650,83 @@ const Scheduling = () => {
                   </Select>
                 </Space>
                 <Space>
-                  <DatePicker.RangePicker
-                    value={dateRange}
-                    onChange={setDateRange}
-                    placeholder={['Start Date', 'End Date']}
-                  />
+                <DatePicker.RangePicker
+  // value={dateRange}
+  onChange={(dates, dateStrings) => {
+    if (dates) {
+      const [start, end] = dates;
+      switch (viewType) {
+        case 'month':
+          // Set to first and last day of selected months
+          setDateRange([
+            start.startOf('month'),
+            end.endOf('month')
+          ]);
+          break;
+        case 'week':
+          // Allow day-to-day selection within weeks
+          setDateRange([
+            start.startOf('day'),  // Changed from startOf('week')
+            end.endOf('day')       // Changed from endOf('week')
+          ]);
+          break;
+        case 'day':
+          // Set to start and end of selected days
+          setDateRange([
+            start.startOf('day'),
+            end.endOf('day')
+          ]);
+          break;
+      }
+    } else {
+      setDateRange(null);
+    }
+  }}
+  placeholder={['Start Date', 'End Date']}
+  picker={viewType === 'month' ? 'month' : 'date'}  // Changed: always use 'date' for week view
+  showTime={false}
+  format={
+    viewType === 'month' 
+      ? 'YYYY MMM'
+      : 'YYYY-MM-DD'  // Changed: use same format for week and day views
+  }
+  allowClear={true}
+  ranges={{
+    'Today': [moment().startOf('day'), moment().endOf('day')],
+    'This Week': [moment().startOf('week'), moment().endOf('week')],
+    'This Month': [moment().startOf('month'), moment().endOf('month')],
+    'Next Month': [
+      moment().add(1, 'month').startOf('month'),
+      moment().add(1, 'month').endOf('month')
+    ]
+  }}
+  onOpenChange={(open) => {
+    // Reset to current date range if cleared
+    if (!open && !dateRange) {
+      const now = moment();
+      switch (viewType) {
+        case 'month':
+          setDateRange([
+            now.clone().startOf('month'),
+            now.clone().endOf('month')
+          ]);
+          break;
+        case 'week':
+          setDateRange([
+            now.clone().startOf('day'),  // Changed from startOf('week')
+            now.clone().endOf('day')     // Changed from endOf('week')
+          ]);
+          break;
+        case 'day':
+          setDateRange([
+            now.clone().startOf('day'),
+            now.clone().endOf('day')
+          ]);
+          break;
+      }
+    }
+  }}
+/>
                   <Select 
                     mode="multiple" 
                     placeholder="Select Machines"
@@ -629,7 +742,7 @@ const Scheduling = () => {
 
                   <Select
                       mode="multiple"
-                      placeholder="Select Components"
+                      placeholder="Select Part Number"
                       value={selectedComponents}
                       onChange={setSelectedComponents}
                       style={{ minWidth: 200 }}
@@ -663,7 +776,7 @@ const Scheduling = () => {
                   <Button 
                     type="primary"
                     icon={<SyncOutlined />}
-                    onClick={fetchScheduleData}
+                    onClick={handleRefresh} 
                   >
                     Refresh
                   </Button>
@@ -674,7 +787,7 @@ const Scheduling = () => {
                 ref={timelineContainerRef} 
                 className="schedule-timeline"
                 style={{ 
-                  height: '500px',
+                  height: '580px',
                   backgroundColor: '#fff',
                   padding: '20px',
                   borderRadius: '8px',
@@ -701,6 +814,7 @@ const Scheduling = () => {
                       machine={machine}
                       operations={scheduleData.scheduled_operations.filter(op => op.machine === machine)}
                       componentStatus={scheduleData.component_status}
+                      componentColors={componentColors} 
                     />
                   </Col>
                 ))}
@@ -826,7 +940,7 @@ const Scheduling = () => {
 };
 
 // New MachineStatusCard component
-const MachineStatusCard = ({ machine, operations, componentStatus }) => {
+const MachineStatusCard = ({ machine, operations, componentStatus, componentColors }) => {
   const currentOperation = operations.find(op => 
     new Date(op.start_time) <= new Date() && 
     new Date(op.end_time) >= new Date()
@@ -853,33 +967,51 @@ const MachineStatusCard = ({ machine, operations, componentStatus }) => {
       }}
     >
       <div className="flex justify-between items-start">
-        <div>
-          <div className="font-medium text-base">{machine}</div>  {/* Increased font size */}
-          <div className="text-sm text-gray-500">  {/* Increased font size */}
-            {currentOperation ? `Processing: ${currentOperation.component}` : 'No active operation'}
-          </div>
-        </div>
-        <Badge 
-          status={status === 'running' ? 'success' : 'warning'} 
-          text={status.toUpperCase()}
+  <div>
+    <div className="font-medium text-base">{machine}</div>
+    <div className="text-sm text-gray-500 flex items-center gap-2">
+      {currentOperation && (
+        <span 
+          className="inline-block w-3 h-3 rounded-sm"
+          style={{ 
+            backgroundColor: componentColors?.[currentOperation.component]?.backgroundColor || '#999',
+          }} 
         />
-      </div>
+      )}
+       <span className="font-normal text-base">  {/* Changed from text-gray-500 to text-gray-900 for darker text */}
+      {currentOperation ? `Part Number: ${currentOperation.component}` : 'No active operation'}
+    </span>
+    </div>
+    {/* {currentOperation && (
+  <div className="text-sm mt-1 flex items-center">
+    <span className="text-gray-700 text-base">Operation: </span>
+    <span className="text-gray-900 ml-1 truncate font-normal text-base" style={{ maxWidth: '75%' }}>
+      {currentOperation.description}
+    </span>
+  </div>
+)} */}
+  </div>
+  <Badge 
+    status={status === 'running' ? 'success' : 'warning'} 
+    text={status.toUpperCase()}
+  />
+</div>
       
       {currentOperation && componentStatus && (
         <div className="mt-auto">
-          <div className="text-sm flex justify-between mb-2">  {/* Increased spacing and font size */}
-            <span className="truncate" style={{ maxWidth: '75%' }}>  {/* Increased from 70% to 75% */}
-              {currentOperation.description}
+          <div className="text-sm flex justify-between mb-2">  
+            <span className="truncate font-normal text-base" style={{ maxWidth: '75%' }}>  
+             Operation: {currentOperation.description}
             </span>
-            <Tag color={componentStatus.on_time ? 'success' : 'error'}>
+            {/* <Tag color={componentStatus.on_time ? 'success' : 'error'}>
               {Math.round((componentStatus.completed_quantity / componentStatus.total_quantity) * 100)}%
-            </Tag>
+            </Tag> */}
           </div>
-          <Progress 
+          {/* <Progress 
             percent={Math.round((componentStatus.completed_quantity / componentStatus.total_quantity) * 100)}
             size="small"
             status={componentStatus.on_time ? 'success' : 'exception'}
-          />
+          /> */}
         </div>
       )}
     </Card>

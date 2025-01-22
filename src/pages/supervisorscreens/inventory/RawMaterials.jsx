@@ -1,14 +1,24 @@
-import React, { useState } from 'react';
-import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col,  Input as AntInput  } from 'antd';
-import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col,  Input as AntInput,  Drawer, Checkbox, Slider, Select, DatePicker   } from 'antd';
+import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined, FilterOutlined  } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
 
-const RawMaterials = () => {
+const RawMaterials = ({filters }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [editingKey, setEditingKey] = useState(null);
   const [searchText, setSearchText] = useState('');
+  const [filteredData, setFilteredData] = useState([]);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState({}); 
+  const [selectedOrderID, setSelectedOrderId] = useState([]);
+  const [selectedPartNumber, setSelectedPartNumber] = useState([]);
+  const [selectedDescription, setSelectedDescription] = useState([]);
+  const [selectedStock, setSelectedStock] = useState([0, 100]);
+  const [selectedUnitID, setSelectedUnitID] = useState([]);
+  const [selectedAvailableFrom, setSelectedAvailableFrom] = useState([]);
+  const [selectedStatus, setSelectedStatus] = useState([]);
   const [RawMaterialsData, setRawMaterialsData] = useState([
     {
       key: '1',
@@ -35,15 +45,90 @@ const RawMaterials = () => {
     // ... other existing data ...
   ]);
 
+  const showDrawer = () => {
+    setSelectedFilters({}); // Reset selected filters when opening the drawer
+    form.resetFields();
+    setIsDrawerVisible(true);
+  };
+
+  const closeDrawer = () => {
+    if (!Object.keys(selectedFilters).length) {
+      // If no filters are applied, reset the data to original state
+      setFilteredData(RawMaterialsData);
+    }
+    setIsDrawerVisible(false);
+  };
+
+  const handleCheckboxChange = (column, values) => {
+    setSelectedFilters(prev => ({ ...prev, [column]: values })); // Update selected filters
+  };
+
+  const handleSliderChange = (column, values) => {
+    setSelectedFilters(prev => ({ ...prev, [column]: values })); // Update selected filters
+  };
+
+  const applyFilters = () => {
+    try {
+        const filtered = RawMaterialsData.filter(item => {
+            return Object.keys(selectedFilters).every(column => {
+                const filterValue = selectedFilters[column];
+                if (!filterValue) return true;
+                
+                // Add date range handling
+                if (column === 'available_from') {
+                  const itemDate = dayjs(item[column]).format('YYYY-MM-DD');
+                  return itemDate === filterValue;
+              }
+                
+                if (Array.isArray(filterValue)) {
+                    return filterValue.includes(item[column]);
+                } else if (typeof filterValue === 'object') {
+                    const itemValue = parseFloat(item[column]);
+                    return itemValue >= filterValue[0] && itemValue <= filterValue[1];
+                }
+                return true;
+            });
+        });
+        setFilteredData(filtered);
+        closeDrawer();
+    } catch (error) {
+        message.error(`Error applying filters: ${error.message}`);
+        console.error(error);
+    }
+};
+
+  const resetFilters = () => {
+    setSelectedFilters({}); // Reset selected filters
+    setFilteredData(RawMaterialsData); // Reset table data
+    setSelectedOrderId([]);
+    setSelectedPartNumber([]);
+    setSelectedDescription([]);
+    setSelectedStock([0, 100]);
+    setSelectedUnitID([]);
+    setSelectedAvailableFrom([]);
+    setSelectedStatus([]);
+    form.resetFields(); // Reset form fields in the drawer
+    setIsDrawerVisible(false);
+    message.success('Filters have been reset');
+  };
+
+  useEffect(() => {
+    if (!isDrawerVisible) {
+      // Reset form and selected filters when drawer closes
+      form.resetFields();
+      setSelectedFilters({});
+    }
+  }, [isDrawerVisible, form]);
+
   const handleGlobalSearch = (value) => {
     setSearchText(value);
   };
 
   // Modify the columns array to work with global search
   const getFilteredData = () => {
-    if (!searchText) return RawMaterialsData;
+    if (!searchText) return filteredData;
 
-    return RawMaterialsData.filter(item => {
+    return filteredData.filter(item => {
       return Object.keys(item).some(key => {
         const value = item[key]?.toString().toLowerCase();
         return value?.includes(searchText.toLowerCase());
@@ -226,6 +311,17 @@ const columns = [
     },
   ];
 
+  useEffect(() => {
+    if (filters?.status) {
+      const filtered = RawMaterialsData.filter(item => 
+        item.status.toLowerCase() === filters.status.toLowerCase()
+      );
+      setFilteredData(filtered);
+    } else {
+      setFilteredData(RawMaterialsData);
+    }
+  }, [filters, RawMaterialsData]);
+
   return (
     <div>
       <Card 
@@ -238,7 +334,7 @@ const columns = [
               style={{ width: 300 }}
               allowClear
             />
-            <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
+            <Button type="primary"
           onClick={showModal}>
           Add New Tool
       </Button>
@@ -254,6 +350,13 @@ const columns = [
                 Upload Excel
               </Button>
             </Upload>
+            <Button 
+              type="primary" 
+              icon={<FilterOutlined />} 
+              onClick={showDrawer}
+            >
+              Master Filter
+            </Button>
           </Space>
         }
       >
@@ -369,6 +472,138 @@ const columns = [
           </Form.Item>
         </Form>
       </Modal>
+
+
+      <Drawer
+  title="Master Filter"
+  placement="right"
+  onClose={closeDrawer}
+  open={isDrawerVisible}
+>
+  <Form layout="vertical" form={form}>
+    {/* Categorical Filters */}
+    <Form.Item label={<span className="font-bold">Order ID</span>}>
+      <Select
+        mode="multiple"
+        allowClear
+        showSearch
+        value={selectedOrderID}
+        placeholder="Select Order ID"
+        style={{ width: '100%' }}
+        options={[...new Set(RawMaterialsData.map(item => item.order_id))].map(value => ({
+          label: value,
+          value: value,
+        }))}
+        onChange={(values) => {
+          setSelectedOrderId(values);
+          handleCheckboxChange('order_id', values);
+        }}
+        filterOption={(input, option) =>
+          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+        }
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Part Number</span>}>
+      <Select
+        mode="multiple"
+        allowClear
+        showSearch
+        value={selectedPartNumber}
+        placeholder="Select Part Number"
+        style={{ width: '100%' }}
+        options={[...new Set(RawMaterialsData.map(item => item.part_number))].map(value => ({
+          label: value,
+          value: value,
+        }))}
+        onChange={(values) => {
+          setSelectedPartNumber(values);
+          handleCheckboxChange('part_number', values);
+        }}
+        filterOption={(input, option) =>
+          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+        }
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Stock</span>}>
+      <Slider
+        range
+        value={selectedStock}
+        min={0}
+        max={Math.max(...RawMaterialsData.map(item => item.stock))}
+        onChange={(values) => {
+          setSelectedStock(values);
+          handleSliderChange('stock', values);
+        }}
+        trackStyle={[{ backgroundColor: '#1890ff' }]}
+        handleStyle={[{ borderColor: '#1890ff' }, { borderColor: '#1890ff' }]}
+        marks={{
+          0: '0',
+          [Math.max(...RawMaterialsData.map(item => item.stock))]: 
+            Math.max(...RawMaterialsData.map(item => item.stock))
+        }}
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Unit ID</span>}>
+      <Select
+        mode="multiple"
+        allowClear
+        showSearch
+        value={selectedUnitID}
+        placeholder="Select UnitID"
+        style={{ width: '100%' }}
+        options={[...new Set(RawMaterialsData.map(item => item.unit_id))].map(value => ({
+          label: value,
+          value: value,
+        }))}
+        onChange={(values) => {
+          setSelectedUnitID(values);
+          handleCheckboxChange('unit_id', values);
+        }}
+        filterOption={(input, option) =>
+          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+        }
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Available From</span>}>
+      <DatePicker
+        value={selectedAvailableFrom}
+        onChange={(date) => {
+          setSelectedAvailableFrom(date);
+          if (date) {
+            handleCheckboxChange('available_from', date.format('YYYY-MM-DD'));
+          } else {
+            handleCheckboxChange('available_from', null);
+          }
+        }}
+        style={{ width: '100%' }}
+      />
+    </Form.Item>
+
+
+    <Form.Item label={<span className="font-bold">Status</span>}>
+      <Checkbox.Group
+        options={[{ label: 'Available', value: 'Available' }, { label: 'In Use', value: 'In Use' }]}
+        onChange={values => handleCheckboxChange('status', values)}
+      />
+    </Form.Item>
+    <Form.Item>
+      <Row justify="space-between">
+        <Col>
+          <Button onClick={resetFilters}>Reset</Button>
+        </Col>
+        <Col>
+          <Button type="primary" onClick={applyFilters}>
+            Apply Filter
+          </Button>
+        </Col>
+      </Row>
+    </Form.Item>
+  </Form>
+</Drawer>
     </div>
   );
 };

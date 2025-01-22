@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Row, Col, DatePicker, Table, Space, Button, Tooltip } from 'antd';
+import { Card, Row, Col, DatePicker, Table, Space, Button, Tooltip, Select } from 'antd';
 import { Line, Column } from '@ant-design/plots';
 import { DownloadOutlined, FilterOutlined } from '@ant-design/icons';
 import moment from 'moment';
@@ -8,6 +8,9 @@ const { RangePicker } = DatePicker;
 
 const ProductionHistory = ({ data }) => {
   const [dateRange, setDateRange] = useState([moment().subtract(7, 'days'), moment()]);
+  const [selectedMachines, setSelectedMachines] = useState(['all']);
+  const [timeRange, setTimeRange] = useState('shift1');
+  const [loading, setLoading] = useState(false);
 
   const columns = [
     {
@@ -46,19 +49,50 @@ const ProductionHistory = ({ data }) => {
 
   return (
     <div className="space-y-6">
-      <Space className="w-full justify-between">
-        <RangePicker 
-          value={dateRange}
-          onChange={setDateRange}
-          allowClear={false}
-        />
-        <Space>
-          <Button icon={<FilterOutlined />}>Filter</Button>
-          <Button type="primary" icon={<DownloadOutlined />}>
-            Export Data
+      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+        <div className="flex items-center gap-4">
+         
+          <Select
+            mode="multiple"
+            style={{ width: '300px' }}
+            placeholder="Select Machines"
+            defaultValue={['all']}
+            onChange={setSelectedMachines}
+            options={[
+              { value: 'all', label: 'All Machines' },
+              ...data.map(m => ({ value: m.id, label: `${m.name} (${m.id})` })),
+            ]}
+          />
+        </div>
+        <Space size="large">
+          <Select
+            value={timeRange}
+            style={{ width: '120px' }}
+            onChange={setTimeRange}
+            options={[
+              { value: 'shift1', label: 'Shift 1' },
+              { value: 'shift2', label: 'Shift 2' },
+              { value: 'shift3', label: 'Shift 3' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+          />
+          {timeRange === 'custom' && (
+            <RangePicker
+              showTime
+              format="YYYY-MM-DD HH:mm"
+              onChange={setDateRange}
+            />
+          )}
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            loading={loading}
+            onClick={() => window.location.reload()}
+          >
+            Refresh
           </Button>
         </Space>
-      </Space>
+      </div>
 
       <Row gutter={[16, 16]}>
         <Col span={12}>

@@ -14,7 +14,7 @@ const useAuthStore = create(
       fetchRoles: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.93:7001/roles');
+          const response = await fetch('http://172.18.7.88:2223/roles');
           const data = await response.json();
           set({ roles: data, isLoading: false });
         } catch (error) {
@@ -25,9 +25,14 @@ const useAuthStore = create(
       fetchMachines: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.89:7010/machines?skip=0&limit=100');
+          const response = await fetch('http://172.18.7.88:2223/master-order/all-machines/');
           const data = await response.json();
-          set({ machines: data.machines, isLoading: false });
+          // Extracting the "code" from each machine's work_center
+          const machinesWithCode = data.map(machine => ({
+            ...machine,
+            code: machine.work_center.code // Adding the "code" to the machine object
+          }));
+          set({ machines: machinesWithCode, isLoading: false });
         } catch (error) {
           set({ error: error.message, isLoading: false });
         }
@@ -45,7 +50,7 @@ const useAuthStore = create(
             client_secret: 'string'
           });
 
-          const response = await fetch('http://172.18.7.93:7001/auth', {
+          const response = await fetch('http://172.18.7.88:2223/login', {
             method: 'POST',
             headers: {
               'accept': 'application/json',
@@ -87,15 +92,21 @@ const useAuthStore = create(
       register: async (userData) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch('http://172.18.7.93:7001/register', {
+          const response = await fetch('http://172.18.7.88:2223/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(userData),
+            body: JSON.stringify({
+              email: userData.email,
+              password: userData.password,
+              role_id: userData.role_id,
+              username: userData.username
+            }),
           });
           
           const data = await response.json();
           if (!response.ok) {
-            throw new Error(data.message || 'Registration failed');
+            console.error('Registration error:', data); // Log the error response
+            throw new Error(data.detail ? data.detail.join(', ') : 'Registration failed');
           }
           
           set({ isLoading: false, error: null });

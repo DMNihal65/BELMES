@@ -11,6 +11,7 @@ const useStore = create((set) => ({
   logout: () => set({ user: null }),
   
   // Sidebar state
+  //yaduuuuu
   isSidebarCollapsed: false,
   toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
 }))

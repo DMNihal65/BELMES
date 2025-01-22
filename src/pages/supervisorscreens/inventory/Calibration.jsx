@@ -148,6 +148,7 @@ const RequestTable = () => {
             }
             return ''; // No background for other rows
           }}
+          scroll={{ x: 1000 }}
         />
 
         <Modal

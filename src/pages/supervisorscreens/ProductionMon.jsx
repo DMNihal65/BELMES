@@ -515,7 +515,7 @@ const ProductionMonitoring = () => {
   return (
     <div className="space-y-6">
       {/* Header with Machine Selection and Time Controls */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+      {/* <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
        
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold">Production Monitoring</h1>
@@ -559,9 +559,9 @@ const ProductionMonitoring = () => {
             Refresh
           </Button>
         </Space>
-      </div>
+      </div> */}
 
-      {/* Enhanced Statistics Dashboard */}
+ 
       <Row gutter={[16, 16]}>
         <Col span={6}>
           <Card bordered={false} className="hover:shadow-md transition-shadow">

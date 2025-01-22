@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Card, Table, Tag, Space, Button, Select, 
-  Timeline, Badge, Alert, Typography ,Row,Col 
+  Timeline, Badge, Alert, Typography, Row, Col 
 } from 'antd';
 import { 
   AlertOutlined, 
@@ -17,6 +17,9 @@ const { Text } = Typography;
 const EnhancedAlerts = ({ machines }) => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
+  const [selectedMachines, setSelectedMachines] = useState(['all']);
+  const [timeRange, setTimeRange] = useState('shift1');
+  const [loading, setLoading] = useState(false);
 
   // Generate mock alerts data
   const alertsData = machines.flatMap(machine => 
@@ -101,6 +104,45 @@ const EnhancedAlerts = ({ machines }) => {
 
   return (
     <div className="space-y-6">
+      {/* Header with Machine Selection and Time Controls */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+        <div className="flex items-center gap-4">
+       
+          <Select
+            mode="multiple"
+            style={{ width: '300px' }}
+            placeholder="Select Machines"
+            defaultValue={['all']}
+            onChange={setSelectedMachines}
+            options={[
+              { value: 'all', label: 'All Machines' },
+              ...machines.map(m => ({ value: m.id, label: `${m.name} (${m.id})` })),
+            ]}
+          />
+        </div>
+        <Space size="large">
+          <Select
+            value={timeRange}
+            style={{ width: '120px' }}
+            onChange={setTimeRange}
+            options={[
+              { value: 'shift1', label: 'Shift 1' },
+              { value: 'shift2', label: 'Shift 2' },
+              { value: 'shift3', label: 'Shift 3' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+          />
+          <Button
+            type="primary"
+            icon={<CheckCircleOutlined />}
+            loading={loading}
+            onClick={() => window.location.reload()}
+          >
+            Refresh
+          </Button>
+        </Space>
+      </div>
+
       {alertsData.some(alert => alert.priority === 'high') && (
         <Alert
           message="High Priority Alerts"
@@ -110,33 +152,6 @@ const EnhancedAlerts = ({ machines }) => {
           closable
         />
       )}
-
-      <Space className="w-full justify-between">
-        <Space>
-          <Select 
-            value={filterStatus} 
-            onChange={setFilterStatus}
-            style={{ width: 120 }}
-          >
-            <Option value="all">All Status</Option>
-            <Option value="active">Active</Option>
-            <Option value="resolved">Resolved</Option>
-          </Select>
-          <Select 
-            value={filterPriority} 
-            onChange={setFilterPriority}
-            style={{ width: 120 }}
-          >
-            <Option value="all">All Priority</Option>
-            <Option value="high">High</Option>
-            <Option value="medium">Medium</Option>
-            <Option value="low">Low</Option>
-          </Select>
-        </Space>
-        <Button type="primary" icon={<CheckCircleOutlined />}>
-          Acknowledge All
-        </Button>
-      </Space>
 
       <Row gutter={[16, 16]}>
         <Col span={16}>

@@ -48,21 +48,7 @@ const Planning = () => {
     const results = await searchOrders(partNumber);
     if (results.orders && results.orders.length > 0) {
       const selectedJobData = results.orders[0];
-      // Ensure operations have the required format
-      const formattedOperations = selectedJobData.operations?.map(op => ({
-        ...op,
-        key: op.id.toString(),
-        operation_number: op.operation_number || op.opNo,
-        operation_description: op.operation_description || op.description,
-        setup_time: op.setup_time || 0,
-        ideal_cycle_time: op.ideal_cycle_time || 0,
-        work_center: op.work_center || ''
-      })) || [];
-
-      setSelectedJob({
-        ...selectedJobData,
-        operations: formattedOperations
-      });
+      setSelectedJob(selectedJobData);
     }
   };
 

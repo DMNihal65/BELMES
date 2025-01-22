@@ -25,8 +25,8 @@ const Login = () => {
     register, 
     fetchMachines, 
     fetchRoles,
-    machines, 
-    roles,
+    machines = [],
+    roles = [],
     isLoading,
     error,
     clearError
@@ -91,11 +91,15 @@ const Login = () => {
 
   const handleRegister = async (values) => {
     try {
+      // Directly use the role_id from the form values
+      const selectedRoleId = values.role; // This will be the id of the selected role
+      console.log('Selected Role ID from Form:', selectedRoleId); // Log the selected role ID
+  
       await register({
+        email: values.email,
         username: values.username,
         password: values.password,
-        role: values.role,
-        ...(values.role === 'supervisor' && { passkey: values.passkey }),
+        role_id: selectedRoleId, // Use the selected role ID directly
       });
       
       message.success('Registration successful! Please login.');
@@ -121,7 +125,7 @@ const Login = () => {
               size="large"
               loading={isLoading}
             >
-              {machines.map(machine => (
+              {(machines || []).map(machine => (
                 <Option key={machine.id} value={machine.id}>
                   {machine.model} ({machine.work_center.code})
                 </Option>
@@ -239,6 +243,18 @@ const Login = () => {
         onFinish={handleRegister}
       >
         <Form.Item
+          name="email"
+          label="Email (Gmail)"
+          rules={[
+            { required: true, message: 'Please enter your email!' },
+            { type: 'email', message: 'Please enter a valid email!' },
+            { pattern: /^[a-zA-Z0-9._%+-]+@gmail\.com$/, message: 'Please enter a valid Gmail address!' }
+          ]}
+        >
+          <Input prefix={<UserOutlined />} placeholder="Enter your Gmail address" />
+        </Form.Item>
+
+        <Form.Item
           name="username"
           label="Username"
           rules={[{ required: true, message: 'Please enter username!' }]}
@@ -264,8 +280,8 @@ const Login = () => {
         >
           <Select placeholder="Select role">
             {roles.map(role => (
-              <Option key={role.id} value={role.name}>
-                {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+              <Option key={role.id} value={role.role_name}>
+                {role.role_name.charAt(0).toUpperCase() + role.role_name.slice(1)}
               </Option>
             ))}
           </Select>
@@ -296,6 +312,8 @@ const Login = () => {
       </Form>
     </Modal>
   );
+
+  console.log('Roles:', roles);
 
   return (
     <div 
@@ -370,6 +388,18 @@ const Login = () => {
                 requiredMark={false}
               >
                 <Form.Item
+                  name="email"
+                  label="Email (Gmail)"
+                  rules={[
+                    { required: true, message: 'Please enter your email!' },
+                    { type: 'email', message: 'Please enter a valid email!' },
+                    { pattern: /^[a-zA-Z0-9._%+-]+@gmail\.com$/, message: 'Please enter a valid Gmail address!' }
+                  ]}
+                >
+                  <Input prefix={<UserOutlined />} placeholder="Enter your Gmail address" />
+                </Form.Item>
+
+                <Form.Item
                   name="username"
                   label="Username"
                   rules={[{ required: true, message: 'Please enter username!' }]}
@@ -395,21 +425,18 @@ const Login = () => {
                 </Form.Item>
 
                 <Form.Item
-                  name="role"
-                  label="Role"
-                  rules={[{ required: true, message: 'Please select role!' }]}
-                >
-                  <Select 
-                    placeholder="Select role"
-                    size="large"
-                  >
-                    {roles.map(role => (
-                      <Option key={role.id} value={role.name}>
-                        {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
+  name="role"
+  label="Role"
+  rules={[{ required: true, message: 'Please select role!' }]}
+>
+  <Select placeholder="Select role">
+    {roles.map(role => (
+      <Option key={role.id} value={role.id}> {/* Use role.id as the value */}
+        {role.role_name.charAt(0).toUpperCase() + role.role_name.slice(1)} {/* Display role_name */}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
 
                 <Form.Item
                   noStyle

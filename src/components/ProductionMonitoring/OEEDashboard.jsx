@@ -1,97 +1,79 @@
-import React from 'react';
-import { Card, Row, Col, Space, Statistic, Progress, Tag, Tooltip } from 'antd';
-import { Line } from '@ant-design/plots';
+import React, { useState } from 'react';
+import { Card, Row, Col, Space, Select, Button, DatePicker } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
+const { RangePicker } = DatePicker;
 
-const OEEDashboard = ({ machines, historicalData }) => {
-  // Filter out machines without OEE data
-  const validMachines = machines.filter(machine => machine.oee?.overall);
-
-  const getOEEColor = (value) => {
-    if (value >= 85) return '#3f8600';
-    if (value >= 70) return '#faad14';
-    return '#cf1322';
-  };
+const OEEDashboard = ({ machines }) => {
+  const [selectedMachines, setSelectedMachines] = useState(['all']);
+  const [timeRange, setTimeRange] = useState('shift1');
+  const [dateRange, setDateRange] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   return (
     <div className="space-y-6">
+      {/* Header with Machine Selection and Time Controls */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+        <div className="flex items-center gap-4">
+          
+          <Select
+            mode="multiple"
+            style={{ width: '300px' }}
+            placeholder="Select Machines"
+            defaultValue={['all']}
+            onChange={setSelectedMachines}
+            options={[
+              { value: 'all', label: 'All Machines' },
+              ...machines.map(m => ({ value: m.id, label: `${m.name} (${m.id})` })),
+            ]}
+          />
+        </div>
+        <Space size="large">
+          <Select
+            value={timeRange}
+            style={{ width: '120px' }}
+            onChange={setTimeRange}
+            options={[
+              { value: 'shift1', label: 'Shift 1' },
+              { value: 'shift2', label: 'Shift 2' },
+              { value: 'shift3', label: 'Shift 3' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+          />
+          {timeRange === 'custom' && (
+            <RangePicker
+              showTime
+              format="YYYY-MM-DD HH:mm"
+              onChange={setDateRange}
+            />
+          )}
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => window.location.reload()}
+          >
+            Refresh
+          </Button>
+        </Space>
+      </div>
+
+      {/* Other components and content */}
       <Row gutter={[16, 16]}>
-        {validMachines.map(machine => (
-          <Col span={8} key={machine.id}>
-            <Card 
-              title={machine.name} 
-              className="hover:shadow-lg transition-shadow"
-              extra={
-                <Tag color={machine.status === 'running' ? 'green' : 'red'}>
-                  {machine.status.toUpperCase()}
-                </Tag>
-              }
-            >
-              <Space direction="vertical" className="w-full">
-                <Statistic
-                  title="Overall OEE"
-                  value={machine.oee.overall}
-                  suffix="%"
-                  valueStyle={{ color: getOEEColor(machine.oee.overall) }}
-                />
-                <div className="space-y-2">
-                  <Tooltip title="Target: 90%">
-                    <Progress 
-                      percent={machine.oee.availability}
-                      status="active"
-                      size="small"
-                      format={percent => `Availability: ${percent}%`}
-                    />
-                  </Tooltip>
-                  <Tooltip title="Target: 95%">
-                    <Progress 
-                      percent={machine.oee.performance}
-                      status="active"
-                      size="small"
-                      format={percent => `Performance: ${percent}%`}
-                    />
-                  </Tooltip>
-                  <Tooltip title="Target: 99%">
-                    <Progress 
-                      percent={machine.oee.quality}
-                      status="active"
-                      size="small"
-                      format={percent => `Quality: ${percent}%`}
-                    />
-                  </Tooltip>
-                </div>
-              </Space>
-            </Card>
-          </Col>
-        ))}
+        <Col span={12}>
+          <Card title="OEE Trend">
+            {/* OEE Trend Chart Component */}
+            {/* Replace with your actual chart component */}
+          </Card>
+        </Col>
+        <Col span={12}>
+          <Card title="Production Trend">
+            {/* Production Trend Chart Component */}
+            {/* Replace with your actual chart component */}
+          </Card>
+        </Col>
       </Row>
-      
-      <Card title="OEE Trends">
-        <Line
-          data={historicalData}
-          xField="date"
-          yField="oee"
-          point={{
-            size: 5,
-            shape: 'diamond',
-          }}
-          label={{
-            style: {
-              fill: '#aaa',
-            },
-          }}
-          annotations={[
-            {
-              type: 'line',
-              start: ['min', 85],
-              end: ['max', 85],
-              style: {
-                stroke: '#ff4d4f',
-                lineDash: [4, 4],
-              },
-            },
-          ]}
-        />
-      </Card>
+
+      {/* Additional content can go here */}
     </div>
   );
 };

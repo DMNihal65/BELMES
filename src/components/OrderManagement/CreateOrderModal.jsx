@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import { 
   InboxOutlined, FileTextOutlined, LoadingOutlined,
-  CloudUploadOutlined, SaveOutlined, ArrowLeftOutlined, EditOutlined 
+  CloudUploadOutlined, SaveOutlined, ArrowLeftOutlined, EditOutlined, UploadOutlined 
 } from '@ant-design/icons';
 import { ArrowLeftCircle } from 'lucide-react';
 import useOrderStore from '../../store/order-store';
@@ -22,6 +22,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   const [fileList, setFileList] = useState([]);
   const [rawMaterials, setRawMaterials] = useState([]);
   const [isManualCreate, setIsManualCreate] = useState(false);
+  const [mppFile, setMppFile] = useState(null);
+  const [drawingFile, setDrawingFile] = useState(null);
 
   const steps = [
     {
@@ -118,30 +120,35 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         return;
       }
   
-      // Ensure we have the correct delivery date format
       const deliveryDate = dayjs(values.deliveryDate);
       const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
   
-      if (orderDetails?.id) {
-        // Update existing order
-        const updatePayload = {
-          sale_order: values.salesOrderNumber,
-          wbs_element: values.wbsElement,
-          part_number: values.partNumber,
-          part_description: values.materialDescription,
-          total_operations: parseInt(values.totalOperations),
-          required_quantity: parseInt(values.targetQuantity),
-          launched_quantity: parseInt(values.launchedQuantity),
-          plant_id: parseInt(values.plant),
-          delivery_date: epochTimestamp
-        };
-  
-        await updateOrder(orderDetails.id, updatePayload, values.orderNumber);
-        message.success('Order updated successfully');
-        handleCancel();
-      } else {
-        // ... rest of the create order logic ...
+      // Create form data to handle file uploads
+      const formData = new FormData();
+      if (mppFile) {
+        formData.append('mppFile', mppFile.originFileObj);
       }
+      if (drawingFile) {
+        formData.append('drawingFile', drawingFile.originFileObj);
+      }
+  
+      // Add other form values
+      const payload = {
+        ...values,
+        delivery_date: epochTimestamp,
+        mppFile: mppFile?.response,
+        drawingFile: drawingFile?.response,
+      };
+  
+      if (orderDetails?.id) {
+        await updateOrder(orderDetails.id, payload);
+        message.success('Order updated successfully');
+      } else {
+        await createOrder(payload);
+        message.success('Order created successfully');
+      }
+      
+      handleCancel();
     } catch (error) {
       console.error('Submit Error:', error);
       message.error(error.message || 'Failed to save order');
@@ -179,6 +186,24 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     }
   }, [visible, initialData, form]);
 
+  const handleMppFileChange = (info) => {
+    if (info.file.status === 'done') {
+      setMppFile(info.file);
+      message.success(`${info.file.name} file uploaded successfully`);
+    } else if (info.file.status === 'error') {
+      message.error(`${info.file.name} file upload failed.`);
+    }
+  };
+
+  const handleDrawingFileChange = (info) => {
+    if (info.file.status === 'done') {
+      setDrawingFile(info.file);
+      message.success(`${info.file.name} file uploaded successfully`);
+    } else if (info.file.status === 'error') {
+      message.error(`${info.file.name} file upload failed.`);
+    }
+  };
+
   const renderOrderForm = () => (
     <Form
       form={form}
@@ -187,9 +212,10 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       initialValues={orderDetails || initialData}
       className="p-4"
     >
-      {/* Read-only fields */}
-      {/* Order Information - Some Editable */}
-    <Divider>Order Information</Divider>
+      {/* Order Information Section */}
+      <Divider>Order Information</Divider>
+      
+      {/* Existing form fields */}
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
@@ -208,71 +234,71 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
           </Form.Item>
         </Col>
       </Row>
-  
+
       {/* Project Information - Read Only */}
       <Divider>Project Information</Divider>
-    <Row gutter={16}>
-      <Col span={12}>
-        <Form.Item
-          name="projectName"
-          label="Project Name"
-        >
-          <Input disabled />
-        </Form.Item>
-      </Col>
-      <Col span={12}>
-        <Form.Item
-          name="priority"
-          label="Priority"
-        >
-          <Input disabled />
-        </Form.Item>
-      </Col>
-    </Row>
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item
+            name="projectName"
+            label="Project Name"
+          >
+            <Input disabled />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item
+            name="priority"
+            label="Priority"
+          >
+            <Input disabled />
+          </Form.Item>
+        </Col>
+      </Row>
 
-    {/* Raw Materials Section - Read Only */}
-    {orderDetails?.rawMaterials && orderDetails.rawMaterials.length > 0 && (
-      <>
-        <Divider>Raw Materials</Divider>
-        {orderDetails.rawMaterials.map((material, index) => (
-          <div key={index}>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label="Part Number"
-                >
-                  <Input value={material.child_part_number} disabled />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label="Description"
-                >
-                  <Input value={material.description} disabled />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label="Quantity"
-                >
-                  <Input value={`${material.quantity} ${material.unit.name}`} disabled />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label="Status"
-                >
-                  <Input value={material.status.name} disabled />
-                </Form.Item>
-              </Col>
-            </Row>
-            {index < orderDetails.rawMaterials.length - 1 && <Divider dashed />}
-          </div>
-        ))}
-      </>
-    )}
+      {/* Raw Materials Section - Read Only */}
+      {orderDetails?.rawMaterials && orderDetails.rawMaterials.length > 0 && (
+        <>
+          <Divider>Raw Materials</Divider>
+          {orderDetails.rawMaterials.map((material, index) => (
+            <div key={index}>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    label="Part Number"
+                  >
+                    <Input value={material.child_part_number} disabled />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="Description"
+                  >
+                    <Input value={material.description} disabled />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    label="Quantity"
+                  >
+                    <Input value={`${material.quantity} ${material.unit.name}`} disabled />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="Status"
+                  >
+                    <Input value={material.status.name} disabled />
+                  </Form.Item>
+                </Col>
+              </Row>
+              {index < orderDetails.rawMaterials.length - 1 && <Divider dashed />}
+            </div>
+          ))}
+        </>
+      )}
 
       <Divider/>
       {/* Editable fields */}
@@ -364,7 +390,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         <Row gutter={16}>
           <Col span={24}>
             <Form.Item
-              name="deliveryDate" // Changed from delivery_date to deliveryDate
+              name="deliveryDate"
               label="Delivery Date"
               rules={[{ required: true, message: 'Please select Delivery Date' }]}
             >
@@ -375,9 +401,59 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             </Form.Item>
           </Col>
         </Row>
+        
       </Row>
 
-    {/* Form Actions */}
+      {/* Optional File Uploads Section - Moved to bottom */}
+      <Divider> MPP and Drawing Files</Divider>
+      <Row gutter={16} className="mb-4">
+        <Col span={12}>
+          <Form.Item
+            label={
+              <span>
+                MPP File
+                <span className="text-gray-400 text-sm ml-2"></span>
+              </span>
+            }
+            name="mppFile"
+          >
+            <Upload
+              maxCount={1}
+              onChange={handleMppFileChange}
+              accept=".mpp,.xml,.xlsx"
+              className="w-full"
+            >
+              <Button icon={<UploadOutlined />} className="w-full">
+                {mppFile ? 'Change MPP File' : 'Upload MPP File'}
+              </Button>
+            </Upload>
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item
+            label={
+              <span>
+                3D Drawing
+                <span className="text-gray-400 text-sm ml-2"></span>
+              </span>
+            }
+            name="drawingFile"
+          >
+            <Upload
+              maxCount={1}
+              onChange={handleDrawingFileChange}
+              accept=".pdf,.dwg,.dxf"
+              className="w-full"
+            >
+              <Button icon={<UploadOutlined />} className="w-full">
+                {drawingFile ? 'Change Drawing File' : 'Upload Drawing'}
+              </Button>
+            </Upload>
+          </Form.Item>
+        </Col>
+      </Row>
+
+      {/* Form Actions */}
       <Form.Item className="mb-0">
         <Space className="w-full justify-end">
           <Button onClick={handleCancel}>Cancel</Button>
@@ -387,7 +463,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             loading={isLoading}
             className="bg-blue-500"
           >
-            Update Order
+            {initialData ? 'Update Order' : 'Create Order'}
           </Button>
         </Space>
       </Form.Item>
@@ -531,13 +607,60 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
           <DatePicker 
             style={{ width: '100%' }} 
             format="YYYY-MM-DD"
-            // Ensure future dates only
             disabledDate={(current) => {
               return current && current < dayjs().startOf('day');
             }}
           />
         </Form.Item>
       </Col>
+        </Row>
+
+        <Divider>MPP and Drawing Files</Divider>
+        <Row gutter={16} className="mb-4">
+          <Col span={12}>
+            <Form.Item
+              label={
+                <span>
+                  MPP File
+                  <span className="text-gray-400 text-sm ml-2"></span>
+                </span>
+              }
+              name="mppFile"
+            >
+              <Upload
+                maxCount={1}
+                onChange={handleMppFileChange}
+                accept=".mpp,.xml,.xlsx"
+                className="w-full"
+              >
+                <Button icon={<UploadOutlined />} className="w-full">
+                  {mppFile ? 'Change MPP File' : 'Upload MPP File'}
+                </Button>
+              </Upload>
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              label={
+                <span>
+                  3D Drawing
+                  <span className="text-gray-400 text-sm ml-2"></span>
+                </span>
+              }
+              name="drawingFile"
+            >
+              <Upload
+                maxCount={1}
+                onChange={handleDrawingFileChange}
+                accept=".pdf,.dwg,.dxf"
+                className="w-full"
+              >
+                <Button icon={<UploadOutlined />} className="w-full">
+                  {drawingFile ? 'Change Drawing File' : 'Upload Drawing'}
+                </Button>
+              </Upload>
+            </Form.Item>
+          </Col>
         </Row>
 
         <Form.Item className="mb-0 mt-6">
@@ -557,20 +680,26 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     </Form>
   );
 
-  // Inside the CreateOrderModal component
-
+  // Update handleManualSubmit to include file handling
   const handleManualSubmit = async (values) => {
     try {
-      // Validate delivery date
       if (!values.delivery_date) {
         message.error('Please select a delivery date');
         return;
       }
-  
-      // Convert delivery date to epoch timestamp (seconds)
+
       const deliveryDate = dayjs(values.delivery_date);
       const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
-  
+
+      // Create form data for file uploads
+      const formData = new FormData();
+      if (mppFile) {
+        formData.append('mppFile', mppFile.originFileObj);
+      }
+      if (drawingFile) {
+        formData.append('drawingFile', drawingFile.originFileObj);
+      }
+
       const payload = {
         production_order: values.production_order,
         sale_order: values.sale_order,
@@ -583,9 +712,11 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         plant_id: parseInt(values.plant_id),
         project_name: values.project_name,
         delivery_date: epochTimestamp,
-        raw_materials: []
+        raw_materials: [],
+        mppFile: mppFile?.response,
+        drawingFile: drawingFile?.response,
       };
-  
+
       const response = await createOrder(payload);
       message.success('Order created successfully');
       handleCancel();

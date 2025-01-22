@@ -1,64 +1,86 @@
-import React from 'react';
-import { Tabs } from 'antd';
+import React, { useState } from 'react';
+import { Tabs, Card, Button } from 'antd';
+import { FilterOutlined } from '@ant-design/icons';
+
 import Tools from './Tools/Tools'; 
 import GaugesAndInstruments from './GaugesAndInstruments';
 import Fixtures from './Fixtures';
 import RawMaterials from './RawMaterials';
 import Consumables from './Consumables';
+import FilterSidebar from '../../../components/inventory/FilterSidebar';
 
 const { TabPane } = Tabs;
 
 function Inventory() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({});
 
-  // Sample data - replace with your actual data
-  const stockLevels = [
-    { category: 'Tools', current: 245, minimum: 100, maximum: 300 },
-    { category: 'Gauges', current: 120, minimum: 50, maximum: 150 },
-    { category: 'Fixtures', current: 85, minimum: 40, maximum: 100 },
-    { category: 'Raw Materials', current: 320, minimum: 200, maximum: 400 },
-    { category: 'Consumables', current: 560, minimum: 300, maximum: 600 }
-  ];
+  // // Define filter fields for each component
+  // const filterFields = [
+  //   {
+  //     name: 'toolType',
+  //     label: 'Tool Type',
+  //     options: [
+  //       { label: 'End Mill', value: 'end_mill' },
+  //       { label: 'Drill', value: 'drill' },
+  //       { label: 'Insert', value: 'insert' }
+  //     ]
+  //   },
+  //   {
+  //     name: 'size',
+  //     label: 'Size',
+  //     options: [
+  //       { label: 'Small', value: 'small' },
+  //       { label: 'Medium', value: 'medium' },
+  //       { label: 'Large', value: 'large' }
+  //     ]
+  //   },
+  //   // Add more filter fields as needed
+  // ];
 
-  const monthlyUsage = [
-    { month: 'Jan', tools: 45, gauges: 12, fixtures: 8, materials: 120, consumables: 200 },
-    { month: 'Feb', tools: 38, gauges: 15, fixtures: 10, materials: 140, consumables: 180 },
-    { month: 'Mar', tools: 52, gauges: 18, fixtures: 12, materials: 100, consumables: 220 }
-  ];
-
-  const getLowStockItems = () => {
-    return stockLevels.filter(item => item.current <= item.minimum * 1.2);
-  };
-
-  const handleRefresh = () => {
-    setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1000);
+  const handleFilterApply = (filters) => {
+    setActiveFilters(filters);
+    setFilterVisible(false);
   };
 
   return (
-    <div className="p-3 md:p-6">
-      <h1>Master Data</h1>
-      <Tabs defaultActiveKey="1" type="card">
-          <TabPane tab="Tools" key="Tools">
-            <Tools />
-          </TabPane>
+    <div className="p-4">
+      {/* <div className="flex justify-end mb-4">
+        <Button 
+          type="primary" 
+          icon={<FilterOutlined />}
+          onClick={() => setFilterVisible(true)}
+        >
+          Master Filter
+        </Button>
+      </div> */}
 
-          <TabPane tab="Gauges And Instruments" key="GaugesAndInstruments">
-          <GaugesAndInstruments />
+      <Card>
+        <Tabs defaultActiveKey="1">
+          <TabPane tab="Tools" key="1">
+            <Tools filters={activeFilters} />
           </TabPane>
-
-          <TabPane tab="Fixtures" key="fixtures">
-          <Fixtures />
+          <TabPane tab="Gauges & Instruments" key="2">
+            <GaugesAndInstruments filters={activeFilters} />
           </TabPane>
-
-          <TabPane tab="RawMaterials" key="RawMaterials">
-          <RawMaterials />
+          <TabPane tab="Fixtures" key="3">
+            <Fixtures filters={activeFilters} />
           </TabPane>
-
-          <TabPane tab="Consumables" key="Consumables">
-          <Consumables />
+          <TabPane tab="Raw Materials" key="4">
+            <RawMaterials filters={activeFilters} />
+          </TabPane>
+          <TabPane tab="Consumables" key="5">
+            <Consumables filters={activeFilters} />
           </TabPane>
         </Tabs>
+      </Card>
+
+      {/* <FilterSidebar
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        onApply={handleFilterApply}
+        filterFields={filterFields}
+      /> */}
     </div>
   );
 }

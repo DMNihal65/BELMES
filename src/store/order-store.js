@@ -15,7 +15,7 @@ const useOrderStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:8010/all_orders');
+      const response = await fetch('http://172.18.7.88:8012/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -47,7 +47,7 @@ const useOrderStore = create((set) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.88:8010/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:8012/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -92,7 +92,7 @@ const useOrderStore = create((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await fetch(
-        `http://172.18.7.88:8010/update_order/${orderId}?order_number=${orderNumber}`,
+        `http://172.18.7.88:8012/update_order/${orderId}?order_number=${orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -129,7 +129,7 @@ const useOrderStore = create((set) => ({
   createOrder: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:8010/create_order', {
+      const response = await fetch('http://172.18.7.88:8012/create_order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

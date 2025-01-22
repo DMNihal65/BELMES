@@ -219,6 +219,7 @@ const History = ({ showModal, handleDownloadData, handleFileUpload }) => {
                 rowKey="key" 
                 onChange={(pagination, filters) => setFilteredInfo(filters)} 
                 filteredInfo={filteredInfo}
+                scroll={{ x: 1000 }}
             />
         </Card>
     );

@@ -1,14 +1,29 @@
-import React, { useState } from 'react';
-import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col,  Input as AntInput  } from 'antd';
-import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col,  Input as AntInput,  Drawer, Checkbox, Slider, Select } from 'antd';
+import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined, FilterOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
 
-const Inserts = () => {
+const Inserts = ({filters }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [editingKey, setEditingKey] = useState(null);
   const [searchText, setSearchText] = useState('');
+  const [filteredData, setFilteredData] = useState([]);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState({});
+  const [selectedBelParts, setSelectedBelParts] = useState([]);
+  const [selectedSuitableFor, setSelectedSuitableFor] = useState([]);
+  const [selectedToolMaterials, setSelectedToolMaterials] = useState([]);
+  const [selectedProjects, setSelectedProjects] = useState([]);
+  const [selectedConfiguration, setSelectedConfiguration] = useState([0, 100]);
+  const [selectedType, setSelectedType] = useState([0, 100]);
+  const [selectedSize, setSelectedSize] = useState([0, 100]); 
+  const [selectedNoOfEdges, setSelectedNoOfEdges] = useState([0, 100]);
+  const [selectedThickness, setSelectedThickness] = useState([0, 100]);
+  const [selectedCornerRadius, setSelectedCornerRadius] = useState([0, 100]);
+  const [selectedStock, setSelectedStock] = useState([0, 100]);
+
   const [InsertsData, setInsertsData] = useState([
     {
       key: '1',
@@ -28,22 +43,98 @@ const Inserts = () => {
     },
     {
       key: '2',
-      bel_part_number: '3105 120 201 59',
+      bel_part_number: '3105 120 201 56',
       bel_part_description: 'low precision end mill',
-      configuration: '', // Added new field
-      type: '', // Added new field
-      size: '', // Added new field
+      configuration: '2', // Added new field
+      type: '2', // Added new field
+      size: '2', // Added new field
       no_of_edges: 0, // Added new field
       thickness: 0, // Added new field
       corner_radius: 0, // Added new field
       suitable_for: 'Aluminum',
       tool_material: 'Carbide',
-      project: 'Milling',
+      project: 'Mill',
       stock: 10,
       status: 'In Use',
     },
     // ... other existing data ...
   ]);
+
+  const showDrawer = () => {
+    setSelectedFilters({}); // Reset selected filters when opening the drawer
+    form.resetFields(); // Reset all form fields to initial empty state
+    setIsDrawerVisible(true);
+  };
+
+  const closeDrawer = () => {
+    if (!Object.keys(selectedFilters).length) {
+      // If no filters are applied, reset the data to original state
+      setFilteredData(InsertsData);
+    }
+    setIsDrawerVisible(false);
+  };
+
+  const handleCheckboxChange = (column, values) => {
+    setSelectedFilters(prev => ({ ...prev, [column]: values })); // Update selected filters
+  };
+
+  const handleSliderChange = (column, values) => {
+    setSelectedFilters(prev => ({ ...prev, [column]: values })); // Update selected filters
+  };
+
+  const applyFilters = () => {
+    try {
+        const filtered = InsertsData.filter(item => {
+            return Object.keys(selectedFilters).every(column => {
+                const filterValue = selectedFilters[column];
+                if (!filterValue) return true;
+                if (Array.isArray(filterValue)) {
+                    // For checkboxes
+                    return filterValue.includes(item[column]);
+                } else if (typeof filterValue === 'object') {
+                    // For sliders
+                    // Ensure that the comparison handles decimal values correctly
+                    const itemValue = parseFloat(item[column]);
+                    return itemValue >= filterValue[0] && itemValue <= filterValue[1];
+                }
+                return true;
+            });
+        });
+        setFilteredData(filtered);
+        closeDrawer();
+    } catch (error) {
+        message.error(`Error applying filters: ${error.message}. Selected filters: ${JSON.stringify(selectedFilters)}`);
+        console.error(error);
+    }
+};
+
+  const resetFilters = () => {
+    setSelectedFilters({}); // Reset selected filters
+    setFilteredData(InsertsData); // Reset table dat
+    setSelectedBelParts([]);
+    setSelectedSuitableFor([]);
+    setSelectedToolMaterials([]);
+    setSelectedProjects([]);
+    setSelectedConfiguration([0, 100]);
+    setSelectedType([0, 100]);
+    setSelectedSize([0, 100]);
+    setSelectedNoOfEdges([0, 100]);
+    setSelectedThickness([0, 100]);
+    setSelectedCornerRadius([0, 100]);
+    setSelectedStock([0, 100]);
+    form.resetFields(); // Reset form fields in the drawer
+    setIsDrawerVisible(false);
+    message.success('Filters have been reset');
+  };
+
+  useEffect(() => {
+    if (!isDrawerVisible) {
+      // Reset form and selected filters when drawer closes
+      form.resetFields();
+      setSelectedFilters({});
+    }
+  }, [isDrawerVisible, form]);
+
 
   const handleGlobalSearch = (value) => {
     setSearchText(value);
@@ -51,9 +142,9 @@ const Inserts = () => {
 
   // Modify the columns array to work with global search
   const getFilteredData = () => {
-    if (!searchText) return InsertsData;
+    if (!searchText) return filteredData;
 
-    return InsertsData.filter(item => {
+    return filteredData.filter(item => {
       return Object.keys(item).some(key => {
         const value = item[key]?.toString().toLowerCase();
         return value?.includes(searchText.toLowerCase());
@@ -268,6 +359,17 @@ const columns = [
     },
   ];
 
+  useEffect(() => {
+    if (filters?.status) {
+      const filtered = InsertsData.filter(item => 
+        item.status.toLowerCase() === filters.status.toLowerCase()
+      );
+      setFilteredData(filtered);
+    } else {
+      setFilteredData(InsertsData);
+    }
+  }, [filters, InsertsData]);
+
   return (
     <div>
       <Card 
@@ -280,7 +382,7 @@ const columns = [
               style={{ width: 300 }}
               allowClear
             />
-         <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
+         <Button type="primary"
           onClick={showModal}>
           Add New Tool
       </Button>
@@ -296,6 +398,13 @@ const columns = [
                           Upload Excel
                       </Button>
             </Upload>
+            <Button 
+              type="primary" 
+              icon={<FilterOutlined />} 
+              onClick={showDrawer}
+            >
+              Master Filter
+            </Button>
           </Space>
         }
       >
@@ -449,6 +558,221 @@ const columns = [
           </Form.Item>
         </Form>
       </Modal>
+
+            <Drawer
+        title="Master Filter"
+        placement="right"
+        onClose={closeDrawer}
+        open={isDrawerVisible}
+      >
+        <Form layout="vertical" form={form}>
+          {/* Categorical Filters */}
+          <Form.Item label={<span className="font-bold">BEL Part Number</span>}>
+            <Select
+              mode="multiple"
+              allowClear
+              showSearch
+              value={selectedBelParts}
+              placeholder="Select BEL Part Numbers"
+              style={{ width: '100%' }}
+              options={[...new Set(InsertsData.map(item => item.bel_part_number))].map(value => ({
+                label: value,
+                value: value,
+              }))}
+              onChange={(values) => {
+                setSelectedBelParts(values);
+                handleCheckboxChange('bel_part_number', values);
+              }}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          </Form.Item>
+
+          <Form.Item label={<span className="font-bold">Suitable For</span>}>
+            <Select
+              mode="multiple"
+              allowClear
+              showSearch
+              value={selectedSuitableFor}
+              placeholder="Select Suitable For"
+              style={{ width: '100%' }}
+              options={[...new Set(InsertsData.map(item => item.suitable_for))].map(value => ({
+                label: value,
+                value: value,
+              }))}
+              onChange={(values) => {
+                setSelectedSuitableFor(values);
+                handleCheckboxChange('suitable_for', values);
+              }}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          </Form.Item>
+          
+          <Form.Item label={<span className="font-bold">Tool Material</span>}>
+          <Select
+            mode="multiple"
+            allowClear
+            showSearch
+            value={selectedToolMaterials}
+            placeholder="Select Tool Material"
+            style={{ width: '100%' }}
+            options={[...new Set(InsertsData.map(item => item.tool_material))].map(value => ({
+              label: value,
+              value: value,
+            }))}
+            onChange={(values) => {
+              setSelectedToolMaterials(values);
+              handleCheckboxChange('tool_material', values);
+            }}
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          />
+        </Form.Item>
+
+        <Form.Item label={<span className="font-bold">Project</span>}>
+          <Select
+            mode="multiple"
+            allowClear
+            showSearch
+            value={selectedProjects}
+            placeholder="Select Project"
+            style={{ width: '100%' }}
+            options={[...new Set(InsertsData.map(item => item.project))].map(value => ({
+              label: value,
+              value: value,
+            }))}
+            onChange={(values) => {
+              setSelectedProjects(values);
+              handleCheckboxChange('project', values);
+            }}
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          />
+        </Form.Item>
+
+        <Form.Item label={<span className="font-bold">Configuration</span>}>
+          <Slider
+            range
+            value={selectedConfiguration}
+            min={0}
+            max={100}
+            onChange={(values) => {
+              setSelectedConfiguration(values);
+              handleSliderChange('configuration', values);
+            }}
+            marks={{ 0: '0', 100: '100' }}
+          />
+        </Form.Item>
+
+        <Form.Item label={<span className="font-bold">Type</span>}>
+          <Slider
+            range
+            value={selectedType}
+            min={0}
+            max={100}
+            onChange={(values) => {
+              setSelectedType(values);
+              handleSliderChange('type', values);
+            }}
+            marks={{ 0: '0', 100: '100' }}
+          />
+        </Form.Item>
+
+        <Form.Item label={<span className="font-bold">Size</span>}>
+          <Slider
+            range
+            value={selectedSize}
+            min={0}
+            max={100}
+            onChange={(values) => {
+              setSelectedSize(values);
+              handleSliderChange('size', values);
+            }}
+            marks={{ 0: '0', 100: '100' }}
+          />
+        </Form.Item>
+
+        <Form.Item label={<span className="font-bold">Number of Edges</span>}>
+          <Slider
+            range
+            value={selectedNoOfEdges}
+            min={0}
+            max={100}
+            onChange={(values) => {
+              setSelectedNoOfEdges(values);
+              handleSliderChange('no_of_edges', values);
+            }}
+            marks={{ 0: '0', 100: '100' }}
+          />
+        </Form.Item>
+
+        <Form.Item label={<span className="font-bold">Thickness</span>}>
+          <Slider
+            range
+            value={selectedThickness}
+            min={0}
+            max={100}
+            onChange={(values) => {
+              setSelectedThickness(values);
+              handleSliderChange('thickness', values);
+            }}
+            marks={{ 0: '0', 100: '100' }}
+          />
+        </Form.Item>
+
+        <Form.Item label={<span className="font-bold">Corner Radius</span>}>
+          <Slider
+            range
+            value={selectedCornerRadius}
+            min={0}
+            max={100}
+            onChange={(values) => {
+              setSelectedCornerRadius(values);
+              handleSliderChange('corner_radius', values);
+            }}
+            marks={{ 0: '0', 100: '100' }}
+          />
+        </Form.Item>
+          
+          <Form.Item label={<span className="font-bold">Stock</span>}>
+            <Slider
+              range
+              value={selectedStock}
+              min={0}
+              max={Math.max(...InsertsData.map(item => item.stock))}
+              onChange={(values) => {
+                setSelectedStock(values);
+                handleSliderChange('stock', values);
+              }}
+              trackStyle={[{ backgroundColor: '#1890ff' }]}
+              handleStyle={[{ borderColor: '#1890ff' }, { borderColor: '#1890ff' }]}
+              marks={{
+                0: '0',
+                [Math.max(...InsertsData.map(item => item.stock))]: 
+                  Math.max(...InsertsData.map(item => item.stock))
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Row justify="space-between">
+              <Col>
+                <Button onClick={resetFilters}>Reset</Button>
+              </Col>
+              <Col>
+                <Button type="primary" onClick={applyFilters}>
+                  Apply Filter
+                </Button>
+              </Col>
+            </Row>
+          </Form.Item>
+        </Form>
+      </Drawer>
     </div>
   );
 };

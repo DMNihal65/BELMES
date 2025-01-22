@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, message, Modal, Row, Col , InputNumber, Alert,  Input as AntInput  } from 'antd';
+import { Card, Table, Button, message, Modal, Row, Col , InputNumber, Alert,  Input as AntInput, Select  } from 'antd';
 import dayjs from 'dayjs';
 
 const GaugesAndInstruments = () => {
@@ -8,6 +8,14 @@ const GaugesAndInstruments = () => {
   const [requestStock, setRequestStock] = useState(1);
   const [stockError, setStockError] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [orderNumber, setOrderNumber] = useState('');
+  const [orderNumbers] = useState([
+    'ORD-001', 'ORD-002', 'ORD-003', 'ORD-004', 'ORD-005'  // Add your order numbers here
+  ]);
+  const [partNumbers] = useState([
+    'PART-001', 'PART-002', 'PART-003', 'PART-004', 'PART-005'  // Add your order numbers here
+  ]);
+  const [partNumber, setPartNumber] = useState('');
   const [GaugesAndInstrumentsData, setGaugesAndInstrumentsData] = useState([
     {
       key: '1',
@@ -170,7 +178,7 @@ const GaugesAndInstruments = () => {
       key: 'action',
       render: (_, record) => (
         <Button 
-          className="bg-sky-400 text-white hover:bg-sky-500"
+          type="primary"
           disabled={record.status === 'In Use'}
           onClick={() => handleRequest(record)}
         >
@@ -194,6 +202,15 @@ const GaugesAndInstruments = () => {
         return value?.includes(searchText.toLowerCase());
       });
     });
+  };
+
+  const handlePartNumberSelect = (value) => {
+    setPartNumber(value || '');
+  };
+
+  // Add this function to handle order number input
+  const handleOrderNumberSelect = (value) => {
+    setOrderNumber(value || '');
   };
 
   const handleRequest = (record) => {
@@ -223,6 +240,16 @@ const GaugesAndInstruments = () => {
     const handleSubmit = () => {
       if (!requestStock || requestStock <= 0) {
         message.error('Please enter a valid stock');
+        return;
+      }
+
+      if (!orderNumber) {
+        message.error('Please enter an order number');
+        return;
+      }
+  
+      if (!partNumber) {
+        message.error('Please enter a part number');
         return;
       }
       
@@ -279,7 +306,7 @@ const GaugesAndInstruments = () => {
         okText="Submit Request"
         okButtonProps={{ 
           disabled: stockError,
-          className: 'bg-sky-500'
+          className: 'bg-blue-500'
         }}
         width={800}
       >
@@ -339,6 +366,49 @@ const GaugesAndInstruments = () => {
             <h3 className="m-0 mb-4">Request Details</h3>
             <div>
               <Row gutter={[0, 16]}>
+                 <Col span={24}>
+              <div className="text-gray-500 mb-2">Order Number</div>
+              <Select
+                id="orderNumberSelect"
+                showSearch
+                placeholder="Select or search order number"
+                value={orderNumber || undefined}
+                onChange={handleOrderNumberSelect}
+                style={{ width: '100%' }}
+                filterOption={(input, option) =>
+                  option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                }
+                onSelect={() => document.getElementById('partNumberSelect').focus()}
+              >
+                {orderNumbers.map(order => (
+                  <Select.Option key={order} value={order}>
+                    {order}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Col> 
+
+            <Col span={24}>
+                <div className="text-gray-500 mb-2">Part Number</div>
+                <Select
+                  id="partNumberSelect"
+                  showSearch
+                  placeholder="Select part number"
+                  value={partNumber || undefined} 
+                  onChange={handlePartNumberSelect}
+                  style={{ width: '100%' }}
+                  filterOption={(input, option) =>
+                    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                  }
+                  onSelect={() => document.getElementById('stockInput').focus()}
+                >
+                  {partNumbers.map(partNum => (  /* Changed mapping logic */
+                    <Select.Option key={partNum} value={partNum}>
+                      {partNum}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
                 <Col span={24}>
                   <div className="text-gray-500 mb-2">
                     Enter Stock Stock

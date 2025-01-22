@@ -25,8 +25,8 @@ const Login = () => {
     register, 
     fetchMachines, 
     fetchRoles,
-    machines, 
-    roles,
+    machines = [],
+    roles = [],
     isLoading,
     error,
     clearError
@@ -91,11 +91,16 @@ const Login = () => {
 
   const handleRegister = async (values) => {
     try {
+      // Find the role_id based on the selected role_name
+      const selectedRole = roles.find(role => role.role_name === values.role);
+      if (!selectedRole) {
+        throw new Error('Invalid role selected');
+      }
+  
       await register({
         username: values.username,
         password: values.password,
-        role: values.role,
-        ...(values.role === 'supervisor' && { passkey: values.passkey }),
+        role_id: selectedRole.id, // Using the role_id from the selected role
       });
       
       message.success('Registration successful! Please login.');
@@ -116,14 +121,19 @@ const Login = () => {
             rules={[{ required: true, message: 'Please select a machine!' }]}
           >
             <Select
-              placeholder="Select machine"
+              placeholder="Search and select machine"
               className="w-full"
               size="large"
               loading={isLoading}
+              showSearch
+              filterOption={(input, option) =>
+                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              }
+              optionFilterProp="children"
             >
-              {machines.map(machine => (
+              {(machines || []).map(machine => (
                 <Option key={machine.id} value={machine.id}>
-                  {machine.model} ({machine.work_center.code})
+                  {machine.work_center.code}
                 </Option>
               ))}
             </Select>
@@ -225,6 +235,11 @@ const Login = () => {
     );
   };
 
+  useEffect(() => {
+    fetchRoles();
+    fetchMachines();
+  }, [fetchRoles, fetchMachines]); 
+
   const RegisterModal = () => (
     <Modal
       title="Register New User"
@@ -258,18 +273,21 @@ const Login = () => {
         </Form.Item>
 
         <Form.Item
-          name="role"
-          label="Role"
-          rules={[{ required: true, message: 'Please select role!' }]}
+        name="role"
+        label="Role"
+        rules={[{ required: true, message: 'Please select role!' }]}
+      >
+        <Select 
+          placeholder="Select role"
+          loading={isLoading}
         >
-          <Select placeholder="Select role">
-            {roles.map(role => (
-              <Option key={role.id} value={role.name}>
-                {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
-              </Option>
-            ))}
-          </Select>
-        </Form.Item>
+          {(roles || []).map(role => (
+            <Option key={role.id} value={role.role_name}>
+              {role.role_name ? role.role_name.charAt(0).toUpperCase() + role.role_name.slice(1) : ''}
+            </Option>
+          ))}
+        </Select>
+      </Form.Item>
 
         <Form.Item
           noStyle
@@ -402,10 +420,11 @@ const Login = () => {
                   <Select 
                     placeholder="Select role"
                     size="large"
+                    loading={isLoading}
                   >
-                    {roles.map(role => (
-                      <Option key={role.id} value={role.name}>
-                        {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                    {(roles || []).map(role => (
+                      <Option key={role.id} value={role.role_name}>
+                        {role.role_name ? role.role_name.charAt(0).toUpperCase() + role.role_name.slice(1) : ''}
                       </Option>
                     ))}
                   </Select>

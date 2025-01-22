@@ -1,14 +1,124 @@
 import React, { useState } from 'react';
+import { Document, Page, pdfjs } from 'react-pdf';
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
 import { Card, Select, DatePicker, Typography, Space, Checkbox, Button, Badge, Progress, Modal, Input, Select as AntSelect, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, FileExcelOutlined, FilterOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CalendarOutlined, ClockCircleOutlined, FileExcelOutlined, FilterOutlined, EyeOutlined, DownloadOutlined, CloseOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
+
+import { Viewer } from '@react-pdf-viewer/core';
+import { Worker } from '@react-pdf-viewer/core';
+import '@react-pdf-viewer/core/lib/styles/index.css';
+import '@react-pdf-viewer/core/lib/styles/index.css';
+import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 
 const { Title, Text } = Typography;
 
 function MaintenanceScreen() {
+  
   const navigate = useNavigate();
   const [selectedMachine, setSelectedMachine] = useState('DMG DMU 60 eVo linear');
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [isDocumentModalVisible, setIsDocumentModalVisible] = useState(false);
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const documents = [
+    {
+      type: 'Instructions',
+      icon: '📋',
+      description: 'Detailed machine operation and maintenance instructions',
+      pdfUrl: '/documents/maintenance/instructions.pdf'  // Remove process.env.PUBLIC_URL
+    },
+    {
+      type: 'Checklist',
+      icon: '✓',
+      description: 'Step-by-step maintenance verification checklist',
+      pdfUrl: '/documents/maintenance/checklist.pdf'
+    },
+    {
+      type: 'Daily',
+      icon: '📅',
+      description: 'Daily maintenance procedures and requirements',
+      pdfUrl: '/documents/maintenance/daily.pdf'
+    },
+    {
+      type: 'Regular',
+      icon: '🔄',
+      description: 'Regular maintenance schedule and procedures',
+      pdfUrl: '/documents/maintenance/regular.pdf'
+    }
+  ];
+
+  const validatePdfUrl = async (url) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/pdf')) {
+        throw new Error('Not a valid PDF file!');
+      }
+      return true;
+    } catch (error) {
+      console.error('PDF validation error:', error);
+      return false;
+    }
+  };
+
+  const DocumentModal = () => (
+    <Modal
+      title={selectedDocument?.type}
+      open={isDocumentModalVisible}
+      onCancel={() => setIsDocumentModalVisible(false)}
+      width={1200}
+      centered
+      bodyStyle={{
+        padding: '12px',
+        height: '800px',
+        overflow: 'hidden',
+      }}
+      footer={[
+        <Button
+          key="download"
+          type="primary"
+          icon={<DownloadOutlined />}
+          onClick={() => {
+            const link = document.createElement('a');
+            link.href = selectedDocument?.pdfUrl; // URL of the PDF
+            link.download = selectedDocument?.type || 'document.pdf'; // Suggested file name
+            link.click();
+          }}
+        >
+          Download
+        </Button>,
+        <Button
+          key="close"
+          icon={<CloseOutlined />}
+          onClick={() => setIsDocumentModalVisible(false)}
+        >
+          Close
+        </Button>,
+      ]}
+    >
+      <div style={{ height: '100%', border: '1px solid #ddd' }}>
+        {selectedDocument?.pdfUrl ? (
+          <iframe
+            src={selectedDocument.pdfUrl}
+            title={selectedDocument.type}
+            width="100%"
+            height="100%"
+            style={{ border: 'none' }}
+          ></iframe>
+        ) : (
+          <Text type="danger">Error loading document. Please try again.</Text>
+        )}
+      </div>
+    </Modal>
+  );
+  
+
   const [tasks, setTasks] = useState([
     {
       id: 1,
@@ -297,6 +407,38 @@ function MaintenanceScreen() {
           </Title>
         </div>
       </div>
+
+      <div className="bg-white shadow-sm px-4 py-1">
+      <Card title="Documentation" className="p-2">
+  <div className="grid grid-cols-4 gap-4">
+    {documents.map((doc) => (
+      <Card
+        key={doc.type}
+        className="text-center p-1 max-w-xs"
+      >
+        <div className="text-lg">{doc.icon}</div>
+        <Title level={5} className="!mb-0 text-sm">{doc.type}</Title>
+        <Text type="secondary" className="text-xs mb-2 mr-3">{doc.description}</Text> 
+        <Button 
+          type="primary" 
+          icon={<EyeOutlined />}
+          size="small"
+          onClick={() => {
+            setSelectedDocument(doc);
+            setIsDocumentModalVisible(true);
+          }}
+        >
+          View
+        </Button>
+      </Card>
+    ))}
+  </div>
+</Card>
+      </div>
+
+
+
+      <DocumentModal />
 
       <div className="flex-1 p-6 grid grid-cols-12 gap-6 overflow-hidden">
         <div className="col-span-3">

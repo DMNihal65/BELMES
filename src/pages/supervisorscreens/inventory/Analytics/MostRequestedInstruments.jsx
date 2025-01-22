@@ -77,7 +77,7 @@ const MostRequestedInstruments = () => {
                 type: 'line',
                 smooth: true,
                 itemStyle: {
-                   color: '#0284c7'
+                //    color: '#0284c7'
                 },
                 lineStyle: {
                     width: 2,

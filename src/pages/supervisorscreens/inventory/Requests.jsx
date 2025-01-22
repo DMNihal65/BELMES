@@ -163,6 +163,7 @@ const RequestTable = () => {
           defaultPageSize: 5,
           showSizeChanger: true,
         }}
+        scroll={{ x: 1000 }}
       />
 
       <Modal

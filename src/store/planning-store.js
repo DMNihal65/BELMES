@@ -12,7 +12,7 @@ const usePlanningStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:8010/all_orders');
+      const response = await fetch('http://172.18.7.88:2223/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -49,7 +49,7 @@ const usePlanningStore = create((set) => ({
   searchOrders: async (partNumber) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:8010/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.88:2223/search_order?part_number=${partNumber}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -97,7 +97,7 @@ const usePlanningStore = create((set) => ({
   fetchMPPDetails: async (partNumber, operationNumber) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:8010/mpp/by-part/${partNumber}/${operationNumber}`);
+      const response = await fetch(`http://172.18.7.88:2223/mpp/by-part/${partNumber}/${operationNumber}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -145,7 +145,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending formatted data:', formattedData);
 
-      const response = await fetch('http://172.18.7.88:8010/mpp', {
+      const response = await fetch('http://172.18.7.88:2223/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,14 +1,28 @@
-import React, { useState } from 'react';
-import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col,  Input as AntInput  } from 'antd';
-import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Card, Table, Button, Space, Upload, message, Modal, Form, Input, Row, Col,  Input as AntInput,  Drawer, Checkbox, Slider, Select, DatePicker  } from 'antd';
+import { DownloadOutlined, UploadOutlined, EyeOutlined, EditOutlined, DeleteOutlined, FilterOutlined  } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
 
-const Fixtures = () => {
+const Fixtures = ({filters }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [editingKey, setEditingKey] = useState(null);
   const [searchText, setSearchText] = useState('');
+  const [filteredData, setFilteredData] = useState([]);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState({}); 
+  const [selectedType, setSelectedType] = useState([]);
+  const [selectedInstrumentCode, setSelectedInstrumentCode] = useState([]);
+  const [selectedStatus, setSelectedStatus] = useState([]);
+  const [selectedSize, setSelectedSize] = useState([0, 100]); 
+  const [selectedStock, setSelectedStock] = useState([0, 100]);
+  const [selectedLocation, setSelectedLocation] = useState([]);
+  const [selectedCalibrationDate, setSelectedCalibrationDate] = useState([]);
+  const [selectedCalibrationDueDate, setSelectedCalibrationDueDate] = useState([]);
+  const [selectedMaintenancePlan, setSelectedMaintenancePlan] = useState([]);
+  const [selectedNotificationNumber, setSelectedNotificationNumber] = useState([]);
+  const [selectedEquipmentNumber, setSelectedEquipmentNumber] = useState([]);
   const [FixturesData, setFixturesData] = useState([
     {
       key: '1',
@@ -45,15 +59,99 @@ const Fixtures = () => {
     // ... other existing data ...
   ]);
 
+  const showDrawer = () => {
+    setSelectedFilters({}); // Reset selected filters when opening the drawer
+    form.resetFields();
+    setIsDrawerVisible(true);
+  };
+
+  const closeDrawer = () => {
+    if (!Object.keys(selectedFilters).length) {
+      // If no filters are applied, reset the data to original state
+      setFilteredData(FixturesData);
+    }
+    setIsDrawerVisible(false);
+  };
+
+  const handleCheckboxChange = (column, values) => {
+    setSelectedFilters(prev => ({ ...prev, [column]: values })); // Update selected filters
+  };
+
+  const handleSliderChange = (column, values) => {
+    setSelectedFilters(prev => ({ ...prev, [column]: values })); // Update selected filters
+  };
+
+   const applyFilters = () => {
+    try {
+      if (Object.keys(selectedFilters).length === 0) {
+        setFilteredData(FixturesData);
+        message.info('No filters applied - showing all data');
+      } else {
+        const filtered = FixturesData.filter(item => {
+          return Object.keys(selectedFilters).every(column => {
+            const filterValue = selectedFilters[column];
+            if (!filterValue || (Array.isArray(filterValue) && filterValue.length === 0)) {
+              return true;
+            }
+  
+            // Handle different types of filters
+            if (column === 'calibration_date' || column === 'calibration_due_date') {
+              const itemDate = dayjs(item[column]);
+              const startDate = dayjs(filterValue[0]);
+              const endDate = dayjs(filterValue[1]);
+              return itemDate.isAfter(startDate) && itemDate.isBefore(endDate);
+            } else if (Array.isArray(filterValue)) {
+              return filterValue.includes(item[column]);
+            }
+            
+            return true;
+          });
+        });
+        setFilteredData(filtered);
+        message.success(`Filtered data to show ${filtered.length} items`);
+      }
+      closeDrawer();
+    } catch (error) {
+      message.error(`Error applying filters: ${error.message}`);
+    }
+  };
+
+  const resetFilters = () => {
+    setSelectedFilters({}); // Reset selected filters
+    setFilteredData(FixturesData); // Reset table data
+    setSelectedType([]);
+    setSelectedInstrumentCode([]);
+    setSelectedStatus([]);
+    setSelectedSize([0, 100]);
+    setSelectedStock([0, 100]);
+    setSelectedLocation([]);
+    setSelectedCalibrationDate([]);
+    setSelectedCalibrationDueDate([]);
+    setSelectedMaintenancePlan([]);
+    setSelectedNotificationNumber([]);
+    setSelectedEquipmentNumber([]);
+    form.resetFields(); // Reset form fields in the drawer
+    setIsDrawerVisible(false);
+    message.success('Filters have been reset');
+  };
+
+  useEffect(() => {
+    if (!isDrawerVisible) {
+      // Reset form and selected filters when drawer closes
+      form.resetFields();
+      setSelectedFilters({});
+    }
+  }, [isDrawerVisible, form]);
+
   const handleGlobalSearch = (value) => {
     setSearchText(value);
   };
 
   // Modify the columns array to work with global search
   const getFilteredData = () => {
-    if (!searchText) return FixturesData;
+    if (!searchText) return filteredData;
 
-    return FixturesData.filter(item => {
+    return filteredData.filter(item => {
       return Object.keys(item).some(key => {
         const value = item[key]?.toString().toLowerCase();
         return value?.includes(searchText.toLowerCase());
@@ -284,6 +382,17 @@ const columns = [
     },
   ];
 
+  useEffect(() => {
+    if (filters?.status) {
+      const filtered = FixturesData.filter(item => 
+        item.status.toLowerCase() === filters.status.toLowerCase()
+      );
+      setFilteredData(filtered);
+    } else {
+      setFilteredData(FixturesData);
+    }
+  }, [filters, FixturesData]);
+
   return (
     <div>
       <Card 
@@ -296,7 +405,7 @@ const columns = [
               style={{ width: 300 }}
               allowClear
             />
-             <Button className='bg-sky-600 text-white hover:bg-white hover:text-sky-600' 
+             <Button type="primary"
           onClick={showModal}>
           Add New Tool
       </Button>
@@ -312,6 +421,13 @@ const columns = [
                 Upload Excel
               </Button>
             </Upload>
+            <Button 
+              type="primary" 
+              icon={<FilterOutlined />} 
+              onClick={showDrawer}
+            >
+              Master Filter
+            </Button>
           </Space>
         }
       >
@@ -477,6 +593,225 @@ const columns = [
                 </Form.Item>
             </Form>
         </Modal>
+
+        <Drawer
+  title="Master Filter"
+  placement="right"
+  onClose={closeDrawer}
+  open={isDrawerVisible}
+>
+  <Form layout="vertical" form={form}>
+    {/* Categorical Filters */}
+      <Form.Item label={<span className="font-bold">Type</span>}>
+      <Select
+        mode="multiple"
+        allowClear
+        showSearch
+        value={selectedType}
+        placeholder="Select Type"
+        style={{ width: '100%' }}
+        options={[...new Set(FixturesData.map(item => item.type))].map(value => ({
+          label: value,
+          value: value,
+        }))}
+        onChange={(values) => {
+          setSelectedType(values);
+          handleCheckboxChange('type', values);
+        }}
+        filterOption={(input, option) =>
+          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+        }
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Instrument Code</span>}>
+      <Select
+        mode="multiple"
+        allowClear
+        showSearch
+        value={selectedInstrumentCode}
+        placeholder="Select Instrument Code"
+        style={{ width: '100%' }}
+        options={[...new Set(FixturesData.map(item => item.instrument_code))].map(value => ({
+          label: value,
+          value: value,
+        }))}
+        onChange={(values) => {
+          setSelectedInstrumentCode(values);
+          handleCheckboxChange('instrument_code', values);
+        }}
+        filterOption={(input, option) =>
+          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+        }
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Size</span>}> 
+      <Slider
+        range
+        value={selectedSize}
+        min={0}
+        max={Math.max(...FixturesData.map(item => {
+          // Extract numeric value from size string (e.g., "8mm" -> 8)
+          return parseFloat(item.size.replace(/[^0-9.]/g, ''));
+        }))}
+        onChange={(values) => {
+          setSelectedSize(values);
+          handleSliderChange('size', values);
+        }}
+        trackStyle={[{ backgroundColor: '#1890ff' }]}
+        handleStyle={[{ borderColor: '#1890ff' }, { borderColor: '#1890ff' }]}
+        marks={{
+          0: '0mm',
+          [Math.max(...FixturesData.map(item => 
+            parseFloat(item.size.replace(/[^0-9.]/g, ''))
+          ))]: `${Math.max(...FixturesData.map(item => 
+            parseFloat(item.size.replace(/[^0-9.]/g, ''))
+          ))}mm`
+        }}
+        tipFormatter={value => `${value}mm`}
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Equipment Number</span>}>
+      <Select
+        mode="multiple"
+        allowClear
+        showSearch
+        value={selectedEquipmentNumber}
+        placeholder="Select Equipment Number"
+        style={{ width: '100%' }}
+        options={[...new Set(FixturesData.map(item => item.equipment_number))].map(value => ({
+          label: value,
+          value: value,
+        }))}
+        onChange={(values) => {
+          setSelectedEquipmentNumber(values);
+          handleCheckboxChange('equipment_number', values);
+        }}
+        filterOption={(input, option) =>
+          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+        }
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Maintenance Plan</span>}>
+      <Checkbox.Group
+        options={[...new Set(FixturesData.map(item => item.maintenance_plan))]}
+        onChange={values => handleCheckboxChange('maintenance_plan', values)}
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Notification Number</span>}>
+      <Select
+        mode="multiple"
+        allowClear
+        showSearch
+        value={selectedNotificationNumber}
+        placeholder="Select Maintenance Plan"
+        style={{ width: '100%' }}
+        options={[...new Set(FixturesData.map(item => item.notification_number))].map(value => ({
+          label: value,
+          value: value,
+        }))}
+        onChange={(values) => {
+          setSelectedNotificationNumber(values);
+          handleCheckboxChange('notification_number', values);
+        }}
+        filterOption={(input, option) =>
+          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+        }
+      />
+    </Form.Item>
+
+   <Form.Item label={<span className="font-bold">Calibration Date Range</span>}>
+        <DatePicker.RangePicker
+          style={{ width: '100%' }}
+          value={selectedCalibrationDate}
+          onChange={(dates) => {
+            setSelectedCalibrationDate(dates);
+            if (dates) {
+              handleCheckboxChange('calibration_date', [
+                dates[0].format('YYYY-MM-DD'),
+                dates[1].format('YYYY-MM-DD')
+              ]);
+            } else {
+              handleCheckboxChange('calibration_date', null);
+            }
+          }}
+          allowClear
+        />
+      </Form.Item>
+
+      <Form.Item label={<span className="font-bold">Calibration Due Date Range</span>}>
+        <DatePicker.RangePicker
+          style={{ width: '100%' }}
+          value={selectedCalibrationDueDate}
+          onChange={(dates) => {
+            setSelectedCalibrationDueDate(dates);
+            if (dates) {
+              handleCheckboxChange('calibration_due_date', [
+                dates[0].format('YYYY-MM-DD'),
+                dates[1].format('YYYY-MM-DD')
+              ]);
+            } else {
+              handleCheckboxChange('calibration_due_date', null);
+            }
+          }}
+          allowClear
+        />
+      </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Location</span>}>
+      <Select
+        mode="multiple"
+        allowClear
+        showSearch
+        value={selectedLocation}
+        placeholder="Select Location"
+        style={{ width: '100%' }}
+        options={[...new Set(FixturesData.map(item => item.location))].map(value => ({
+          label: value,
+          value: value,
+        }))}
+        onChange={(values) => {
+          setSelectedLocation(values);
+          handleCheckboxChange('location', values);
+        }}
+        filterOption={(input, option) =>
+          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+        }
+      />
+    </Form.Item>
+
+    <Form.Item label={<span className="font-bold">Stock</span>}>
+            <Slider
+              range
+              min={0}
+              max={Math.max(...FixturesData.map(item => item.stock))}
+              onChange={values => handleSliderChange('stock', values)}
+            />
+          </Form.Item>
+    <Form.Item label={<span className="font-bold">Status</span>}>
+      <Checkbox.Group
+        options={[{ label: 'Available', value: 'Available' }, { label: 'In Use', value: 'In Use' }]}
+        onChange={values => handleCheckboxChange('status', values)}
+      />
+    </Form.Item>
+    <Form.Item>
+      <Row justify="space-between">
+        <Col>
+          <Button onClick={resetFilters}>Reset</Button>
+        </Col>
+        <Col>
+          <Button type="primary" onClick={applyFilters}>
+            Apply Filter
+          </Button>
+        </Col>
+      </Row>
+    </Form.Item>
+  </Form>
+</Drawer>
     </div>
   );
 };

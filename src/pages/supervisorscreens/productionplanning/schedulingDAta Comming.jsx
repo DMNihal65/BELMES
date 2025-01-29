@@ -235,27 +235,10 @@ const Scheduling = () => {
   const [componentColors, setComponentColors] = useState(null);
   const styleElementRef = useRef(null);
 
-  // const [dateRange, setDateRange] = useState([
-  //   moment().startOf('month'),
-  //   moment().endOf('month')
-  // ]);
-  
-  const [visibleRange, setVisibleRange] = useState(() => {
-    const now = moment();
-    return [
-      now.clone().startOf('month'),
-      now.clone().endOf('month')
-    ];
-  });
-
-  const [dateRange, setDateRange] = useState(() => {
-    const now = moment();
-    // Set visible range to current month but load more data
-    return [
-      now.clone().subtract(3, 'months').startOf('month'),
-      now.clone().add(3, 'months').endOf('month')
-    ];
-  });
+  const [dateRange, setDateRange] = useState([
+    moment().startOf('month'),
+    moment().endOf('month')
+  ]);
 
   useEffect(() => {
     fetchScheduleData();
@@ -368,23 +351,9 @@ const Scheduling = () => {
             item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
             axis: 5
           },
-          // start: timeRange.start,
-          // end: timeRange.end,
-          
-          // min: moment().subtract(6, 'months').toDate(), // Allow scrolling up to 6 months back
-          // max: moment().add(6, 'months').toDate(),      // Allow scrolling up to 6 months forward
-          // zoomMin: 1000 * 60 * 60 * 24,                 // Minimum zoom of 1 day
-          // zoomMax: 1000 * 60 * 60 * 24 * 365,          // Maximum zoom of 1 year
-          // editable: false,
-
-          start: visibleRange[0].toDate(),  // Use visibleRange for initial view
-          end: visibleRange[1].toDate(),
-          min: dateRange[0].toDate(),       // Use dateRange for scrollable bounds
-          max: dateRange[1].toDate(),
-          zoomMin: 1000 * 60 * 60 * 24,
-          zoomMax: 1000 * 60 * 60 * 24 * 365,
+          start: timeRange.start,
+          end: timeRange.end,
           editable: false,
-
           tooltip: {
             followMouse: true,
             overflowMethod: 'cap',
@@ -461,19 +430,9 @@ const Scheduling = () => {
         timelineRef.current = timeline;
 
         // Initial fit with delay to ensure proper rendering
-        // setTimeout(() => {
-        //   if (timelineRef.current) {
-        //     timelineRef.current.fit();
-        //   }
-        // }, 100);
-
         setTimeout(() => {
           if (timelineRef.current) {
-            timelineRef.current.setWindow(
-              visibleRange[0].toDate(),
-              visibleRange[1].toDate(),
-              { animation: false }
-            );
+            timelineRef.current.fit();
           }
         }, 100);
 
@@ -1246,35 +1205,6 @@ const styles = {
 //   return { start, end };
 // };
 
-// const getTimeRange = (viewType, dateRange) => {
-//   if (dateRange && dateRange[0] && dateRange[1]) {
-//     return {
-//       start: dateRange[0].toDate(),
-//       end: dateRange[1].toDate()
-//     };
-//   }
-
-//   const now = moment();
-//   let start, end;
-
-//   switch (viewType) {
-//     case 'month':
-//       // Set to current month's start and end
-//       start = now.clone().startOf('month');
-//       end = now.clone().endOf('month');
-//       break;
-//     case 'week':
-//       start = now.clone().startOf('week');
-//       end = now.clone().endOf('week');
-//       break;
-//     default: // day
-//       start = now.clone().startOf('day');
-//       end = now.clone().endOf('day');
-//   }
-
-//   return { start: start.toDate(), end: end.toDate() };
-// };
-
 const getTimeRange = (viewType, dateRange) => {
   if (dateRange && dateRange[0] && dateRange[1]) {
     return {
@@ -1288,19 +1218,17 @@ const getTimeRange = (viewType, dateRange) => {
 
   switch (viewType) {
     case 'month':
-      // Show 3 months before and after the current month
-      start = now.clone().subtract(3, 'months').startOf('month');
-      end = now.clone().add(3, 'months').endOf('month');
+      // Set to current month's start and end
+      start = now.clone().startOf('month');
+      end = now.clone().endOf('month');
       break;
     case 'week':
-      // Show 4 weeks before and after the current week
-      start = now.clone().subtract(4, 'weeks').startOf('week');
-      end = now.clone().add(4, 'weeks').endOf('week');
+      start = now.clone().startOf('week');
+      end = now.clone().endOf('week');
       break;
     default: // day
-      // Show 2 weeks before and after the current day
-      start = now.clone().subtract(2, 'weeks').startOf('day');
-      end = now.clone().add(2, 'weeks').endOf('day');
+      start = now.clone().startOf('day');
+      end = now.clone().endOf('day');
   }
 
   return { start: start.toDate(), end: end.toDate() };

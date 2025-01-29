@@ -1,31 +1,42 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import MainLayout from '../../../../components/layout/MainLayout';
-import OperatorDashboard from '../../../operatorscreens/dashboard';
-import Inventory from '../../../operatorscreens/inventory/inventoryRequest';
-import SupervisorDashboard from '../../dashboard';
+import MainLayout from '../components/layout/MainLayout';
+import OperatorDashboard from '../pages/operatorscreens/dashboard';
+import Inventory from '../pages/operatorscreens/inventory/inventoryRequest';
+import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
 
-import JobDetails from '../../../operatorscreens/jobdetails';
-import AlertScreens from '../../../operatorscreens/AlertScreens';
-import Login from '../../../auth/Login';
-import Planning from '../../productionplanning/planning';
-import Scheduling from '../../productionplanning/scheduling';
+import JobDetails from '../pages/operatorscreens/jobdetails';
+import AlertScreens from '../pages/operatorscreens/AlertScreens';
+import Login from '../pages/auth/Login';
+import Planning from '../pages/supervisorscreens/productionplanning/planning';
+import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
 
-import InventoryUsageAndAnalytics from '../../inventory/inventoryMaster';
-import RequestsCalibrationHistory from '../../inventory/requestsCalibrationHistory';
+import InventoryUsageAndAnalytics from '../pages/supervisorscreens/inventory/inventoryMaster';
+import RequestsCalibrationHistory from '../pages/supervisorscreens/inventory/requestsCalibrationHistory';
 
-import ProductionMonitoring from '../../ProductionMon'
-import OrderDashboard from '../../ordermanagement/orderdashboard';
+import ProductionMonitoring from '../pages/supervisorscreens/ProductionMon'
+import OrderDashboard from '../pages/supervisorscreens/ordermanagement/orderdashboard';
 
-import MaintenanceScreen from '../../../operatorscreens/MaintenanceScreen';
-import InspectionResult from '../../../operatorscreens/InspectionResult';
-import HelpAndSupport from '../../../operatorscreens/HelpAndSupport';
-import DocumentManagement from '../../documentmanagement';
-import QualityManagement from '../../qualitymanagement';
+import MaintenanceScreen from '../pages/operatorscreens/MaintenanceScreen';
+import InspectionResult from '../pages/operatorscreens/InspectionResult';
+import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
+import DocumentManagement from '../pages/supervisorscreens/documentmanagement';
+import QualityManagement from '../pages/supervisorscreens/qualitymanagement';
 // import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
 
 
 // Protected Route wrapper
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRole }) => {
+  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const userRole = localStorage.getItem('userRole');
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRole && userRole !== allowedRole) {
+    return <Navigate to={`/${userRole}/dashboard`} replace />;
+  }
+
   return children;
 };
 
@@ -37,8 +48,9 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: (
-     
+      <ProtectedRoute>
         <MainLayout />
+      </ProtectedRoute>
     ),
     children: [
       {
@@ -52,8 +64,9 @@ export const router = createBrowserRouter([
           {
             path: 'dashboard',
             element: (
-             
+              <ProtectedRoute allowedRole="operator">
                 <OperatorDashboard />
+              </ProtectedRoute>
             ),
           },
           {
@@ -63,23 +76,26 @@ export const router = createBrowserRouter([
           {
             path: 'alerts',
             element: (
-             
+              <ProtectedRoute allowedRole="operator">
                 <AlertScreens />
+              </ProtectedRoute>
             ),
           },
           {
             path: 'maintenance',
             element: (
-            
+              <ProtectedRoute allowedRole="operator">
                 <MaintenanceScreen/>
+              </ProtectedRoute>
             ),
           },
           // Updated Inspection Route
           {
             path: 'inspection',
             element: (
-              
+              <ProtectedRoute allowedRole="operator">
                 <InspectionResult />
+              </ProtectedRoute>
             ),
           },
           {
@@ -89,8 +105,9 @@ export const router = createBrowserRouter([
           {
             path: 'help',
             element: (
-             
+              <ProtectedRoute allowedRole="operator">
                 <HelpAndSupport />
+              </ProtectedRoute>
             ),
           },
         ],
@@ -102,8 +119,9 @@ export const router = createBrowserRouter([
           {
             path: 'dashboard',
             element: (
-              
+              <ProtectedRoute allowedRole="supervisor">
                 <SupervisorDashboard />
+              </ProtectedRoute>
             ),
           },
           {
@@ -118,22 +136,25 @@ export const router = createBrowserRouter([
               {
                 index: true,
                 element: (
-                 
+                  <ProtectedRoute allowedRole="supervisor">
                     <Planning />
+                  </ProtectedRoute>
                 ),
               },
               {
                 path: 'planning',
                 element: (
-                  
+                  <ProtectedRoute allowedRole="supervisor">
                     <Planning />
+                  </ProtectedRoute>
                 ),
               },
               {
                 path: 'scheduling',
                 element: (
-                
+                  <ProtectedRoute allowedRole="supervisor">
                     <Scheduling />
+                  </ProtectedRoute>
                 ),
               },
             ],
@@ -141,15 +162,17 @@ export const router = createBrowserRouter([
           {
             path: 'production-monitoring',
             element: (
-            
+              <ProtectedRoute allowedRole="supervisor">
                 <ProductionMonitoring />
+              </ProtectedRoute>
             ),
           },
           {
             path: 'quality-management',
             element: (
-             
+              <ProtectedRoute allowedRole="supervisor">
                 <QualityManagement />
+              </ProtectedRoute>
             ),
           },
           {
@@ -170,8 +193,9 @@ export const router = createBrowserRouter([
           {
             path: 'documents',
             element: (
-              
+              <ProtectedRoute allowedRole="supervisor">
                 <DocumentManagement />
+              </ProtectedRoute>
             ),
           },
         ],

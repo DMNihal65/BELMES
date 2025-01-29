@@ -7,12 +7,17 @@ const usePlanningStore = create((set) => ({
   isLoading: false,
   error: null,
   mppDetails: null,
+  machines: [
+    { id: 1, name: 'Machine A', status: 'Available' },
+    { id: 2, name: 'Machine B', status: 'In Use' },
+    { id: 3, name: 'Machine C', status: 'Under Maintenance' },
+  ],
 
   // Fetch all orders to get part numbers for dropdown
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:2223/planning/all_orders');
+      const response = await fetch('http://172.18.7.88:7722/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -49,7 +54,7 @@ const usePlanningStore = create((set) => ({
   searchOrders: async (partNumber) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:2223/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.88:7722/planning/search_order?part_number=${partNumber}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -95,29 +100,56 @@ const usePlanningStore = create((set) => ({
 
   // Fetch MPP details
   fetchMPPDetails: async (partNumber, operationNumber) => {
-    set({ isLoading: true, error: null });
+    // Clear existing MPP details before fetching new ones
+    set({ 
+      mppDetails: null,
+      isLoading: true, 
+      error: null 
+    });
+
     try {
-      const response = await fetch(`http://172.18.7.88:2223/mpp/by-part/${partNumber}/${operationNumber}`);
-      const data = await response.json();
+      const response = await fetch(`http://172.18.7.88:7722/mpp/by-part/${partNumber}/${operationNumber}`);
       
-      if (!response.ok) {
-        throw new Error(data.detail || 'Failed to fetch MPP details');
+      // Handle 404 case explicitly
+      if (response.status === 404) {
+        set({ 
+          mppDetails: null,
+          isLoading: false,
+          error: null
+        });
+        return null;
       }
 
-      const mppDetail = Array.isArray(data) ? data[0] : data;
-      set({ 
-        mppDetails: mppDetail,
-        isLoading: false,
-        error: null
-      });
+      const data = await response.json();
       
-      return mppDetail;
+      // Enhanced error checking
+      if (!response.ok) {
+        throw new Error(data.detail || `Error ${response.status}: Failed to fetch MPP details`);
+      }
+
+      // Validate data structure before setting state
+      if (data && (Array.isArray(data) ? data.length > 0 : true)) {
+        const mppDetail = Array.isArray(data) ? data[0] : data;
+        set({ 
+          mppDetails: mppDetail,
+          isLoading: false,
+          error: null
+        });
+        return mppDetail;
+      } else {
+        set({ 
+          mppDetails: null,
+          isLoading: false,
+          error: null
+        });
+        return null;
+      }
     } catch (error) {
       console.error('MPP details fetch error:', error);
       set({ 
         mppDetails: null,
-        error: error.message, 
-        isLoading: false 
+        isLoading: false,
+        error: error.message
       });
       return null;
     }
@@ -127,55 +159,69 @@ const usePlanningStore = create((set) => ({
   saveMPPDetails: async (mppData) => {
     set({ isLoading: true, error: null });
     try {
-      // Format the data according to API requirements
+      // Format the data according to the API requirements
       const formattedData = {
-        order_id: mppData.order_id || null,
-        operation_id: mppData.operation_id || null,
-        document_id: mppData.document_id || null,
-        fixture_number: mppData.fixture_number,
-        ipid_number: mppData.ipid_number,
-        datum_x: mppData.datum_x,
-        datum_y: mppData.datum_y,
-        datum_z: mppData.datum_z,
-        // Change work_instructions to be an array instead of an object
-        work_instructions: mppData.work_instructions.sections,
-        part_number: mppData.part_number,
+        order_id: mppData.order_id,
+        operation_id: mppData.operation_id,
+        document_id: mppData.document_id,
+        fixture_number: String(mppData.fixture_number).trim(),
+        ipid_number: String(mppData.ipid_number).trim(),
+        datum_x: String(mppData.datum_x).trim(),
+        datum_y: String(mppData.datum_y).trim(),
+        datum_z: String(mppData.datum_z).trim(),
+        work_instructions: mppData.work_instructions.sections
+          .filter(section => section.title || section.instructions)
+          .map((section, index) => ({
+            title: String(section.title || '').trim(),
+            instructions: String(section.instructions || '').trim(),
+            sequence: index + 1
+          })),
+        part_number: String(mppData.part_number).trim(),
         operation_number: Number(mppData.operation_number)
       };
 
-      console.log('Sending formatted data:', formattedData);
+      console.log('Sending MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.88:2223/mpp', {
+      const response = await fetch('http://172.18.7.88:7722/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
         body: JSON.stringify(formattedData)
       });
-      
-      const responseData = await response.json();
+
+      // First try to get the error response as JSON
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = await response.text();
+      }
 
       if (!response.ok) {
-        console.error('API Error:', responseData);
+        // Log the complete error response for debugging
+        console.error('Server Error Response:', errorData);
+        
         throw new Error(
-          typeof responseData.detail === 'string' 
-            ? responseData.detail 
-            : JSON.stringify(responseData)
+          typeof errorData === 'object' 
+            ? JSON.stringify(errorData) 
+            : errorData || `Failed to save MPP details (${response.status})`
         );
       }
 
+
+
       set({ 
-        mppDetails: responseData,
+        mppDetails: errorData,
         isLoading: false,
         error: null
       });
       
-      return responseData;
+      return errorData;
     } catch (error) {
-      console.error('Save MPP details error:', error.message);
+      console.error('Save MPP details error:', error);
       set({ 
-        error: error.message, 
+        error: error.message,
         isLoading: false 
       });
       throw error;
@@ -186,7 +232,9 @@ const usePlanningStore = create((set) => ({
   clearMPPDetails: () => {
     set({ 
       mppDetails: null,
-      error: null 
+      error: null,
+      isLoading: false,
+      searchResults: [], // Clear search results as well
     });
   }
 }));

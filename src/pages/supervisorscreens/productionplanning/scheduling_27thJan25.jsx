@@ -89,25 +89,28 @@ const timelineStyles = {
 // Helper functions for timeline
 const getTimeAxisScale = (viewType) => {
   switch (viewType) {
-    case 'month': return 'day';
-    case 'week': return 'hour';
-    default: return 'minute';
+    case 'year': return 'month'; // Scale for year: months (Jan-Dec)
+    case 'month': return 'day';  // Scale for month: days
+    case 'week': return 'hour';  // Scale for week: hours
+    default: return 'minute';    // Default scale: minutes
   }
 };
 
 const getTimeAxisStep = (viewType) => {
   switch (viewType) {
-    case 'month': return 1;
-    case 'week': return 6;
-    default: return 30;
+    case 'year': return 1;  // Step for year: 1 month
+    case 'month': return 1; // Step for month: 1 day
+    case 'week': return 6;  // Step for week: 6 hours
+    default: return 30;     // Default step: 30 minutes
   }
 };
 
 const getDurationByViewType = (viewType) => {
-  switch (viewType) { 
-    case 'month': return 1000 * 60 * 60 * 24 * 31;
-    case 'week': return 1000 * 60 * 60 * 24 * 7;
-    default: return 1000 * 60 * 60 * 24;
+  switch (viewType) {
+    case 'year': return 1000 * 60 * 60 * 24 * 365; // Duration for 1 year (365 days)
+    case 'month': return 1000 * 60 * 60 * 24 * 31; // Approximate duration for 1 month
+    case 'week': return 1000 * 60 * 60 * 24 * 7;   // Duration for 1 week
+    default: return 1000 * 60 * 60 * 24;           // Default duration: 1 day
   }
 };
 
@@ -120,11 +123,14 @@ const getMachineStatus = (machine, operations) => {
 };
 
 const calculateZoomLevel = (duration) => {
-  const hours = duration / (1000 * 60 * 60);
-  if (hours <= 24) return 'day';
-  if (hours <= 168) return 'week';
-  return 'month';
+  const days = duration / (1000 * 60 * 60 * 24);
+  if (days <= 1) return 'day';           // Zoom level for 1 day
+  if (days <= 7) return 'week';          // Zoom level for up to 7 days
+  if (days <= 31) return 'month';        // Zoom level for up to 31 days
+  if (days <= 365) return 'year';        // Zoom level for up to 1 year
+  return 'month';                         // Default to year for anything longer
 };
+
 
 const generateDistinctColors = (count) => {
   const colors = [
@@ -235,31 +241,41 @@ const Scheduling = () => {
   const [componentColors, setComponentColors] = useState(null);
   const styleElementRef = useRef(null);
 
-  // const [dateRange, setDateRange] = useState([
-  //   moment().startOf('month'),
-  //   moment().endOf('month')
-  // ]);
-  
   const [visibleRange, setVisibleRange] = useState(() => {
+
+    const now = moment();
+
+    return [
+      now.clone().startOf('month'),
+      now.clone().endOf('month')
+    ];
+
+  });
+
+  // const [dateRange, setDateRange] = useState(() => {
+  //   const now = moment();
+  //   // Set visible range to current month but load more data
+  //   return [
+  //     now.clone().subtract(12, 'months').startOf('month'),
+  //     now.clone().add(12, 'months').endOf('month')
+  //   ];
+
+  // });
+
+  const [dateRange, setDateRange] = useState(() => {
     const now = moment();
     return [
       now.clone().startOf('month'),
       now.clone().endOf('month')
     ];
   });
+  
 
-  const [dateRange, setDateRange] = useState(() => {
-    const now = moment();
-    // Set visible range to current month but load more data
-    return [
-      now.clone().subtract(3, 'months').startOf('month'),
-      now.clone().add(3, 'months').endOf('month')
-    ];
-  });
 
   useEffect(() => {
     fetchScheduleData();
   }, [fetchScheduleData]);
+  
 
   // Initialize timeline
   useEffect(() => {
@@ -290,6 +306,7 @@ const Scheduling = () => {
          if (selectedComponents.length > 0) {
           operations = operations.filter(op => selectedComponents.includes(op.component));
         }
+        
 
         // Generate and store component colors
         const colors = getComponentColors(operations);
@@ -368,23 +385,16 @@ const Scheduling = () => {
             item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
             axis: 5
           },
-          // start: timeRange.start,
-          // end: timeRange.end,
-          
-          // min: moment().subtract(6, 'months').toDate(), // Allow scrolling up to 6 months back
-          // max: moment().add(6, 'months').toDate(),      // Allow scrolling up to 6 months forward
-          // zoomMin: 1000 * 60 * 60 * 24,                 // Minimum zoom of 1 day
-          // zoomMax: 1000 * 60 * 60 * 24 * 365,          // Maximum zoom of 1 year
-          // editable: false,
+          // start: visibleRange[0].toDate(),  // Use visibleRange for initial view
+          // end: visibleRange[1].toDate(),
+          start: timeRange.start,
+          end: timeRange.end,
 
-          start: visibleRange[0].toDate(),  // Use visibleRange for initial view
-          end: visibleRange[1].toDate(),
           min: dateRange[0].toDate(),       // Use dateRange for scrollable bounds
           max: dateRange[1].toDate(),
           zoomMin: 1000 * 60 * 60 * 24,
           zoomMax: 1000 * 60 * 60 * 24 * 365,
           editable: false,
-
           tooltip: {
             followMouse: true,
             overflowMethod: 'cap',
@@ -433,7 +443,7 @@ const Scheduling = () => {
           },
           timeAxis: { 
             scale: getTimeAxisScale(viewType),
-            step: getTimeAxisStep(viewType)
+            step: getTimeAxisStep(viewType) // Step by month for yearly view
           }
         };
 
@@ -459,23 +469,12 @@ const Scheduling = () => {
         });
 
         timelineRef.current = timeline;
-
         // Initial fit with delay to ensure proper rendering
-        // setTimeout(() => {
-        //   if (timelineRef.current) {
-        //     timelineRef.current.fit();
-        //   }
-        // }, 100);
-
-        setTimeout(() => {
-          if (timelineRef.current) {
-            timelineRef.current.setWindow(
-              visibleRange[0].toDate(),
-              visibleRange[1].toDate(),
-              { animation: false }
-            );
-          }
-        }, 100);
+        timelineRef.current.setWindow(
+          visibleRange[0].toDate(),
+          visibleRange[1].toDate(),
+          { animation: false }
+        );
 
       } catch (error) {
         console.error('Timeline initialization error:', error);
@@ -631,6 +630,12 @@ const Scheduling = () => {
     const now = moment();
     
     switch (newViewType) {
+      case 'year': // New case for yearly view
+        setDateRange([
+          now.clone().startOf('year'),
+          now.clone().endOf('year')
+        ]);
+        break;
       case 'month':
         setDateRange([
           now.clone().startOf('month'),
@@ -688,86 +693,87 @@ const Scheduling = () => {
                     <Option value="day">Daily</Option>
                     <Option value="week">Weekly</Option>
                     <Option value="month">Monthly</Option>
+                    <Option value="year">Yearly</Option>
                   </Select>
                 </Space>
                 <Space>
                 <DatePicker.RangePicker
-  // value={dateRange}
-  onChange={(dates, dateStrings) => {
-    if (dates) {
-      const [start, end] = dates;
-      switch (viewType) {
-        case 'month':
-          // Set to first and last day of selected months
-          setDateRange([
-            start.startOf('month'),
-            end.endOf('month')
-          ]);
-          break;
-        case 'week':
-          // Allow day-to-day selection within weeks
-          setDateRange([
-            start.startOf('day'),  // Changed from startOf('week')
-            end.endOf('day')       // Changed from endOf('week')
-          ]);
-          break;
-        case 'day':
-          // Set to start and end of selected days
-          setDateRange([
-            start.startOf('day'),
-            end.endOf('day')
-          ]);
-          break;
-      }
-    } else {
-      setDateRange(null);
-    }
-  }}
-  placeholder={['Start Date', 'End Date']}
-  picker={viewType === 'month' ? 'month' : 'date'}  // Changed: always use 'date' for week view
-  showTime={false}
-  format={
-    viewType === 'month' 
-      ? 'YYYY MMM'
-      : 'YYYY-MM-DD'  // Changed: use same format for week and day views
-  }
-  allowClear={true}
-  ranges={{
-    'Today': [moment().startOf('day'), moment().endOf('day')],
-    'This Week': [moment().startOf('week'), moment().endOf('week')],
-    'This Month': [moment().startOf('month'), moment().endOf('month')],
-    'Next Month': [
-      moment().add(1, 'month').startOf('month'),
-      moment().add(1, 'month').endOf('month')
-    ]
-  }}
-  onOpenChange={(open) => {
-    // Reset to current date range if cleared
-    if (!open && !dateRange) {
-      const now = moment();
-      switch (viewType) {
-        case 'month':
-          setDateRange([
-            now.clone().startOf('month'),
-            now.clone().endOf('month')
-          ]);
-          break;
-        case 'week':
-          setDateRange([
-            now.clone().startOf('day'),  // Changed from startOf('week')
-            now.clone().endOf('day')     // Changed from endOf('week')
-          ]);
-          break;
-        case 'day':
-          setDateRange([
-            now.clone().startOf('day'),
-            now.clone().endOf('day')
-          ]);
-          break;
-      }
-    }
-  }}
-/>
+                  // value={dateRange}
+                  onChange={(dates, dateStrings) => {
+                    if (dates) {
+                      const [start, end] = dates;
+                      switch (viewType) {
+                        case 'month':
+                          // Set to first and last day of selected months
+                          setDateRange([
+                            start.startOf('month'),
+                            end.endOf('month')
+                          ]);
+                          break;
+                        case 'week':
+                          // Allow day-to-day selection within weeks
+                          setDateRange([
+                            start.startOf('day'),  // Changed from startOf('week')
+                            end.endOf('day')       // Changed from endOf('week')
+                          ]);
+                          break;
+                        case 'day':
+                          // Set to start and end of selected days
+                          setDateRange([
+                            start.startOf('day'),
+                            end.endOf('day')
+                          ]);
+                          break;
+                      }
+                    } else {
+                      setDateRange(null);
+                    }
+                  }}
+                  placeholder={['Start Date', 'End Date']}
+                  picker={viewType === 'month' ? 'month' : 'date'}  // Changed: always use 'date' for week view
+                  showTime={false}
+                  format={
+                    viewType === 'month' 
+                      ? 'YYYY MMM'
+                      : 'YYYY-MM-DD'  // Changed: use same format for week and day views
+                  }
+                  allowClear={true}
+                  ranges={{
+                    'Today': [moment().startOf('day'), moment().endOf('day')],
+                    'This Week': [moment().startOf('week'), moment().endOf('week')],
+                    'This Month': [moment().startOf('month'), moment().endOf('month')],
+                    'Next Month': [
+                      moment().add(1, 'month').startOf('month'),
+                      moment().add(1, 'month').endOf('month')
+                    ]
+                  }}
+                  onOpenChange={(open) => {
+                    // Reset to current date range if cleared
+                    if (!open && !dateRange) {
+                      const now = moment();
+                      switch (viewType) {
+                        case 'month':
+                          setDateRange([
+                            now.clone().startOf('month'),
+                            now.clone().endOf('month')
+                          ]);
+                          break;
+                        case 'week':
+                          setDateRange([
+                            now.clone().startOf('day'),  // Changed from startOf('week')
+                            now.clone().endOf('day')     // Changed from endOf('week')
+                          ]);
+                          break;
+                        case 'day':
+                          setDateRange([
+                            now.clone().startOf('day'),
+                            now.clone().endOf('day')
+                          ]);
+                          break;
+                      }
+                    }
+                  }}
+                />
                   <Select 
                     mode="multiple" 
                     placeholder="Select Machines"
@@ -1246,35 +1252,6 @@ const styles = {
 //   return { start, end };
 // };
 
-// const getTimeRange = (viewType, dateRange) => {
-//   if (dateRange && dateRange[0] && dateRange[1]) {
-//     return {
-//       start: dateRange[0].toDate(),
-//       end: dateRange[1].toDate()
-//     };
-//   }
-
-//   const now = moment();
-//   let start, end;
-
-//   switch (viewType) {
-//     case 'month':
-//       // Set to current month's start and end
-//       start = now.clone().startOf('month');
-//       end = now.clone().endOf('month');
-//       break;
-//     case 'week':
-//       start = now.clone().startOf('week');
-//       end = now.clone().endOf('week');
-//       break;
-//     default: // day
-//       start = now.clone().startOf('day');
-//       end = now.clone().endOf('day');
-//   }
-
-//   return { start: start.toDate(), end: end.toDate() };
-// };
-
 const getTimeRange = (viewType, dateRange) => {
   if (dateRange && dateRange[0] && dateRange[1]) {
     return {
@@ -1286,24 +1263,42 @@ const getTimeRange = (viewType, dateRange) => {
   const now = moment();
   let start, end;
 
-  switch (viewType) {
-    case 'month':
-      // Show 3 months before and after the current month
-      start = now.clone().subtract(3, 'months').startOf('month');
-      end = now.clone().add(3, 'months').endOf('month');
-      break;
-    case 'week':
-      // Show 4 weeks before and after the current week
-      start = now.clone().subtract(4, 'weeks').startOf('week');
-      end = now.clone().add(4, 'weeks').endOf('week');
-      break;
-    default: // day
-      // Show 2 weeks before and after the current day
-      start = now.clone().subtract(2, 'weeks').startOf('day');
-      end = now.clone().add(2, 'weeks').endOf('day');
-  }
+  ////current data 
+  // switch (viewType) {
+  //   case 'month':
+  //     // Set to current month's start and end
+  //     start = now.clone().startOf('month');
+  //     end = now.clone().endOf('month');
+  //     break;
+  //   case 'week':
+  //     start = now.clone().startOf('week');
+  //     end = now.clone().endOf('week');
+  //     break;
+  //   default: // day
+  //     start = now.clone().startOf('day');
+  //     end = now.clone().endOf('day');
+  // }
 
-  return { start: start.toDate(), end: end.toDate() };
+      //past and future dates
+      // Set to current month's start and end
+      switch (viewType) {
+        case 'year':
+          start = now.clone().subtract(1, 'year').startOf('year');
+          end = now.clone().add(1, 'year').endOf('year');
+          break;
+      case 'month':
+        start = now.clone().subtract(3, 'months').startOf('month');
+        end = now.clone().add(3, 'months').endOf('month');
+        break;
+      case 'week':
+        start = now.clone().subtract(4, 'weeks').startOf('week');
+        end = now.clone().add(4, 'weeks').endOf('week');
+        break;
+      default: // day
+        start = now.clone().subtract(2, 'weeks').startOf('day');
+        end = now.clone().add(2, 'weeks').endOf('day');
+      }
+      return { start: start.toDate(), end: end.toDate() };
 };
 
 export default Scheduling;

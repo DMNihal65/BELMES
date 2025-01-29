@@ -1,3 +1,9 @@
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> e0790644a9d7edae155b19e538d87c4330e695a1
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 // Async thunks

@@ -13,7 +13,7 @@ import {
 } from '@ant-design/icons';
 import {
   Timer, AlertTriangle, CheckCircle2, 
-  Gauge, Settings, Users, Calendar
+  Gauge, Settings, Users, Calendar,  CheckCircle, Hourglass, CalendarCheck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import JobOperationsTable from '../../../components/ProductionPlanning/JobOperationsTable';
@@ -48,21 +48,7 @@ const Planning = () => {
     const results = await searchOrders(partNumber);
     if (results.orders && results.orders.length > 0) {
       const selectedJobData = results.orders[0];
-      // Ensure operations have the required format
-      const formattedOperations = selectedJobData.operations?.map(op => ({
-        ...op,
-        key: op.id.toString(),
-        operation_number: op.operation_number || op.opNo,
-        operation_description: op.operation_description || op.description,
-        setup_time: op.setup_time || 0,
-        ideal_cycle_time: op.ideal_cycle_time || 0,
-        work_center: op.work_center || ''
-      })) || [];
-
-      setSelectedJob({
-        ...selectedJobData,
-        operations: formattedOperations
-      });
+      setSelectedJob(selectedJobData);
     }
   };
 
@@ -234,10 +220,14 @@ const Planning = () => {
                 key="jobDetails"
               >
                 <Card 
-                  className="shadow-sm mb-6 hover:shadow-md transition-shadow"
+                  className={`shadow-sm mb-6 hover:shadow-md transition-shadow ${
+                    selectedJob.part_number === '213001220002' ? 'bg-green-50' : 
+                    selectedJob.part_number === '213301840171' ? 'bg-yellow-50' : 
+                    selectedJob.part_number === '252322000101' ? 'bg-green-200' : 'bg-white'
+                  }`} 
                   size="small"
                 >
-                  <Descriptions column={3}>
+                  <Descriptions column={3} >
                     <Descriptions.Item label="Part Number">
                       {selectedJob.part_number}
                     </Descriptions.Item>
@@ -273,8 +263,33 @@ const Planning = () => {
                     <Descriptions.Item label="Start Date">
                       {selectedJob.project?.start_date || 'N/A'}
                     </Descriptions.Item>
+
+                    {/* Status & Button Section */}
+                <Descriptions.Item label="Status">
+                  {selectedJob.part_number === "213001220002" ? (
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" className="bg-green-600 text-white hover:bg-green-700">
+                        <CalendarCheck className="w-5 h-5 mr-2" /> Scheduled
+                      </Button>
+                    </div>
+                  ) : selectedJob.part_number === "213301840171" ? (
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" className="bg-yellow-600 text-white hover:bg-yellow-700">
+                        <Hourglass className="w-5 h-5 mr-2" /> Pending
+                      </Button>
+                    </div>
+                  ) : selectedJob.part_number === "252322000101" ? (
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" className="bg-green-800 text-white hover:bg-green-900">
+                        <CheckCircle className="w-5 h-5 mr-2" /> Complete
+                      </Button>
+                    </div>
+                  ) : null}
+                </Descriptions.Item>;
                   </Descriptions>
                 </Card>
+
+
 
                 <JobOperationsTable 
                   jobId={selectedJob.id}

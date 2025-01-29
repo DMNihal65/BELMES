@@ -7,7 +7,7 @@ import GaugesAndInstruments from './GaugesAndInstruments';
 import Fixtures from './Fixtures';
 import RawMaterials from './RawMaterials';
 import Consumables from './Consumables';
-import FilterSidebar from '../../../components/inventory/FilterSidebar';
+// import FilterSidebar from '../../../components/inventory/FilterSidebar';
 
 const { TabPane } = Tabs;
 

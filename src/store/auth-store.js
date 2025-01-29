@@ -6,78 +6,85 @@ const useAuthStore = create(
     (set) => ({
       token: null,
       user: null,
-      roles: [
-        { id: 1, name: 'operator' },
-        { id: 2, name: 'supervisor' }
-      ],
-      machines: [
-        { 
-          id: 1, 
-          model: "machine name new 1",
-          work_center: { code: "WC1" }
-        }
-      ],
+      roles: [],
+      machines: [],
       isLoading: false,
       error: null,
 
       fetchRoles: async () => {
-        // Hardcoded roles, no need to fetch
-        return;
+        set({ isLoading: true });
+        try {
+          const response = await fetch('http://172.18.7.88:7722/roles');
+          const data = await response.json();
+          set({ roles: data, isLoading: false });
+        } catch (error) {
+          set({ error: error.message, isLoading: false });
+        }
       },
 
       fetchMachines: async () => {
-        // Hardcoded machines, no need to fetch
-        return;
+        set({ isLoading: true });
+        try {
+          const response = await fetch('http://172.18.7.88:7722/master-order/all-machines/');
+          const data = await response.json();
+          // Extracting the "code" from each machine's work_center
+          const machinesWithCode = data.map(machine => ({
+            ...machine,
+            code: machine.work_center.code // Adding the "code" to the machine object
+          }));
+          set({ machines: machinesWithCode, isLoading: false });
+        } catch (error) {
+          set({ error: error.message, isLoading: false });
+        }
       },
 
       login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-          // Hardcoded validation
-          if (credentials.role === 'operator') {
-            if (credentials.username === 'string' && credentials.password === 'string') {
-              const userData = {
-                username: credentials.username,
-                role: 'operator',
-                access: 'granted'
-              };
+          const formData = new URLSearchParams({
+            grant_type: 'password',
+            username: credentials.username,
+            password: credentials.password,
+            scope: '',
+            client_id: 'string',
+            client_secret: 'string'
+          });
 
-              localStorage.setItem('isAuthenticated', 'true');
-              localStorage.setItem('userRole', 'operator');
-
-              set({ 
-                token: 'fake-token',
-                user: userData,
-                isLoading: false,
-                error: null
-              });
-
-              return { user: userData };
-            }
-          } else if (credentials.role === 'supervisor') {
-            if (credentials.username === 'string' && credentials.password === 'string') {
-              const userData = {
-                username: credentials.username,
-                role: 'supervisor',
-                access: 'granted'
-              };
-
-              localStorage.setItem('isAuthenticated', 'true');
-              localStorage.setItem('userRole', 'supervisor');
-
-              set({ 
-                token: 'fake-token',
-                user: userData,
-                isLoading: false,
-                error: null
-              });
-
-              return { user: userData };
-            }
+          const response = await fetch('http://172.18.7.88:7722/login', {
+            method: 'POST',
+            headers: {
+              'accept': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString(),
+          });
+          
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.detail?.[0]?.msg || 'Authentication failed');
           }
-          throw new Error('Invalid credentials');
+          
+          const userData = {
+            username: credentials.username,
+            role: credentials.role || data.role,
+            access: data.access,
+          };
+
+          set({ 
+            token: data.access_token,
+            user: userData,
+            isLoading: false,
+            error: null
+          });
+
+          localStorage.setItem('token', data.access_token);
+          localStorage.setItem('user', JSON.stringify(userData));
+
+          return { ...data, user: userData };
         } catch (error) {
           set({ error: error.message, isLoading: false, token: null, user: null });
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
           throw error;
         }
       },
@@ -85,9 +92,25 @@ const useAuthStore = create(
       register: async (userData) => {
         set({ isLoading: true, error: null });
         try {
-          // Simulate successful registration
+          const response = await fetch('http://172.18.7.88:7722/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: userData.email,
+              password: userData.password,
+              role_id: userData.role_id,
+              username: userData.username
+            }),
+          });
+          
+          const data = await response.json();
+          if (!response.ok) {
+            console.error('Registration error:', data); // Log the error response
+            throw new Error(data.detail ? data.detail.join(', ') : 'Registration failed');
+          }
+          
           set({ isLoading: false, error: null });
-          return { message: 'Registration successful' };
+          return data;
         } catch (error) {
           set({ error: error.message, isLoading: false });
           throw error;
@@ -96,8 +119,8 @@ const useAuthStore = create(
 
       logout: () => {
         set({ token: null, user: null });
-        localStorage.removeItem('isAuthenticated');
-        localStorage.removeItem('userRole');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       },
 
       clearError: () => set({ error: null }),
@@ -109,4 +132,4 @@ const useAuthStore = create(
   )
 );
 
-export default useAuthStore;
+export default useAuthStore; 

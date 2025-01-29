@@ -7,6 +7,7 @@ import OrderTable from '../../../components/OrderManagement/OrderTable';
 import ReorderableTable from '../../../components/OrderManagement/ReorderableTable';
 import CreateOrderModal from '../../../components/OrderManagement/CreateOrderModal';
 import useOrderStore from '../../../store/order-store';
+import Workcenter from '../../../components/OrderManagement/Workcenter';
 
 const { TabPane } = Tabs;
 
@@ -97,7 +98,7 @@ const OrderDashboard = () => {
         </Row>
 
         {/* Main Content Area - Full Width Order Management */}
-        <Row className="h-[calc(100vh-240px)]">
+        <Row className="h-[calc(100vh-20px)]">
           <Col span={24} className="h-full">
             <Card
               title={
@@ -154,6 +155,11 @@ const OrderDashboard = () => {
                           message.success('Order sequence updated successfully');
                         }} 
                       />
+                    </div>
+                  </TabPane>
+                  <TabPane tab="Workcenter" key="workcenter">
+                    <div className="h-full overflow-auto">
+                      <Workcenter />
                     </div>
                   </TabPane>
                 </Tabs>

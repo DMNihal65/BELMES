@@ -87,7 +87,6 @@ const useScheduleStore = create((set, get) => ({
   plannedSchedule: null,
   forecastSchedule: null,
   scheduleHistory: [],
-  availableProductionOrders: [],
   comparisonMetrics: null,
   comparisonLoading: false,
   
@@ -95,14 +94,8 @@ const useScheduleStore = create((set, get) => ({
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:7722/operations/schedule-batch/');
+      const response = await fetch('http://172.18.7.88:3822/operations/schedule-batch/');
       const data = await response.json();
-
-        
-      // Extract unique production orders
-      const uniqueProductionOrders = [...new Set(data.scheduled_operations.map(op => op.production_order))];
-      set({ availableProductionOrders: uniqueProductionOrders });
-
       
       // Transform the data for Gantt chart
       const tasks = data.scheduled_operations.map((op, index) => ({
@@ -112,7 +105,6 @@ const useScheduleStore = create((set, get) => ({
         end: new Date(op.end_time),
         machine: op.machine,
         component: op.component,
-        production_order: op.production_order,
         progress: calculateProgress(op, data.component_status[op.component]),
         type: 'task',
         quantity: op.quantity,
@@ -130,66 +122,6 @@ const useScheduleStore = create((set, get) => ({
       set({ error: error.message, loading: false });
     }
   },
-
-  getDailyProduction: (componentId) => {
-    const { scheduleData } = get();
-    if (!scheduleData || !scheduleData.daily_production) return null; // Ensure daily_production exists
-    const productionData = scheduleData.daily_production[componentId] || [];
-    
-    // Return the expected structure
-    return productionData.map(item => ({
-      date: item.scheduled_end_time, // Assuming this is the date field
-      partno: componentId,
-      quantity: item.completed_quantity || 0, // Adjust based on your actual data structure
-    }));
-  },
-  
-  getComponentDetails: (componentId) => {
-    const { scheduleData } = get();
-    if (!scheduleData || !scheduleData.component_status) return null; // Ensure component_status exists
-    return scheduleData.component_status[componentId] || {}; // Return an empty object if not found
-  },
-  
-
-  ////unit schedule
-    // Fetch schedule data
-    // fetchScheduleData: async () => {
-    //   set({ loading: true, error: null });
-    //   try {
-    //     const response = await fetch('http://172.18.7.88:7722/operations/unit_schedule/');
-    //     const operations = await response.json();
-        
-    //     // Transform the array response into the expected format
-    //     const transformedData = {
-    //       scheduled_operations: operations,
-    //       component_status: {} // Since the new API doesn't provide status, initialize empty
-    //     };
-        
-    //     // Transform the data for Gantt chart
-    //     const tasks = operations.map((op, index) => ({
-    //       id: `${op.component}-${op.description}-${index}`,
-    //       name: `${op.component} - ${op.description}`,
-    //       start: new Date(op.start_time),
-    //       end: new Date(op.end_time),
-    //       machine: op.machine,
-    //       component: op.component,
-    //       progress: 0, // Since we don't have status data, default to 0
-    //       type: 'task',
-    //       quantity: op.quantity,
-    //       styles: getTaskStyles(op, null) // Pass null for status since we don't have it
-    //     }));
-  
-    //     set({ 
-    //       scheduleData: {
-    //         ...transformedData,
-    //         tasks
-    //       },
-    //       loading: false 
-    //     });
-    //   } catch (error) {
-    //     set({ error: error.message, loading: false });
-    //   }
-    // },
 
   setSelectedComponent: (component) => set({ selectedComponent: component }),
   setViewMode: (mode) => set({ viewMode: mode }),

@@ -46,12 +46,11 @@ const App = () => {
 
           {/* Operator Routes */}
           <Route path="/operator" element={
-            <ProtectedRoute>
+            // <ProtectedRoute>
               <MainLayout />
-            </ProtectedRoute>
+            // </ProtectedRoute>
           }>
-            <Route path="dashboard" element={<OperatorDashboard />} />
-            <Route path="job-details" element={<JobDetails />} />
+            <Route path="dashboard" element={<JobDetails />} />
             <Route path="alerts" element={<AlertScreens />} />
             <Route path="maintenance" element={<MaintenanceScreen />} />
             <Route path="inspection" element={<InspectionResult />} />

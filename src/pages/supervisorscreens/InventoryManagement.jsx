@@ -121,7 +121,8 @@ const InventoryManagement = () => {
       <Row gutter={[16, 16]}>
         <Col span={24}>
           <Title level={2}>
-            <InboxOutlined /> Inventory Management
+            <InboxOutlined /> Inventory 
+            Management
           </Title>
         </Col>
 

@@ -144,31 +144,53 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
       },
     },
     {
-      title: 'Priority',
-      key: 'priority',
-      render: (_, record) => {
-        const priority = record.project?.priority;
-        let displayPriority = 'normal';
-        let tagColor = 'blue';
-
-        if (priority === 1) {
-          displayPriority = 'high';
-          tagColor = 'red';
-        } else if (priority === 2) {
-          displayPriority = 'medium';
-          tagColor = 'orange';
-        } else if (priority === 3) {
-          displayPriority = 'low';
-          tagColor = 'blue';
-        }
-
-        return (
-          <Tag color={tagColor}>
-            {displayPriority.toUpperCase()}
+      title: 'WBS Element',
+      dataIndex: 'wbs_element',
+      key: 'wbs_element',
+    },
+    {
+      title: 'Sales Order',
+      dataIndex: 'sale_order',
+      key: 'sale_order',
+    },
+    {
+      title: 'Project',
+      key: 'project',
+      render: (_, record) => (
+        <div>
+          <div>{record.project?.name}</div>
+          <Tag color={record.project?.priority === 1 ? 'red' : 'blue'}>
+            Priority: {record.project?.priority}
           </Tag>
-        );
-      },
-    }
+        </div>
+      ),
+    },
+    // {
+    //   title: 'Priority',
+    //   key: 'priority',
+    //   render: (_, record) => {
+    //     const priority = record.project?.priority;
+    //     let displayPriority = 'normal';
+    //     let tagColor = 'blue';
+
+    //     if (priority === 1) {
+    //       displayPriority = 'high';
+    //       tagColor = 'red';
+    //     } else if (priority === 2) {
+    //       displayPriority = 'medium';
+    //       tagColor = 'orange';
+    //     } else if (priority === 3) {
+    //       displayPriority = 'low';
+    //       tagColor = 'blue';
+    //     }
+
+    //     return (
+    //       <Tag color={tagColor}>
+    //         {displayPriority.toUpperCase()}
+    //       </Tag>
+    //     );
+    //   },
+    // }
   ];
 
   const onDragEnd = ({ active, over }) => {
@@ -289,5 +311,3 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
 };
 
 export default ReorderableTable;
-
-

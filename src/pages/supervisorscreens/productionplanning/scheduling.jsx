@@ -18,6 +18,11 @@ import "vis-timeline/dist/vis-timeline-graph2d.css";
 import useScheduleStore from '../../../store/schedule-store';
 import ReactApexChart from 'react-apexcharts';
 import moment from 'moment';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, LineChart,
+  Line } from 'recharts';
+import AnalyticsDashboard from './Analytics/AnalyticsDashboard';
+import { ComponentLegend, MachineStatusCards } from './Schedule/ComponentsAndStatus';
+import ReactECharts from "echarts-for-react";
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -89,25 +94,30 @@ const timelineStyles = {
 // Helper functions for timeline
 const getTimeAxisScale = (viewType) => {
   switch (viewType) {
-    case 'month': return 'day';
-    case 'week': return 'hour';
-    default: return 'minute';
+    case 'year': return 'month'; // Scale for year: months (Jan-Dec)
+    case 'month': return 'day';  // Scale for month: days
+    case 'week': return 'hour';  // Scale for week: hours
+    case 'day': return 'hour';   // Scale for day: hours (changed from 'minute')
+    default: return 'hour';      // Default scale: hours
   }
 };
 
 const getTimeAxisStep = (viewType) => {
   switch (viewType) {
-    case 'month': return 1;
-    case 'week': return 6;
-    default: return 30;
+    case 'year': return 1;  // Step for year: 1 month
+    case 'month': return 1; // Step for month: 1 day
+    case 'week': return 6;  // Step for week: 6 hours
+    case 'day': return 1;   // Step for day: 1 hour (changed from 30)
+    default: return 1;      // Default step: 1 hour
   }
 };
 
 const getDurationByViewType = (viewType) => {
-  switch (viewType) { 
-    case 'month': return 1000 * 60 * 60 * 24 * 31;
-    case 'week': return 1000 * 60 * 60 * 24 * 7;
-    default: return 1000 * 60 * 60 * 24;
+  switch (viewType) {
+    case 'year': return 1000 * 60 * 60 * 24 * 365; // Duration for 1 year (365 days)
+    case 'month': return 1000 * 60 * 60 * 24 * 31; // Approximate duration for 1 month
+    case 'week': return 1000 * 60 * 60 * 24 * 7;   // Duration for 1 week
+    default: return 1000 * 60 * 60 * 24;           // Default duration: 1 day
   }
 };
 
@@ -120,11 +130,14 @@ const getMachineStatus = (machine, operations) => {
 };
 
 const calculateZoomLevel = (duration) => {
-  const hours = duration / (1000 * 60 * 60);
-  if (hours <= 24) return 'day';
-  if (hours <= 168) return 'week';
-  return 'month';
+  const days = duration / (1000 * 60 * 60 * 24);
+  if (days <= 1) return 'day';           // Zoom level for 1 day
+  if (days <= 7) return 'week';          // Zoom level for up to 7 days
+  if (days <= 31) return 'month';        // Zoom level for up to 31 days
+  if (days <= 365) return 'year';        // Zoom level for up to 1 year
+  return 'month';                         // Default to year for anything longer
 };
+
 
 const generateDistinctColors = (count) => {
   const colors = [
@@ -157,55 +170,7 @@ const getComponentColors = (operations) => {
   }, {});
 };
 
-const ComponentLegend = ({ componentColors }) => {
-  return (
-    <div className="component-legend">
-      <div className="legend-title">Components</div>
-      <div className="legend-items">
-        {Object.entries(componentColors).map(([component, colors]) => (
-          <div key={component} className="legend-item">
-            <span 
-              className="color-box" 
-              style={{ backgroundColor: colors.backgroundColor }}
-            />
-            <span className="component-name">{component}</span>
-          </div>
-        ))}
-      </div>
-      <style jsx>{`
-        .component-legend {
-          margin-top: 16px;
-          padding: 12px;
-          background: white;
-          border-radius: 8px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .legend-title {
-          font-weight: 600;
-          margin-bottom: 8px;
-        }
-        .legend-items {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-        }
-        .legend-item {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .color-box {
-          width: 16px;
-          height: 16px;
-          border-radius: 4px;
-        }
-        .component-name {
-          font-size: 12px;
-        }
-      `}</style>
-    </div>
-  );
-};
+
 
 const Scheduling = () => {
   const [form] = Form.useForm();
@@ -219,11 +184,13 @@ const Scheduling = () => {
     filterScheduleByMachines,
     filterScheduleByDateRange,
     getMachineUtilization,
+    availableProductionOrders,
     conflicts
   } = useScheduleStore();
 
   const [selectedMachines, setSelectedMachines] = useState([]);
   const [selectedComponents, setSelectedComponents] = useState([]); 
+  const [selectedProductionOrders, setSelectedProductionOrders] = useState([]);
   const [isRescheduleModalVisible, setIsRescheduleModalVisible] = useState(false);
   const [scheduleView, setScheduleView] = useState('timeline');
   const [filteredData, setFilteredData] = useState(null);
@@ -234,15 +201,44 @@ const Scheduling = () => {
   const [showCompleted, setShowCompleted] = useState(true);
   const [componentColors, setComponentColors] = useState(null);
   const styleElementRef = useRef(null);
+  const componentStatus = scheduleData?.component_status || {};
+  const dailyProduction = scheduleData?.daily_production || {};
 
-  const [dateRange, setDateRange] = useState([
-    moment().startOf('month'),
-    moment().endOf('month')
-  ]);
+  const [visibleRange, setVisibleRange] = useState(() => {
+
+    const now = moment();
+
+    return [
+      now.clone().startOf('month'),
+      now.clone().endOf('month')
+    ];
+
+  });
+
+  // const [dateRange, setDateRange] = useState(() => {
+  //   const now = moment();
+  //   // Set visible range to current month but load more data
+  //   return [
+  //     now.clone().subtract(12, 'months').startOf('month'),
+  //     now.clone().add(12, 'months').endOf('month')
+  //   ];
+
+  // });
+
+  const [dateRange, setDateRange] = useState(() => {
+    const now = moment();
+    return [
+      now.clone().startOf('month'),
+      now.clone().endOf('month')
+    ];
+  });
+  
+
 
   useEffect(() => {
     fetchScheduleData();
   }, [fetchScheduleData]);
+  
 
   // Initialize timeline
   useEffect(() => {
@@ -260,6 +256,19 @@ const Scheduling = () => {
         if (selectedComponents.length > 0) {
           operations = operations.filter(op => selectedComponents.includes(op.component));
         }
+
+        if (selectedProductionOrders.length > 0) {
+          operations = operations.filter(op => selectedProductionOrders.includes(op.production_order));
+        }
+
+          // Create groups based on available machines in filtered operations
+      const filteredMachines = [...new Set(operations.map(op => op.machine))];
+      const groups = new DataSet(
+        filteredMachines.map(machine => ({
+          id: machine,
+          content: machine
+        }))
+      );
         
         if (dateRange && dateRange[0] && dateRange[1]) {
           operations = operations.filter(op => {
@@ -273,6 +282,7 @@ const Scheduling = () => {
          if (selectedComponents.length > 0) {
           operations = operations.filter(op => selectedComponents.includes(op.component));
         }
+        
 
         // Generate and store component colors
         const colors = getComponentColors(operations);
@@ -331,14 +341,15 @@ const Scheduling = () => {
         //     content: machine
         //   }))
         // );
-        const groups = new DataSet(
-          (selectedMachines.length > 0 ? selectedMachines : availableMachines).map(machine => ({
-            id: machine,
-            content: machine
-          }))
-        );
+        // const groups = new DataSet(
+        //   (selectedMachines.length > 0 ? selectedMachines : availableMachines).map(machine => ({
+        //     id: machine,
+        //     content: machine
+        //   }))
+        // );
         // Get time range based on view type
-        const timeRange = getTimeRange(viewType, dateRange);
+        const timeRange = getTimeRange(viewType, dateRange, selectedComponents, scheduleData);
+
 
         // Configure options
         const options = {
@@ -351,8 +362,15 @@ const Scheduling = () => {
             item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
             axis: 5
           },
+          // start: visibleRange[0].toDate(),  // Use visibleRange for initial view
+          // end: visibleRange[1].toDate(),
           start: timeRange.start,
           end: timeRange.end,
+
+          min: dateRange[0].toDate(),       // Use dateRange for scrollable bounds
+          max: dateRange[1].toDate(),
+          zoomMin: 1000 * 60 * 60 * 24,
+          zoomMax: 1000 * 60 * 60 * 24 * 365,
           editable: false,
           tooltip: {
             followMouse: true,
@@ -364,10 +382,21 @@ const Scheduling = () => {
               return `
                 <div class="timeline-tooltip">
                   <div class="tooltip-header">
-                    <span class="component">${op.component}</span>
-                    <span class="machine">${op.machine}</span>
+                  <div class="info-row">
+                      <span class="label">Component:</span>
+                      <span class="component">${op.component}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="label">Machine:</span>
+                      <span class="value">${op.machine}</span>
+                    </div>
                   </div>
                   <div class="tooltip-body">
+                  
+                    <div class="info-row">
+                      <span class="label">Production Order:</span>
+                      <span class="value">${op.production_order}</span>
+                    </div>
                     <div class="info-row">
                       <span class="label">Operation:</span>
                       <span class="value">${op.description}</span>
@@ -402,7 +431,13 @@ const Scheduling = () => {
           },
           timeAxis: { 
             scale: getTimeAxisScale(viewType),
-            step: getTimeAxisStep(viewType)
+            step: getTimeAxisStep(viewType) // Step by month for yearly view
+          },
+          format: {
+            minorLabels: {
+              hour: 'HH:mm',
+              minute: 'HH:mm'
+            }
           }
         };
 
@@ -428,13 +463,12 @@ const Scheduling = () => {
         });
 
         timelineRef.current = timeline;
-
         // Initial fit with delay to ensure proper rendering
-        setTimeout(() => {
-          if (timelineRef.current) {
-            timelineRef.current.fit();
-          }
-        }, 100);
+        timelineRef.current.setWindow(
+          visibleRange[0].toDate(),
+          visibleRange[1].toDate(),
+          { animation: false }
+        );
 
       } catch (error) {
         console.error('Timeline initialization error:', error);
@@ -455,7 +489,7 @@ const Scheduling = () => {
         styleElementRef.current = null;
       }
     };
-  }, [scheduleData, selectedMachines, selectedComponents, dateRange, viewType]);
+  }, [scheduleData, selectedMachines, selectedComponents,selectedProductionOrders, dateRange, viewType, visibleRange]);
 
   // Helper function to get operation class name
   const getOperationClassName = (operation, status) => {
@@ -483,7 +517,10 @@ const Scheduling = () => {
 
   const availableComponents = React.useMemo(() => {
     if (!scheduleData) return [];
-    return [...new Set(scheduleData.scheduled_operations.map(op => op.component))];
+    return [...new Set(scheduleData.scheduled_operations
+      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+      .map(op => op.component)
+    )];
   }, [scheduleData]);
 
   // Add this effect to handle filtering
@@ -500,12 +537,27 @@ const Scheduling = () => {
       }
 
       if (selectedComponents.length > 0) {
-        filtered = filtered.scheduled_operations.filter(op => selectedComponents.includes(op.component));
+        filtered = {
+          ...filtered,
+          scheduled_operations: filtered.scheduled_operations.filter(op => 
+            selectedComponents.includes(op.component)
+          )
+        };
+      }
+  
+      // Add production order filtering
+      if (selectedProductionOrders.length > 0) {
+        filtered = {
+          ...filtered,
+          scheduled_operations: filtered.scheduled_operations.filter(op => 
+            selectedProductionOrders.includes(op.production_order)
+          )
+        };
       }
       
       setFilteredData(filtered);
     }
-  }, [scheduleData, selectedMachines, selectedComponents, dateRange]);
+  }, [scheduleData, selectedMachines, selectedComponents, selectedProductionOrders, dateRange]);
 
   // Calculate schedule analytics
   const scheduleAnalytics = React.useMemo(() => {
@@ -590,6 +642,12 @@ const Scheduling = () => {
     const now = moment();
     
     switch (newViewType) {
+      case 'year': // New case for yearly view
+        setDateRange([
+          now.clone().startOf('year'),
+          now.clone().endOf('year')
+        ]);
+        break;
       case 'month':
         setDateRange([
           now.clone().startOf('month'),
@@ -597,9 +655,10 @@ const Scheduling = () => {
         ]);
         break;
       case 'week':
+        // Set date range to 3 days before and after current day
         setDateRange([
-          now.clone().startOf('week'),
-          now.clone().endOf('week')
+          now.clone().subtract(3, 'days').startOf('day'),
+          now.clone().add(3, 'days').endOf('day')
         ]);
         break;
       default: // day
@@ -621,6 +680,7 @@ const Scheduling = () => {
     // Fetch fresh data
     fetchScheduleData();
   };
+  
   
 
   return (
@@ -647,86 +707,94 @@ const Scheduling = () => {
                     <Option value="day">Daily</Option>
                     <Option value="week">Weekly</Option>
                     <Option value="month">Monthly</Option>
+                    <Option value="year">Yearly</Option>
                   </Select>
                 </Space>
                 <Space>
                 <DatePicker.RangePicker
-  // value={dateRange}
-  onChange={(dates, dateStrings) => {
-    if (dates) {
-      const [start, end] = dates;
-      switch (viewType) {
-        case 'month':
-          // Set to first and last day of selected months
-          setDateRange([
-            start.startOf('month'),
-            end.endOf('month')
-          ]);
-          break;
-        case 'week':
-          // Allow day-to-day selection within weeks
-          setDateRange([
-            start.startOf('day'),  // Changed from startOf('week')
-            end.endOf('day')       // Changed from endOf('week')
-          ]);
-          break;
-        case 'day':
-          // Set to start and end of selected days
-          setDateRange([
-            start.startOf('day'),
-            end.endOf('day')
-          ]);
-          break;
-      }
-    } else {
-      setDateRange(null);
-    }
-  }}
-  placeholder={['Start Date', 'End Date']}
-  picker={viewType === 'month' ? 'month' : 'date'}  // Changed: always use 'date' for week view
-  showTime={false}
-  format={
-    viewType === 'month' 
-      ? 'YYYY MMM'
-      : 'YYYY-MM-DD'  // Changed: use same format for week and day views
-  }
-  allowClear={true}
-  ranges={{
-    'Today': [moment().startOf('day'), moment().endOf('day')],
-    'This Week': [moment().startOf('week'), moment().endOf('week')],
-    'This Month': [moment().startOf('month'), moment().endOf('month')],
-    'Next Month': [
-      moment().add(1, 'month').startOf('month'),
-      moment().add(1, 'month').endOf('month')
-    ]
-  }}
-  onOpenChange={(open) => {
-    // Reset to current date range if cleared
-    if (!open && !dateRange) {
-      const now = moment();
-      switch (viewType) {
-        case 'month':
-          setDateRange([
-            now.clone().startOf('month'),
-            now.clone().endOf('month')
-          ]);
-          break;
-        case 'week':
-          setDateRange([
-            now.clone().startOf('day'),  // Changed from startOf('week')
-            now.clone().endOf('day')     // Changed from endOf('week')
-          ]);
-          break;
-        case 'day':
-          setDateRange([
-            now.clone().startOf('day'),
-            now.clone().endOf('day')
-          ]);
-          break;
-      }
-    }
-  }}
-/>
+                  // value={dateRange}
+                  onChange={(dates, dateStrings) => {
+                    if (dates) {
+                      const [start, end] = dates;
+                      switch (viewType) {
+                        case 'year':
+                          setDateRange([
+                            start.startOf('year'),
+                            end.endOf('year')
+                          ]);
+                          break;
+                        case 'month':
+                          // Set to first and last day of selected months
+                          setDateRange([
+                            start.startOf('month'),
+                            end.endOf('month')
+                          ]);
+                          break;
+                        case 'week':
+                          // Allow day-to-day selection within weeks
+                          setDateRange([
+                            start.startOf('day'),  // Changed from startOf('week')
+                            end.endOf('day')       // Changed from endOf('week')
+                          ]);
+                          break;
+                          default:
+                          // Set to start and end of selected days
+                          setDateRange([
+                            start.startOf('day'),
+                            end.endOf('day')
+                          ]);
+                          // break;
+                      }
+                    }
+                    //  else {
+                    //   setDateRange(null);
+                    // }
+                  }}
+                  placeholder={['Start Date', 'End Date']}
+                  picker={viewType === 'month' ? 'month' : 'date'}  // Changed: always use 'date' for week view
+                  showTime={false}
+                  format={
+                    viewType === 'month' 
+                      ? 'YYYY MMM'
+                      : 'YYYY-MM-DD'  // Changed: use same format for week and day views
+                  }
+                  allowClear={true}
+                  ranges={{
+                    'Today': [moment().startOf('day'), moment().endOf('day')],
+                    'This Week': [moment().startOf('week'), moment().endOf('week')],
+                    'This Month': [moment().startOf('month'), moment().endOf('month')],
+                    'Next Month': [
+                      moment().add(1, 'month').startOf('month'),
+                      moment().add(1, 'month').endOf('month')
+                    ]
+                  }}
+                  onOpenChange={(open) => {
+                    // Reset to current date range if cleared
+                    if (!open && !dateRange) {
+                      const now = moment();
+                      switch (viewType) {
+                        case 'month':
+                          setDateRange([
+                            now.clone().startOf('month'),
+                            now.clone().endOf('month')
+                          ]);
+                          break;
+                        case 'week':
+                          setDateRange([
+                            now.clone().startOf('day'),  // Changed from startOf('week')
+                            now.clone().endOf('day')     // Changed from endOf('week')
+                          ]);
+                          break;
+                        case 'day':
+                          setDateRange([
+                            now.clone().startOf('day'),
+                            now.clone().endOf('day')
+                          ]);
+                          break;
+                      }
+                    }
+                  }}
+                />
                   <Select 
                     mode="multiple" 
                     placeholder="Select Machines"
@@ -742,7 +810,7 @@ const Scheduling = () => {
 
                   <Select
                       mode="multiple"
-                      placeholder="Select Part Number"
+                      placeholder="Select Component Number"
                       value={selectedComponents}
                       onChange={setSelectedComponents}
                       style={{ minWidth: 200 }}
@@ -752,7 +820,20 @@ const Scheduling = () => {
                         <Option key={component} value={component}>{component}</Option>
                       ))}
                     </Select>
-                  
+                
+                    <Select
+                    mode="multiple"
+                    placeholder="Select Production Orders"
+                    value={selectedProductionOrders}
+                    onChange={setSelectedProductionOrders}
+                    style={{ minWidth: 200 }}
+                    allowClear
+                  >
+                    {availableProductionOrders.map(order => (
+                      <Option key={order} value={order}>{order}</Option>
+                    ))}
+                  </Select>
+
                   <Button.Group>
                     <Tooltip title="Zoom In">
                       <Button 
@@ -787,17 +868,25 @@ const Scheduling = () => {
                 ref={timelineContainerRef} 
                 className="schedule-timeline"
                 style={{ 
-                  height: '600px',
+                  height: '580px',
                   backgroundColor: '#fff',
                   padding: '20px',
                   borderRadius: '8px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}
               />
-              {scheduleData && componentColors && (
-                <ComponentLegend componentColors={componentColors} />
-              )}
 
+              {scheduleData && componentColors && (
+                <>
+                  <ComponentLegend componentColors={componentColors} />
+                  <MachineStatusCards 
+                    machines={availableMachines}
+                    operations={scheduleData.scheduled_operations}
+                    componentStatus={scheduleData.component_status}
+                    componentColors={componentColors}
+                  />
+                </>
+              )}
               <style jsx global>
                 {Object.entries(timelineStyles).map(([selector, styles]) => `
                   ${selector} {
@@ -807,18 +896,16 @@ const Scheduling = () => {
               </style>
 
               {/* Machine Status Cards */}
-              <Row gutter={[20, 20]} className="mt-6" style={{ maxWidth: '1800px', gridTemplateColumns: 'repeat(5, 1fr)'}}>
-                {availableMachines.map(machine => (
-                  <Col span={4.8} key={machine}>  {/* Changed to span={4.8} for 5 cards per row */}
-                    <MachineStatusCard
-                      machine={machine}
-                      operations={scheduleData.scheduled_operations.filter(op => op.machine === machine)}
-                      componentStatus={scheduleData.component_status}
-                      componentColors={componentColors} 
-                    />
-                  </Col>
-                ))}
-              </Row>
+              
+
+              {scheduleData && (
+                <ProductionGraphs 
+                  componentStatus={componentStatus} 
+                  dailyProduction={dailyProduction} 
+                />
+              )}
+
+
             </Card>
           </TabPane>
 
@@ -831,6 +918,17 @@ const Scheduling = () => {
             key="history"
           >
             <ScheduleHistory />
+          </TabPane>
+
+          <TabPane 
+            tab={ 
+              <span>
+                <HistoryOutlined /> Analytics
+              </span>
+            } 
+            key="analytics"
+          >
+            <AnalyticsDashboard  />
           </TabPane>
         </Tabs>
       </Content>
@@ -940,83 +1038,7 @@ const Scheduling = () => {
 };
 
 // New MachineStatusCard component
-const MachineStatusCard = ({ machine, operations, componentStatus, componentColors }) => {
-  const currentOperation = operations.find(op => 
-    new Date(op.start_time) <= new Date() && 
-    new Date(op.end_time) >= new Date()
-  );
-  const status = currentOperation ? 'running' : 'idle';
-  
-  return (
-    <Card 
-      size="small" 
-      className={`hover:shadow-md transition-shadow border-l-4 ${
-        status === 'running' ? 'border-green-500' : 'border-yellow-500'
-      }`}
-      style={{
-        height: '140px',
-        minWidth: '290px', // Increased from 240px to 280px for wider cards
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-      bodyStyle={{
-        flex: 1,
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
-      <div className="flex justify-between items-start">
-  <div>
-    <div className="font-medium text-base">{machine}</div>
-    <div className="text-sm text-gray-500 flex items-center gap-2">
-      {currentOperation && (
-        <span 
-          className="inline-block w-3 h-3 rounded-sm"
-          style={{ 
-            backgroundColor: componentColors?.[currentOperation.component]?.backgroundColor || '#999',
-          }} 
-        />
-      )}
-       <span className="font-normal text-base">  {/* Changed from text-gray-500 to text-gray-900 for darker text */}
-      {currentOperation ? `Part Number: ${currentOperation.component}` : 'No active operation'}
-    </span>
-    </div>
-    {/* {currentOperation && (
-  <div className="text-sm mt-1 flex items-center">
-    <span className="text-gray-700 text-base">Operation: </span>
-    <span className="text-gray-900 ml-1 truncate font-normal text-base" style={{ maxWidth: '75%' }}>
-      {currentOperation.description}
-    </span>
-  </div>
-)} */}
-  </div>
-  <Badge 
-    status={status === 'running' ? 'success' : 'warning'} 
-    text={status.toUpperCase()}
-  />
-</div>
-      
-      {currentOperation && componentStatus && (
-        <div className="mt-auto">
-          <div className="text-sm flex justify-between mb-2">  
-            <span className="truncate font-normal text-base" style={{ maxWidth: '75%' }}>  
-             Operation: {currentOperation.description}
-            </span>
-            {/* <Tag color={componentStatus.on_time ? 'success' : 'error'}>
-              {Math.round((componentStatus.completed_quantity / componentStatus.total_quantity) * 100)}%
-            </Tag> */}
-          </div>
-          {/* <Progress 
-            percent={Math.round((componentStatus.completed_quantity / componentStatus.total_quantity) * 100)}
-            size="small"
-            status={componentStatus.on_time ? 'success' : 'exception'}
-          /> */}
-        </div>
-      )}
-    </Card>
-  );
-};
+
 
 const ScheduleHistory = () => {
   const [activeTab, setActiveTab] = useState('operations');
@@ -1146,6 +1168,186 @@ const ScheduleHistory = () => {
   );
 };
 
+const ProductionGraphs = ({ componentStatus, dailyProduction }) => {
+  // Default values in case of undefined or null data
+  const validComponentStatus = componentStatus || {};
+  const validDailyProduction = dailyProduction || {};
+
+  // Prepare Component Status data for ECharts (Bar chart)
+  const componentStatusData = Object.entries(validComponentStatus).map(([partno, data]) => {
+    const completedQuantity = data?.completed_quantity || 0;
+    const totalQuantity = data?.total_quantity || 0;
+    const onTime = data?.on_time ? 'Yes' : 'No';
+    const completionRate = totalQuantity > 0 ? ((completedQuantity / totalQuantity) * 100).toFixed(1) : 0;
+
+    return {
+      partno,
+      completed: completedQuantity,
+      total: totalQuantity,
+      onTime,
+      completionRate,
+      scheduledEndTime: data.scheduled_end_time, // Add scheduled end time
+      leadTime: data.lead_time // Add lead time
+    };
+  });
+
+  // ECharts Option for Component Status (Bar chart)
+  const componentStatusOption = {
+    title: {
+      text: "Component Status",
+      left: "center",
+      top: "10",
+      textStyle: { fontSize: 16 }
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: (params) => {
+        const data = params.data;
+        if (!data) {
+          return '<div>No data available</div>';
+        }
+
+        const partno = data.partno || 'N/A';
+        const completed = data.completed || 'N/A';
+        const total = data.total || 'N/A';
+        const completionRate = total > 0 ? ((completed / total) * 100).toFixed(1) : 0;
+        const onTime = data.onTime || 'N/A';
+        const scheduledEndTime = data.scheduledEndTime || 'N/A';
+        const leadTime = data.leadTime || 'N/A';
+
+        return `
+          <div>
+            <strong>Part Number: ${partno}</strong><br>
+            Completed: ${completed}<br>
+            Total: ${total}<br>
+            Completion Rate: ${completionRate}%<br>
+            On Time: ${onTime}<br>
+            Scheduled End Time: ${new Date(scheduledEndTime).toLocaleString()}<br>
+            Lead Time: ${new Date(leadTime).toLocaleString()}
+          </div>`;
+      }
+    },
+    xAxis: {
+      type: "category",
+      data: componentStatusData.map((item) => item.partno),
+      axisLabel: {
+        rotate: 45,
+        textStyle: { fontSize: 12 }
+      }
+    },
+    yAxis: {
+      type: "value"
+    },
+    series: [
+      {
+        name: "Completed",
+        type: "bar",
+        data: componentStatusData.map((item) => item.completed),
+        itemStyle: { color: "#4CAF50" }
+      },
+      {
+        name: "Total Required",
+        type: "bar",
+        data: componentStatusData.map((item) => item.total),
+        itemStyle: { color: "#2196F3" }
+      }
+    ]
+  };
+
+  // Prepare Daily Production data for ECharts (Line chart)
+  const dailyProductionData = [];
+  Object.entries(validDailyProduction).forEach(([partno, dateData]) => {
+    Object.entries(dateData).forEach(([date, quantity]) => {
+      const formattedDate = new Date(date).toLocaleDateString();
+      const existingEntry = dailyProductionData.find(entry => entry.date === formattedDate);
+      if (existingEntry) {
+        existingEntry.quantity += quantity;
+      } else {
+        dailyProductionData.push({
+          date: formattedDate,
+          quantity,
+          partno
+        });
+      }
+    });
+  });
+
+  // Sort the daily production data by date
+  dailyProductionData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // ECharts Option for Daily Production (Line chart)
+  const dailyProductionOption = {
+    title: {
+      text: "Daily Production Schedule",
+      left: "center",
+      top: "10",
+      textStyle: { fontSize: 16 }
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: (params) => {
+        const data = params.data;
+        if (!data) {
+          return '<div>No data available</div>';
+        }
+
+        const date = data.date || 'N/A';
+        const partno = data.partno || 'N/A';
+        const quantity = data.quantity || 'N/A';
+
+        return `
+          <div>
+            <strong>Date: ${date}</strong><br>
+            Part Number: ${partno}<br>
+            Quantity: ${quantity}
+          </div>`;
+      }
+    },
+    xAxis: {
+      type: "category",
+      data: dailyProductionData.map((item) => item.date),
+      axisLabel: {
+        rotate: 45,
+        textStyle: { fontSize: 12 }
+      }
+    },
+    yAxis: {
+      type: "value"
+    },
+    series: [
+      {
+        name: "Production Quantity",
+        type: "line",
+        data: dailyProductionData.map((item) => item.quantity),
+        smooth: true,
+        lineStyle: { color: "#FF5722" },
+        itemStyle: { color: "#FF5722" }
+      }
+    ]
+  };
+
+  return (
+    <div className="mt-8 space-y-6">
+      {/* Component Status Graph */}
+      <div className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Component Status</h3>
+        <div style={{ height: "400px" }}>
+          <ReactECharts option={componentStatusOption} />
+        </div>
+      </div>
+
+      {/* Daily Production Graph */}
+      <div className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Daily Production Schedule</h3>
+        <div style={{ height: "400px" }}>
+          <ReactECharts option={dailyProductionOption} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const styles = {
   wrapper: `
     .machine-status-card {
@@ -1205,7 +1407,27 @@ const styles = {
 //   return { start, end };
 // };
 
-const getTimeRange = (viewType, dateRange) => {
+const getTimeRange = (viewType, dateRange, selectedComponents, scheduleData) => {
+  if (selectedComponents?.length > 0 && scheduleData) {
+    // When componentnumbers are selected, get the full range of their operations
+    const filteredOps = scheduleData.scheduled_operations.filter(op => 
+      selectedComponents.includes(op.component)
+    );
+    
+    if (filteredOps.length > 0) {
+      const startTimes = filteredOps.map(op => new Date(op.start_time));
+      const endTimes = filteredOps.map(op => new Date(op.end_time));
+      const earliestStart = moment(Math.min(...startTimes));
+      const latestEnd = moment(Math.max(...endTimes));
+      
+      // Add padding before and after
+      return {
+        start: earliestStart.subtract(1, 'day').startOf('day').toDate(),
+        end: latestEnd.add(1, 'day').endOf('day').toDate()
+      };
+    }
+  }
+
   if (dateRange && dateRange[0] && dateRange[1]) {
     return {
       start: dateRange[0].toDate(),
@@ -1216,22 +1438,43 @@ const getTimeRange = (viewType, dateRange) => {
   const now = moment();
   let start, end;
 
-  switch (viewType) {
-    case 'month':
-      // Set to current month's start and end
-      start = now.clone().startOf('month');
-      end = now.clone().endOf('month');
-      break;
-    case 'week':
-      start = now.clone().startOf('week');
-      end = now.clone().endOf('week');
-      break;
-    default: // day
-      start = now.clone().startOf('day');
-      end = now.clone().endOf('day');
-  }
+  ////current data 
+  // switch (viewType) {
+  //   case 'month':
+  //     // Set to current month's start and end
+  //     start = now.clone().startOf('month');
+  //     end = now.clone().endOf('month');
+  //     break;
+  //   case 'week':
+  //     start = now.clone().startOf('week');
+  //     end = now.clone().endOf('week');
+  //     break;
+  //   default: // day
+  //     start = now.clone().startOf('day');
+  //     end = now.clone().endOf('day');
+  // }
 
-  return { start: start.toDate(), end: end.toDate() };
+      //past and future dates
+      // Set to current month's start and end
+      switch (viewType) {
+        case 'year':
+          start = now.clone().subtract(1, 'year').startOf('year');
+          end = now.clone().add(1, 'year').endOf('year');
+          break;
+      case 'month':
+        start = now.clone().subtract(3, 'months').startOf('month');
+        end = now.clone().add(3, 'months').endOf('month');
+        break;
+      case 'week':
+        // Show 3 days before and after current day
+        start = now.clone().subtract(3, 'days').startOf('day');
+        end = now.clone().add(3, 'days').endOf('day');
+        break;
+      default: // day
+        start = now.clone().subtract(2, 'weeks').startOf('day');
+        end = now.clone().add(2, 'weeks').endOf('day');
+      }
+      return { start: start.toDate(), end: end.toDate() };
 };
 
 export default Scheduling;

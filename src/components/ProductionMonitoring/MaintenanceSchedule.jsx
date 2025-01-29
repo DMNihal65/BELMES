@@ -1,14 +1,20 @@
-import React from 'react';
-import { Card, Calendar, Badge, Table, Tag, Button, Space, Tooltip,Row ,Col,Statistic  } from 'antd';
+import React, { useState } from 'react';
+import { Card, Calendar, Badge, Table, Tag, Button, Space, Tooltip, Row, Col, Statistic, Select } from 'antd';
 import { 
   CheckCircleOutlined, 
   ClockCircleOutlined, 
   ToolOutlined,
-  WarningOutlined
+  WarningOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import moment from 'moment';
 
 const MaintenanceSchedule = ({ machines }) => {
+  const [selectedMachines, setSelectedMachines] = useState(['all']);
+  const [timeRange, setTimeRange] = useState('shift1');
+  const [dateRange, setDateRange] = useState([]);
+  const [loading, setLoading] = useState(false);
+
   const maintenanceData = machines.map(machine => ({
     key: machine.id,
     machine: machine.name,
@@ -110,6 +116,51 @@ const MaintenanceSchedule = ({ machines }) => {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+        <div className="flex items-center gap-4">
+     
+          <Select
+            mode="multiple"
+            style={{ width: '300px' }}
+            placeholder="Select Machines"
+            defaultValue={['all']}
+            onChange={setSelectedMachines}
+            options={[
+              { value: 'all', label: 'All Machines' },
+              ...machines.map(m => ({ value: m.id, label: `${m.name} (${m.id})` })),
+            ]}
+          />
+        </div>
+        <Space size="large">
+          <Select
+            value={timeRange}
+            style={{ width: '120px' }}
+            onChange={setTimeRange}
+            options={[
+              { value: 'shift1', label: 'Shift 1' },
+              { value: 'shift2', label: 'Shift 2' },
+              { value: 'shift3', label: 'Shift 3' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+          />
+          {timeRange === 'custom' && (
+            <RangePicker
+              showTime
+              format="YYYY-MM-DD HH:mm"
+              onChange={setDateRange}
+            />
+          )}
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => window.location.reload()}
+          >
+            Refresh
+          </Button>
+        </Space>
+      </div>
+
       <Row gutter={[16, 16]}>
         <Col span={16}>
           <Card title="Maintenance Calendar">

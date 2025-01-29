@@ -1,6 +1,6 @@
 import React, { useState, Suspense,useEffect  } from 'react';
-import { Card, Row, Col, Statistic, Tabs, Progress, Badge } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Statistic, Tabs, Progress, Badge, Collapse, Tag } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, ClockCircleOutlined, CheckCircleOutlined, ToolOutlined, DashboardOutlined, CodeSandboxOutlined, BarcodeOutlined, BarChartOutlined, MonitorOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, Grid, Box, Environment, PerspectiveCamera,useGLTF  } from '@react-three/drei';
@@ -233,6 +233,9 @@ const getSparklineOption = (data, color, type = 'line') => ({
 const SupervisorDashboard = () => {
   const [selectedMachine, setSelectedMachine] = useState(null);
 
+  const { TabPane } = Tabs;
+  const { Panel } = Collapse;
+
   return (
     <div style={{ padding: '24px', height: '100vh', background: '#f0f2f5' }}>
       {/* Stats Cards */}
@@ -376,45 +379,218 @@ const SupervisorDashboard = () => {
         {/* Machine Details */}
         <Col span={8}>
           <Card 
-            title="Machine Details" 
+            title={selectedMachine ? selectedMachine.name : "Machine Dashboard"}
             style={{ height: 'calc(100vh - 220px)', overflowY: 'auto' }}
+            extra={selectedMachine && (
+              <Badge 
+                status={selectedMachine.status === 'running' ? 'success' : selectedMachine.status === 'idle' ? 'warning' : 'error'}
+                text={selectedMachine.status.toUpperCase()}
+              />
+            )}
           >
             {selectedMachine ? (
-              <Tabs defaultActiveKey="overview">
-                <Tabs.TabPane tab="Overview" key="overview">
-                  <p>
-                    <strong>Status: </strong>
-                    <Badge
-                      status={selectedMachine.status === 'running' ? 'success' : selectedMachine.status === 'idle' ? 'warning' : 'error'}
-                      text={selectedMachine.status}
-                    />
-                  </p>
-                  <p><strong>OEE:</strong> {selectedMachine.oee}%</p>
-                  <p><strong>Current Program:</strong> {selectedMachine.currentProgram}</p>
-                  <p><strong>Part Number:</strong> {selectedMachine.partNumber}</p>
+              <div className="space-y-4">
+                {/* Enhanced Overview Section */}
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-blue-800">
+                      <DashboardOutlined className="mr-2" />
+                      Machine Overview
+                    </h3>
+                    <Tag color={selectedMachine.status === 'running' ? 'success' : 'warning'}>
+                      {selectedMachine.status === 'running' ? 'Active' : 'Inactive'}
+                    </Tag>
+                  </div>
+                  
+                  <Row gutter={[16, 16]}>
+                    <Col span={8}>
+                      <Card 
+                        className="text-center hover:shadow-md transition-shadow"
+                        bordered={false}
+                        style={{ background: 'rgba(255, 255, 255, 0.8)' }}
+                      >
+                        <Statistic
+                          title={<span className="text-blue-600">OEE</span>}
+                          value={selectedMachine.oee}
+                          suffix="%"
+                          valueStyle={{ 
+                            color: selectedMachine.oee >= 80 ? '#3f8600' : selectedMachine.oee >= 60 ? '#faad14' : '#cf1322',
+                            fontWeight: 'bold'
+                          }}
+                        />
+                        <Progress 
+                          percent={selectedMachine.oee} 
+                          size="small" 
+                          showInfo={false}
+                          strokeColor={{
+                            '0%': '#108ee9',
+                            '100%': '#87d068',
+                          }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card 
+                        className="text-center hover:shadow-md transition-shadow"
+                        bordered={false}
+                        style={{ background: 'rgba(255, 255, 255, 0.8)' }}
+                      >
+                        <Statistic
+                          title={<span className="text-blue-600">Efficiency</span>}
+                          value={selectedMachine.efficiency || 85}
+                          suffix="%"
+                          valueStyle={{ color: '#1890ff', fontWeight: 'bold' }}
+                        />
+                        <Progress 
+                          percent={selectedMachine.efficiency || 85} 
+                          size="small" 
+                          showInfo={false}
+                          strokeColor="#1890ff"
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card 
+                        className="text-center hover:shadow-md transition-shadow"
+                        bordered={false}
+                        style={{ background: 'rgba(255, 255, 255, 0.8)' }}
+                      >
+                        <Statistic
+                          title={<span className="text-blue-600">Availability</span>}
+                          value={selectedMachine.availability || 92}
+                          suffix="%"
+                          valueStyle={{ color: '#52c41a', fontWeight: 'bold' }}
+                        />
+                        <Progress 
+                          percent={selectedMachine.availability || 92} 
+                          size="small" 
+                          showInfo={false}
+                          strokeColor="#52c41a"
+                        />
+                      </Card>
+                    </Col>
+                  </Row>
+
+                  <div className="mt-4 bg-white p-3 rounded-lg">
+                    <Row gutter={[16, 16]}>
+                      <Col span={12}>
+                        <div className="flex items-center">
+                          <CodeSandboxOutlined className="text-blue-500 text-xl mr-2" />
+                          <div>
+                            <div className="text-gray-500 text-sm">Current Program</div>
+                            <div className="font-medium">{selectedMachine.currentProgram}</div>
+                          </div>
+                        </div>
+                      </Col>
+                      <Col span={12}>
+                        <div className="flex items-center">
+                          <BarcodeOutlined className="text-blue-500 text-xl mr-2" />
+                          <div>
+                            <div className="text-gray-500 text-sm">Part Number</div>
+                            <div className="font-medium">{selectedMachine.partNumber}</div>
+                          </div>
+                        </div>
+                      </Col>
+                    </Row>
+                  </div>
+                </div>
+
+                {/* Production Data Section */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3">Production Data</h3>
+                  <Card size="small" className="mb-3">
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Statistic
+                          title="Total Count"
+                          value={selectedMachine.totalCount}
+                          suffix={`/ ${selectedMachine.targetCount}`}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <Statistic
+                          title="Cycle Time"
+                          value={selectedMachine.cycleTime}
+                        />
+                      </Col>
+                    </Row>
+                  </Card>
                   <Progress 
-                    percent={selectedMachine.oee} 
-                    status={selectedMachine.oee >= 80 ? 'success' : selectedMachine.oee >= 60 ? 'normal' : 'exception'} 
+                    percent={(selectedMachine.totalCount / selectedMachine.targetCount) * 100}
+                    status="active"
+                    strokeColor={{
+                      '0%': '#108ee9',
+                      '100%': '#87d068',
+                    }}
                   />
-                </Tabs.TabPane>
-                <Tabs.TabPane tab="Production Data" key="production">
-                  <p><strong>Total Count:</strong> {selectedMachine.totalCount}</p>
-                  <p><strong>Target Count:</strong> {selectedMachine.targetCount}</p>
-                  <p><strong>Cycle Time:</strong> {selectedMachine.cycleTime}</p>
-                  <Progress 
-                    percent={(selectedMachine.totalCount / selectedMachine.targetCount) * 100} 
-                    format={percent => `${selectedMachine.totalCount}/${selectedMachine.targetCount}`}
-                  />
-                </Tabs.TabPane>
-                <Tabs.TabPane tab="Maintenance" key="maintenance">
-                  <p><strong>Downtime:</strong> {selectedMachine.downtime}</p>
-                  <p><strong>Start Time:</strong> {selectedMachine.startTime}</p>
-                  <p><strong>Est. Completion:</strong> {selectedMachine.estimatedCompletion}</p>
-                </Tabs.TabPane>
-              </Tabs>
+                </div>
+
+                {/* Maintenance Section */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3">Maintenance</h3>
+                  <Row gutter={[16, 16]}>
+                    <Col span={8}>
+                      <Card size="small" className="text-center">
+                        <ClockCircleOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
+                        <div className="mt-2">Start Time</div>
+                        <div className="font-semibold">{selectedMachine.startTime}</div>
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card size="small" className="text-center">
+                        <CheckCircleOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
+                        <div className="mt-2">Est. Completion</div>
+                        <div className="font-semibold">{selectedMachine.estimatedCompletion}</div>
+                      </Card>
+                    </Col>
+                    <Col span={8}>
+                      <Card size="small" className="text-center">
+                        <ToolOutlined style={{ fontSize: '24px', color: '#faad14' }} />
+                        <div className="mt-2">Next Service</div>
+                        <div className="font-semibold">2d 5h</div>
+                      </Card>
+                    </Col>
+                  </Row>
+                </div>
+
+                {/* Additional Information */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3">Additional Information</h3>
+                  <Row gutter={[16, 16]}>
+                    <Col span={12}>
+                      <div className="text-sm">
+                        <p><strong>Operator:</strong> {selectedMachine.operator}</p>
+                        <p><strong>Shift:</strong> Morning</p>
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div className="text-sm">
+                        <p><strong>Department:</strong> Machining</p>
+                        <p><strong>Last Maintenance:</strong> 2d ago</p>
+                      </div>
+                    </Col>
+                  </Row>
+                </div>
+              </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                Select a machine to view details
+              // Enhanced Empty State
+              <div className="h-full flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
+                <div className="text-center p-8 rounded-xl">
+                  <div className="mb-6">
+                    <MonitorOutlined className="text-6xl text-blue-400 animate-pulse" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    Welcome to Machine Dashboard
+                  </h3>
+                  <p className="text-gray-500 mb-4 max-w-sm">
+                    Select a machine from the list to view detailed performance metrics, status updates, and maintenance information.
+                  </p>
+                  <div className="flex justify-center gap-4">
+                    <Tag icon={<CheckCircleOutlined />} color="success">Real-time Monitoring</Tag>
+                    <Tag icon={<BarChartOutlined />} color="processing">Performance Metrics</Tag>
+                    <Tag icon={<ToolOutlined />} color="warning">Maintenance Data</Tag>
+                  </div>
+                </div>
               </div>
             )}
           </Card>

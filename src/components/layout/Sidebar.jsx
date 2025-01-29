@@ -29,13 +29,8 @@ function Sidebar() {
   const operatorMenuItems = [
     {
       key: '/operator/dashboard',
-      icon: <Home size={20} />,
-      label: 'Dashboard',
-    },
-    {
-      key: '/operator/job-details',
       icon: <ClipboardList size={20} />,
-      label: 'Job Details',
+      label: 'Dashboard',
     },
     {
       key: '/operator/alerts',

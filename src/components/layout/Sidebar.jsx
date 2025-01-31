@@ -102,19 +102,17 @@ function Sidebar() {
     //   label: 'Inventory Management',
     // },
     {
-
-
-      key: 'inventory_master',
+      key: 'inventory-management',
       icon: <Archive size={20} />,
       label: 'Inventory Management',
       children: [
         {
-          key: '/supervisor/inventory_master/inventory_usage_and_analytics',
-          label: 'Master Data',
+          key: '/supervisor/inventory-management/overview',
+          label: 'Overview',
         },
         {
-          key: '/supervisor/inventory_master/requests_calibration_history',
-          label: 'Overview ',
+          key: '/supervisor/inventory-management/master-data',
+          label: 'Master Data',
         },
       ],
     },

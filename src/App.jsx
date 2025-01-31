@@ -19,6 +19,7 @@ import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagem
 import AlertScreens from './pages/operatorscreens/AlertScreens';
 import MaintenanceScreen from './pages/operatorscreens/MaintenanceScreen';
 import InspectionResult from './pages/operatorscreens/InspectionResult';
+import InventoryManagement from './pages/supervisorscreens/InventoryManagement';
 
 const App = () => {
   return (
@@ -42,6 +43,7 @@ const App = () => {
             <Route path="quality-management" element={<QualityManagementDashboard />} />
             <Route path="inventory_master/inventory_usage_and_analytics" element={<InventoryUsageAndAnalytics />} />
             <Route path="inventory_master/requests_calibration_history" element={<RequestsCalibrationHistory />} />
+            <Route path="inventory-management/*" element={<InventoryManagement />} />
           </Route>
 
           {/* Operator Routes */}

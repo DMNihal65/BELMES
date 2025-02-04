@@ -7,6 +7,7 @@ const usePlanningStore = create((set) => ({
   isLoading: false,
   error: null,
   mppDetails: null,
+  activeParts: [],
   machines: [
     { id: 1, name: 'Machine A', status: 'Available' },
     { id: 2, name: 'Machine B', status: 'In Use' },
@@ -17,7 +18,7 @@ const usePlanningStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:7722/planning/all_orders');
+      const response = await fetch('http://172.18.7.85:4411/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -54,7 +55,7 @@ const usePlanningStore = create((set) => ({
   searchOrders: async (partNumber) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:7722/planning/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.85:4411/planning/search_order?part_number=${partNumber}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -108,7 +109,7 @@ const usePlanningStore = create((set) => ({
     });
 
     try {
-      const response = await fetch(`http://172.18.7.88:7722/mpp/by-part/${partNumber}/${operationNumber}`);
+      const response = await fetch(`http://172.18.7.85:4411/mpp/by-part/${partNumber}/${operationNumber}`);
       
       // Handle 404 case explicitly
       if (response.status === 404) {
@@ -182,7 +183,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.88:7722/mpp', {
+      const response = await fetch('http://172.18.7.85:4411/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -236,6 +237,53 @@ const usePlanningStore = create((set) => ({
       isLoading: false,
       searchResults: [], // Clear search results as well
     });
+  },
+
+  // Add new function to fetch active parts
+  fetchActiveParts: async () => {
+    try {
+      const response = await fetch('http://172.18.7.85:4411/scheduling/active-parts');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to fetch active parts');
+      }
+
+      set({ activeParts: data.active_parts });
+      return data.active_parts;
+    } catch (error) {
+      console.error('Fetch active parts error:', error);
+      set({ activeParts: [] });
+      return [];
+    }
+  },
+
+  // Add function to change part status
+  changePartStatus: async (partNumber, newStatus) => {
+    try {
+      // Ensure we're using the exact same URL format as the working endpoint
+      const response = await fetch(`http://172.18.7.85:4411/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
+        method: 'POST',  // Changed to POST since GET is not allowed
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to change part status');
+      }
+
+      // Refresh active parts list after status change
+      const fetchActiveParts = usePlanningStore.getState().fetchActiveParts;
+      await fetchActiveParts();
+
+      return data;
+    } catch (error) {
+      console.error('Change part status error:', error);
+      throw error;
+    }
   }
 }));
 

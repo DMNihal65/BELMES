@@ -143,7 +143,7 @@ const OrderDashboard = () => {
                       <OrderTable orders={orders.filter(order => order.status === 'delayed')} onRefresh={handleRefresh}/>
                     </div>
                   </TabPane>
-                  <TabPane tab="Reorder" key="reorder">
+                  <TabPane tab="Priority" key="reorder">
                     <div className="h-full overflow-auto">
                       <ReorderableTable 
                         orders={orders.map(order => ({
@@ -157,11 +157,11 @@ const OrderDashboard = () => {
                       />
                     </div>
                   </TabPane>
-                  <TabPane tab="Workcenter" key="workcenter">
+                  {/* <TabPane tab="Workcenter" key="workcenter">
                     <div className="h-full overflow-auto">
                       <Workcenter />
                     </div>
-                  </TabPane>
+                  </TabPane> */}
                 </Tabs>
               </div>
             </Card>

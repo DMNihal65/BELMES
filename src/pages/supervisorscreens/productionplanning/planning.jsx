@@ -36,13 +36,79 @@ const Planning = () => {
     searchOrders, 
     partNumbers, 
     searchResults,
-    isLoading 
+    isLoading,
+    fetchActiveParts,
+    activeParts,
+    changePartStatus 
   } = usePlanningStore();
 
-  // Fetch part numbers on component mount
+  // Fetch part numbers and active parts on component mount
   React.useEffect(() => {
     fetchAllOrders();
-  }, [fetchAllOrders]);
+    fetchActiveParts();
+  }, [fetchAllOrders, fetchActiveParts]);
+
+  const getJobStatus = (partNumber) => {
+    const activePart = activeParts.find(part => part.part_number === partNumber);
+    return activePart ? activePart.status : 'unknown';
+  };
+
+  const handleStatusChange = (partNumber, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const modalTitle = currentStatus === 'active' ? 'Deactivate Part' : 'Activate Part';
+    const modalContent = currentStatus === 'active' 
+      ? 'Are you sure you want to deactivate this part?' 
+      : 'Are you sure you want to activate this part?';
+
+    Modal.confirm({
+      title: modalTitle,
+      content: modalContent,
+      okText: 'Yes',
+      cancelText: 'No',
+      onOk: async () => {
+        try {
+          await changePartStatus(partNumber, newStatus);
+          message.success(`Part status successfully changed to ${newStatus}`);
+        } catch (error) {
+          message.error('Failed to change part status');
+        }
+      }
+    });
+  };
+
+  const renderStatusButton = (partNumber) => {
+    const status = getJobStatus(partNumber);
+    
+    switch (status) {
+      case 'active':
+        return (
+          <Button 
+            className="bg-green-600 text-white hover:bg-green-700"
+            onClick={() => handleStatusChange(partNumber, status)}
+          >
+            <CalendarCheck className="w-5 h-5 mr-2" /> Active
+          </Button>
+        );
+      case 'inactive':
+        return (
+          <Button 
+            className="bg-yellow-600 text-white hover:bg-yellow-700"
+            onClick={() => handleStatusChange(partNumber, status)}
+          >
+            <Hourglass className="w-5 h-5 mr-2" /> Inactive
+          </Button>
+        );
+      default:
+        return (
+          <Button 
+            className="bg-gray-600 text-white hover:bg-gray-700"
+            onClick={() => handleStatusChange(partNumber, 'unknown')}
+          >
+            <AlertTriangle className="w-5 h-5 mr-2" /> Unknown
+          </Button>
+        );
+    }
+  };
 
   const handleJobSelect = async (partNumber) => {
     const results = await searchOrders(partNumber);
@@ -220,14 +286,10 @@ const Planning = () => {
                 key="jobDetails"
               >
                 <Card 
-                  className={`shadow-sm mb-6 hover:shadow-md transition-shadow ${
-                    selectedJob.part_number === '213001220002' ? 'bg-green-50' : 
-                    selectedJob.part_number === '213301840171' ? 'bg-yellow-50' : 
-                    selectedJob.part_number === '252322000101' ? 'bg-green-200' : 'bg-white'
-                  }`} 
+                  className="shadow-sm mb-6 hover:shadow-md transition-shadow bg-white"
                   size="small"
                 >
-                  <Descriptions column={3} >
+                  <Descriptions column={3}>
                     <Descriptions.Item label="Part Number">
                       {selectedJob.part_number}
                     </Descriptions.Item>
@@ -263,33 +325,13 @@ const Planning = () => {
                     <Descriptions.Item label="Start Date">
                       {selectedJob.project?.start_date || 'N/A'}
                     </Descriptions.Item>
-
-                    {/* Status & Button Section */}
-                <Descriptions.Item label="Status">
-                  {selectedJob.part_number === "213001220002" ? (
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" className="bg-green-600 text-white hover:bg-green-700">
-                        <CalendarCheck className="w-5 h-5 mr-2" /> Scheduled
-                      </Button>
-                    </div>
-                  ) : selectedJob.part_number === "213301840171" ? (
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" className="bg-yellow-600 text-white hover:bg-yellow-700">
-                        <Hourglass className="w-5 h-5 mr-2" /> Pending
-                      </Button>
-                    </div>
-                  ) : selectedJob.part_number === "252322000101" ? (
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" className="bg-green-800 text-white hover:bg-green-900">
-                        <CheckCircle className="w-5 h-5 mr-2" /> Complete
-                      </Button>
-                    </div>
-                  ) : null}
-                </Descriptions.Item>;
+                    <Descriptions.Item label="Status">
+                      <div className="flex items-center space-x-2">
+                        {renderStatusButton(selectedJob.part_number)}
+                      </div>
+                    </Descriptions.Item>
                   </Descriptions>
                 </Card>
-
-
 
                 <JobOperationsTable 
                   jobId={selectedJob.id}

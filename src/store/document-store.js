@@ -400,6 +400,8 @@ const useDocumentStore = create((set, get) => ({
         ...(searchParams.folder_id && { folder_id: searchParams.folder_id })
       });
 
+      console.log('Search query params:', queryParams.toString()); // Debug log
+
       const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/search/?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -408,13 +410,18 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to search documents');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to search documents');
       }
 
       const data = await response.json();
+      console.log('Search response:', data); // Debug log
+      
+      // Update the documents in state
       set({ documents: data.documents || [] });
       return data;
     } catch (error) {
+      console.error('Search error:', error);
       message.error(error.message);
       throw error;
     }
@@ -423,6 +430,10 @@ const useDocumentStore = create((set, get) => ({
   // Search documents by part number
   searchByPartNumber: async (partNumber, docTypeId) => {
     try {
+      if (partNumber.length < 3) {
+        throw new Error('Please enter at least 3 characters for part number search');
+      }
+
       const token = useAuthStore.getState().token;
       
       if (!token) {
@@ -434,6 +445,8 @@ const useDocumentStore = create((set, get) => ({
         ...(docTypeId && { doc_type_id: docTypeId })
       });
 
+      console.log('Part number search params:', queryParams.toString()); // Debug log
+
       const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/by-part-number/?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -442,13 +455,25 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to search documents by part number');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to search documents by part number');
       }
 
       const data = await response.json();
-      set({ documents: data || [] });
+      console.log('Part number search response:', data); // Debug log
+
+      // Make sure we're setting the documents array correctly
+      if (data && data.documents) {
+        set({ documents: data.documents });
+      } else if (Array.isArray(data)) {
+        set({ documents: data });
+      } else {
+        set({ documents: [] });
+      }
+      
       return data;
     } catch (error) {
+      console.error('Part number search error:', error);
       message.error(error.message);
       throw error;
     }

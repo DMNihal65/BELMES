@@ -1052,6 +1052,17 @@ const DocumentManagement = () => {
       ),
     },
     {
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+      width: 150,
+      render: (partNumber) => (
+        <div>
+          {partNumber || 'N/A'}
+        </div>
+      ),
+    },
+    {
       title: 'Actions',
       key: 'actions',
       width: 150,
@@ -1426,11 +1437,54 @@ const DocumentManagement = () => {
           folder_id: selectedFolder !== 'all' ? selectedFolder : undefined,
           doc_type_id: selectedDocType
         });
-      } else {
-        await searchByPartNumber(value, selectedDocType);
+      } else if (searchType === 'partNumber') {
+        // Update minimum character check to match your requirements
+        if (value.length >= 2) { // You can adjust this minimum length
+          // Get the token from auth store
+          const token = useAuthStore.getState().token;
+
+          if (!token) {
+            throw new Error('No authorization token available');
+          }
+
+          const response = await fetch(
+            `http://172.18.7.89:2222/api/v1/documents/search/by-partnumber/?part_number_query=${encodeURIComponent(value)}&skip=0&limit=100`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+
+          if (!response.ok) {
+            if (response.status === 401) {
+              message.error('Session expired. Please login again.');
+              // Optionally handle logout/redirect here
+              return;
+            }
+            throw new Error('Failed to fetch documents');
+          }
+
+          const data = await response.json();
+          
+          // Update the documents state with the search results
+          useDocumentStore.setState({
+            documents: data.documents,
+            totalDocuments: data.total
+          });
+          
+          if (data.documents.length === 0) {
+            message.info('No documents found for this part number');
+          }
+        } else {
+          message.warning('Please enter at least 2 characters for part number search');
+        }
       }
     } catch (error) {
-      message.error('Search failed');
+      console.error('Search error:', error);
+      message.error('Search failed: ' + error.message);
     }
   };
 
@@ -1443,14 +1497,27 @@ const DocumentManagement = () => {
           <Select
             defaultValue="text"
             style={{ width: '130px' }}
-            onChange={(value) => setSearchType(value)}
+            onChange={(value) => {
+              setSearchType(value);
+              setSearchText(''); // Clear search text when switching search type
+            }}
           >
             <Select.Option value="text">Search Text</Select.Option>
             <Select.Option value="partNumber">Part Number</Select.Option>
           </Select>
           <Search
-            placeholder={searchType === 'text' ? "Search documents..." : "Enter part number..."}
+            placeholder={searchType === 'text' ? "Search documents..." : "Enter part number (min. 2 characters)..."}
             allowClear
+            value={searchText}
+            onChange={(e) => {
+              setSearchText(e.target.value);
+              if (searchType === 'partNumber' && e.target.value.length < 2) {
+                // Clear results if less than 2 characters
+                if (selectedFolder && selectedFolder !== 'all') {
+                  fetchFolderDocuments(selectedFolder);
+                }
+              }
+            }}
             onSearch={handleSearch}
             style={{ width: 'calc(100% - 130px)' }}
             enterButton

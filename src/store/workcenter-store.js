@@ -10,7 +10,7 @@ const useWorkcenterStore = create((set) => ({
   fetchWorkcenters: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.89:2222/api/v1/master-order/all-machines/');
+      const response = await fetch('http://172.18.7.88:7721/master-order/all-machines/');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -35,7 +35,7 @@ const useWorkcenterStore = create((set) => ({
   updateWorkcenter: async (updatedItem) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/master-order/workcenters/${updatedItem.work_center_id}`, {
+      const response = await fetch(`http://172.18.7.88:7721/master-order/machines/${updatedItem.work_center_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

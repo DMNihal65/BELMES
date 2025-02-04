@@ -99,7 +99,7 @@ const getTimeAxisScale = (viewType) => {
     case 'year': return 'month'; // Scale for year: months (Jan-Dec)
     case 'month': return 'day';  // Scale for month: days
     case 'week': return 'hour';  // Scale for week: hours
-    case 'day': return 'hour';   // Scale for day: hours (changed from 'minute')
+    case 'day': return 'hour';   // Scale for day: hours
     default: return 'hour';      // Default scale: hours
   }
 };
@@ -108,8 +108,8 @@ const getTimeAxisStep = (viewType) => {
   switch (viewType) {
     case 'year': return 1;  // Step for year: 1 month
     case 'month': return 1; // Step for month: 1 day
-    case 'week': return 6;  // Step for week: 6 hours
-    case 'day': return 1;   // Step for day: 1 hour (changed from 30)
+    case 'week': return 4;  // Step for week: 4 hours
+    case 'day': return 1;   // Step for day: 1 hour (changed from 15)
     default: return 1;      // Default step: 1 hour
   }
 };
@@ -247,43 +247,31 @@ const Scheduling = () => {
       try {
         let operations = scheduleData.scheduled_operations;
         
-        // Apply filters
-        if (selectedMachines.length > 0) {
-          operations = operations.filter(op => selectedMachines.includes(op.machine));
-        }
+        // Apply all filters once
+        operations = operations.filter(op => {
+          const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(op.machine);
+          const matchesComponent = selectedComponents.length === 0 || selectedComponents.includes(op.component);
+          const matchesOrder = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
+          
+          // Apply date range filter if exists
+          const withinDateRange = !dateRange || !dateRange[0] || !dateRange[1] || (
+            new Date(op.start_time) >= dateRange[0] && 
+            new Date(op.end_time) <= dateRange[1]
+          );
 
-        if (selectedComponents.length > 0) {
-          operations = operations.filter(op => selectedComponents.includes(op.component));
-        }
+          return matchesMachine && matchesComponent && matchesOrder && withinDateRange;
+        });
 
-        if (selectedProductionOrders.length > 0) {
-          operations = operations.filter(op => selectedProductionOrders.includes(op.production_order));
-        }
+        // Create groups based on filtered machines
+        const filteredMachines = [...new Set(operations.map(op => op.machine))];
+        const groups = new DataSet(
+          filteredMachines.map(machine => ({
+            id: machine,
+            content: machine
+          }))
+        );
 
-          // Create groups based on available machines in filtered operations
-      const filteredMachines = [...new Set(operations.map(op => op.machine))];
-      const groups = new DataSet(
-        filteredMachines.map(machine => ({
-          id: machine,
-          content: machine
-        }))
-      );
-        
-        if (dateRange && dateRange[0] && dateRange[1]) {
-          operations = operations.filter(op => {
-            const opStart = new Date(op.start_time);
-            const opEnd = new Date(op.end_time);
-            return opStart >= dateRange[0] && opEnd <= dateRange[1];
-          });
-        }
-
-         // Filter by selected components
-         if (selectedComponents.length > 0) {
-          operations = operations.filter(op => selectedComponents.includes(op.component));
-        }
-        
-
-        // Generate and store component colors
+        // Generate and store component colors for filtered operations
         const colors = getComponentColors(operations);
         setComponentColors(colors);
 
@@ -295,8 +283,8 @@ const Scheduling = () => {
             content: `
               <div class="timeline-item">
                 <div class="item-header">${op.component}</div>
-                <!-- <div class="item-desc">${op.description}</div> -->
-                <!-- <div class="item-qty">${op.quantity}</div> -->
+                <div class="item-desc">${op.description}</div>
+                <div class="item-order">${op.production_order}</div>
               </div>
             `,
             start: new Date(op.start_time),
@@ -311,44 +299,15 @@ const Scheduling = () => {
           }))
         );
 
-        // Remove previous dynamic styles
-        if (styleElementRef.current) {
-          styleElementRef.current.remove();
-        }
-
-        // Add dynamic styles for components
-        const componentStyles = Object.entries(colors).map(([component, colors]) => `
-          .component-${component.replace(/[^a-zA-Z0-9]/g, '-')} {
-            background-color: ${colors.backgroundColor} !important;
-            border-color: ${colors.borderColor} !important;
-          }
-          .component-${component.replace(/[^a-zA-Z0-9]/g, '-')}:hover {
-            background-color: ${colors.hoverColor} !important;
-          }
-        `).join('\n');
-
-        // Create and add new style element
-        const styleElement = document.createElement('style');
-        styleElement.textContent = componentStyles;
-        document.head.appendChild(styleElement);
-        styleElementRef.current = styleElement;
-
-        // Create groups
-        // const groups = new DataSet(
-        //   availableMachines.map(machine => ({
-        //     id: machine,
-        //     content: machine
-        //   }))
-        // );
-        // const groups = new DataSet(
-        //   (selectedMachines.length > 0 ? selectedMachines : availableMachines).map(machine => ({
-        //     id: machine,
-        //     content: machine
-        //   }))
-        // );
-        // Get time range based on view type
-        const timeRange = getTimeRange(viewType, dateRange, selectedComponents, scheduleData);
-
+        // Get time range based on filtered operations
+        const timeRange = getTimeRange(
+          viewType, 
+          dateRange, 
+          selectedComponents, 
+          selectedMachines, 
+          selectedProductionOrders, 
+          { scheduled_operations: operations } // Pass filtered operations
+        );
 
         // Configure options
         const options = {
@@ -361,14 +320,12 @@ const Scheduling = () => {
             item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
             axis: 5
           },
-          // start: visibleRange[0].toDate(),  // Use visibleRange for initial view
-          // end: visibleRange[1].toDate(),
-          start: visibleRange[0].toDate(),
-          end: visibleRange[1].toDate(),
-          min: dateRange[0].toDate(),
-          max: dateRange[1].toDate(),
-          zoomMin: 1000 * 60 * 60 * 24,
-          zoomMax: 1000 * 60 * 60 * 24 * 365,
+          start: timeRange.start,
+          end: timeRange.end,
+          min: timeRange.min,
+          max: timeRange.max,
+          zoomMin: 1000 * 60 * 30,
+          zoomMax: 1000 * 60 * 60 * 24 * 365 * 2,
           mousewheel: {
             zoom: false,
             scroll: true
@@ -433,12 +390,16 @@ const Scheduling = () => {
           },
           timeAxis: { 
             scale: getTimeAxisScale(viewType),
-            step: getTimeAxisStep(viewType) // Step by month for yearly view
+            step: getTimeAxisStep(viewType)
           },
           format: {
             minorLabels: {
-              hour: 'HH:mm',
+              hour: 'HH:00', // Format hours as "00:00", "01:00", etc.
               minute: 'HH:mm'
+            },
+            majorLabels: {
+              hour: 'ddd D MMM', // Show date above hours
+              minute: 'HH:00' // For minute scale, show hours
             }
           }
         };
@@ -456,19 +417,12 @@ const Scheduling = () => {
           options
         );
 
-        // Add event handlers
-        timeline.on('select', (properties) => {
-          const selectedItem = items.get(properties.items?.[0]);
-          if (selectedItem?.operation) {
-            showOperationDetails(selectedItem.operation);
-          }
-        });
-
         timelineRef.current = timeline;
-        // Initial fit with delay to ensure proper rendering
+
+        // Set the window to show the filtered operations
         timelineRef.current.setWindow(
-          visibleRange[0].toDate(),
-          visibleRange[1].toDate(),
+          timeRange.start,
+          timeRange.end,
           { animation: false }
         );
 
@@ -491,7 +445,7 @@ const Scheduling = () => {
         styleElementRef.current = null;
       }
     };
-  }, [scheduleData, selectedMachines, selectedComponents,selectedProductionOrders, dateRange, viewType, visibleRange]);
+  }, [scheduleData, selectedMachines, selectedComponents, selectedProductionOrders, dateRange, viewType]);
 
   // Helper function to get operation class name
   const getOperationClassName = (operation, status) => {
@@ -641,42 +595,22 @@ const Scheduling = () => {
   
   const handleViewTypeChange = (newViewType) => {
     setViewType(newViewType);
-    const now = moment();
     
-    let visibleStart, visibleEnd;
-    switch (newViewType) {
-      case 'year':
-        visibleStart = now.clone().startOf('year');
-        visibleEnd = now.clone().endOf('year');
-        break;
-      case 'month':
-        visibleStart = now.clone().startOf('month');
-        visibleEnd = now.clone().endOf('month');
-        break;
-      case 'week':
-        visibleStart = now.clone().subtract(3, 'days').startOf('day');
-        visibleEnd = now.clone().add(3, 'days').endOf('day');
-        break;
-      default: // day
-        visibleStart = now.clone().startOf('day');
-        visibleEnd = now.clone().endOf('day');
-    }
-
-    setDateRange([
-      visibleStart.clone().subtract(12, newViewType + 's'),
-      visibleEnd.clone().add(12, newViewType + 's')
-    ]);
-
-    // Set visible window
-    setVisibleRange([visibleStart, visibleEnd]);
-
-    // Update timeline window
-    if (timelineRef.current) {
-      timelineRef.current.setWindow(
-        visibleStart.toDate(),
-        visibleEnd.toDate(),
-        { animation: false }
-      );
+    if (!dateRange || !dateRange[0] || !dateRange[1]) {
+      const timeRange = getTimeRange(newViewType, null, selectedComponents, selectedMachines, selectedProductionOrders, scheduleData);
+      
+      setVisibleRange([
+        moment(timeRange.start),
+        moment(timeRange.end)
+      ]);
+      
+      if (timelineRef.current) {
+        timelineRef.current.setWindow(
+          timeRange.start,
+          timeRange.end,
+          { animation: false }
+        );
+      }
     }
   };
 
@@ -756,10 +690,10 @@ const Scheduling = () => {
             key="schedule"
           >
             <Card>
-              <div className="flex justify-between items-center mb-4">
-                <Space>
-                  <Title level={4}>Production Schedule</Title>
-                  <Select 
+            <Title level={4}>Production Schedule</Title>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <Select 
                     value={viewType}
                     onChange={handleViewTypeChange}
                     style={{ width: 120 }}
@@ -769,92 +703,11 @@ const Scheduling = () => {
                     <Option value="month">Monthly</Option>
                     <Option value="year">Yearly</Option>
                   </Select>
-                </Space>
-                <Space>
-                <DatePicker.RangePicker
-                  // value={dateRange}
-                  onChange={(dates, dateStrings) => {
-                    if (dates) {
-                      const [start, end] = dates;
-                      switch (viewType) {
-                        case 'year':
-                          setDateRange([
-                            start.startOf('year'),
-                            end.endOf('year')
-                          ]);
-                          break;
-                        case 'month':
-                          // Set to first and last day of selected months
-                          setDateRange([
-                            start.startOf('month'),
-                            end.endOf('month')
-                          ]);
-                          break;
-                        case 'week':
-                          // Allow day-to-day selection within weeks
-                          setDateRange([
-                            start.startOf('day'),  // Changed from startOf('week')
-                            end.endOf('day')       // Changed from endOf('week')
-                          ]);
-                          break;
-                          default:
-                          // Set to start and end of selected days
-                          setDateRange([
-                            start.startOf('day'),
-                            end.endOf('day')
-                          ]);
-                          // break;
-                      }
-                    }
-                    //  else {
-                    //   setDateRange(null);
-                    // }
-                  }}
-                  placeholder={['Start Date', 'End Date']}
-                  picker={viewType === 'month' ? 'month' : 'date'}  // Changed: always use 'date' for week view
-                  showTime={false}
-                  format={
-                    viewType === 'month' 
-                      ? 'YYYY MMM'
-                      : 'YYYY-MM-DD'  // Changed: use same format for week and day views
-                  }
-                  allowClear={true}
-                  ranges={{
-                    'Today': [moment().startOf('day'), moment().endOf('day')],
-                    'This Week': [moment().startOf('week'), moment().endOf('week')],
-                    'This Month': [moment().startOf('month'), moment().endOf('month')],
-                    'Next Month': [
-                      moment().add(1, 'month').startOf('month'),
-                      moment().add(1, 'month').endOf('month')
-                    ]
-                  }}
-                  onOpenChange={(open) => {
-                    // Reset to current date range if cleared
-                    if (!open && !dateRange) {
-                      const now = moment();
-                      switch (viewType) {
-                        case 'month':
-                          setDateRange([
-                            now.clone().startOf('month'),
-                            now.clone().endOf('month')
-                          ]);
-                          break;
-                        case 'week':
-                          setDateRange([
-                            now.clone().startOf('day'),  // Changed from startOf('week')
-                            now.clone().endOf('day')     // Changed from endOf('week')
-                          ]);
-                          break;
-                        case 'day':
-                          setDateRange([
-                            now.clone().startOf('day'),
-                            now.clone().endOf('day')
-                          ]);
-                          break;
-                      }
-                    }
-                  }}
-                />
+                  <DatePicker.RangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    placeholder={['Start Date', 'End Date']}
+                  />
                   <Select 
                     mode="multiple" 
                     placeholder="Select Machines"
@@ -921,7 +774,7 @@ const Scheduling = () => {
                   >
                     Refresh
                   </Button>
-                </Space>
+                </div>
               </div>
 
               <div 
@@ -1467,73 +1320,78 @@ const styles = {
 //   return { start, end };
 // };
 
-const getTimeRange = (viewType, dateRange, selectedComponents, scheduleData) => {
-  if (selectedComponents?.length > 0 && scheduleData) {
-    // When componentnumbers are selected, get the full range of their operations
-    const filteredOps = scheduleData.scheduled_operations.filter(op => 
-      selectedComponents.includes(op.component)
-    );
-    
+const getTimeRange = (viewType, dateRange, selectedComponents, selectedMachines, selectedProductionOrders, scheduleData) => {
+  // If date range is selected, use it as the primary window
+  if (dateRange && dateRange[0] && dateRange[1]) {
+    return {
+      start: dateRange[0].toDate(),
+      end: dateRange[1].toDate(),
+      min: dateRange[0].clone().subtract(1, 'year').toDate(),
+      max: dateRange[1].clone().add(1, 'year').toDate()
+    };
+  }
+
+  // If any filters are applied, find the earliest operation start date
+  if ((selectedComponents?.length > 0 || selectedMachines?.length > 0 || selectedProductionOrders?.length > 0) && scheduleData) {
+    const filteredOps = scheduleData.scheduled_operations.filter(op => {
+      const matchesComponent = selectedComponents.length === 0 || selectedComponents.includes(op.component);
+      const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(op.machine);
+      const matchesOrder = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
+      return matchesComponent && matchesMachine && matchesOrder;
+    });
+
     if (filteredOps.length > 0) {
       const startTimes = filteredOps.map(op => new Date(op.start_time));
       const endTimes = filteredOps.map(op => new Date(op.end_time));
       const earliestStart = moment(Math.min(...startTimes));
       const latestEnd = moment(Math.max(...endTimes));
-      
-      // Add padding before and after
+
+      // Add some padding before and after
       return {
-        start: earliestStart.subtract(1, 'day').startOf('day').toDate(),
-        end: latestEnd.add(1, 'day').endOf('day').toDate()
+        start: earliestStart.subtract(12, 'hours').startOf('hour').toDate(),
+        end: latestEnd.add(12, 'hours').endOf('hour').toDate(),
+        min: earliestStart.clone().subtract(1, 'month').toDate(),
+        max: latestEnd.clone().add(1, 'month').toDate()
       };
     }
   }
 
-  if (dateRange && dateRange[0] && dateRange[1]) {
-    return {
-      start: dateRange[0].toDate(),
-      end: dateRange[1].toDate()
-    };
+  // Default ranges based on view type
+  const now = moment();
+  let start, end, min, max;
+  
+  switch (viewType) {
+    case 'year':
+      start = now.clone().startOf('year');
+      end = now.clone().endOf('year');
+      min = start.clone().subtract(1, 'year');
+      max = end.clone().add(1, 'year');
+      break;
+    case 'month':
+      start = now.clone().startOf('month');
+      end = now.clone().endOf('month');
+      min = start.clone().subtract(6, 'months');
+      max = end.clone().add(6, 'months');
+      break;
+    case 'week':
+      start = now.clone().startOf('week');
+      end = now.clone().endOf('week');
+      min = start.clone().subtract(1, 'month');
+      max = end.clone().add(1, 'month');
+      break;
+    default: // day
+      start = now.clone().startOf('day');
+      end = now.clone().endOf('day');
+      min = start.clone().subtract(2, 'weeks');
+      max = end.clone().add(2, 'weeks');
   }
 
-  const now = moment();
-  let start, end;
-
-  ////current data 
-  // switch (viewType) {
-  //   case 'month':
-  //     // Set to current month's start and end
-  //     start = now.clone().startOf('month');
-  //     end = now.clone().endOf('month');
-  //     break;
-  //   case 'week':
-  //     start = now.clone().startOf('week');
-  //     end = now.clone().endOf('week');
-  //     break;
-  //   default: // day
-  //     start = now.clone().startOf('day');
-  //     end = now.clone().endOf('day');
-  // }
-
-      //past and future dates
-      // Set to current month's start and end
-      switch (viewType) {
-        case 'year':
-          start = now.clone().subtract(2, 'years').startOf('year');
-          end = now.clone().add(2, 'years').endOf('year');
-          break;
-        case 'month':
-          start = now.clone().subtract(6, 'months').startOf('month');
-          end = now.clone().add(6, 'months').endOf('month');
-          break;
-        case 'week':
-          start = now.clone().subtract(12, 'weeks').startOf('week');
-          end = now.clone().add(12, 'weeks').endOf('week');
-          break;
-        default: // day
-          start = now.clone().subtract(30, 'days').startOf('day');
-          end = now.clone().add(30, 'days').endOf('day');
-      }
-      return { start: start.toDate(), end: end.toDate() };
-    };
+  return {
+    start: start.toDate(),
+    end: end.toDate(),
+    min: min.toDate(),
+    max: max.toDate()
+  };
+};
 
 export default Scheduling;

@@ -31,13 +31,13 @@ function InventoryAnalytics() {
             <TabPane tab="Calibration" key="calibration">
                 <Calibration />
             </TabPane>
-            <TabPane tab="History" key="history">
+            {/* <TabPane tab="History" key="history">
                 <History 
                     showModal={showModal} 
                     handleDownloadData={handleDownloadData} 
                     handleFileUpload={handleFileUpload} 
                 />
-            </TabPane>
+            </TabPane> */}
         </Tabs>
     );
 }

@@ -99,7 +99,7 @@ const useScheduleStore = create((set, get) => ({
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4411/operations/schedule-batch/');
+      const response = await fetch('http://172.18.7.88:4411/operations/schedule-batch/');
       const data = await response.json();
 
         
@@ -143,7 +143,7 @@ const useScheduleStore = create((set, get) => ({
   fetchLeadTimeData: async () => {
     set({ leadTimeLoading: true, leadTimeError: null });
     try {
-      const response = await axios.get('http://172.18.7.85:4411/component_status/');
+      const response = await axios.get('http://172.18.7.85:4412/component_status/');
       const formattedData = [
         ...response.data.early_complete,
         ...response.data.delayed_complete
@@ -197,7 +197,7 @@ const useScheduleStore = create((set, get) => ({
     // fetchScheduleData: async () => {
     //   set({ loading: true, error: null });
     //   try {
-    //     const response = await fetch('http://172.18.7.85:4411/operations/unit_schedule/');
+    //     const response = await fetch('http://172.18.7.85:4412/operations/unit_schedule/');
     //     const operations = await response.json();
         
     //     // Transform the array response into the expected format

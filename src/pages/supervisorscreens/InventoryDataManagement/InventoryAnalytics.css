@@ -1,0 +1,19 @@
+.inventory-analytics-tabs .ant-tabs-tab.ant-tabs-tab-active {
+    background-color: #1890ff !important;
+    border-radius: 4px;
+}
+
+.inventory-analytics-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: #ffffff !important;
+}
+
+.inventory-analytics-tabs .ant-tabs-tab:hover {
+    background-color: #40a9ff;
+    border-radius: 4px;
+    color: #ffffff;
+}
+
+.inventory-analytics-tabs .ant-tabs-tab {
+    transition: all 0.3s;
+    padding: 8px 16px;
+} 

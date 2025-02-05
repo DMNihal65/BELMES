@@ -513,7 +513,7 @@ const ComponentStatusAnalytics = ({ data }) => {
 
   const option = {
     title: {
-      text: 'Component Completion Timeline',
+      text: 'Part Number Completion Timeline',
       left: 'center'
     },
     tooltip: {
@@ -521,7 +521,7 @@ const ComponentStatusAnalytics = ({ data }) => {
       formatter: function(params) {
         const component = params[0].name;
         const item = allComponents.find(i => i.component === component);
-        return `Component: ${component}<br/>` +
+        return `Part Number: ${component}<br/>` +
                `Scheduled End: ${new Date(item.scheduled_end_time).toLocaleDateString()}<br/>` +
                `Lead Time: ${new Date(item.lead_time).toLocaleDateString()}<br/>` +
                `Status: ${item.delay ? 'Delayed' : 'Early'}<br/>` +
@@ -608,7 +608,7 @@ const ComponentStatusAnalytics = ({ data }) => {
           opts={{ renderer: 'svg' }}
         />
       </div>
-      <div className="p-4">
+      {/* <div className="p-4">
         <h3 className="text-xl font-semibold mb-4">Components Detail</h3>
         <Table
           columns={columns}
@@ -616,7 +616,7 @@ const ComponentStatusAnalytics = ({ data }) => {
           pagination={{ pageSize: 5 }}
           rowKey="component"
         />
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -994,8 +994,8 @@ const AnalyticsDashboard = () => {
     const fetchData = async () => {
       try {
         const [componentResponse, scheduleResponse] = await Promise.all([
-          fetch('http://172.18.7.85:4411/component_status/'),
-          fetch('http://172.18.7.85:4411/operations/machine_schedules/')
+          fetch('http://172.18.7.85:4412/component_status/'),
+          fetch('http://172.18.7.85:4412/operations/machine_schedules/')
         ]);
         
         const componentResult = await componentResponse.json();
@@ -1031,9 +1031,9 @@ const AnalyticsDashboard = () => {
         {/* <TabPane tab="Delivery Date Analysis" key="leadTime">
           <LeadTimeAnalytics  />
         </TabPane> */} 
-        <TabPane tab="Component Status" key="componentStatus">
+        <TabPane tab="Part Number Status" key="componentStatus">
           <ComponentStatusAnalytics data={data} />
-          <div>
+          {/* <div>
             <h3 className="text-xl font-semibold mb-4">Delayed Components Detail</h3>
             <Table
               columns={columns}
@@ -1041,7 +1041,7 @@ const AnalyticsDashboard = () => {
               pagination={{ pageSize: 5 }}
               rowKey="component"
             />
-          </div>
+          </div> */}
         </TabPane>
         <TabPane tab="Schedule Details" key="scheduleDetails">
           <ScheduleDetails data={scheduleData} />

@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import axios from 'axios';
 import { message } from 'antd';
 
-const BASE_URL = 'http://172.18.7.85:4411/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:4412/api/v1/api/inventory';
 
 const useInventoryStore = create((set, get) => ({
   categories: [],
@@ -254,12 +254,24 @@ const useInventoryStore = create((set, get) => ({
   addItem: async (itemData) => {
     set({ loading: true });
     try {
-      // Use the /items endpoint with the correct data structure
+      // Process dynamic data to handle image fields
+      const processedDynamicData = {};
+      if (itemData.dynamic_data) {
+        for (const [key, value] of Object.entries(itemData.dynamic_data)) {
+          // If it's a base64 image, compress it before sending
+          if (value && typeof value === 'string' && value.startsWith('data:image')) {
+            processedDynamicData[key] = await compressImage(value);
+          } else {
+            processedDynamicData[key] = value;
+          }
+        }
+      }
+
       const response = await axios.post(
         `${BASE_URL}/items`, 
         {
           item_code: itemData.item_code,
-          dynamic_data: itemData.dynamic_data,
+          dynamic_data: processedDynamicData,
           quantity: parseInt(itemData.quantity),
           available_quantity: parseInt(itemData.available_quantity),
           status: itemData.status,
@@ -285,11 +297,24 @@ const useInventoryStore = create((set, get) => ({
   updateItem: async (id, itemData) => {
     set({ loading: true });
     try {
+      // Process dynamic data to handle image fields
+      const processedDynamicData = {};
+      if (itemData.dynamic_data) {
+        for (const [key, value] of Object.entries(itemData.dynamic_data)) {
+          // If it's a base64 image, compress it before sending
+          if (value && typeof value === 'string' && value.startsWith('data:image')) {
+            processedDynamicData[key] = await compressImage(value);
+          } else {
+            processedDynamicData[key] = value;
+          }
+        }
+      }
+
       const response = await axios.put(
         `${BASE_URL}/items/${id}`,
         {
           item_code: itemData.item_code,
-          dynamic_data: itemData.dynamic_data,
+          dynamic_data: processedDynamicData,
           quantity: parseInt(itemData.quantity),
           available_quantity: parseInt(itemData.available_quantity),
           status: itemData.status,
@@ -470,7 +495,7 @@ const useInventoryStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ loading: true });
     try {
-      const response = await axios.get('http://172.18.7.85:4411/planning/all_orders');
+      const response = await axios.get('http://172.18.7.85:4412/planning/all_orders');
       set({ 
         allOrders: response.data || [],
         loading: false 
@@ -503,7 +528,7 @@ const useInventoryStore = create((set, get) => ({
 
       // Create axios instance with default headers
       const axiosInstance = axios.create({
-        baseURL: 'http://172.18.7.85:4411/api/v1',
+        baseURL: 'http://172.18.7.85:4412/api/v1',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -548,7 +573,7 @@ const useInventoryStore = create((set, get) => ({
   fetchOperationsByPartNumber: async (partNumber) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`http://172.18.7.85:4411/planning/search_order?part_number=${partNumber}`);
+      const response = await axios.get(`http://172.18.7.85:4412/planning/search_order?part_number=${partNumber}`);
       const operations = response.data?.orders?.[0]?.operations || [];
       set({ 
         operations: operations,
@@ -563,6 +588,44 @@ const useInventoryStore = create((set, get) => ({
     }
   },
 }));
+
+// Add helper function for image compression
+const compressImage = async (base64String) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 800;
+      const MAX_HEIGHT = 800;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert to base64 with reduced quality
+      const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+      resolve(compressedBase64);
+    };
+    img.onerror = reject;
+    img.src = base64String;
+  });
+};
 
 export default useInventoryStore;
 

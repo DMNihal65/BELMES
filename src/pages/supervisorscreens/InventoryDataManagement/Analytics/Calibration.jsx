@@ -31,7 +31,8 @@ import {
   WarningOutlined,
   SyncOutlined,
   ToolOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import useInventoryStore from '../../../../store/inventory-store';
 import moment from 'moment';
@@ -39,7 +40,7 @@ import axios from 'axios';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const BASE_URL = 'http://172.18.7.85:4411/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:4412/api/v1/api/inventory';
 
 function Calibration() {
   const [form] = Form.useForm();
@@ -55,6 +56,9 @@ function Calibration() {
   const [isLoading, setIsLoading] = useState(true);
   const [upcomingCalibrations, setUpcomingCalibrations] = useState([]);
   const [daysFilter, setDaysFilter] = useState(7);
+  const [dateRange, setDateRange] = useState([null, null]);
+  const [historyDateRange, setHistoryDateRange] = useState([null, null]);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState(null);
 
   const {
     calibrations,
@@ -92,11 +96,22 @@ function Calibration() {
     }
   };
 
+  const filterCalibrations = async (status) => {
+    setSelectedStatus(status);
+    if (status === 'due_soon') {
+      try {
+        await fetchUpcomingCalibrations(7);
+      } catch (error) {
+        console.error('Error fetching due soon calibrations:', error);
+      }
+    }
+  };
+
   useEffect(() => {
     const initializeData = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([
+        const [calibrationsData, historyData, categoriesData, itemsData, subcatsData, upcomingData] = await Promise.all([
           fetchCalibrations(),
           fetchCalibrationHistory(),
           fetchCategories(),
@@ -114,6 +129,20 @@ function Calibration() {
 
     initializeData();
   }, [fetchCalibrations, fetchCalibrationHistory, fetchCategories, daysFilter]);
+
+  // Add a new useEffect to refresh upcoming calibrations periodically
+  useEffect(() => {
+    // Initial fetch
+    fetchUpcomingCalibrations(daysFilter);
+
+    // Set up interval to refresh every 5 minutes
+    const intervalId = setInterval(() => {
+      fetchUpcomingCalibrations(daysFilter);
+    }, 5 * 60 * 1000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [daysFilter]);
 
   const loadInventoryItems = async () => {
     try {
@@ -204,6 +233,44 @@ function Calibration() {
     }
   };
 
+  const getCalibrationStatus = (nextCalibrationDate) => {
+    const daysRemaining = moment(nextCalibrationDate).diff(moment(), 'days');
+    
+    if (daysRemaining < 0) {
+      return { 
+        status: 'overdue', 
+        color: '#ffccc7',  // Light Red background
+        textColor: '#cf1322', // Dark Red text
+        icon: <ExclamationCircleOutlined style={{ color: '#cf1322' }} />, 
+        text: 'OVERDUE' 
+      };
+    } else if (daysRemaining <= 2) {
+      return { 
+        status: 'due_soon', 
+        color: '#fff1b8',  // Light Yellow background
+        textColor: '#d48806', // Dark Yellow text
+        icon: <WarningOutlined style={{ color: '#d48806' }} />, 
+        text: 'DUE SOON' 
+      };
+    } else if (daysRemaining <= 15) {
+      return { 
+        status: 'warning', 
+        color: '#ffe7ba',  // Light Orange background
+        textColor: '#d46b08', // Dark Orange text
+        icon: <WarningOutlined style={{ color: '#d46b08' }} />, 
+        text: 'WARNING' 
+      };
+    } else {
+      return { 
+        status: 'normal', 
+        color: '#d9f7be',  // Light Green background
+        textColor: '#389e0d', // Dark Green text
+        icon: <CheckCircleOutlined style={{ color: '#389e0d' }} />, 
+        text: 'NORMAL' 
+      };
+    }
+  };
+
   const getStatusColor = (status) => {
     if (!status) return 'default';
     const colors = {
@@ -226,16 +293,54 @@ function Calibration() {
     return icons[status] || null;
   };
 
+  const handleInventoryItemClick = (itemId) => {
+    setSelectedInventoryItem(itemId);
+    setActiveTab('history');
+  };
+
+  const getFilteredHistory = () => {
+    if (!calibrationHistory) return [];
+
+    let filtered = calibrationHistory;
+
+    // Filter by selected inventory item if any
+    if (selectedInventoryItem) {
+      filtered = filtered.filter(history => {
+        const calibration = calibrations.find(cal => cal.calibration_schedule_id === history.calibration_schedule_id);
+        return calibration?.inventory_item_id === selectedInventoryItem;
+      });
+    }
+
+    // Apply date range filter for history
+    if (historyDateRange && historyDateRange[0] && historyDateRange[1]) {
+      filtered = filtered.filter(history => {
+        const calibrationDate = moment(history.calibration_date);
+        return calibrationDate.isBetween(historyDateRange[0], historyDateRange[1], 'day', '[]');
+      });
+    }
+
+    return filtered;
+  };
+
   const columns = [
     {
-      title: 'Category',
+      title: 'Inventory Item',
       dataIndex: 'inventory_item_id',
-      key: 'category',
+      key: 'inventory_item_id',
       render: (itemId) => {
-        const category = categories.find(cat => 
-          cat.items?.some(item => item.id === itemId)
+        const item = inventoryItems.find(item => item.id === itemId);
+        const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+        return (
+          <Tooltip title={`Click to view calibration history for this item`}>
+            <Tag 
+              icon={<ToolOutlined />} 
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleInventoryItemClick(itemId)}
+            >
+              {item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId}
+            </Tag>
+          </Tooltip>
         );
-        return <Tag color="blue">{category?.name || 'N/A'}</Tag>;
       }
     },
     {
@@ -289,38 +394,23 @@ function Calibration() {
       title: 'Next Calibration',
       dataIndex: 'next_calibration',
       key: 'next_calibration',
-      render: (date, record) => {
-        const isEditing = editingCalibration?.id === record.id;
-        return isEditing ? (
-          <DatePicker
-            showTime
-            defaultValue={moment(date)}
-            format="DD MMM YYYY HH:mm"
-            onChange={(value) => {
-              const newData = { ...editingCalibration, next_calibration: value };
-              setEditingCalibration(newData);
-            }}
-          />
-        ) : (
-          <Tag icon={<CalendarOutlined />} color={moment(date).isBefore(moment()) ? 'error' : 'default'}>
-            {moment(date).format('DD MMM YYYY')}
-          </Tag>
-        );
-      }
-    },
-    {
-      title: 'Inventory Item',
-      dataIndex: 'inventory_item_id',
-      key: 'inventory_item_id',
-      render: (itemId) => {
-        const item = inventoryItems.find(item => item.id === itemId);
-        const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+      render: (date) => {
+        const { color, textColor, icon, text } = getCalibrationStatus(date);
+        const daysRemaining = moment(date).diff(moment(), 'days');
+        
         return (
-          <Tooltip title={`ID: ${itemId}`}>
-            <Tag icon={<ToolOutlined />}>
-              {item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId}
+          <Space direction="vertical" size="small">
+            <Tag 
+              icon={<CalendarOutlined style={{ color: textColor }} />} 
+              color={color}
+              style={{ 
+                color: textColor,
+                borderColor: textColor
+              }}
+            >
+              {moment(date).format('DD MMM YYYY HH:mm')}
             </Tag>
-          </Tooltip>
+          </Space>
         );
       }
     },
@@ -346,10 +436,27 @@ function Calibration() {
       }
     },
     {
+      title: 'Status',
+      key: 'status',
+      render: (_, record) => {
+        const { color, textColor, icon, text } = getCalibrationStatus(record.next_calibration);
+        return (
+          <Tag 
+            color={color} 
+            icon={icon}
+            style={{ 
+              color: textColor,
+              borderColor: textColor
+            }}
+          >
+            {text}
+          </Tag>
+        );
+      }
+    },
+    {
       title: 'Calibrate',
       key: 'calibrate',
-      fixed: 'right',
-      width: 100,
       render: (_, record) => (
         <Button
           className="bg-green-500 text-white"
@@ -370,6 +477,8 @@ function Calibration() {
     {
       title: 'Actions',
       key: 'actions',
+      fixed: 'right',
+      width: 100,
       render: (_, record) => {
         const isEditing = editingCalibration?.id === record.id;
         return isEditing ? (
@@ -480,42 +589,64 @@ function Calibration() {
     
   ];
 
-  const filterCalibrations = async (status) => {
-    setSelectedStatus(status);
-    if (status === 'due_soon') {
-      try {
-        await fetchUpcomingCalibrations(7); // Default to 7 days for due soon
-      } catch (error) {
-        console.error('Error fetching due soon calibrations:', error);
-      }
-    }
-  };
-
   const getFilteredCalibrations = () => {
     if (!calibrations) return [];
     
+    // Return only upcoming calibrations for due_soon status
     if (selectedStatus === 'due_soon') {
-      return upcomingCalibrations.map(cal => {
+      const dueSoonItems = upcomingCalibrations.map(cal => {
         const item = inventoryItems.find(item => item.id === cal.item_id);
+        const status = getCalibrationStatus(cal.next_calibration);
         return {
           ...cal,
-          id: cal.item_id,
+          id: `${cal.item_id}-${cal.next_calibration}`,
           calibration_type: 'Regular',
-          status: 'due_soon',
+          status: status.status,
           inventory_item_id: cal.item_id,
           quantity: item?.quantity,
           available_quantity: item?.available_quantity,
-          item_status: item?.status
+          item_status: item?.status,
+          next_calibration: cal.next_calibration
         };
+      });
+      return dueSoonItems;
+    }
+
+    // For other statuses, work with the main calibrations array
+    let filtered = [...calibrations];
+
+    // Apply date range filter if exists
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      filtered = filtered.filter(cal => {
+        const nextCalDate = moment(cal.next_calibration);
+        return nextCalDate.isBetween(dateRange[0], dateRange[1], 'day', '[]');
       });
     }
     
-    let filtered = calibrations;
-    
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter(cal => cal.status === selectedStatus);
+    // Apply status filter for up_to_date and overdue
+    if (selectedStatus === 'up_to_date') {
+      filtered = filtered.filter(cal => {
+        const nextCalDate = moment(cal.next_calibration);
+        return nextCalDate.isAfter(moment()) && 
+               !upcomingCalibrations.some(upcoming => upcoming.item_id === cal.inventory_item_id);
+      });
+    } else if (selectedStatus === 'overdue') {
+      filtered = filtered.filter(cal => {
+        const nextCalDate = moment(cal.next_calibration);
+        return nextCalDate.isBefore(moment());
+      });
     }
+
+    // Add status to all items
+    filtered = filtered.map(cal => {
+      const status = getCalibrationStatus(cal.next_calibration);
+      return {
+        ...cal,
+        status: status.status
+      };
+    });
     
+    // Apply category filter if not 'all'
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(cal => {
         const category = categories.find(cat => 
@@ -532,9 +663,9 @@ function Calibration() {
     if (!calibrations) return { total: 0, upToDate: 0, dueSoon: 0, overdue: 0 };
     
     const total = calibrations.length;
-    const upToDate = calibrations.filter(cal => cal.status === 'up_to_date').length;
-    const dueSoon = calibrations.filter(cal => cal.status === 'due_soon').length;
-    const overdue = calibrations.filter(cal => cal.status === 'overdue').length;
+    const upToDate = calibrations.filter(cal => moment(cal.next_calibration).isAfter(moment())).length;
+    const dueSoon = upcomingCalibrations.length; // Use the separate upcoming calibrations data
+    const overdue = calibrations.filter(cal => moment(cal.next_calibration).isBefore(moment())).length;
 
     return { total, upToDate, dueSoon, overdue };
   };
@@ -572,6 +703,16 @@ function Calibration() {
       render: (text) => <Text strong>{text}</Text>
     },
     {
+      title: 'Next Calibration',
+      dataIndex: 'next_calibration',
+      key: 'next_calibration',
+      render: (date) => (
+        <Tag icon={<CalendarOutlined />} color="warning">
+          {moment(date).format('DD MMM YYYY HH:mm')}
+        </Tag>
+      )
+    },
+    {
       title: 'Quantity',
       key: 'quantity',
       render: (_, record) => {
@@ -598,16 +739,6 @@ function Calibration() {
           </Tag>
         );
       }
-    },
-    {
-      title: 'Next Calibration',
-      dataIndex: 'next_calibration',
-      key: 'next_calibration',
-      render: (date) => (
-        <Tag icon={<CalendarOutlined />} color="warning">
-          {moment(date).format('DD MMM YYYY HH:mm')}
-        </Tag>
-      )
     },
     {
       title: 'Days Remaining',
@@ -663,6 +794,11 @@ function Calibration() {
       console.error('Error saving calibration:', error);
       message.error(error.response?.data?.message || 'Failed to save calibration record');
     }
+  };
+
+  const getOverdueCount = () => {
+    if (!calibrations) return 0;
+    return calibrations.filter(cal => moment(cal.next_calibration).isBefore(moment())).length;
   };
 
   if (loading) {
@@ -761,36 +897,55 @@ function Calibration() {
           className="custom-tabs"
         >
           <Tabs.TabPane tab="Current Calibrations" key="current">
-            <div className="filter-buttons">
-              <Space wrap>
-                <Button
-                  type={selectedStatus === 'all' ? 'primary' : 'default'}
-                  onClick={() => filterCalibrations('all')}
-                >
-                  All
-                </Button>
-                <Button
-                  type={selectedStatus === 'up_to_date' ? 'primary' : 'default'}
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => filterCalibrations('up_to_date')}
-                >
-                  Up to Date
-                </Button>
-                <Button
-                  type={selectedStatus === 'due_soon' ? 'primary' : 'default'}
-                  icon={<WarningOutlined />}
-                  onClick={() => filterCalibrations('due_soon')}
-                >
-                  Due Soon ({upcomingCalibrations.length})
-                </Button>
-                <Button
-                  type={selectedStatus === 'overdue' ? 'primary' : 'default'}
-                  danger={selectedStatus === 'overdue'}
-                  icon={<ExclamationCircleOutlined />}
-                  onClick={() => filterCalibrations('overdue')}
-                >
-                  Overdue
-                </Button>
+            <div className="filter-section">
+              <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+                <Card>
+                  <Row gutter={[16, 16]} align="middle">
+                    
+                    <Col xs={24} sm={24} md={8}>
+                      <DatePicker.RangePicker
+                        style={{ width: '100%' }}
+                        onChange={(dates) => setDateRange(dates)}
+                        format="YYYY-MM-DD"
+                        allowClear
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={16}>
+                      <div className="filter-buttons">
+                        <Space size={[8, 8]} wrap={false} style={{ display: 'flex', flexWrap: 'nowrap', overflowX: 'auto' }}>
+                          <Button
+                            type={selectedStatus === 'all' ? 'primary' : 'default'}
+                            onClick={() => filterCalibrations('all')}
+                          >
+                            All
+                          </Button>
+                          {/* <Button
+                            type={selectedStatus === 'up_to_date' ? 'primary' : 'default'}
+                            icon={<CheckCircleOutlined />}
+                            onClick={() => filterCalibrations('up_to_date')}
+                          >
+                            Up to Date
+                          </Button> */}
+                          <Button
+                            type={selectedStatus === 'due_soon' ? 'primary' : 'default'}
+                            icon={<WarningOutlined />}
+                            onClick={() => filterCalibrations('due_soon')}
+                          >
+                            Due Soon ({upcomingCalibrations.length})
+                          </Button>
+                          <Button
+                            type={selectedStatus === 'overdue' ? 'primary' : 'default'}
+                            danger={selectedStatus === 'overdue'}
+                            icon={<ExclamationCircleOutlined />}
+                            onClick={() => filterCalibrations('overdue')}
+                          >
+                            Overdue ({getOverdueCount()})
+                          </Button>
+                        </Space>
+                      </div>
+                    </Col>
+                  </Row>
+                </Card>
               </Space>
             </div>
 
@@ -801,7 +956,7 @@ function Calibration() {
                 loading={loading}
                 rowKey="id"
                 pagination={{
-                  pageSize: 10,
+                  pageSize: 5,
                   showSizeChanger: true,
                   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
                   responsive: true
@@ -813,24 +968,53 @@ function Calibration() {
           </Tabs.TabPane>
 
           <Tabs.TabPane tab="Calibration History" key="history">
-            <div className="history-header">
-              {/* <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setIsHistoryModalVisible(true)}
-                className="add-button"
-              >
-                Add Calibration History
-              </Button> */}
+            <div className="filter-section">
+              <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+                <Card>
+                  <Row gutter={[16, 16]} align="middle">
+                    <Col xs={24} sm={24} md={8}>
+                      <DatePicker.RangePicker
+                        style={{ width: '100%' }}
+                        onChange={(dates) => setHistoryDateRange(dates)}
+                        format="YYYY-MM-DD"
+                        allowClear
+                      />
+                    </Col>
+                    {selectedInventoryItem && (
+                      <Col xs={24} sm={24} md={16}>
+                        <Space>
+                          <Text type="secondary">
+                            Showing history for: {
+                              (() => {
+                                const item = inventoryItems.find(item => item.id === selectedInventoryItem);
+                                const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+                                return item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : selectedInventoryItem;
+                              })()
+                            }
+                          </Text>
+                          <Button 
+                            className="bg-blue-500 text-white"
+                            type="link" 
+                            onClick={() => setSelectedInventoryItem(null)}
+                            icon={<CloseOutlined />}
+                          >
+                            Clear Selection
+                          </Button>
+                        </Space>
+                      </Col>
+                    )}
+                  </Row>
+                </Card>
+              </Space>
             </div>
             <div className="table-container">
               <Table
                 columns={historyColumns}
-                dataSource={calibrationHistory}
+                dataSource={getFilteredHistory()}
                 loading={loading}
                 rowKey="id"
                 pagination={{
-                  pageSize: 10,
+                  pageSize: 5,
                   showSizeChanger: true,
                   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
                   responsive: true
@@ -1128,10 +1312,39 @@ function Calibration() {
         }
 
         .filter-buttons {
-          margin-bottom: 16px;
+          width: 100%;
           overflow-x: auto;
           white-space: nowrap;
-          padding-bottom: 8px;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE and Edge */
+        }
+
+        .filter-buttons::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Opera */
+        }
+
+        .filter-buttons .ant-space {
+          padding-bottom: 4px; /* Add some padding to account for scroll bar */
+        }
+
+        .filter-buttons .ant-btn {
+          flex-shrink: 0;
+          margin-right: 8px;
+        }
+
+        .filter-buttons .ant-btn:last-child {
+          margin-right: 0;
+        }
+
+        @media (max-width: 768px) {
+          .filter-buttons {
+            padding-bottom: 8px;
+          }
+          
+          .filter-buttons .ant-space {
+            gap: 8px !important;
+          }
         }
 
         .table-container {
@@ -1273,6 +1486,29 @@ function Calibration() {
           .ant-tag {
             padding: 2px 6px;
             font-size: 12px;
+          }
+        }
+
+        .filter-section {
+          margin-bottom: 16px;
+        }
+
+        .filter-section .ant-card {
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .filter-section .ant-picker {
+          border-radius: 6px;
+        }
+
+        @media (max-width: 768px) {
+          .filter-section .ant-space {
+            width: 100%;
+          }
+          
+          .filter-section .ant-picker {
+            width: 100%;
           }
         }
       `}</style>

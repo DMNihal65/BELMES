@@ -249,9 +249,9 @@ const Scheduling = () => {
         
         // Apply all filters once
         operations = operations.filter(op => {
-          const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(op.machine);
           const matchesComponent = selectedComponents.length === 0 || selectedComponents.includes(op.component);
           const matchesOrder = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
+          const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(op.machine);
           
           // Apply date range filter if exists
           const withinDateRange = !dateRange || !dateRange[0] || !dateRange[1] || (
@@ -259,23 +259,14 @@ const Scheduling = () => {
             new Date(op.end_time) <= dateRange[1]
           );
 
-          return matchesMachine && matchesComponent && matchesOrder && withinDateRange;
+          return matchesComponent && matchesOrder && matchesMachine && withinDateRange;
         });
-
-        // Create groups based on filtered machines
-        const filteredMachines = [...new Set(operations.map(op => op.machine))];
-        const groups = new DataSet(
-          filteredMachines.map(machine => ({
-            id: machine,
-            content: machine
-          }))
-        );
 
         // Generate and store component colors for filtered operations
         const colors = getComponentColors(operations);
         setComponentColors(colors);
 
-        // Create items with proper date handling
+        // Create items from filtered operations
         const items = new DataSet(
           operations.map((op, index) => ({
             id: index,
@@ -299,15 +290,38 @@ const Scheduling = () => {
           }))
         );
 
-        // Get time range based on filtered operations
-        const timeRange = getTimeRange(
-          viewType, 
-          dateRange, 
-          selectedComponents, 
-          selectedMachines, 
-          selectedProductionOrders, 
-          { scheduled_operations: operations } // Pass filtered operations
+        // Remove previous dynamic styles
+        if (styleElementRef.current) {
+          styleElementRef.current.remove();
+        }
+
+        // Add dynamic styles for components
+        const componentStyles = Object.entries(colors).map(([component, colors]) => `
+          .component-${component.replace(/[^a-zA-Z0-9]/g, '-')} {
+            background-color: ${colors.backgroundColor} !important;
+            border-color: ${colors.borderColor} !important;
+          }
+          .component-${component.replace(/[^a-zA-Z0-9]/g, '-')}:hover {
+            background-color: ${colors.hoverColor} !important;
+          }
+        `).join('\n');
+
+        // Create and add new style element
+        const styleElement = document.createElement('style');
+        styleElement.textContent = componentStyles;
+        document.head.appendChild(styleElement);
+        styleElementRef.current = styleElement;
+
+        // Create groups with all available machines, regardless of operations
+        const groups = new DataSet(
+          availableMachines.map(machine => ({
+            id: machine,
+            content: machine
+          }))
         );
+
+        // Get time range based on view type
+        const timeRange = getTimeRange(viewType, dateRange, selectedComponents, selectedMachines, selectedProductionOrders, scheduleData);
 
         // Configure options
         const options = {
@@ -315,7 +329,7 @@ const Scheduling = () => {
           horizontalScroll: true,
           zoomKey: 'ctrlKey',
           orientation: 'top',
-          height: '560px',
+          height: '570px',
           margin: {
             item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
             axis: 5
@@ -336,12 +350,12 @@ const Scheduling = () => {
             overflowMethod: 'cap',
             template: function(item) {
               const op = item.operation;
-              if (!op) return ''; // Add null check
+              if (!op) return '';
               const status = scheduleData.component_status[op.component];
               return `
                 <div class="timeline-tooltip">
                   <div class="tooltip-header">
-                  <div class="info-row">
+                    <div class="info-row">
                       <span class="label">Component:</span>
                       <span class="component">${op.component}</span>
                     </div>
@@ -351,7 +365,6 @@ const Scheduling = () => {
                     </div>
                   </div>
                   <div class="tooltip-body">
-                  
                     <div class="info-row">
                       <span class="label">Production Order:</span>
                       <span class="value">${op.production_order}</span>
@@ -394,12 +407,12 @@ const Scheduling = () => {
           },
           format: {
             minorLabels: {
-              hour: 'HH:00', // Format hours as "00:00", "01:00", etc.
+              hour: 'HH:00',
               minute: 'HH:mm'
             },
             majorLabels: {
-              hour: 'ddd D MMM', // Show date above hours
-              minute: 'HH:00' // For minute scale, show hours
+              hour: 'ddd D MMM',
+              minute: 'HH:00'
             }
           }
         };
@@ -740,7 +753,7 @@ const Scheduling = () => {
 
                   <Select
                       mode="multiple"
-                      placeholder="Select Component Number"
+                      placeholder="Select Part Number"
                       value={selectedComponents}
                       onChange={setSelectedComponents}
                       style={{ minWidth: 200 }}
@@ -798,7 +811,7 @@ const Scheduling = () => {
                 ref={timelineContainerRef} 
                 className="schedule-timeline"
                 style={{ 
-                  height: '580px',
+                  height: '590px',
                   backgroundColor: '#fff',
                   padding: '20px',
                   borderRadius: '8px',

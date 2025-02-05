@@ -5,7 +5,7 @@ import { Card, Badge } from 'antd';
 export const ComponentLegend = ({ componentColors }) => {
   return (
     <div className="component-legend">
-      <div className="legend-title">Components</div>
+      <div className="legend-title">Part Numbers</div>
       <div className="legend-items">
         {Object.entries(componentColors).map(([component, colors]) => (
           <div key={component} className="legend-item">

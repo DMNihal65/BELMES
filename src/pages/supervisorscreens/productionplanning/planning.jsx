@@ -286,7 +286,13 @@ const Planning = () => {
                 key="jobDetails"
               >
                 <Card 
-                  className="shadow-sm mb-6 hover:shadow-md transition-shadow bg-white"
+                  className={`shadow-sm mb-6 hover:shadow-md transition-shadow ${
+                    getJobStatus(selectedJob.part_number) === 'active' 
+                      ? 'bg-green-50' 
+                      : getJobStatus(selectedJob.part_number) === 'inactive'
+                      ? 'bg-yellow-50'
+                      : 'bg-gray-50'
+                  }`}
                   size="small"
                 >
                   <Descriptions column={3}>
@@ -341,7 +347,7 @@ const Planning = () => {
                 />
               </TabPane>
 
-              <TabPane 
+              {/* <TabPane 
                 tab={
                   <span>
                     <BarChartOutlined />
@@ -354,7 +360,7 @@ const Planning = () => {
                   machines={mockMachines}
                   selectedJob={selectedJob}
                 />
-              </TabPane>
+              </TabPane> */}
 
               <TabPane 
                 tab={

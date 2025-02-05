@@ -69,6 +69,7 @@ const InventoryAllData = () => {
   const [searchText, setSearchText] = useState('');
   const tableRef = useRef();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isAutoGenerateCode, setIsAutoGenerateCode] = useState(true);
 
   // Store hooks
   const { 
@@ -91,6 +92,20 @@ const InventoryAllData = () => {
     error,
     set,
   } = useInventoryStore();
+
+  // Add function to generate sequential item code
+  const generateItemCode = (categoryName, subcategoryName) => {
+    const prefix = `${categoryName}_${subcategoryName}_`.toUpperCase().replace(/\s+/g, '_');
+    const existingCodes = items
+      .filter(item => item.item_code.startsWith(prefix))
+      .map(item => {
+        const num = parseInt(item.item_code.replace(prefix, ''));
+        return isNaN(num) ? 0 : num;
+      });
+    
+    const nextNumber = existingCodes.length > 0 ? Math.max(...existingCodes) + 1 : 1;
+    return `${prefix}${String(nextNumber).padStart(3, '0')}`;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -510,7 +525,7 @@ const InventoryAllData = () => {
 
           try {
             const response = await axios.post(
-              'http://172.18.7.85:4411/api/v1/api/inventory/items/bulk/',
+              'http://172.18.7.85:4412/api/v1/api/inventory/items/bulk/',
               {
                 created_by: 1,
                 subcategory_id: selectedCategory.id,
@@ -642,13 +657,23 @@ const InventoryAllData = () => {
         const isEditing = rightClickedNode?.data?.id && !rightClickedNode?.key?.startsWith('category-');
         
         if (isEditing) {
-          result = await updateSubcategory(rightClickedNode.data.id, {
+          // For updating existing subcategory
+          const updateData = {
             name: values.name,
             description: values.description,
             category_id: rightClickedNode.data.category_id,
-            dynamic_fields: dynamicFields
-          });
+            dynamic_fields: rightClickedNode.data.dynamic_fields || {} // Use existing dynamic fields
+          };
+
+          // If new dynamic fields are defined, update them
+          if (Object.keys(dynamicFields).length > 0) {
+            updateData.dynamic_fields = dynamicFields;
+          }
+
+          console.log('Updating subcategory with data:', updateData);
+          result = await updateSubcategory(rightClickedNode.data.id, updateData);
         } else {
+          // For creating new subcategory
           result = await addSubcategory({
             name: values.name,
             description: values.description,
@@ -745,16 +770,27 @@ const InventoryAllData = () => {
   // Update the Add Item button click handler
   const handleAddItemClick = () => {
     if (selectedCategory?.type === 'subcategory') {
-      setModalType('item');
-      setRightClickedNode(null);
-      form.resetFields();
-      form.setFieldsValue({
-        status: 'Active',
-        quantity: 0,
-        available_quantity: 0,
-        subcategory_id: selectedCategory.id
-      });
-      setIsModalVisible(true);
+      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
+      const category = categories.find(cat => cat.id === subcategory?.category_id);
+      
+      if (subcategory && category) {
+        const generatedCode = generateItemCode(category.name, subcategory.name);
+        
+        setModalType('item');
+        setRightClickedNode(null);
+        form.resetFields();
+        setIsAutoGenerateCode(true);
+        form.setFieldsValue({
+          status: 'Active',
+          quantity: 0,
+          available_quantity: 0,
+          subcategory_id: selectedCategory.id,
+          item_code: generatedCode
+        });
+        setIsModalVisible(true);
+      } else {
+        message.warning('Please select a subcategory to add an item');
+      }
     } else {
       message.warning('Please select a subcategory to add an item');
     }
@@ -1137,7 +1173,9 @@ const InventoryAllData = () => {
   // Render item form based on subcategory dynamic fields
   const renderItemForm = () => {
     const subcategory = subcategories.find(sub => sub.id === selectedCategory?.id);
-    if (!subcategory) {
+    const category = categories.find(cat => cat.id === subcategory?.category_id);
+    
+    if (!subcategory || !category) {
       message.error('Please select a subcategory first');
       return null;
     }
@@ -1154,82 +1192,215 @@ const InventoryAllData = () => {
           subcategory_id: selectedCategory.id
         }}
       >
-        <Form.Item
-          name="id"
-          hidden
-        >
+        <Form.Item name="id" hidden>
           <Input />
         </Form.Item>
 
-        <Form.Item
-          name="subcategory_id"
-          hidden
-        >
+        <Form.Item name="subcategory_id" hidden>
           <Input />
         </Form.Item>
 
-        <Form.Item
-          name="item_code"
-          label="Item Code"
-          rules={[{ required: true, message: 'Please enter item code' }]}
-        >
-          <Input placeholder="e.g., EM-001" />
-        </Form.Item>
-
-        <Form.Item
-          name="quantity"
-          label="Quantity"
-          rules={[{ required: true, message: 'Please enter quantity' }]}
-        >
-          <InputNumber 
-            min={0} 
-            style={{ width: '100%' }} 
-            onChange={(value) => {
-              // Auto-update available quantity when quantity changes
-              form.setFieldsValue({ available_quantity: value });
-            }}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="available_quantity"
-          label="Available Quantity"
-          rules={[{ required: true, message: 'Please enter available quantity' }]}
-        >
-          <InputNumber min={0} style={{ width: '100%' }} />
-        </Form.Item>
-
-        <Form.Item
-          name="status"
-          label="Status"
-          rules={[{ required: true, message: 'Please select status' }]}
-        >
-          <Select>
-            <Select.Option value="Active">Active</Select.Option>
-            <Select.Option value="Inactive">Inactive</Select.Option>
-          </Select>
-        </Form.Item>
-
-        <Divider>Dynamic Fields</Divider>
-
-        {Object.entries(subcategory.dynamic_fields || {}).map(([fieldName, config]) => (
+        {/* First Row: Item Code and Status */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
           <Form.Item
-            key={fieldName}
-            name={['dynamic_data', fieldName]}
-            label={`${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}${config.unit ? ` (${config.unit})` : ''}`}
-            rules={[{ required: config.required, message: `Please enter ${fieldName}` }]}
+            name="item_code"
+            label={
+              <Space>
+                Item Code
+                {!form.getFieldValue('id') && (
+                  <Switch
+                    checked={isAutoGenerateCode}
+                    onChange={(checked) => {
+                      setIsAutoGenerateCode(checked);
+                      if (checked) {
+                        const newCode = generateItemCode(category.name, subcategory.name);
+                        form.setFieldsValue({ item_code: newCode });
+                      }
+                    }}
+                    checkedChildren="Auto"
+                    unCheckedChildren="Manual"
+                    size="small"
+                  />
+                )}
+              </Space>
+            }
+            rules={[
+              { required: true, message: 'Please enter item code' },
+              {
+                pattern: /^[A-Z0-9_]+$/,
+                message: 'Item code must contain only uppercase letters, numbers, and underscores'
+              }
+            ]}
+            style={{ flex: 2 }}
+            extra={
+              !form.getFieldValue('id') 
+                ? isAutoGenerateCode 
+                  ? "Item code will be auto-generated based on category and subcategory names" 
+                  : "Enter a custom item code (uppercase letters, numbers, and underscores only)"
+                : null
+            }
           >
-            {config.type === 'number' ? (
-              <InputNumber style={{ width: '100%' }} />
-            ) : config.type === 'boolean' ? (
-              <Switch checkedChildren="Yes" unCheckedChildren="No" />
-            ) : config.type === 'date' ? (
-              <DatePicker style={{ width: '100%' }} />
-            ) : (
-              <Input />
-            )}
+            <Input 
+              placeholder="e.g., CATEGORY_SUBCATEGORY_001"
+              readOnly={!form.getFieldValue('id') && isAutoGenerateCode}
+              addonAfter={
+                <Space>
+                  {(form.getFieldValue('id') || !isAutoGenerateCode) && (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => {
+                        const newCode = generateItemCode(category.name, subcategory.name);
+                        form.setFieldsValue({ item_code: newCode });
+                        if (!form.getFieldValue('id')) {
+                          setIsAutoGenerateCode(true);
+                        }
+                      }}
+                    >
+                      Generate New
+                    </Button>
+                  )}
+                </Space>
+              }
+              onChange={(e) => {
+                form.setFieldsValue({ 
+                  item_code: e.target.value.toUpperCase() 
+                });
+              }}
+            />
           </Form.Item>
-        ))}
+
+          <Form.Item
+            name="status"
+            label="Status"
+            rules={[{ required: true, message: 'Please select status' }]}
+            style={{ flex: 1 }}
+          >
+            <Select>
+              <Select.Option value="Active">Active</Select.Option>
+              <Select.Option value="Inactive">Inactive</Select.Option>
+            </Select>
+          </Form.Item>
+        </div>
+
+        {/* Second Row: Quantity and Available Quantity */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+          <Form.Item
+            name="quantity"
+            label="Quantity"
+            rules={[
+              { required: true, message: 'Please enter quantity' },
+              { type: 'number', min: 0, message: 'Quantity must be greater than or equal to 0' }
+            ]}
+            style={{ flex: 1 }}
+          >
+            <InputNumber 
+              min={0} 
+              style={{ width: '100%' }}
+              placeholder="Enter total quantity"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="available_quantity"
+            label="Available Quantity"
+            rules={[
+              { required: true, message: 'Please enter available quantity' },
+              { type: 'number', min: 0, message: 'Available quantity must be greater than or equal to 0' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  const totalQuantity = getFieldValue('quantity');
+                  if (value > totalQuantity) {
+                    return Promise.reject('Available quantity cannot exceed total quantity');
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+            style={{ flex: 1 }}
+            extra="Available quantity must be less than or equal to total quantity"
+          >
+            <InputNumber 
+              min={0} 
+              style={{ width: '100%' }}
+              placeholder="Enter available quantity"
+            />
+          </Form.Item>
+        </div>
+
+        {/* Dynamic Fields Section */}
+        <Divider>Dynamic Fields</Divider>
+        
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+          {Object.entries(subcategory.dynamic_fields || {}).map(([fieldName, config], index) => (
+            <Form.Item
+              key={fieldName}
+              name={['dynamic_data', fieldName]}
+              label={
+                <Space>
+                  {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
+                  <Tag color={
+                    config.type === 'number' ? 'blue' :
+                    config.type === 'boolean' ? 'green' :
+                    config.type === 'date' ? 'purple' : 
+                    'default'
+                  }>
+                    {config.type.toUpperCase()}
+                  </Tag>
+                  {config.required && <Tag color="red">Required</Tag>}
+                </Space>
+              }
+              rules={[
+                { 
+                  required: config.required, 
+                  message: `Please enter ${fieldName}` 
+                },
+                config.type === 'number' && {
+                  type: 'number',
+                  message: 'Please enter a valid number'
+                }
+              ].filter(Boolean)}
+              extra={
+                config.type === 'number' ? `Enter numeric value${config.unit ? ` in ${config.unit}` : ''}` :
+                config.type === 'boolean' ? 'Select Yes or No' :
+                config.type === 'date' ? 'Select a date' :
+                'Enter text value'
+              }
+              style={{ 
+                flex: '1 1 calc(33.333% - 11px)',
+                minWidth: '250px',
+                margin: 0
+              }}
+            >
+              {config.type === 'number' ? (
+                <InputNumber 
+                  style={{ width: '100%' }}
+                  placeholder={`Enter ${fieldName} in ${config.unit || 'numbers'}`}
+                  min={0}
+                  addonAfter={config.unit}
+                />
+              ) : config.type === 'boolean' ? (
+                <Switch 
+                  checkedChildren="Yes" 
+                  unCheckedChildren="No"
+                  defaultChecked={false}
+                />
+              ) : config.type === 'date' ? (
+                <DatePicker 
+                  style={{ width: '100%' }}
+                  placeholder={`Select ${fieldName} date`}
+                  format="YYYY-MM-DD"
+                />
+              ) : (
+                <Input 
+                  placeholder={`Enter ${fieldName}`}
+                  maxLength={255}
+                  showCount
+                />
+              )}
+            </Form.Item>
+          ))}
+        </div>
 
         <Form.Item className="mb-0 text-right">
           <Space>

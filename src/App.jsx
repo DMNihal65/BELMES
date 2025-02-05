@@ -13,7 +13,7 @@ import DocumentManagement from './pages/supervisorscreens/DocumentManagement';
 import InventoryUsageAndAnalytics from './pages/supervisorscreens/inventory/inventoryMaster';
 import RequestsCalibrationHistory from './pages/supervisorscreens/inventory/requestsCalibrationHistory';
 import JobDetails from './pages/operatorscreens/jobdetails';
-import Inventory from './pages/operatorscreens/inventory/inventoryRequest';
+import Inventory from './pages/operatorscreens/inventory/InventoryViewData';
 import HelpAndSupport from './pages/operatorscreens/HelpAndSupport';
 import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagement';
 import AlertScreens from './pages/operatorscreens/AlertScreens';

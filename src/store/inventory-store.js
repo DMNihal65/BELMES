@@ -12,6 +12,8 @@ const useInventoryStore = create((set, get) => ({
   selectedSubcategory: null,
   loading: false,
   error: null,
+  allOrders: [],
+  operations: [],
 
   // Categories
   fetchCategories: async () => {
@@ -321,6 +323,95 @@ const useInventoryStore = create((set, get) => ({
   // Selection handlers
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSelectedSubcategory: (subcategory) => set({ selectedSubcategory: subcategory }),
+
+  // Add this function to fetch all orders
+  fetchAllOrders: async () => {
+    set({ loading: true });
+    try {
+      const response = await axios.get('http://172.18.7.89:2222/api/v1/planning/all_orders');
+      set({ 
+        allOrders: response.data || [],
+        loading: false 
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      message.error('Failed to fetch orders');
+      set({ loading: false, allOrders: [] });
+      return [];
+    }
+  },
+
+  // Update the submit request function
+  submitItemRequest: async (requestData) => {
+    set({ loading: true });
+    try {
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Log the request for debugging
+      console.log('Request Payload:', {
+        expected_return_date: requestData.expected_return_date?.toISOString(),
+        inventory_item_id: parseInt(requestData.item_id),
+        operation_id: parseInt(requestData.operation_id),
+        order_id: parseInt(requestData.order_id),
+        purpose: requestData.purpose,
+        quantity: parseInt(requestData.quantity),
+        remarks: requestData.remarks || "",
+        status: "Pending"
+      });
+
+      const response = await axios.post(
+        // Updated URL to match your API endpoint structure
+        'http://172.18.7.89:2222/api/v1/api/inventory/requests',  // Added 'api' in the path
+        {
+          expected_return_date: requestData.expected_return_date?.toISOString(),
+          inventory_item_id: parseInt(requestData.item_id),
+          operation_id: parseInt(requestData.operation_id),
+          order_id: parseInt(requestData.order_id),
+          purpose: requestData.purpose,
+          quantity: parseInt(requestData.quantity),
+          remarks: requestData.remarks || "",
+          status: "Pending"
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      message.success('Request submitted successfully');
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting request:', error);
+      // More detailed error message
+      message.error(`Failed to submit request: ${error.response?.data?.detail || error.message}`);
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  fetchOperationsByPartNumber: async (partNumber) => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`http://172.18.7.89:2222/api/v1/planning/search_order?part_number=${partNumber}`);
+      // Extract operations from the orders array
+      const operations = response.data?.orders?.[0]?.operations || [];
+      set({ 
+        operations: operations,
+        loading: false 
+      });
+      return operations;
+    } catch (error) {
+      console.error('Error fetching operations:', error);
+      message.error('Failed to fetch operations');
+      set({ loading: false, operations: [] });
+      return [];
+    }
+  },
 }));
 
 export default useInventoryStore;

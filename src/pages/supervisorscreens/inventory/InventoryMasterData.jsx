@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Card, 
   Tree, 
@@ -45,11 +45,13 @@ import {
   FileExcelOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  DownOutlined
 } from '@ant-design/icons';
 import useInventoryStore from '../../../store/inventory-store';
 import dayjs from 'dayjs';
 import axios from 'axios';
+import { read, utils, write } from 'xlsx';
 
 const { Title, Text } = Typography;
 
@@ -64,6 +66,9 @@ const InventoryAllData = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [form] = Form.useForm();
   const [editingKey, setEditingKey] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const tableRef = useRef();
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Store hooks
   const { 
@@ -84,16 +89,47 @@ const InventoryAllData = () => {
     deleteItem,
     isLoading,
     error,
+    set,
   } = useInventoryStore();
 
   useEffect(() => {
     const fetchData = async () => {
-      await fetchCategories();
-      await fetchAllSubcategories();
-      await fetchItems();
+      try {
+        set({ loading: true });
+        await fetchCategories();
+        const subcategoriesData = await fetchAllSubcategories();
+        set({ subcategories: subcategoriesData });
+        const itemsData = await fetchItems();
+        set({ items: itemsData });
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        message.error('Failed to fetch data');
+      } finally {
+        set({ loading: false });
+      }
     };
     fetchData();
   }, [fetchCategories, fetchAllSubcategories, fetchItems]);
+
+  useEffect(() => {
+    const refreshData = async () => {
+      if (selectedCategory?.id && selectedCategory?.type === 'subcategory') {
+        try {
+          set({ loading: true });
+          const newItems = await fetchItems();
+          if (Array.isArray(newItems)) {
+            set({ items: newItems });
+          }
+        } catch (error) {
+          console.error('Error refreshing data:', error);
+          message.error('Failed to refresh data');
+        } finally {
+          set({ loading: false });
+        }
+      }
+    };
+    refreshData();
+  }, [refreshTrigger, selectedCategory]);
 
   // Add context menu handler
   const getContextMenu = (node) => {
@@ -200,47 +236,62 @@ const InventoryAllData = () => {
   };
 
   // Handlers
-  const handleExportExcel = async () => {
+  const handleExportExcel = () => {
     if (!selectedCategory || selectedCategory.type !== 'subcategory') {
       message.warning('Please select a subcategory first');
       return;
     }
 
     try {
-      // Get items for the selected subcategory
-      const subcategoryItems = getTableData();
+      // Get the current table data
+      const tableData = getTableData();
       
-      const response = await axios({
-        url: 'http://172.18.7.89:2222/api/v1/api/inventory/items/bulk/',
-        method: 'POST',
-        responseType: 'blob',
-        headers: {
-          'Content-Type': 'application/json',
-          'accept': 'application/json'
-        },
-        data: {
-          created_by: 1,
-          items: subcategoryItems.map(item => ({
-            item_code: item.item_code,
-            quantity: item.quantity,
-            available_quantity: item.available_quantity,
-            status: item.status,
-            dynamic_data: item.dynamic_data || {}
-          })),
-          subcategory_id: selectedCategory.id
+      // Get the subcategory to access its dynamic fields
+      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
+      
+      // Transform data for Excel
+      const excelData = tableData.map(item => {
+        const row = {
+          'Item Code': item.item_code,
+          'Quantity': item.quantity,
+          'Available Quantity': item.available_quantity,
+          'Status': item.status,
+        };
+
+        // Add dynamic fields
+        if (subcategory?.dynamic_fields && item.dynamic_data) {
+          Object.entries(subcategory.dynamic_fields).forEach(([fieldName, fieldConfig]) => {
+            const value = item.dynamic_data[fieldName];
+            if (fieldConfig.type === 'boolean') {
+              row[fieldName] = value ? 'Yes' : 'No';
+            } else if (fieldConfig.type === 'date' && value) {
+              row[fieldName] = dayjs(value).format('YYYY-MM-DD');
+            } else if (fieldConfig.unit) {
+              row[fieldName] = `${value} ${fieldConfig.unit}`;
+            } else {
+              row[fieldName] = value;
+            }
+          });
         }
+
+        return row;
       });
 
-      // Create a blob from the response data
-      const blob = new Blob([response.data], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      // Create worksheet
+      const ws = utils.json_to_sheet(excelData);
+
+      // Create workbook
+      const wb = utils.book_new();
+      utils.book_append_sheet(wb, ws, 'Items');
+
+      // Generate Excel file
+      const excelBuffer = write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
-      
-      // Get subcategory name for the file name
-      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
+
+      // Download file
       const fileName = `${subcategory?.name || 'inventory'}_items.xlsx`;
-      
-      // Create a link element and trigger download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -252,40 +303,262 @@ const InventoryAllData = () => {
 
       message.success('Excel file downloaded successfully');
     } catch (error) {
-      console.error('Error downloading Excel:', error);
-      message.error('Failed to download Excel file: ' + (error.response?.data?.detail || error.message));
+      console.error('Error exporting to Excel:', error);
+      message.error('Failed to export Excel file');
     }
   };
 
   const handleDownloadTemplate = () => {
-    window.open('http://172.18.7.89:2222/api/v1/api/inventory/items/bulk/', '_blank');
+    if (!selectedCategory || selectedCategory.type !== 'subcategory') {
+      message.warning('Please select a subcategory first');
+      return;
+    }
+
+    try {
+      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
+      if (!subcategory) {
+        throw new Error('Subcategory not found');
+      }
+
+      // Get all columns from the table
+      const columns = getColumns()
+        .filter(col => col.key !== 'actions') // Exclude actions column
+        .map(col => {
+          // Handle nested dataIndex for dynamic fields
+          const fieldName = Array.isArray(col.dataIndex) ? col.dataIndex[1] : col.dataIndex;
+          return {
+            header: typeof col.title === 'string' ? col.title : fieldName,
+            key: fieldName
+          };
+        });
+
+      // Create template data with example row
+      const templateData = [{
+        'Item Code': '',
+        'Quantity': '',
+        'Available Quantity': '',
+        'Status': 'Active',
+        ...Object.entries(subcategory.dynamic_fields || {}).reduce((acc, [fieldName, config]) => {
+          acc[fieldName] = '';
+          return acc;
+        }, {})
+      }];
+
+      // Create worksheet with headers
+      const ws = utils.json_to_sheet(templateData);
+
+      // Customize column widths
+      const colWidths = columns.map(() => ({ wch: 20 })); // Set width of 20 for all columns
+      ws['!cols'] = colWidths;
+
+      // Add notes/instructions in a separate worksheet
+      const instructionsWS = utils.json_to_sheet([
+        { Instructions: 'Please follow these guidelines:' },
+        { Instructions: '1. Item Code: Unique identifier for the item (e.g., EM-001)' },
+        { Instructions: '2. Quantity: Total quantity of the item (numeric value)' },
+        { Instructions: '3. Available Quantity: Currently available quantity (numeric value)' },
+        { Instructions: '4. Status: Must be either "Active" or "Inactive"' },
+        { Instructions: '\nDynamic Fields:' },
+        ...Object.entries(subcategory.dynamic_fields || {}).map(([fieldName, config]) => ({
+          Instructions: `${fieldName}: ${getFieldInstructions(config)}`
+        }))
+      ], { header: ['Instructions'] });
+
+      // Set column width for instructions
+      instructionsWS['!cols'] = [{ wch: 100 }];
+
+      // Create workbook and add worksheets
+      const wb = utils.book_new();
+      utils.book_append_sheet(wb, ws, 'Template');
+      utils.book_append_sheet(wb, instructionsWS, 'Instructions');
+
+      // Generate Excel file
+      const excelBuffer = write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      // Download file
+      const fileName = `${subcategory.name}_template.xlsx`;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      message.success('Template downloaded successfully');
+    } catch (error) {
+      console.error('Error creating template:', error);
+      message.error('Failed to create template');
+    }
   };
 
-  const handleExcelUpload = (file) => {
+  // Helper function to get field instructions based on field configuration
+  const getFieldInstructions = (config) => {
+    let instructions = `Type: ${config.type}`;
+    if (config.required) {
+      instructions += ' (Required)';
+    }
+    if (config.unit) {
+      instructions += ` (Unit: ${config.unit})`;
+    }
+    
+    switch (config.type) {
+      case 'number':
+        instructions += ' - Enter numeric value';
+        break;
+      case 'boolean':
+        instructions += ' - Enter "Yes" or "No"';
+        break;
+      case 'date':
+        instructions += ' - Enter date in YYYY-MM-DD format';
+        break;
+      default:
+        instructions += ' - Enter text value';
+    }
+    
+    return instructions;
+  };
+
+  const handleExcelUpload = async (file) => {
     if (!selectedCategory || selectedCategory.type !== 'subcategory') {
       message.warning('Please select a subcategory first');
       return false;
     }
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('created_by', 1);
-    formData.append('subcategory_id', selectedCategory.id);
+    const loadingMessage = message.loading('Processing file...', 0);
 
-    axios.post('http://172.18.7.89:2222/api/v1/api/inventory/items/bulk/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-    .then(response => {
-      message.success('Excel file uploaded successfully');
-      // Refresh the items list
-      fetchItems(selectedCategory.id);
-    })
-    .catch(error => {
-      console.error('Error uploading Excel:', error);
-      message.error('Failed to upload Excel file: ' + (error.response?.data?.detail || error.message));
-    });
+    try {
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = utils.sheet_to_json(worksheet);
+
+          const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
+          if (!subcategory) {
+            throw new Error('Subcategory not found');
+          }
+
+          // Validate data before sending
+          for (const row of jsonData) {
+            if (!row['Item Code']) {
+              throw new Error('Item Code is required for all items');
+            }
+            if (!row['Quantity'] || isNaN(parseInt(row['Quantity']))) {
+              throw new Error(`Invalid Quantity for item ${row['Item Code']}`);
+            }
+            if (!row['Available Quantity'] || isNaN(parseInt(row['Available Quantity']))) {
+              throw new Error(`Invalid Available Quantity for item ${row['Item Code']}`);
+            }
+            
+            // Validate dynamic fields
+            for (const [fieldName, config] of Object.entries(subcategory.dynamic_fields || {})) {
+              const value = row[fieldName];
+              if (config.required && (value === undefined || value === null || value === '')) {
+                throw new Error(`${fieldName} is required for item ${row['Item Code']}`);
+              }
+              if (value !== undefined && value !== null && value !== '') {
+                if (config.type === 'number' && isNaN(parseFloat(value))) {
+                  throw new Error(`Invalid number value for ${fieldName} in item ${row['Item Code']}`);
+                }
+                if (config.type === 'date' && !dayjs(value).isValid()) {
+                  throw new Error(`Invalid date format for ${fieldName} in item ${row['Item Code']}`);
+                }
+              }
+            }
+          }
+
+          const formattedItems = jsonData.map(row => ({
+            item_code: String(row['Item Code'] || '').trim(),
+            quantity: parseInt(row['Quantity'] || 0),
+            available_quantity: parseInt(row['Available Quantity'] || 0),
+            status: String(row['Status'] || 'Active').trim(),
+            dynamic_data: Object.entries(subcategory.dynamic_fields || {}).reduce((acc, [fieldName, config]) => {
+              const value = row[fieldName];
+              if (value !== undefined && value !== null && value !== '') {
+                acc[fieldName] = config.type === 'number' ? parseFloat(value) 
+                  : config.type === 'boolean' ? (value === true || value === 'true' || value === 'Yes' || value === 1)
+                  : config.type === 'date' ? dayjs(value).format('YYYY-MM-DD')
+                  : String(value);
+              }
+              return acc;
+            }, {})
+          }));
+
+          // Log the request payload for debugging
+          console.log('Request Payload:', {
+            created_by: 1,
+            subcategory_id: selectedCategory.id,
+            items: formattedItems
+          });
+
+          try {
+            const response = await axios.post(
+              'http://172.18.7.89:2222/api/v1/api/inventory/items/bulk/',
+              {
+                created_by: 1,
+                subcategory_id: selectedCategory.id,
+                items: formattedItems
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              }
+            );
+
+            if (response.data) {
+              loadingMessage();
+              message.success('Excel data imported successfully');
+              setRefreshTrigger(prev => prev + 1);
+            }
+          } catch (error) {
+            loadingMessage();
+            console.error('Server Error Details:', {
+              status: error.response?.status,
+              data: error.response?.data,
+              error: error.message
+            });
+
+            if (error.response?.status === 500) {
+              message.error(
+                'Server error (500). Possible issues:\n' +
+                '1. Duplicate item codes\n' +
+                '2. Invalid data format\n' +
+                '3. Missing required fields\n' +
+                'Please check your data and try again.'
+              );
+            } else if (error.response?.data?.detail) {
+              message.error(`Upload failed: ${error.response.data.detail}`);
+            } else {
+              message.error('Failed to upload data. Please check the server logs for details.');
+            }
+          }
+        } catch (error) {
+          loadingMessage();
+          console.error('Data Processing Error:', error);
+          message.error(error.message || 'Failed to process Excel file');
+        }
+      };
+
+      reader.onerror = () => {
+        loadingMessage();
+        message.error('Failed to read file');
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      loadingMessage();
+      console.error('File Processing Error:', error);
+      message.error('Failed to process file');
+    }
 
     return false;
   };
@@ -478,51 +751,45 @@ const InventoryAllData = () => {
     }
   };
 
-  // Update the table title section
-  const renderTableTitle = () => (
-    <Space className="w-full justify-between">
-      <Space>
-        <Text strong>
-          {selectedCategory 
-            ? `${selectedCategory.type === 'category' ? 'Category' : 'Subcategory'} Items` 
-            : 'All Items'}
-        </Text>
-      </Space>
-      <Space>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAddItemClick}
-        >
-          Add Item
-        </Button>
-        {selectedCategory?.type === 'subcategory' && (
-          <Upload
-            beforeUpload={handleExcelUpload}
-            showUploadList={false}
-            accept=".xlsx,.xls"
-          >
-            <Button icon={<UploadOutlined />}>Import</Button>
-          </Upload>
-        )}
-        <Button 
-          icon={<DownloadOutlined />}
-          onClick={handleExportExcel}
-        >
-          Export
-        </Button>
-      </Space>
-    </Space>
-  );
+  // Add search function
+  const handleSearch = (value) => {
+    setSearchText(value);
+  };
 
-  // Get table data based on selection
+  // Modify getTableData to include search filter
   const getTableData = () => {
     if (!selectedCategory || selectedCategory.type === 'category') {
       return [];
     }
     
-    // Only show items for selected subcategory
-    return items.filter(item => item.subcategory_id === selectedCategory.id);
+    // Get items for selected subcategory
+    let filteredData = items.filter(item => item.subcategory_id === selectedCategory.id);
+
+    // Apply search filter if searchText exists
+    if (searchText) {
+      filteredData = filteredData.filter(item => {
+        // Search in standard fields
+        if (
+          item.item_code?.toString().toLowerCase().includes(searchText.toLowerCase()) ||
+          item.quantity?.toString().includes(searchText) ||
+          item.available_quantity?.toString().includes(searchText) ||
+          item.status?.toLowerCase().includes(searchText.toLowerCase())
+        ) {
+          return true;
+        }
+
+        // Search in dynamic fields
+        if (item.dynamic_data) {
+          return Object.values(item.dynamic_data).some(value => 
+            value?.toString().toLowerCase().includes(searchText.toLowerCase())
+          );
+        }
+
+        return false;
+      });
+    }
+
+    return filteredData;
   };
 
   const isEditing = (record) => record.id === editingKey;
@@ -638,6 +905,13 @@ const InventoryAllData = () => {
         key: 'item_code',
         width: 150,
         editable: true,
+        sorter: (a, b) => a.item_code.localeCompare(b.item_code),
+        filterSearch: true,
+        filters: [...new Set(items
+          .filter(item => item.subcategory_id === selectedCategory.id)
+          .map(item => item.item_code))]
+          .map(code => ({ text: code, value: code })),
+        onFilter: (value, record) => record.item_code === value,
       },
       {
         title: 'Quantity',
@@ -645,6 +919,20 @@ const InventoryAllData = () => {
         key: 'quantity',
         width: 100,
         editable: true,
+        sorter: (a, b) => a.quantity - b.quantity,
+        filters: [
+          { text: '0', value: '0' },
+          { text: '1-10', value: '1-10' },
+          { text: '11-50', value: '11-50' },
+          { text: '50+', value: '50+' },
+        ],
+        onFilter: (value, record) => {
+          if (value === '0') return record.quantity === 0;
+          if (value === '1-10') return record.quantity > 0 && record.quantity <= 10;
+          if (value === '11-50') return record.quantity > 10 && record.quantity <= 50;
+          if (value === '50+') return record.quantity > 50;
+          return true;
+        },
       },
       {
         title: 'Available Quantity',
@@ -652,6 +940,20 @@ const InventoryAllData = () => {
         key: 'available_quantity',
         width: 150,
         editable: true,
+        sorter: (a, b) => a.available_quantity - b.available_quantity,
+        filters: [
+          { text: '0', value: '0' },
+          { text: '1-10', value: '1-10' },
+          { text: '11-50', value: '11-50' },
+          { text: '50+', value: '50+' },
+        ],
+        onFilter: (value, record) => {
+          if (value === '0') return record.available_quantity === 0;
+          if (value === '1-10') return record.available_quantity > 0 && record.available_quantity <= 10;
+          if (value === '11-50') return record.available_quantity > 10 && record.available_quantity <= 50;
+          if (value === '50+') return record.available_quantity > 50;
+          return true;
+        },
       },
       {
         title: 'Status',
@@ -659,6 +961,11 @@ const InventoryAllData = () => {
         key: 'status',
         width: 100,
         editable: true,
+        filters: [
+          { text: 'Active', value: 'Active' },
+          { text: 'Inactive', value: 'Inactive' },
+        ],
+        onFilter: (value, record) => record.status === value,
         render: (status) => (
           <Tag color={status === 'Active' ? 'green' : 'red'}>
             {status}
@@ -671,6 +978,12 @@ const InventoryAllData = () => {
     const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
     if (subcategory?.dynamic_fields) {
       Object.entries(subcategory.dynamic_fields).forEach(([fieldName, fieldConfig]) => {
+        const uniqueValues = [...new Set(items
+          .filter(item => item.subcategory_id === selectedCategory.id)
+          .map(item => item.dynamic_data?.[fieldName])
+          .filter(value => value !== undefined && value !== null)
+        )];
+
         columns.push({
           title: (
             <Tooltip title={`Type: ${fieldConfig.type}${fieldConfig.unit ? `, Unit: ${fieldConfig.unit}` : ''}`}>
@@ -685,6 +998,35 @@ const InventoryAllData = () => {
           width: 150,
           editable: true,
           fieldConfig: fieldConfig,
+          sorter: (a, b) => {
+            const aValue = a.dynamic_data?.[fieldName];
+            const bValue = b.dynamic_data?.[fieldName];
+            if (fieldConfig.type === 'number') {
+              return (aValue || 0) - (bValue || 0);
+            }
+            if (fieldConfig.type === 'date') {
+              return dayjs(aValue).unix() - dayjs(bValue).unix();
+            }
+            return String(aValue || '').localeCompare(String(bValue || ''));
+          },
+          filters: uniqueValues.map(value => ({
+            text: fieldConfig.type === 'boolean' 
+              ? (value ? 'Yes' : 'No')
+              : fieldConfig.type === 'date'
+              ? dayjs(value).format('YYYY-MM-DD')
+              : String(value),
+            value: String(value)
+          })),
+          onFilter: (value, record) => {
+            const recordValue = record.dynamic_data?.[fieldName];
+            if (fieldConfig.type === 'boolean') {
+              return String(recordValue) === value;
+            }
+            if (fieldConfig.type === 'date') {
+              return dayjs(recordValue).format('YYYY-MM-DD') === value;
+            }
+            return String(recordValue) === value;
+          },
           render: (value) => {
             if (fieldConfig.type === 'boolean') {
               return value ? 'Yes' : 'No';
@@ -798,7 +1140,7 @@ const InventoryAllData = () => {
           status: 'Active',
           quantity: 0,
           available_quantity: 0,
-          subcategory_id: selectedCategory.id  // Set initial subcategory_id
+          subcategory_id: selectedCategory.id
         }}
       >
         <Form.Item
@@ -811,7 +1153,6 @@ const InventoryAllData = () => {
         <Form.Item
           name="subcategory_id"
           hidden
-          initialValue={selectedCategory.id}  // Set initial value here as well
         >
           <Input />
         </Form.Item>
@@ -994,207 +1335,258 @@ const InventoryAllData = () => {
     );
   };
 
-  return (
-    <div className="bg-white p-6 rounded-lg shadow">
-      <Title level={4}>Inventory Master Data</Title>
-      <Divider />
-      
-      {/* Top Action Bar */}
-      <div className="mb-6">
-        <Space wrap>
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setModalType('category');
-              setRightClickedNode(null);
-              setIsModalVisible(true);
+  // Update the table title section
+  const renderTableTitle = () => (
+    <div className="w-full">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+          <Text strong className="whitespace-nowrap">
+            {selectedCategory 
+              ? `${selectedCategory.type === 'category' ? 'Category' : 'Subcategory'} Items` 
+              : 'All Items'}
+          </Text>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Input.Search
+            placeholder="Search in all columns..."
+            allowClear
+            onSearch={handleSearch}
+            onChange={(e) => handleSearch(e.target.value)}
+            style={{ 
+              width: '100%',
+              minWidth: '200px',
+              maxWidth: '300px'
             }}
+          />
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAddItemClick}
           >
-            Add Category
+            Add Item
           </Button>
-          <Upload
-            beforeUpload={handleExcelUpload}
-            showUploadList={false}
-            accept=".xlsx,.xls"
-          >
-            <Button icon={<UploadOutlined />}>Import Excel</Button>
-          </Upload>
+          {selectedCategory?.type === 'subcategory' && (
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'download',
+                    icon: <DownloadOutlined />,
+                    label: 'Download Template',
+                    onClick: handleDownloadTemplate
+                  },
+                  {
+                    key: 'upload',
+                    icon: <UploadOutlined />,
+                    label: (
+                      <Upload
+                        accept=".xlsx,.xls"
+                        beforeUpload={handleExcelUpload}
+                        showUploadList={false}
+                      >
+                        Upload Excel
+                      </Upload>
+                    )
+                  }
+                ]
+              }}
+            >
+              <Button icon={<ImportOutlined />}>
+                Import <DownOutlined />
+              </Button>
+            </Dropdown>
+          )}
           <Button 
-            icon={<FileExcelOutlined />}
+            icon={<DownloadOutlined />}
             onClick={handleExportExcel}
           >
-            Export to Excel
+            Export
           </Button>
-          <Button 
-            icon={<SettingOutlined />}
-            onClick={() => {/* Implement column settings */}}
-          >
-            Column Settings
-          </Button>
-        </Space>
+        </div>
       </div>
-      
-      <div className="flex gap-6" style={{ minHeight: 'calc(100vh - 250px)' }}>
-        {/* Collapsible Category Tree */}
-        <div 
-          className={`transition-all duration-300 flex-shrink-0`}
-          style={{ 
-            width: isSidebarCollapsed ? '80px' : '300px',
-            minWidth: isSidebarCollapsed ? '80px' : '300px'
-          }}
-        >
-          <Card 
-            className="h-full"
-            title={
-              <div className="flex items-center justify-between">
-                {!isSidebarCollapsed && <span>Categories</span>}
-                <Button
-                  type="text"
-                  icon={isSidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="!flex items-center justify-center"
-                />
-              </div>
-            }
-            bodyStyle={{ padding: isSidebarCollapsed ? '12px 8px' : '24px' }}
-          >
-            {isSidebarCollapsed ? (
-              <div className="flex flex-col gap-2">
-                {categories.map(category => (
-                  <Tooltip 
-                    key={category.id} 
-                    title={category.name}
-                    placement="right"
-                  >
-                    <Button
-                      type="text"
-                      icon={<FolderOutlined />}
-                      onClick={() => {
-                        setSelectedCategory({ type: 'category', id: category.id });
-                        setBreadcrumbItems([
-                          { title: 'Inventory' },
-                          { title: category.name }
-                        ]);
-                      }}
-                      className="w-full !flex items-center justify-center"
-                    />
-                  </Tooltip>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <Space className="mb-2">
-                  <Tooltip title="Expand All">
-                    <Button 
-                      type="text" 
-                      size="small"
-                      icon={<FolderOpenOutlined />}
-                      onClick={handleExpandAll}
-                    />
-                  </Tooltip>
-                  <Tooltip title="Collapse All">
-                    <Button 
-                      type="text" 
-                      size="small"
-                      icon={<CompressOutlined />}
-                      onClick={handleCollapseAll}
-                    />
-                  </Tooltip>
-                </Space>
-                <Tree
-                  treeData={getTreeData()}
-                  showLine={{ showLeafIcon: false }}
-                  onSelect={(selectedKeys, info) => {
-                    const key = selectedKeys[0];
-                    if (key) {
-                      const [type, id] = key.split('-');
-                      setSelectedCategory({ type, id: parseInt(id) });
-                      
-                      // Update breadcrumb
-                      const items = [{ title: 'Inventory' }];
-                      if (type === 'category') {
-                        const category = categories.find(c => c.id === parseInt(id));
-                        if (category) {
-                          items.push({ title: category.name });
-                        }
-                      } else if (type === 'subcategory') {
-                        const subcategory = subcategories.find(s => s.id === parseInt(id));
-                        const category = categories.find(c => c.id === subcategory?.category_id);
-                        if (category) {
-                          items.push({ title: category.name });
-                        }
-                        if (subcategory) {
-                          items.push({ title: subcategory.name });
-                        }
-                      }
-                      setBreadcrumbItems(items);
-                    }
-                  }}
-                  expandedKeys={expandedKeys}
-                  onExpand={setExpandedKeys}
-                />
-              </div>
-            )}
-          </Card>
+    </div>
+  );
+
+  return (
+    <div className="bg-white p-4 lg:p-6 xl:p-8 rounded-lg shadow min-h-screen">
+      <div className="flex flex-col h-full">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+          <Title level={4} className="m-0">Inventory Master Data</Title>
+          <Space wrap className="self-start lg:self-auto">
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setModalType('category');
+                setRightClickedNode(null);
+                setIsModalVisible(true);
+              }}
+            >
+              Add Category
+            </Button>
+          </Space>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 min-w-0">
-          <div className="mb-4">
-            <Breadcrumb items={breadcrumbItems} />
-            {selectedCategory && (
-              <div className="mt-2">
-                <Title level={5}>
-                  {selectedCategory.type === 'category' 
-                    ? categories.find(c => c.id === selectedCategory.id)?.name
-                    : subcategories.find(s => s.id === selectedCategory.id)?.name}
-                </Title>
-                <Text type="secondary">
-                  {selectedCategory.type === 'category'
-                    ? categories.find(c => c.id === selectedCategory.id)?.description
-                    : subcategories.find(s => s.id === selectedCategory.id)?.description}
-                </Text>
-              </div>
-            )}
+        <Divider className="my-2" />
+        
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 xl:gap-8 flex-1" style={{ minHeight: 0 }}>
+          {/* Collapsible Category Tree */}
+          <div 
+            className="transition-all duration-300 flex-shrink-0 w-full lg:w-auto"
+            style={{ 
+              width: isSidebarCollapsed ? '80px' : '300px',
+              minWidth: isSidebarCollapsed ? '80px' : '300px'
+            }}
+          >
+            <Card 
+              className="h-full"
+              bodyStyle={{ 
+                padding: isSidebarCollapsed ? '12px 8px' : '16px',
+                height: '100%',
+                overflowY: 'auto'
+              }}
+              title={
+                <div className="flex items-center justify-between">
+                  {!isSidebarCollapsed && <span>Categories</span>}
+                  <Button
+                    type="text"
+                    icon={isSidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    className="!flex items-center justify-center"
+                  />
+                </div>
+              }
+            >
+              {isSidebarCollapsed ? (
+                <div className="flex flex-col gap-2">
+                  {categories.map(category => (
+                    <Tooltip 
+                      key={category.id} 
+                      title={category.name}
+                      placement="right"
+                    >
+                      <Button
+                        type="text"
+                        icon={<FolderOutlined />}
+                        onClick={() => {
+                          setSelectedCategory({ type: 'category', id: category.id });
+                          setBreadcrumbItems([
+                            { title: 'Inventory' },
+                            { title: category.name }
+                          ]);
+                        }}
+                        className="w-full !flex items-center justify-center"
+                      />
+                    </Tooltip>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  <Space className="mb-2">
+                    <Tooltip title="Expand All">
+                      <Button 
+                        type="text" 
+                        size="small"
+                        icon={<FolderOpenOutlined />}
+                        onClick={handleExpandAll}
+                      />
+                    </Tooltip>
+                    <Tooltip title="Collapse All">
+                      <Button 
+                        type="text" 
+                        size="small"
+                        icon={<CompressOutlined />}
+                        onClick={handleCollapseAll}
+                      />
+                    </Tooltip>
+                  </Space>
+                  <Tree
+                    treeData={getTreeData()}
+                    showLine={{ showLeafIcon: false }}
+                    onSelect={(selectedKeys, info) => {
+                      const key = selectedKeys[0];
+                      if (key) {
+                        const [type, id] = key.split('-');
+                        setSelectedCategory({ type, id: parseInt(id) });
+                        
+                        // Update breadcrumb
+                        const items = [{ title: 'Inventory' }];
+                        if (type === 'category') {
+                          const category = categories.find(c => c.id === parseInt(id));
+                          if (category) {
+                            items.push({ title: category.name });
+                          }
+                        } else if (type === 'subcategory') {
+                          const subcategory = subcategories.find(s => s.id === parseInt(id));
+                          const category = categories.find(c => c.id === subcategory?.category_id);
+                          if (category) {
+                            items.push({ title: category.name });
+                          }
+                          if (subcategory) {
+                            items.push({ title: subcategory.name });
+                          }
+                        }
+                        setBreadcrumbItems(items);
+                      }
+                    }}
+                    expandedKeys={expandedKeys}
+                    onExpand={setExpandedKeys}
+                  />
+                </div>
+              )}
+            </Card>
           </div>
-          
-          <Card>
-            {!selectedCategory ? (
-              <div className="text-center py-12">
-                <Title level={4} type="secondary">Please select a category from the left sidebar</Title>
-                <Text type="secondary">Select a category or subcategory to view its items</Text>
-              </div>
-            ) : selectedCategory.type === 'category' ? (
-              <div className="text-center py-12">
-                <Title level={4} type="secondary">Please select a subcategory</Title>
-                <Text type="secondary">Select a subcategory from {categories.find(c => c.id === selectedCategory.id)?.name} to view its items</Text>
-              </div>
-            ) : (
-              <Form form={form} component={false}>
-                <Table
-                  components={{
-                    body: {
-                      cell: EditableCell,
-                    },
-                  }}
-                  columns={mergedColumns}
-                  dataSource={getTableData()}
-                  scroll={{ x: 'max-content' }}
-                  size="middle"
-                  rowSelection={{
-                    type: 'checkbox',
-                  }}
-                  loading={isLoading}
-                  title={renderTableTitle}
-                  rowKey="id"
-                  pagination={{
-                    onChange: cancel,
-                  }}
-                />
-              </Form>
-            )}
-          </Card>
+
+          {/* Main Content */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            <Card className="flex-1" bodyStyle={{ height: '100%', padding: '16px', overflow: 'auto' }}>
+              {!selectedCategory ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Title level={4} type="secondary">Please select a category from the left sidebar</Title>
+                    <Text type="secondary">Select a category or subcategory to view its items</Text>
+                  </div>
+                </div>
+              ) : selectedCategory.type === 'category' ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Title level={4} type="secondary">Please select a subcategory</Title>
+                    <Text type="secondary">Select a subcategory from {categories.find(c => c.id === selectedCategory.id)?.name} to view its items</Text>
+                  </div>
+                </div>
+              ) : (
+                <Form form={form} component={false} className="h-full">
+                  <Table
+                    ref={tableRef}
+                    components={{
+                      body: {
+                        cell: EditableCell,
+                      },
+                    }}
+                    columns={mergedColumns}
+                    dataSource={getTableData()}
+                    scroll={{ x: 'max-content' }}
+                    size="middle"
+                    rowSelection={{
+                      type: 'checkbox',
+                    }}
+                    loading={isLoading}
+                    title={renderTableTitle}
+                    rowKey="id"
+                    pagination={{
+                      onChange: cancel,
+                      pageSize: 10,
+                      showSizeChanger: true,
+                      showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                      position: ['bottomRight'],
+                      className: 'px-4'
+                    }}
+                    className="border border-gray-200 rounded"
+                  />
+                </Form>
+              )}
+            </Card>
+          </div>
         </div>
       </div>
 
@@ -1210,7 +1602,15 @@ const InventoryAllData = () => {
           form.resetFields();
         }}
         footer={null}
-        width={modalType === 'subcategory' ? 800 : 600}
+        width={modalType === 'subcategory' ? '90vw' : '70vw'}
+        style={{ 
+          maxWidth: modalType === 'subcategory' ? '800px' : '600px',
+          top: 20
+        }}
+        bodyStyle={{ 
+          maxHeight: 'calc(100vh - 200px)',
+          overflow: 'auto'
+        }}
       >
         {renderModalContent()}
       </Modal>

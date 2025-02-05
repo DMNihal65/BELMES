@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Row, Col, InputNumber, DatePicker, Input, Alert, Space, Select, Typography, message } from 'antd';
-import useOperatorInventoryStore from '../../store/operator-inventory-store';
+import useInventoryStore from '../../store/inventory-store';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -14,7 +14,7 @@ const RequestItemModal = ({ visible, onCancel, item }) => {
     fetchOperationsByPartNumber,
     allOrders = [],
     operations = []
-  } = useOperatorInventoryStore();
+  } = useInventoryStore();
   
   const [requestData, setRequestData] = useState({
     quantity: 0,

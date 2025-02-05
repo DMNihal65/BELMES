@@ -15,6 +15,8 @@ const useInventoryStore = create((set, get) => ({
   selectedSubcategory: null,
   loading: false,
   error: null,
+  allOrders: [],
+  operations: [],
   set: (state) => set(state),
 
   // Categories
@@ -208,19 +210,31 @@ const useInventoryStore = create((set, get) => ({
   },
 
   // Items
-  fetchItems: async () => {
+  fetchItems: async (subcategoryId) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`${BASE_URL}/items/`);
-      console.log('Items API Response:', response.data); // Debug log
-      const items = Array.isArray(response.data) ? response.data : [];
-      return items;
+      let url = `${BASE_URL}/items`;
+      if (subcategoryId) {
+        url = `${url}?subcategory_id=${subcategoryId}`;
+      }
+      
+      const response = await axios.get(url);
+      console.log('Items response:', response.data);
+      
+      set({ 
+        items: Array.isArray(response.data) ? response.data : [],
+        loading: false 
+      });
+      return response.data;
     } catch (error) {
       console.error('Error fetching items:', error);
       message.error(`Failed to fetch items: ${error.response?.data?.detail || error.message}`);
+      set({ 
+        items: [],
+        loading: false,
+        error: error.message 
+      });
       return [];
-    } finally {
-      set({ loading: false });
     }
   },
 
@@ -451,6 +465,103 @@ const useInventoryStore = create((set, get) => ({
   // Selection handlers
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSelectedSubcategory: (subcategory) => set({ selectedSubcategory: subcategory }),
+
+  // Add new functions
+  fetchAllOrders: async () => {
+    set({ loading: true });
+    try {
+      const response = await axios.get('http://172.18.7.85:4411/planning/all_orders');
+      set({ 
+        allOrders: response.data || [],
+        loading: false 
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      message.error('Failed to fetch orders');
+      set({ loading: false, allOrders: [] });
+      return [];
+    }
+  },
+
+  submitItemRequest: async (requestData) => {
+    set({ loading: true });
+    try {
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Validate token exists
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
+      // Validate token format
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) {
+        throw new Error('Invalid token format');
+      }
+
+      // Create axios instance with default headers
+      const axiosInstance = axios.create({
+        baseURL: 'http://172.18.7.85:4411/api/v1',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Make the request
+      const response = await axiosInstance.post(
+        '/api/inventory/requests',
+        {
+          expected_return_date: requestData.expected_return_date?.toISOString(),
+          inventory_item_id: parseInt(requestData.item_id),
+          operation_id: parseInt(requestData.operation_id),
+          order_id: parseInt(requestData.order_id),
+          purpose: requestData.purpose,
+          quantity: parseInt(requestData.quantity),
+          remarks: requestData.remarks || "",
+          status: "Pending"
+        }
+      );
+      
+      message.success('Request submitted successfully');
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting request:', error);
+      
+      // Handle different types of errors
+      if (error.response?.status === 401) {
+        message.error('Session expired. Please login again.');
+        // You might want to trigger a logout or redirect to login here
+      } else if (error.response?.data?.detail) {
+        message.error(`Failed to submit request: ${error.response.data.detail}`);
+      } else {
+        message.error(error.message || 'Failed to submit request');
+      }
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  fetchOperationsByPartNumber: async (partNumber) => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`http://172.18.7.85:4411/planning/search_order?part_number=${partNumber}`);
+      const operations = response.data?.orders?.[0]?.operations || [];
+      set({ 
+        operations: operations,
+        loading: false 
+      });
+      return operations;
+    } catch (error) {
+      console.error('Error fetching operations:', error);
+      message.error('Failed to fetch operations');
+      set({ loading: false, operations: [] });
+      return [];
+    }
+  },
 }));
 
 export default useInventoryStore;

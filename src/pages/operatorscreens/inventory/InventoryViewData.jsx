@@ -47,7 +47,7 @@ import {
   MenuUnfoldOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
-import useOperatorInventoryStore from '../../../store/operator-inventory-store';
+import useInventoryStore from '../../../store/inventory-store';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import RequestItemModal from '../../../components/inventory/RequestItemModal';
@@ -87,7 +87,7 @@ const InventoryAllData = () => {
     deleteItem,
     isLoading,
     error,
-  } = useOperatorInventoryStore();
+  } = useInventoryStore();
 
   useEffect(() => {
     const fetchData = async () => {

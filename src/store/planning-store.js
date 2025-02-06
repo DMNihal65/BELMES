@@ -55,7 +55,7 @@ const usePlanningStore = create((set) => ({
   searchOrders: async (partNumber) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.85:4413/planning/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.85:4413/planning/search_order2?part_number=${partNumber}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -282,6 +282,105 @@ const usePlanningStore = create((set) => ({
       return data;
     } catch (error) {
       console.error('Change part status error:', error);
+      throw error;
+    }
+  },
+
+  // Add this new function to fetch machine details
+  fetchMachineDetails: async (machineId) => {
+    try {
+      const response = await fetch(`http://172.18.7.85:4413/master-order/machines/${machineId}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to fetch machine details');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching machine details:', error);
+      throw error;
+    }
+  },
+
+  // Add the updateMachine function to the store
+  updateMachine: async (machineId, updatedData) => {
+    try {
+      const response = await fetch(`http://172.18.7.85:4413/master-order/machines/${machineId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updatedData)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to update machine');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error updating machine:', error);
+      throw error;
+    }
+  },
+
+  // Function to update operation details
+  updateOperationDetails: async (partNumber, operationNumber, updateData) => {
+    try {
+      const response = await fetch(`http://172.18.7.85:4413/planning/operations/${partNumber}/${operationNumber}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operation_description: updateData.operation_description,
+          setup_time: updateData.setup_time,
+          ideal_cycle_time: updateData.ideal_cycle_time,
+          work_center_code: updateData.work_center_code,
+          machine_id: updateData.machine_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update operation details');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating operation:', error);
+      throw error;
+    }
+  },
+
+  // Function to update machine for operation
+  updateOperationMachine: async (partNumber, operationNumber, currentData, newMachineId) => {
+    try {
+      const response = await fetch(`http://172.18.7.85:4413/planning/operations/${partNumber}/${operationNumber}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operation_description: currentData.operation_description,
+          setup_time: currentData.setup_time,
+          ideal_cycle_time: currentData.ideal_cycle_time,
+          work_center_code: currentData.work_center,
+          machine_id: newMachineId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update machine');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating machine:', error);
       throw error;
     }
   }

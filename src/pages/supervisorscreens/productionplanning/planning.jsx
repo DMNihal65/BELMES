@@ -31,6 +31,7 @@ const Planning = () => {
   const [showMPPDetails, setShowMPPDetails] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [activeTab, setActiveTab] = useState('jobDetails');
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
   const { 
     fetchAllOrders, 
     searchOrders, 
@@ -115,6 +116,8 @@ const Planning = () => {
     if (results.orders && results.orders.length > 0) {
       const selectedJobData = results.orders[0];
       setSelectedJob(selectedJobData);
+      setSelectedOrderNumber(selectedJobData?.orderNumber);
+      console.log('Selected Order Number:', selectedJobData?.orderNumber);
     }
   };
 
@@ -286,13 +289,7 @@ const Planning = () => {
                 key="jobDetails"
               >
                 <Card 
-                  className={`shadow-sm mb-6 hover:shadow-md transition-shadow ${
-                    getJobStatus(selectedJob.part_number) === 'active' 
-                      ? 'bg-green-50' 
-                      : getJobStatus(selectedJob.part_number) === 'inactive'
-                      ? 'bg-yellow-50'
-                      : 'bg-gray-50'
-                  }`}
+                  className="shadow-sm mb-6 hover:shadow-md transition-shadow bg-white"
                   size="small"
                 >
                   <Descriptions column={3}>
@@ -344,10 +341,11 @@ const Planning = () => {
                   onOperationEdit={handleOperationEdit}
                   operations={selectedJob.operations}
                   partNumber={selectedJob.part_number}
+                  orderNumber={selectedJob.production_order}
                 />
               </TabPane>
 
-              {/* <TabPane 
+              <TabPane 
                 tab={
                   <span>
                     <BarChartOutlined />
@@ -360,7 +358,7 @@ const Planning = () => {
                   machines={mockMachines}
                   selectedJob={selectedJob}
                 />
-              </TabPane> */}
+              </TabPane>
 
               <TabPane 
                 tab={

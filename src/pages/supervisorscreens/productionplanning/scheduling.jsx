@@ -12,7 +12,7 @@ import {
   BarChartOutlined, WarningOutlined, SwapOutlined,
   ExclamationCircleOutlined, CheckCircleOutlined,
   ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined, LeftOutlined, 
-  RightOutlined, 
+  RightOutlined, InfoCircleOutlined
 } from '@ant-design/icons';
 import { Timeline } from "vis-timeline/esnext";
 import { DataSet } from "vis-data/esnext";
@@ -232,7 +232,7 @@ const Scheduling = () => {
     ];
   });
   
-
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
 
   useEffect(() => {
     fetchScheduleData();
@@ -797,6 +797,13 @@ const Scheduling = () => {
                       />
                     </Tooltip>
                   </Button.Group>
+                  <Tooltip title="How to use timeline">
+                    <Button
+                      className="bg-blue-500 text-white"
+                      icon={<InfoCircleOutlined />}
+                      onClick={() => setIsHelpModalVisible(true)}
+                    />
+                  </Tooltip>
                   <Button 
                     type="primary"
                     icon={<SyncOutlined />}
@@ -963,6 +970,58 @@ const Scheduling = () => {
         </Form>
       </Modal>
 
+      {/* Timeline Help Modal */}
+      <Modal
+        title="How to Use Timeline"
+        open={isHelpModalVisible}
+        onCancel={() => setIsHelpModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsHelpModalVisible(false)}>
+            Close
+          </Button>
+        ]}
+      >
+        <div className="timeline-help">
+          <h4>Navigation</h4>
+          <ul>
+            <li>
+              <LeftOutlined /> <RightOutlined /> Use arrow buttons or drag horizontally to navigate through days
+            </li>
+            <li>
+              <CalendarOutlined /> Click "Today" button to return to current date
+            </li>
+          </ul>
+
+          <h4>Zooming</h4>
+          <ul>
+            <li>
+              <ZoomInOutlined /> Click "+" button to zoom in
+            </li>
+            <li>
+              <ZoomOutOutlined /> Click "-" button to zoom out
+            </li>
+            <li>
+              <FullscreenOutlined /> Click "Fit" button to fit all content
+            </li>
+            <li>
+              Hold CTRL + Mouse wheel to zoom in/out at cursor position
+            </li>
+          </ul>
+
+          <h4>Interaction</h4>
+          <ul>
+            <li>Click and drag timeline to move left/right</li>
+            <li>Click on any task to see its details</li>
+            <li>Use the date picker to jump to specific dates</li>
+            <li>Select view type (Day/Week/Month/Year) to change time scale</li>
+          </ul>
+
+          <div className="timeline-help-note">
+            <InfoCircleOutlined /> <strong>Note:</strong> For best experience, use CTRL + Mouse wheel for precise zooming at cursor position.
+          </div>
+        </div>
+      </Modal>
+
       <style jsx global>{`
         .schedule-tabs .ant-tabs-nav {
           margin-bottom: 16px;
@@ -974,6 +1033,32 @@ const Scheduling = () => {
         
         .hover\:shadow-md:hover {
           box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .timeline-help h4 {
+          margin-top: 16px;
+          margin-bottom: 8px;
+          color: #1890ff;
+        }
+        .timeline-help ul {
+          list-style-type: none;
+          padding-left: 0;
+        }
+        .timeline-help li {
+          margin: 8px 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .timeline-help-note {
+          margin-top: 16px;
+          padding: 12px;
+          background-color: #f0f5ff;
+          border-radius: 4px;
+          border: 1px solid #d6e4ff;
+        }
+        .timeline-help .anticon {
+          color: #1890ff;
         }
       `}</style>
     </Layout>

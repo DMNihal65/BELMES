@@ -17,13 +17,29 @@ const { Step } = Steps;
 
 const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) => {
   const [form] = Form.useForm();
-  const { uploadPDF, updateOrder, createOrder, orderDetails, isLoading, error, clearOrderDetails } = useOrderStore();
+  const { 
+    uploadPDF, 
+    updateOrder, 
+    createOrder, 
+    orderDetails, 
+    isLoading, 
+    error, 
+    clearOrderDetails,
+    uploadMppFile,
+    uploadEngineeringDrawing 
+  } = useOrderStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [fileList, setFileList] = useState([]);
   const [rawMaterials, setRawMaterials] = useState([]);
   const [isManualCreate, setIsManualCreate] = useState(false);
   const [mppFile, setMppFile] = useState(null);
   const [drawingFile, setDrawingFile] = useState(null);
+  const [mppDocName, setMppDocName] = useState('');
+  const [mppVersion, setMppVersion] = useState('v1');
+  const [drawingDocName, setDrawingDocName] = useState('');
+  const [drawingVersion, setDrawingVersion] = useState('v1');
+  const [mppDescription, setMppDescription] = useState('');
+  const [drawingDescription, setDrawingDescription] = useState('');
 
   const steps = [
     {
@@ -108,7 +124,13 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     setCurrentStep(0);
     setFileList([]);
     setRawMaterials([]);
-    setIsManualCreate(false); // Reset manual create mode
+    setIsManualCreate(false);
+    setMppDocName('');
+    setMppVersion('v1');
+    setMppDescription('');
+    setDrawingDocName('');
+    setDrawingVersion('v1');
+    setDrawingDescription('');
     onCancel();
   };
 
@@ -119,35 +141,85 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         message.error('Please select a delivery date');
         return;
       }
+
+      // Validate document names if files are selected
+      if (mppFile && !mppDocName.trim()) {
+        message.error('Please enter MPP document name');
+        return;
+      }
+      if (drawingFile && !drawingDocName.trim()) {
+        message.error('Please enter Engineering Drawing document name');
+        return;
+      }
   
       const deliveryDate = dayjs(values.deliveryDate);
       const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
   
-      // Create form data to handle file uploads
-      const formData = new FormData();
-      if (mppFile) {
-        formData.append('mppFile', mppFile.originFileObj);
-      }
-      if (drawingFile) {
-        formData.append('drawingFile', drawingFile.originFileObj);
-      }
-  
-      // Add other form values
+      // First update the order
       const payload = {
         ...values,
         delivery_date: epochTimestamp,
-        mppFile: mppFile?.response,
-        drawingFile: drawingFile?.response,
       };
   
+      let response;
       if (orderDetails?.id) {
-        await updateOrder(orderDetails.id, payload);
-        message.success('Order updated successfully');
+        response = await updateOrder(orderDetails.id, payload);
       } else {
-        await createOrder(payload);
-        message.success('Order created successfully');
+        response = await createOrder(payload);
+      }
+
+      // After order is created/updated, handle file uploads
+      const productionOrder = values.orderNumber || response.production_order;
+      
+      try {
+        // Upload MPP file if exists
+        if (mppFile) {
+          try {
+            await uploadMppFile(
+              mppFile.originFileObj || mppFile, 
+              productionOrder,
+              mppDocName.trim(),
+              mppDescription.trim(),
+              mppVersion.trim()
+            );
+          } catch (mppError) {
+            if (mppError.message.includes('Authentication token not found')) {
+              message.error('Please log in again to upload files');
+              return;
+            }
+            throw mppError;
+          }
+        }
+        
+        // Upload engineering drawing if exists
+        if (drawingFile) {
+          try {
+            await uploadEngineeringDrawing(
+              drawingFile.originFileObj || drawingFile, 
+              productionOrder,
+              drawingDocName.trim(),
+              drawingDescription.trim(),
+              drawingVersion.trim()
+            );
+          } catch (drawingError) {
+            if (drawingError.message.includes('Authentication token not found')) {
+              message.error('Please log in again to upload files');
+              return;
+            }
+            throw drawingError;
+          }
+        }
+      } catch (fileError) {
+        console.error('File upload error:', fileError);
+        if (fileError.message.includes('401') || fileError.message.includes('Unauthorized')) {
+          message.error('Your session has expired. Please log in again to upload files.');
+        } else {
+          message.warning('Order was created but there was an issue uploading some files: ' + fileError.message);
+        }
+        return;
       }
       
+      message.success(orderDetails?.id ? 'Order updated successfully' : 'Order created successfully');
       handleCancel();
     } catch (error) {
       console.error('Submit Error:', error);
@@ -187,21 +259,19 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   }, [visible, initialData, form]);
 
   const handleMppFileChange = (info) => {
-    if (info.file.status === 'done') {
-      setMppFile(info.file);
-      message.success(`${info.file.name} file uploaded successfully`);
-    } else if (info.file.status === 'error') {
-      message.error(`${info.file.name} file upload failed.`);
+    if (info.file.status === 'uploading') {
+      return;
     }
+    // Store the file for later upload
+    setMppFile(info.file);
   };
 
   const handleDrawingFileChange = (info) => {
-    if (info.file.status === 'done') {
-      setDrawingFile(info.file);
-      message.success(`${info.file.name} file uploaded successfully`);
-    } else if (info.file.status === 'error') {
-      message.error(`${info.file.name} file upload failed.`);
+    if (info.file.status === 'uploading') {
+      return;
     }
+    // Store the file for later upload
+    setDrawingFile(info.file);
   };
 
   const renderOrderForm = () => (
@@ -405,53 +475,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       </Row>
 
       {/* Optional File Uploads Section - Moved to bottom */}
-      <Divider> MPP and Drawing Files</Divider>
-      <Row gutter={16} className="mb-4">
-        <Col span={12}>
-          <Form.Item
-            label={
-              <span>
-                MPP File
-                <span className="text-gray-400 text-sm ml-2"></span>
-              </span>
-            }
-            name="mppFile"
-          >
-            <Upload
-              maxCount={1}
-              onChange={handleMppFileChange}
-              accept=".mpp,.xml,.xlsx"
-              className="w-full"
-            >
-              <Button icon={<UploadOutlined />} className="w-full">
-                {mppFile ? 'Change MPP File' : 'Upload MPP File'}
-              </Button>
-            </Upload>
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item
-            label={
-              <span>
-                3D Drawing
-                <span className="text-gray-400 text-sm ml-2"></span>
-              </span>
-            }
-            name="drawingFile"
-          >
-            <Upload
-              maxCount={1}
-              onChange={handleDrawingFileChange}
-              accept=".pdf,.dwg,.dxf"
-              className="w-full"
-            >
-              <Button icon={<UploadOutlined />} className="w-full">
-                {drawingFile ? 'Change Drawing File' : 'Upload Drawing'}
-              </Button>
-            </Upload>
-          </Form.Item>
-        </Col>
-      </Row>
+      {renderFileUploadSection()}
 
       {/* Form Actions */}
       <Form.Item className="mb-0">
@@ -630,8 +654,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
               <Upload
                 maxCount={1}
                 onChange={handleMppFileChange}
-                accept=".mpp,.xml,.xlsx"
-                className="w-full"
+                beforeUpload={() => false}
+                showUploadList={{ showRemoveIcon: true }}
               >
                 <Button icon={<UploadOutlined />} className="w-full">
                   {mppFile ? 'Change MPP File' : 'Upload MPP File'}
@@ -643,7 +667,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             <Form.Item
               label={
                 <span>
-                  3D Drawing
+                  Engineering Drawing
                   <span className="text-gray-400 text-sm ml-2"></span>
                 </span>
               }
@@ -652,8 +676,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
               <Upload
                 maxCount={1}
                 onChange={handleDrawingFileChange}
-                accept=".pdf,.dwg,.dxf"
-                className="w-full"
+                beforeUpload={() => false}
+                showUploadList={{ showRemoveIcon: true }}
               >
                 <Button icon={<UploadOutlined />} className="w-full">
                   {drawingFile ? 'Change Drawing File' : 'Upload Drawing'}
@@ -688,17 +712,18 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         return;
       }
 
+      // Validate document names if files are selected
+      if (mppFile && !mppDocName.trim()) {
+        message.error('Please enter MPP document name');
+        return;
+      }
+      if (drawingFile && !drawingDocName.trim()) {
+        message.error('Please enter Engineering Drawing document name');
+        return;
+      }
+
       const deliveryDate = dayjs(values.delivery_date);
       const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
-
-      // Create form data for file uploads
-      const formData = new FormData();
-      if (mppFile) {
-        formData.append('mppFile', mppFile.originFileObj);
-      }
-      if (drawingFile) {
-        formData.append('drawingFile', drawingFile.originFileObj);
-      }
 
       const payload = {
         production_order: values.production_order,
@@ -713,11 +738,60 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         project_name: values.project_name,
         delivery_date: epochTimestamp,
         raw_materials: [],
-        mppFile: mppFile?.response,
-        drawingFile: drawingFile?.response,
       };
 
+      // Create the order first
       const response = await createOrder(payload);
+      const productionOrder = response.production_order || values.production_order;
+
+      try {
+        // Upload MPP file if exists
+        if (mppFile) {
+          try {
+            await uploadMppFile(
+              mppFile.originFileObj || mppFile, 
+              productionOrder,
+              mppDocName.trim(),
+              mppDescription.trim(),
+              mppVersion.trim()
+            );
+          } catch (mppError) {
+            if (mppError.message.includes('Authentication token not found')) {
+              message.error('Please log in again to upload files');
+              return;
+            }
+            throw mppError;
+          }
+        }
+        
+        // Upload engineering drawing if exists
+        if (drawingFile) {
+          try {
+            await uploadEngineeringDrawing(
+              drawingFile.originFileObj || drawingFile, 
+              productionOrder,
+              drawingDocName.trim(),
+              drawingDescription.trim(),
+              drawingVersion.trim()
+            );
+          } catch (drawingError) {
+            if (drawingError.message.includes('Authentication token not found')) {
+              message.error('Please log in again to upload files');
+              return;
+            }
+            throw drawingError;
+          }
+        }
+      } catch (fileError) {
+        console.error('File upload error:', fileError);
+        if (fileError.message.includes('401') || fileError.message.includes('Unauthorized')) {
+          message.error('Your session has expired. Please log in again to upload files.');
+        } else {
+          message.warning('Order was created but there was an issue uploading some files: ' + fileError.message);
+        }
+        return;
+      }
+
       message.success('Order created successfully');
       handleCancel();
       return response;
@@ -728,6 +802,113 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     }
   };
   
+  // Update the file upload sections in renderOrderForm
+  const renderFileUploadSection = () => (
+    <>
+      <Divider>MPP and Drawing Files</Divider>
+      <Row gutter={16} className="mb-4">
+        <Col span={12}>
+          <div className="border p-4 rounded">
+            <h4 className="mb-3">MPP File</h4>
+            <Form.Item
+              label="Document Name"
+              required
+            >
+              <Input 
+                value={mppDocName}
+                onChange={(e) => setMppDocName(e.target.value)}
+                placeholder="Enter document name"
+              />
+            </Form.Item>
+            <Form.Item
+              label="Description"
+            >
+              <Input.TextArea 
+                value={mppDescription}
+                onChange={(e) => setMppDescription(e.target.value)}
+                placeholder="Enter description"
+                rows={2}
+              />
+            </Form.Item>
+            <Form.Item
+              label="Version"
+              required
+            >
+              <Input 
+                value={mppVersion}
+                onChange={(e) => setMppVersion(e.target.value)}
+                placeholder="Enter version (e.g. v1)"
+              />
+            </Form.Item>
+            <Form.Item
+              name="mppFile"
+            >
+              <Upload
+                maxCount={1}
+                onChange={handleMppFileChange}
+                beforeUpload={() => false}
+                showUploadList={{ showRemoveIcon: true }}
+              >
+                <Button icon={<UploadOutlined />} className="w-full">
+                  {mppFile ? 'Change MPP File' : 'Upload MPP File'}
+                </Button>
+              </Upload>
+            </Form.Item>
+          </div>
+        </Col>
+        <Col span={12}>
+          <div className="border p-4 rounded">
+            <h4 className="mb-3">Engineering Drawing</h4>
+            <Form.Item
+              label="Document Name"
+              required
+            >
+              <Input 
+                value={drawingDocName}
+                onChange={(e) => setDrawingDocName(e.target.value)}
+                placeholder="Enter document name"
+              />
+            </Form.Item>
+            <Form.Item
+              label="Description"
+            >
+              <Input.TextArea 
+                value={drawingDescription}
+                onChange={(e) => setDrawingDescription(e.target.value)}
+                placeholder="Enter description"
+                rows={2}
+              />
+            </Form.Item>
+            <Form.Item
+              label="Version"
+              required
+            >
+              <Input 
+                value={drawingVersion}
+                onChange={(e) => setDrawingVersion(e.target.value)}
+                placeholder="Enter version (e.g. v1)"
+              />
+            </Form.Item>
+            <Form.Item
+              name="drawingFile"
+            >
+              <Upload
+                maxCount={1}
+                onChange={handleDrawingFileChange}
+                beforeUpload={() => false}
+                showUploadList={{ showRemoveIcon: true }}
+              >
+                <Button icon={<UploadOutlined />} className="w-full">
+                  {drawingFile ? 'Change Drawing File' : 'Upload Drawing'}
+                </Button>
+              </Upload>
+            </Form.Item>
+          </div>
+        </Col>
+      </Row>
+    </>
+  );
+
   return (
     <Modal
       title={

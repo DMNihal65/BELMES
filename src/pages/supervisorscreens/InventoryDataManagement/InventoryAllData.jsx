@@ -525,7 +525,7 @@ const InventoryAllData = () => {
 
           try {
             const response = await axios.post(
-              'http://172.18.7.85:4412/api/v1/api/inventory/items/bulk/',
+              'http://172.18.7.85:4413/api/v1/api/inventory/items/bulk/',
               {
                 created_by: 1,
                 subcategory_id: selectedCategory.id,
@@ -641,6 +641,17 @@ const InventoryAllData = () => {
             created_by: 1
           });
         }
+        
+        // Refresh both categories and subcategories after category operation
+        if (result) {
+          await Promise.all([
+            fetchCategories(),
+            fetchAllSubcategories()
+          ]);
+          // Expand the newly added category
+          const newCategory = result.data || result;
+          setExpandedKeys(prevKeys => [...prevKeys, `category-${newCategory.id}`]);
+        }
       } else if (modalType === 'subcategory') {
         // Transform dynamic fields into required format
         const dynamicFields = {};
@@ -682,14 +693,24 @@ const InventoryAllData = () => {
             created_by: 1
           });
         }
+
+        // Refresh data after subcategory operation
+        if (result) {
+          await Promise.all([
+            fetchCategories(),
+            fetchAllSubcategories()
+          ]);
+          // Expand the parent category
+          if (!isEditing && rightClickedNode?.data?.id) {
+            setExpandedKeys(prevKeys => [...prevKeys, `category-${rightClickedNode.data.id}`]);
+          }
+        }
       }
 
       if (result) {
         setIsModalVisible(false);
         form.resetFields();
         message.success(`${modalType} ${rightClickedNode?.data?.id ? 'updated' : 'added'} successfully`);
-        await fetchCategories();
-        await fetchAllSubcategories();
       }
     } catch (error) {
       message.error(`Error: ${error.message}`);
@@ -1331,7 +1352,12 @@ const InventoryAllData = () => {
         {/* Dynamic Fields Section */}
         <Divider>Dynamic Fields</Divider>
         
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ 
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)', // Exactly 4 columns
+          gap: '16px',
+          marginBottom: '24px'
+        }}>
           {Object.entries(subcategory.dynamic_fields || {}).map(([fieldName, config], index) => (
             <Form.Item
               key={fieldName}
@@ -1339,15 +1365,15 @@ const InventoryAllData = () => {
               label={
                 <Space>
                   {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
-                  <Tag color={
+                  {/* <Tag color={
                     config.type === 'number' ? 'blue' :
                     config.type === 'boolean' ? 'green' :
                     config.type === 'date' ? 'purple' : 
                     'default'
                   }>
                     {config.type.toUpperCase()}
-                  </Tag>
-                  {config.required && <Tag color="red">Required</Tag>}
+                  </Tag> */}
+                  {/* {config.required && <Tag color="red">Required</Tag>} */}
                 </Space>
               }
               rules={[
@@ -1367,9 +1393,8 @@ const InventoryAllData = () => {
                 'Enter text value'
               }
               style={{ 
-                flex: '1 1 calc(33.333% - 11px)',
-                minWidth: '250px',
-                margin: 0
+                margin: 0,
+                minWidth: 0 // Ensures content fits in grid cell
               }}
             >
               {config.type === 'number' ? (
@@ -1520,72 +1545,104 @@ const InventoryAllData = () => {
   // Update the table title section
   const renderTableTitle = () => (
     <div className="w-full">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-          <Text strong className="whitespace-nowrap">
-            {selectedCategory 
-              ? `${selectedCategory.type === 'category' ? 'Category' : 'Subcategory'} Items` 
-              : 'All Items'}
-          </Text>
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+        {/* Title and Category Info */}
+        <div className="flex flex-col w-full xl:w-auto">
+          <div className="flex items-center gap-2 mb-2">
+            <Title level={4} className="!m-0 !text-lg">
+              {subcategories.find(sub => sub.id === selectedCategory.id)?.name} Items
+            </Title>
+            {/* <Badge 
+              count={getTableData().length} 
+              style={{ backgroundColor: '#52c41a' }} 
+              title="Total Items"
+            /> */}
+          </div>
+          <div className="flex items-center gap-2">
+            <Text type="secondary" className="text-sm">
+              Category: {categories.find(cat => 
+                cat.id === subcategories.find(sub => 
+                  sub.id === selectedCategory.id)?.category_id)?.name}
+            </Text>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        {/* Actions Section */}
+        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
           <Input.Search
-            placeholder="Search in all columns..."
+            placeholder="Search items..."
             allowClear
             onSearch={handleSearch}
             onChange={(e) => handleSearch(e.target.value)}
-            style={{ 
-              width: '100%',
-              minWidth: '200px',
-              maxWidth: '300px'
-            }}
+            className="min-w-[200px] max-w-[300px] flex-1 xl:flex-none"
           />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleAddItemClick}
-          >
-            Add Item
-          </Button>
-          {selectedCategory?.type === 'subcategory' && (
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: 'download',
-                    icon: <DownloadOutlined />,
-                    label: 'Download Template',
-                    onClick: handleDownloadTemplate
-                  },
-                  {
-                    key: 'upload',
-                    icon: <UploadOutlined />,
-                    label: (
-                      <Upload
-                        accept=".xlsx,.xls"
-                        beforeUpload={handleExcelUpload}
-                        showUploadList={false}
-                      >
-                        Upload Excel
-                      </Upload>
-                    )
-                  }
-                ]
-              }}
+          
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleAddItemClick}
             >
-              <Button icon={<ImportOutlined />}>
-                Import <DownOutlined />
-              </Button>
-            </Dropdown>
-          )}
-          <Button 
-            icon={<DownloadOutlined />}
-            onClick={handleExportExcel}
-          >
-            Export
-          </Button>
+              Add Item
+            </Button>
+
+            {selectedCategory?.type === 'subcategory' && (
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'download',
+                      icon: <DownloadOutlined />,
+                      label: 'Download Template',
+                      onClick: handleDownloadTemplate
+                    },
+                    {
+                      key: 'upload',
+                      icon: <UploadOutlined />,
+                      label: (
+                        <Upload
+                          accept=".xlsx,.xls"
+                          beforeUpload={handleExcelUpload}
+                          showUploadList={false}
+                        >
+                          Upload Excel
+                        </Upload>
+                      )
+                    }
+                  ]
+                }}
+              >
+                <Button icon={<ImportOutlined />}>
+                  Import <DownOutlined />
+                </Button>
+              </Dropdown>
+            )}
+
+            <Button 
+              icon={<DownloadOutlined />}
+              onClick={handleExportExcel}
+            >
+              Export
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Add responsive styles */}
+      <style>
+        {`
+          @media (max-width: 1200px) {
+            .ant-table-title {
+              padding: 12px !important;
+            }
+          }
+          @media (min-width: 1201px) {
+            .ant-table-title {
+              padding: 16px !important;
+            }
+          }
+        `}
+      </style>
     </div>
   );
 
@@ -1738,6 +1795,26 @@ const InventoryAllData = () => {
                 </div>
               ) : (
                 <Form form={form} component={false} className="h-full">
+                  <div className="mb-4">
+                    <Breadcrumb>
+                      {breadcrumbItems.map((item, index) => (
+                        <Breadcrumb.Item key={index}>
+                          {item.title}
+                          {index === breadcrumbItems.length - 1 && (
+                            <Badge 
+                              count={getTableData().length} 
+                              style={{ 
+                                marginLeft: '8px',
+                                backgroundColor: '#52c41a'
+                              }} 
+                              title="Total Items"
+                            />
+                          )}
+                        </Breadcrumb.Item>
+                      ))}
+                    </Breadcrumb>
+                  </div>
+
                   <Table
                     ref={tableRef}
                     components={{

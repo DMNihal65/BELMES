@@ -348,14 +348,14 @@ function InspectionResult() {
         <Card className="shadow-md">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <Button
+              {/* <Button
                 icon={<ArrowLeftOutlined />}
                 onClick={() => navigate('/operator/dashboard')}
                 type="primary"
                 ghost
               >
                 Back
-              </Button>
+              </Button> */}
               <div>
                 <Title level={4} style={{ margin: 0 }}>Inspection Results</Title>
                 <Text type="secondary">Monitor and analyze inspection data</Text>

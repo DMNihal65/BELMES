@@ -76,7 +76,7 @@ function Sidebar() {
         },
         {
           key: '/supervisor/configuration',
-          label: 'Configuration',
+          label: 'Work Center',
         },
       ]
     },

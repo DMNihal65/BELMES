@@ -20,7 +20,8 @@ import {
   Spin,
   InputNumber,
   Tabs,
-  Cascader
+  Cascader,
+  Alert
 } from 'antd';
 import {
   PlusOutlined,
@@ -40,7 +41,7 @@ import axios from 'axios';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const BASE_URL = 'http://172.18.7.85:4412/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:4413/api/v1/api/inventory';
 
 function Calibration() {
   const [form] = Form.useForm();
@@ -196,6 +197,9 @@ function Calibration() {
       onOk: async () => {
         try {
           await deleteCalibration(id);
+          // Update the local state instead of fetching
+          const updatedCalibrations = calibrations.filter(cal => cal.id !== id);
+          useInventoryStore.setState({ calibrations: updatedCalibrations });
           message.success('Calibration record deleted successfully');
         } catch (error) {
           message.error('Failed to delete calibration record');
@@ -217,16 +221,22 @@ function Calibration() {
 
       if (editingCalibration) {
         await updateCalibration(editingCalibration.id, formattedValues);
+        // Update the local state instead of fetching
+        const updatedCalibrations = calibrations.map(cal => 
+          cal.id === editingCalibration.id ? { ...cal, ...formattedValues } : cal
+        );
+        useInventoryStore.setState({ calibrations: updatedCalibrations });
         message.success('Calibration record updated successfully');
       } else {
-        await addCalibration(formattedValues);
+        const newCalibration = await addCalibration(formattedValues);
+        // Update the local state instead of fetching
+        const updatedCalibrations = [...calibrations, newCalibration];
+        useInventoryStore.setState({ calibrations: updatedCalibrations });
         message.success('Calibration record added successfully');
       }
       setIsModalVisible(false);
       form.resetFields();
       setEditingCalibration(null);
-      // Refresh the calibrations list
-      fetchCalibrations();
     } catch (error) {
       console.error('Error saving calibration:', error);
       message.error(error.response?.data?.message || 'Failed to save calibration record');
@@ -295,19 +305,28 @@ function Calibration() {
 
   const handleInventoryItemClick = (itemId) => {
     setSelectedInventoryItem(itemId);
-    setActiveTab('history');
+    setActiveTab('history');  // Switch to history tab
+    
+    // Get item details for the message
+    const item = inventoryItems.find(item => item.id === itemId);
+    const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+    const itemName = item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId;
+    
+    message.info(`Showing calibration history for ${itemName}`);
   };
 
   const getFilteredHistory = () => {
     if (!calibrationHistory) return [];
 
-    let filtered = calibrationHistory;
+    let filtered = [...calibrationHistory];
 
     // Filter by selected inventory item if any
     if (selectedInventoryItem) {
       filtered = filtered.filter(history => {
-        const calibration = calibrations.find(cal => cal.calibration_schedule_id === history.calibration_schedule_id);
-        return calibration?.inventory_item_id === selectedInventoryItem;
+        // Find the calibration record for this history
+        const calibration = calibrations.find(cal => cal.id === history.calibration_schedule_id);
+        // Check if this calibration belongs to the selected item
+        return calibration && calibration.inventory_item_id === selectedInventoryItem;
       });
     }
 
@@ -319,7 +338,19 @@ function Calibration() {
       });
     }
 
+    // Sort by calibration date in descending order (newest first)
+    filtered.sort((a, b) => moment(b.calibration_date).valueOf() - moment(a.calibration_date).valueOf());
+
     return filtered;
+  };
+
+  const generateCertificateNumber = (itemId) => {
+    const today = moment();
+    const year = today.format('YYYY');
+    const month = today.format('MM');
+    const day = today.format('DD');
+    const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `CAL-${year}${month}${day}-${itemId}-${randomNum}`;
   };
 
   const columns = [
@@ -334,7 +365,7 @@ function Calibration() {
           <Tooltip title={`Click to view calibration history for this item`}>
             <Tag 
               icon={<ToolOutlined />} 
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'pointer', color: '#1890ff' }}
               onClick={() => handleInventoryItemClick(itemId)}
             >
               {item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId}
@@ -457,15 +488,21 @@ function Calibration() {
     {
       title: 'Calibrate',
       key: 'calibrate',
+      fixed: 'right',
+      width: 100,
       render: (_, record) => (
         <Button
           className="bg-green-500 text-white"
           icon={<PlusOutlined />}
           size="small"
           onClick={() => {
+            const certificateNumber = generateCertificateNumber(record.inventory_item_id);
             setIsHistoryModalVisible(true);
             historyForm.setFieldsValue({
-              calibration_schedule_id: record.id
+              calibration_schedule_id: record.id,
+              certificate_number: certificateNumber,
+              calibration_date: moment(),
+              next_due_date: moment().add(record.frequency_days, 'days')
             });
             console.log('Selected Calibration ID:', record.id);
           }}
@@ -524,18 +561,25 @@ function Calibration() {
 
   const historyColumns = [
     {
-      title: 'Calibration Schedule ID',
-      dataIndex: 'calibration_schedule_id',
-      key: 'calibration_schedule_id',
-      render: (scheduleId) => {
-        const calibration = calibrations.find(cal => cal.id === scheduleId);
+      title: 'Inventory Item',
+      key: 'inventory_item',
+      render: (_, record) => {
+        const calibration = calibrations.find(cal => cal.id === record.calibration_schedule_id);
+        const item = inventoryItems.find(item => item.id === calibration?.inventory_item_id);
+        const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
         return (
-          <Tooltip title={`Schedule ID: ${scheduleId}`}>
-            <Tag icon={<ToolOutlined />}>
-              {calibration ? `${calibration.calibration_type}` : scheduleId}
-            </Tag>
-          </Tooltip>
+          <Tag icon={<ToolOutlined />}>
+            {item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : 'N/A'}
+          </Tag>
         );
+      }
+    },
+    {
+      title: 'Calibration Type',
+      key: 'calibration_type',
+      render: (_, record) => {
+        const calibration = calibrations.find(cal => cal.id === record.calibration_schedule_id);
+        return <Text strong>{calibration?.calibration_type || 'N/A'}</Text>;
       }
     },
     {
@@ -555,7 +599,7 @@ function Calibration() {
       dataIndex: 'next_due_date',
       key: 'next_due_date',
       render: (date) => (
-        <Tag icon={<CalendarOutlined />} color={moment(date).isBefore(moment()) ? 'error' : 'default'}>
+        <Tag icon={<CalendarOutlined />} color={moment(date).isBefore(moment()) ? 'error' : 'success'}>
           {moment(date).format('DD MMM YYYY HH:mm')}
         </Tag>
       )
@@ -565,8 +609,8 @@ function Calibration() {
       dataIndex: 'result',
       key: 'result',
       render: (result) => (
-        <Tag color={result.toLowerCase() === 'pass' ? 'success' : 'error'}>
-          {result.toUpperCase()}
+        <Tag color={result?.toLowerCase() === 'pass' ? 'success' : 'error'}>
+          {result?.toUpperCase() || 'N/A'}
         </Tag>
       )
     },
@@ -576,17 +620,37 @@ function Calibration() {
       key: 'remarks',
       render: (text) => (
         <Tooltip title={text}>
-          <Text ellipsis style={{ maxWidth: 200 }}>{text}</Text>
+          <Text ellipsis style={{ maxWidth: 200 }}>{text || '-'}</Text>
         </Tooltip>
       )
     },
     {
-      title: 'Created At',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      render: (date) => moment(date).format('DD MMM YYYY HH:mm')
-    },
-    
+      title: 'Actions',
+      key: 'actions',
+      fixed: 'right',
+      width: 100,
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="primary"
+            ghost
+            icon={<EditOutlined />}
+            size="small"
+            onClick={() => {
+              // Handle edit if needed
+            }}
+          />
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            size="small"
+            onClick={() => {
+              // Handle delete if needed
+            }}
+          />
+        </Space>
+      )
+    }
   ];
 
   const getFilteredCalibrations = () => {
@@ -681,14 +745,17 @@ function Calibration() {
         remarks: values.remarks || '',
         next_due_date: values.next_due_date.toISOString(),
         calibration_schedule_id: values.calibration_schedule_id,
-        performed_by: 1 // You might want to get this from user context
+        performed_by: 1
       };
 
-      await addCalibrationHistory(formattedValues);
+      const newHistory = await addCalibrationHistory(formattedValues);
+      // Update the local state instead of fetching
+      const updatedHistory = [...calibrationHistory, newHistory];
+      useInventoryStore.setState({ calibrationHistory: updatedHistory });
+      
       message.success('Calibration history record added successfully');
       setIsHistoryModalVisible(false);
       historyForm.resetFields();
-      fetchCalibrationHistory();
     } catch (error) {
       console.error('Error saving calibration history:', error);
       message.error(error.response?.data?.message || 'Failed to save calibration history');
@@ -763,9 +830,13 @@ function Calibration() {
           icon={<PlusOutlined />}
           size="small"
           onClick={() => {
+            const certificateNumber = generateCertificateNumber(record.item_id);
             setIsHistoryModalVisible(true);
             historyForm.setFieldsValue({
-              calibration_schedule_id: record.item_id
+              calibration_schedule_id: record.item_id,
+              certificate_number: certificateNumber,
+              calibration_date: moment(),
+              next_due_date: moment().add(30, 'days') // Default to 30 days for due soon items
             });
           }}
         >
@@ -778,7 +849,7 @@ function Calibration() {
   const handleSaveInline = async (id) => {
     try {
       const formattedValues = {
-        calibration_type: editingCalibration.calibration_type, // Keep the original value
+        calibration_type: editingCalibration.calibration_type,
         frequency_days: editingCalibration.frequency_days,
         last_calibration: moment(editingCalibration.last_calibration).toISOString(),
         next_calibration: moment(editingCalibration.next_calibration).toISOString(),
@@ -787,9 +858,14 @@ function Calibration() {
       };
 
       await updateCalibration(id, formattedValues);
+      // Update the local state instead of fetching
+      const updatedCalibrations = calibrations.map(cal => 
+        cal.id === id ? { ...cal, ...formattedValues } : cal
+      );
+      useInventoryStore.setState({ calibrations: updatedCalibrations });
+      
       message.success('Calibration record updated successfully');
       setEditingCalibration(null);
-      fetchCalibrations();
     } catch (error) {
       console.error('Error saving calibration:', error);
       message.error(error.response?.data?.message || 'Failed to save calibration record');
@@ -887,13 +963,16 @@ function Calibration() {
         </div>
       )}
 
-      
-
       {/* Main Content */}
       <Card className="main-content">
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={(key) => {
+            setActiveTab(key);
+            if (key === 'current') {
+              setSelectedInventoryItem(null); // Clear selected item when switching back to current
+            }
+          }}
           className="custom-tabs"
         >
           <Tabs.TabPane tab="Current Calibrations" key="current">
@@ -982,25 +1061,28 @@ function Calibration() {
                     </Col>
                     {selectedInventoryItem && (
                       <Col xs={24} sm={24} md={16}>
-                        <Space>
-                          <Text type="secondary">
-                            Showing history for: {
-                              (() => {
-                                const item = inventoryItems.find(item => item.id === selectedInventoryItem);
-                                const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
-                                return item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : selectedInventoryItem;
-                              })()
-                            }
-                          </Text>
-                          <Button 
-                            className="bg-blue-500 text-white"
-                            type="link" 
-                            onClick={() => setSelectedInventoryItem(null)}
-                            icon={<CloseOutlined />}
-                          >
-                            Clear Selection
-                          </Button>
-                        </Space>
+                        <Alert
+                          message={(() => {
+                            const item = inventoryItems.find(item => item.id === selectedInventoryItem);
+                            const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+                            return (
+                              <Space>
+                                <span>
+                                  Showing history for: <Text strong>{item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : selectedInventoryItem}</Text>
+                                </span>
+                                <Button 
+                                  type="link" 
+                                  icon={<CloseOutlined />}
+                                  onClick={() => setSelectedInventoryItem(null)}
+                                >
+                                  Clear Filter
+                                </Button>
+                              </Space>
+                            );
+                          })()}
+                          type="info"
+                          showIcon
+                        />
                       </Col>
                     )}
                   </Row>
@@ -1019,7 +1101,7 @@ function Calibration() {
                   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
                   responsive: true
                 }}
-                scroll={{ x: 1200, y: 500 }}
+                scroll={{ x: 1500, y: 500 }}
                 className="responsive-table"
               />
             </div>
@@ -1173,10 +1255,9 @@ function Calibration() {
 
           <Form.Item
             name="certificate_number"
-            label="Certificate Number"
-            rules={[{ required: true, message: 'Please enter certificate number' }]}
+            hidden
           >
-            <Input placeholder="Enter certificate number" />
+            <Input />
           </Form.Item>
 
           <Row gutter={16}>

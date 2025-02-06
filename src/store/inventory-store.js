@@ -3,7 +3,18 @@ import { create } from 'zustand';
 import axios from 'axios';
 import { message } from 'antd';
 
-const BASE_URL = 'http://172.18.7.85:4412/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:4413/api/v1/api/inventory';
+
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  };
+};
 
 const useInventoryStore = create((set, get) => ({
   categories: [],
@@ -17,6 +28,9 @@ const useInventoryStore = create((set, get) => ({
   error: null,
   allOrders: [],
   operations: [],
+  requests: [],
+  machines: [],
+  transactions: [],
   set: (state) => set(state),
 
   // Categories
@@ -495,7 +509,7 @@ const useInventoryStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ loading: true });
     try {
-      const response = await axios.get('http://172.18.7.85:4412/planning/all_orders');
+      const response = await axios.get('http://172.18.7.85:4413/planning/all_orders');
       set({ 
         allOrders: response.data || [],
         loading: false 
@@ -528,7 +542,7 @@ const useInventoryStore = create((set, get) => ({
 
       // Create axios instance with default headers
       const axiosInstance = axios.create({
-        baseURL: 'http://172.18.7.85:4412/api/v1',
+        baseURL: 'http://172.18.7.85:4413/api/v1',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -573,7 +587,7 @@ const useInventoryStore = create((set, get) => ({
   fetchOperationsByPartNumber: async (partNumber) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`http://172.18.7.85:4412/planning/search_order?part_number=${partNumber}`);
+      const response = await axios.get(`http://172.18.7.85:4413/planning/search_order?part_number=${partNumber}`);
       const operations = response.data?.orders?.[0]?.operations || [];
       set({ 
         operations: operations,
@@ -587,6 +601,150 @@ const useInventoryStore = create((set, get) => ({
       return [];
     }
   },
+
+  // Requests Management
+  fetchRequests: async () => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`${BASE_URL}/requests/`, getAuthHeaders());
+      set({ requests: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch requests');
+      throw error;
+    }
+  },
+
+  approveRequest: async (requestId, requestData) => {
+    set({ loading: true });
+    try {
+      // Create transaction for the request
+      const transactionPayload = {
+        inventory_item_id: requestData.inventory_item_id,
+        transaction_type: "Issue",
+        quantity: requestData.quantity,
+        performed_by: 1, // You might want to get this from user context
+        reference_request_id: requestId,
+        remarks: requestData.remarks || "Issued based on approved request"
+      };
+
+      await axios.post(
+        `${BASE_URL}/transactions`,
+        transactionPayload,
+        getAuthHeaders()
+      );
+
+      // Update local state
+      set(state => ({
+        requests: state.requests.map(req => 
+          req.id === requestId ? { ...req, status: 'approved' } : req
+        ),
+        loading: false
+      }));
+
+      message.success('Request approved successfully');
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to approve request');
+      throw error;
+    }
+  },
+
+  // Machines Management
+  fetchMachines: async () => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`${BASE_URL}/machines/`, getAuthHeaders());
+      set({ machines: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch machines');
+      throw error;
+    }
+  },
+
+  updateRequestMachine: async (requestId, machineId) => {
+    set({ loading: true });
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/inventory/requests/${requestId}/machine`,
+        { machine_id: machineId },
+        getAuthHeaders()
+      );
+      set(state => ({
+        requests: state.requests.map(req => 
+          req.id === requestId ? { ...req, machine_id: machineId } : req
+        ),
+        loading: false
+      }));
+      message.success('Machine updated successfully');
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to update machine');
+      throw error;
+    }
+  },
+
+  // Add transaction analytics
+  fetchTransactionAnalytics: async () => {
+    try {
+      const response = await axios.get(`${BASE_URL}/inventory/analytics/transaction-summary`, getAuthHeaders());
+      if (!response.data) {
+        throw new Error('Failed to fetch transaction analytics');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching transaction analytics:', error);
+      message.error('Failed to fetch analytics data');
+      return null;
+    }
+  },
+
+  // Add transaction management functions
+  fetchTransactions: async () => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`${BASE_URL}/inventory/transactions`, getAuthHeaders());
+      const transactions = Array.isArray(response.data) ? response.data : [];
+      set({ transactions, loading: false });
+      return transactions;
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      message.error('Failed to fetch transactions');
+      set({ transactions: [], loading: false });
+      return [];
+    }
+  },
+
+  createReturnTransaction: async (returnData) => {
+    set({ loading: true });
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/inventory/transactions`,
+        returnData,
+        getAuthHeaders()
+      );
+
+      if (response.status === 201 || response.status === 200) {
+        message.success('Item returned successfully');
+        // Update local transactions state
+        const { fetchTransactions } = get();
+        await fetchTransactions();
+        return response.data;
+      } else {
+        throw new Error('Failed to create return transaction');
+      }
+    } catch (error) {
+      console.error('Error returning item:', error);
+      message.error('Failed to return item: ' + (error.response?.data?.detail || error.message));
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  }
 }));
 
 // Add helper function for image compression
@@ -626,6 +784,7 @@ const compressImage = async (base64String) => {
     img.src = base64String;
   });
 };
+
 
 export default useInventoryStore;
 

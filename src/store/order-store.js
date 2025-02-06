@@ -142,7 +142,7 @@ const useOrderStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4412/planning/all_orders');
+      const response = await fetch('http://172.18.7.85:4413/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -174,7 +174,7 @@ const useOrderStore = create((set) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.85:4412/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.85:4413/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -240,7 +240,7 @@ const useOrderStore = create((set) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.85:4412/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.85:4413/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -282,7 +282,7 @@ const useOrderStore = create((set) => ({
   createOrder: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4412/create_order', {
+      const response = await fetch('http://172.18.7.85:4413/create_order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -353,7 +353,7 @@ const useOrderStore = create((set) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.85:4412/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.85:4413/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -395,6 +395,80 @@ const useOrderStore = create((set) => ({
         workcenters: [...currentWorkcenters, workcenterWithId],
       };
     });
+  },
+
+  uploadMppFile: async (file, productionOrder, documentName, description, version) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('production_order', productionOrder);
+      formData.append('document_name', documentName);
+      formData.append('description', description || '');
+      formData.append('version_number', version);
+      formData.append('metadata', JSON.stringify({}));
+
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/mpp/upload/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload MPP file');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('MPP Upload Error:', error);
+      throw error;
+    }
+  },
+
+  uploadEngineeringDrawing: async (file, productionOrder, documentName, description, version) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('production_order', productionOrder);
+      formData.append('document_name', documentName);
+      formData.append('description', description || '');
+      formData.append('version_number', version);
+      formData.append('metadata', JSON.stringify({}));
+
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/engineering-drawing/upload/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload engineering drawing');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Engineering Drawing Upload Error:', error);
+      throw error;
+    }
   },
 }));
 

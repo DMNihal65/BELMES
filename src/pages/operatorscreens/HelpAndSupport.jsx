@@ -134,14 +134,14 @@ function HelpAndSupport() {
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 bg-white p-6 rounded-lg shadow-sm gap-4">
           <div className="flex items-center gap-4">
-            <Button
+            {/* <Button
               icon={<ArrowLeftOutlined style={{ color: '#0284C7' }} />}
               onClick={() => navigate('/operator/dashboard')}
               size="large"
               className="hover:scale-105 transition-transform"
             >
               Back to Dashboard
-            </Button>
+            </Button> */}
             <div>
               <Title level={4} style={{ margin: 0, color: '#0284C7' }}>Help and Support</Title>
               <Text type="secondary">Get assistance and find answers to your questions</Text>

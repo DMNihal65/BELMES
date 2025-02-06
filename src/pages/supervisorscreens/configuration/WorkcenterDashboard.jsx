@@ -9,7 +9,9 @@ import {
   Select, 
   message,
   DatePicker,
-  Typography
+  Typography,
+  Card,
+  Tabs
 } from 'antd';
 import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -192,7 +194,7 @@ const Workcenter = () => {
       sorter: (a, b) => (a.work_center?.code || '').localeCompare(b.work_center?.code || ''),
     },
     {
-      title: 'Machine Name',
+      title: 'Machine Type',
       dataIndex: 'type',
       width: 130,
       editable: true,
@@ -216,7 +218,7 @@ const Workcenter = () => {
       sorter: (a, b) => (a.type || '').localeCompare(b.type || ''),
     },
     {
-      title: 'Make',
+      title: 'Machine Name',
       dataIndex: 'make',
       width: 130,
       editable: true,
@@ -670,7 +672,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.85:4412/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.85:4413/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -918,9 +920,9 @@ const Workcenter = () => {
                 {machines.map(machine => (
                   <Option 
                     key={machine.id} 
-                    value={machine.type}
+                    value={machine.make}
                   >
-                    {machine.type}
+                    {machine.make}
                   </Option>
                 ))}
               </Select>
@@ -1165,195 +1167,222 @@ const Workcenter = () => {
   );
 
   return (
-    <div className="p-1">
-      <div className="flex justify-end mb-4 gap-3">
-        <Button 
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAddMachineClick}
-        >
-          Add Machine
-        </Button>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />}
-          onClick={() => setIsAddModalVisible(true)}
-        >
-          Add Workcenter
-        </Button>
-      </div>
-
-      <div className="border rounded-lg">
-   <Form form={form} component={false}>
-          <Table
-            components={{
-              body: {
-                cell: EditableCell,
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Main Content Card */}
+      <Card className="shadow-sm">
+        {/* Header Section */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <Title level={4} className="!mb-1">Work Center Management</Title>
+              <Text type="secondary">Manage and configure work centers and machines</Text>
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleAddMachineClick}
+              >
+                Add Machine
+              </Button>
+              <Button 
+                type="primary" 
+                icon={<PlusOutlined />}
+                onClick={() => setIsAddModalVisible(true)}
+              >
+                Add Workcenter
+              </Button>
+            </div>
+          </div>
+          
+          {/* Tabs for future expansion */}
+          <Tabs 
+            defaultActiveKey="workcenter" 
+            className="mb-4"
+            items={[
+              {
+                key: 'workcenter',
+                label: 'Work Center',
+                children: (
+                  <div className="border rounded-lg bg-white">
+                    <Form form={form} component={false}>
+                      <Table
+                        components={{
+                          body: {
+                            cell: EditableCell,
+                          },
+                        }}
+                        dataSource={data.map((item, index) => ({
+                          ...item,
+                          key: `${item.work_center_id}_${index}`,
+                          sequential_id: index + 1,
+                        }))}
+                        columns={mergedColumns}
+                        rowClassName={(record) => 
+                          `${isEditing(record) ? 'bg-blue-50' : 'hover:bg-gray-50'}`
+                        }
+                        loading={isLoading}
+                        pagination={{
+                          current: currentPage,
+                          pageSize: 6,
+                          total: data.length,
+                          showSizeChanger: false,
+                          showQuickJumper: true,
+                          position: ['bottomCenter'],
+                          showTotal: (total, range) => (
+                            <span className="text-gray-600">
+                              Showing {range[0]}-{range[1]} of {total} items
+                            </span>
+                          ),
+                          onChange: (page) => {
+                            setCurrentPage(page);
+                            setEditingKey('');
+                          }
+                        }}
+                        scroll={{ 
+                          x: 'max-content',
+                          y: 'calc(100vh - 460px)'
+                        }}
+                        sticky
+                        bordered
+                        className="ant-table-striped"
+                        size="middle"
+                        rowKey={(record) => `${record.work_center_id}_${record.sequential_id}`}
+                      />
+                    </Form>
+                  </div>
+                ),
               },
-            }}
-            dataSource={data.map((item, index) => ({
-              ...item,
-              key: `${item.work_center_id}_${index}`,
-              sequential_id: index + 1,
-            }))}
-            columns={mergedColumns}
-            rowClassName={(record) => 
-              `${isEditing(record) ? 'bg-blue-50' : 'hover:bg-gray-50'}`
-            }
-            loading={isLoading}
-            pagination={{
-              current: currentPage,
-              pageSize: 6,
-              total: data.length,
-              showSizeChanger: false,
-              showQuickJumper: true,
-              position: ['bottomCenter'],
-              showTotal: (total, range) => (
-                <span className="text-gray-600">
-                  Showing {range[0]}-{range[1]} of {total} items
-                </span>
-              ),
-              onChange: (page) => {
-                setCurrentPage(page);
-                setEditingKey('');
-              }
-            }}
-            scroll={{ 
-              x: 'max-content',
-              y: 'calc(100vh - 460px)'
-            }}
-            sticky
-            bordered
-            className="ant-table-striped"
-            size="middle"
-            rowKey={(record) => `${record.work_center_id}_${record.sequential_id}`}
+              // Add more tabs here in the future
+            ]}
           />
-        </Form>
-      </div>
+        </div>
 
-      <Modal
-        title={`Workcenter Details - ${selectedWorkcenter?.work_center?.code}`}
-        visible={isViewModalVisible}
-        onOk={handleViewModalOk}
-        onCancel={handleViewModalOk}
-        width={400}
-      >
-        {viewModalContent}
-      </Modal>
-
-      <Modal
-        title="Add New Workcenter"
-        open={isAddModalVisible}
-        onOk={handleAddWorkcenter}
-        onCancel={() => {
-          setIsAddModalVisible(false);
-          addForm.resetFields();
-        }}
-        width={500}
-        className="top-20"
-      >
-        {addWorkcenterForm}
-      </Modal>
-
-      <Modal
-        title="Edit Workcenter"
-        open={isEditModalVisible}
-        onOk={handleEditSubmit}
-        onCancel={() => {
-          setIsEditModalVisible(false);
-          setEditingRecord(null);
-          form.resetFields();
-        }}
-        width={500}
-      >
-        <Form
-          form={form}
-          layout="vertical"
+        {/* Keep all your existing modals */}
+        <Modal
+          title={`Workcenter Details - ${selectedWorkcenter?.work_center?.code}`}
+          visible={isViewModalVisible}
+          onOk={handleViewModalOk}
+          onCancel={handleViewModalOk}
+          width={400}
         >
-          <Form.Item
-            name="workcenterCode"
-            label="Workcenter Code"
-            rules={[{ required: true, message: 'Please select Workcenter Code' }]}
-          >
-            <Select placeholder="Select Workcenter Code">
-              {workcenterCodes.map(code => (
-                <Option key={code} value={code}>
-                  {code}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+          {viewModalContent}
+        </Modal>
 
-          <Form.Item
-            name="machineIds"
-            label="Machine ID"
-            rules={[{ required: true, message: 'Please select Machine ID' }]}
-          >
-            <Select mode="multiple" placeholder="Select Machine IDs">
-              {machineNames.map((machine, index) => (
-                <Option key={index} value={machine}>
-                  {machine}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+        <Modal
+          title="Add New Workcenter"
+          open={isAddModalVisible}
+          onOk={handleAddWorkcenter}
+          onCancel={() => {
+            setIsAddModalVisible(false);
+            addForm.resetFields();
+          }}
+          width={500}
+          className="top-20"
+        >
+          {addWorkcenterForm}
+        </Modal>
 
-          <Form.Item
-            name="description"
-            label="Description"
-            rules={[{ required: true, message: 'Please enter Description' }]}
+        <Modal
+          title="Edit Workcenter"
+          open={isEditModalVisible}
+          onOk={handleEditSubmit}
+          onCancel={() => {
+            setIsEditModalVisible(false);
+            setEditingRecord(null);
+            form.resetFields();
+          }}
+          width={500}
+        >
+          <Form
+            form={form}
+            layout="vertical"
           >
-            <Input.TextArea rows={3} />
-          </Form.Item>
+            <Form.Item
+              name="workcenterCode"
+              label="Workcenter Code"
+              rules={[{ required: true, message: 'Please select Workcenter Code' }]}
+            >
+              <Select placeholder="Select Workcenter Code">
+                {workcenterCodes.map(code => (
+                  <Option key={code} value={code}>
+                    {code}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
 
-          <Form.Item
-            name="operation"
-            label="Operation"
-            rules={[{ required: true, message: 'Please enter Operation' }]}
-          >
-            <Input />
-          </Form.Item>
+            <Form.Item
+              name="machineIds"
+              label="Machine ID"
+              rules={[{ required: true, message: 'Please select Machine ID' }]}
+            >
+              <Select mode="multiple" placeholder="Select Machine IDs">
+                {machineNames.map((machine, index) => (
+                  <Option key={index} value={machine}>
+                    {machine}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
 
-          <Form.Item
-            name="plant_id"
-            label="Plant ID"
-            initialValue="PLANT001"
-            hidden
-          >
-            <Input />
-          </Form.Item>
-        </Form>
-      </Modal>
+            <Form.Item
+              name="description"
+              label="Description"
+              rules={[{ required: true, message: 'Please enter Description' }]}
+            >
+              <Input.TextArea rows={3} />
+            </Form.Item>
 
-      <Modal
-        title={
-          machineModalStep === 'select' ? 'Add Machine' :
-          machineModalStep === 'existing' ? 'Select Existing Machine' :
-          'Add New Machine'
-        }
-        open={isAddMachineModalVisible}
-        onOk={() => {
-          if (machineModalStep === 'select') {
-            if (selectedWorkcenterId) {
-              setMachineModalStep('existing');
+            <Form.Item
+              name="operation"
+              label="Operation"
+              rules={[{ required: true, message: 'Please enter Operation' }]}
+            >
+              <Input />
+            </Form.Item>
+
+            <Form.Item
+              name="plant_id"
+              label="Plant ID"
+              initialValue="PLANT001"
+              hidden
+            >
+              <Input />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal
+          title={
+            machineModalStep === 'select' ? 'Add Machine' :
+            machineModalStep === 'existing' ? 'Select Existing Machine' :
+            'Add New Machine'
+          }
+          open={isAddMachineModalVisible}
+          onOk={() => {
+            if (machineModalStep === 'select') {
+              if (selectedWorkcenterId) {
+                setMachineModalStep('existing');
+              }
+              return;
             }
-            return;
-          }
-          addMachineForm.submit();
-        }}
-        onCancel={() => {
-          if (machineModalStep === 'select') {
-            handleAddMachineCancel();
-          } else {
-            setMachineModalStep('select');
-          }
-        }}
-        width={800}
-        className="top-20"
-        footer={null}
-      >
-        {addMachineFormContent()}
-      </Modal>
+            addMachineForm.submit();
+          }}
+          onCancel={() => {
+            if (machineModalStep === 'select') {
+              handleAddMachineCancel();
+            } else {
+              setMachineModalStep('select');
+            }
+          }}
+          width={800}
+          className="top-20"
+          footer={null}
+        >
+          {addMachineFormContent()}
+        </Modal>
+      </Card>
     </div>
   );
 };

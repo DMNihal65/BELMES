@@ -1,83 +1,6 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
-const MOCK_COMPARISON_DATA = {
-  planned: {
-    scheduled_operations: [
-      {
-        component: "212800970195",
-        description: "cutting",
-        machine: "MMC1",
-        start_time: "2024-12-24T09:00:00",
-        end_time: "2024-12-24T10:06:00",
-        quantity: "Batch(10)",
-        status: "completed"
-      },
-      {
-        component: "213511100114",
-        description: "CUTTING",
-        machine: "MMC1",
-        start_time: "2024-12-24T10:45:36",
-        end_time: "2024-12-24T15:57:36",
-        quantity: "Batch(10)",
-        status: "in_progress"
-      }
-    ]
-  },
-  forecast: {
-    scheduled_operations: [
-      {
-        component: "212800970195",
-        description: "cutting",
-        machine: "MMC1",
-        start_time: "2024-12-24T09:30:00",
-        end_time: "2024-12-24T10:36:00",
-        quantity: "Batch(10)"
-      },
-      {
-        component: "213511100114",
-        description: "CUTTING",
-        machine: "MMC1",
-        start_time: "2024-12-24T11:00:00",
-        end_time: "2024-12-24T16:00:00",
-        quantity: "Batch(10)"
-      }
-    ]
-  },
-  metrics: {
-    adherence: 85.5,
-    utilization: 92.3,
-    onTime: 78.6,
-    efficiency: 88.9,
-    bottlenecks: [
-      {
-        machine: "MMC1",
-        utilizationRate: 95.2,
-        queueTime: 12.5,
-        waitingJobs: 5,
-        avgProcessTime: 2.3
-      },
-      {
-        machine: "CNCM",
-        utilizationRate: 88.7,
-        queueTime: 8.2,
-        waitingJobs: 3,
-        avgProcessTime: 1.8
-      }
-    ],
-    resourceUtilization: {
-      MMC1: [85, 90, 95, 88, 92, 87, 89],
-      CNCM: [78, 82, 85, 80, 83, 79, 81],
-      CNCT: [70, 75, 72, 78, 73, 71, 74]
-    },
-    workloadDistribution: {
-      MMC1: { planned: 45, actual: 48 },
-      CNCM: { planned: 35, actual: 32 },
-      CNCT: { planned: 20, actual: 22 }
-    }
-  }
-};
-
 const useScheduleStore = create((set, get) => ({
   scheduleData: null,
   loading: false,
@@ -143,7 +66,7 @@ const useScheduleStore = create((set, get) => ({
   fetchLeadTimeData: async () => {
     set({ leadTimeLoading: true, leadTimeError: null });
     try {
-      const response = await axios.get('http://172.18.7.85:4412/component_status/');
+      const response = await axios.get('http://172.18.7.85:4413/component_status/');
       const formattedData = [
         ...response.data.early_complete,
         ...response.data.delayed_complete
@@ -197,7 +120,7 @@ const useScheduleStore = create((set, get) => ({
     // fetchScheduleData: async () => {
     //   set({ loading: true, error: null });
     //   try {
-    //     const response = await fetch('http://172.18.7.85:4412/operations/unit_schedule/');
+    //     const response = await fetch('http://172.18.7.85:4413/operations/unit_schedule/');
     //     const operations = await response.json();
         
     //     // Transform the array response into the expected format

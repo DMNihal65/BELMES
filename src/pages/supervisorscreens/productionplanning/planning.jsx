@@ -13,7 +13,7 @@ import {
 } from '@ant-design/icons';
 import {
   Timer, AlertTriangle, CheckCircle2, 
-  Gauge, Settings, Users, Calendar
+  Gauge, Settings, Users, Calendar,  CheckCircle, Hourglass, CalendarCheck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import JobOperationsTable from '../../../components/ProductionPlanning/JobOperationsTable';
@@ -31,24 +31,93 @@ const Planning = () => {
   const [showMPPDetails, setShowMPPDetails] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [activeTab, setActiveTab] = useState('jobDetails');
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
   const { 
     fetchAllOrders, 
     searchOrders, 
     partNumbers, 
     searchResults,
-    isLoading 
+    isLoading,
+    fetchActiveParts,
+    activeParts,
+    changePartStatus 
   } = usePlanningStore();
 
-  // Fetch part numbers on component mount
+  // Fetch part numbers and active parts on component mount
   React.useEffect(() => {
     fetchAllOrders();
-  }, [fetchAllOrders]);
+    fetchActiveParts();
+  }, [fetchAllOrders, fetchActiveParts]);
+
+  const getJobStatus = (partNumber) => {
+    const activePart = activeParts.find(part => part.part_number === partNumber);
+    return activePart ? activePart.status : 'unknown';
+  };
+
+  const handleStatusChange = (partNumber, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const modalTitle = currentStatus === 'active' ? 'Deactivate Part' : 'Activate Part';
+    const modalContent = currentStatus === 'active' 
+      ? 'Are you sure you want to deactivate this part?' 
+      : 'Are you sure you want to activate this part?';
+
+    Modal.confirm({
+      title: modalTitle,
+      content: modalContent,
+      okText: 'Yes',
+      cancelText: 'No',
+      onOk: async () => {
+        try {
+          await changePartStatus(partNumber, newStatus);
+          message.success(`Part status successfully changed to ${newStatus}`);
+        } catch (error) {
+          message.error('Failed to change part status');
+        }
+      }
+    });
+  };
+
+  const renderStatusButton = (partNumber) => {
+    const status = getJobStatus(partNumber);
+    
+    switch (status) {
+      case 'active':
+        return (
+          <Button 
+            className="bg-green-600 text-white hover:bg-green-700"
+            onClick={() => handleStatusChange(partNumber, status)}
+          >
+            <CalendarCheck className="w-5 h-5 mr-2" /> Active
+          </Button>
+        );
+      case 'inactive':
+        return (
+          <Button 
+            className="bg-yellow-600 text-white hover:bg-yellow-700"
+            onClick={() => handleStatusChange(partNumber, status)}
+          >
+            <Hourglass className="w-5 h-5 mr-2" /> Inactive
+          </Button>
+        );
+      default:
+        return (
+          <Button 
+            className="bg-gray-600 text-white hover:bg-gray-700"
+            onClick={() => handleStatusChange(partNumber, 'unknown')}
+          >
+            <AlertTriangle className="w-5 h-5 mr-2" /> Unknown
+          </Button>
+        );
+    }
+  };
 
   const handleJobSelect = async (partNumber) => {
     const results = await searchOrders(partNumber);
     if (results.orders && results.orders.length > 0) {
       const selectedJobData = results.orders[0];
       setSelectedJob(selectedJobData);
+      setSelectedOrderNumber(selectedJobData?.orderNumber);
+      console.log('Selected Order Number:', selectedJobData?.orderNumber);
     }
   };
 
@@ -220,7 +289,7 @@ const Planning = () => {
                 key="jobDetails"
               >
                 <Card 
-                  className="shadow-sm mb-6 hover:shadow-md transition-shadow"
+                  className="shadow-sm mb-6 hover:shadow-md transition-shadow bg-white"
                   size="small"
                 >
                   <Descriptions column={3}>
@@ -259,6 +328,11 @@ const Planning = () => {
                     <Descriptions.Item label="Start Date">
                       {selectedJob.project?.start_date || 'N/A'}
                     </Descriptions.Item>
+                    <Descriptions.Item label="Status">
+                      <div className="flex items-center space-x-2">
+                        {renderStatusButton(selectedJob.part_number)}
+                      </div>
+                    </Descriptions.Item>
                   </Descriptions>
                 </Card>
 
@@ -267,6 +341,7 @@ const Planning = () => {
                   onOperationEdit={handleOperationEdit}
                   operations={selectedJob.operations}
                   partNumber={selectedJob.part_number}
+                  orderNumber={selectedJob.production_order}
                 />
               </TabPane>
 

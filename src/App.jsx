@@ -6,12 +6,16 @@ import Login from './pages/auth/Login';
 import SupervisorDashboard from './pages/supervisorscreens/dashboard';
 import OperatorDashboard from './pages/operatorscreens/dashboard';
 import OrderDashboard from './pages/supervisorscreens/ordermanagement/orderdashboard';
+import WorkcenterDashboard from './pages/supervisorscreens/configuration/WorkcenterDashboard';
 import Planning from './pages/supervisorscreens/productionplanning/planning';
 import Scheduling from './pages/supervisorscreens/productionplanning/scheduling';
 import ProductionMonitoring from './pages/supervisorscreens/ProductionMon';
 import DocumentManagement from './pages/supervisorscreens/DocumentManagement';
 import InventoryUsageAndAnalytics from './pages/supervisorscreens/inventory/inventoryMaster';
 import RequestsCalibrationHistory from './pages/supervisorscreens/inventory/requestsCalibrationHistory';
+import DataManagement from './pages/supervisorscreens/InventoryDataManagement/DataManagement'
+import InventoryAllData from './pages/supervisorscreens/InventoryDataManagement/InventoryAllData'
+import InventoryAnalytics from './pages/supervisorscreens/InventoryDataManagement/InventoryAnalytics'
 import JobDetails from './pages/operatorscreens/jobdetails';
 import Inventory from './pages/operatorscreens/inventory/InventoryViewData';
 import HelpAndSupport from './pages/operatorscreens/HelpAndSupport';
@@ -20,6 +24,7 @@ import AlertScreens from './pages/operatorscreens/AlertScreens';
 import MaintenanceScreen from './pages/operatorscreens/MaintenanceScreen';
 import InspectionResult from './pages/operatorscreens/InspectionResult';
 import InventoryManagement from './pages/supervisorscreens/InventoryManagement';
+import DocumentScreen from './pages/operatorscreens/DocumentScreen';
 
 const App = () => {
   return (
@@ -36,6 +41,7 @@ const App = () => {
           }>
             <Route path="dashboard" element={<SupervisorDashboard />} />
             <Route path="order-management" element={<OrderDashboard />} />
+            <Route path="configuration" element={<WorkcenterDashboard />} />
             <Route path="production-planning/planning" element={<Planning />} />
             <Route path="production-planning/scheduling" element={<Scheduling />} />
             <Route path="production-monitoring" element={<ProductionMonitoring />} />
@@ -43,20 +49,20 @@ const App = () => {
             <Route path="quality-management" element={<QualityManagementDashboard />} />
             <Route path="inventory_master/inventory_usage_and_analytics" element={<InventoryUsageAndAnalytics />} />
             <Route path="inventory_master/requests_calibration_history" element={<RequestsCalibrationHistory />} />
-            <Route path="inventory-management/*" element={<InventoryManagement />} />
           </Route>
 
           {/* Operator Routes */}
           <Route path="/operator" element={
-            // <ProtectedRoute>
+            <ProtectedRoute>
               <MainLayout />
-            // </ProtectedRoute>
+            </ProtectedRoute>
           }>
             <Route path="dashboard" element={<JobDetails />} />
             <Route path="alerts" element={<AlertScreens />} />
             <Route path="maintenance" element={<MaintenanceScreen />} />
             <Route path="inspection" element={<InspectionResult />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="documents" element={<DocumentScreen />} />
             <Route path="help" element={<HelpAndSupport />} />
           </Route>
 

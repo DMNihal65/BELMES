@@ -64,6 +64,8 @@ const Planning = () => {
     machineUtilization: 78,
     upcomingMaintenance: 3
   };
+  console.log("before sending")
+    console.log(selectedJob.orderNumber)
 
   return (
     <div className="space-y-3 p-1">
@@ -231,8 +233,10 @@ const Planning = () => {
                 <Divider style={{ margin: '16px 0' }} />
                 <Row gutter={[24, 24]}>
                   <Col span={24}>
+                    
                     <JobOperationsTable 
                       jobId={selectedJob.id}
+                      orderNumber={selectedJob.orderNumber}
                       onOperationEdit={handleOperationEdit}
                       operations={selectedJob.operations}
                     />

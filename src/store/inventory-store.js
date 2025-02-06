@@ -1,19 +1,23 @@
+// src/store/inventory-store.js
 import { create } from 'zustand';
 import axios from 'axios';
 import { message } from 'antd';
 
-const BASE_URL = 'http://172.18.7.89:2222/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:4413/api/v1/api/inventory';
 
 const useInventoryStore = create((set, get) => ({
   categories: [],
   subcategories: [],
   items: [],
+  calibrations: [],
+  calibrationHistory: [],
   selectedCategory: null,
   selectedSubcategory: null,
   loading: false,
   error: null,
   allOrders: [],
   operations: [],
+  set: (state) => set(state),
 
   // Categories
   fetchCategories: async () => {
@@ -102,10 +106,15 @@ const useInventoryStore = create((set, get) => ({
     set({ loading: true });
     try {
       const response = await axios.get(`${BASE_URL}/subcategories/`);
-      set({ subcategories: response.data, loading: false });
+      console.log('Subcategories API Response:', response.data); // Debug log
+      const subcategories = Array.isArray(response.data) ? response.data : [];
+      set({ subcategories, loading: false }); // Set the subcategories in state
+      return subcategories;
     } catch (error) {
-      set({ error: error.message, loading: false });
+      console.error('Error fetching subcategories:', error);
       message.error('Failed to fetch subcategories');
+      set({ subcategories: [], loading: false }); // Set empty array on error
+      return [];
     }
   },
 
@@ -204,7 +213,6 @@ const useInventoryStore = create((set, get) => ({
   fetchItems: async (subcategoryId) => {
     set({ loading: true });
     try {
-      // Always use the /items endpoint with query parameter for subcategory_id
       let url = `${BASE_URL}/items`;
       if (subcategoryId) {
         url = `${url}?subcategory_id=${subcategoryId}`;
@@ -320,15 +328,149 @@ const useInventoryStore = create((set, get) => ({
     }
   },
 
+  // Calibration Management
+  fetchCalibrations: async () => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`${BASE_URL}/calibrations/`);
+      set({ calibrations: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch calibrations');
+      throw error;
+    }
+  },
+
+  fetchCalibrationById: async (id) => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`${BASE_URL}/calibrations/${id}`);
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch calibration details');
+      throw error;
+    }
+  },
+
+  addCalibration: async (calibrationData) => {
+    set({ loading: true });
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/calibrations/`,
+        {
+          ...calibrationData,
+          created_by: 1 // You might want to get this from user context
+        }
+      );
+      set((state) => ({
+        calibrations: [...state.calibrations, response.data],
+        loading: false
+      }));
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to add calibration');
+      throw error;
+    }
+  },
+
+  updateCalibration: async (id, calibrationData) => {
+    set({ loading: true });
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/calibrations/${id}`,
+        calibrationData
+      );
+      set((state) => ({
+        calibrations: state.calibrations.map(cal => 
+          cal.id === id ? response.data : cal
+        ),
+        loading: false
+      }));
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to update calibration');
+      throw error;
+    }
+  },
+
+  deleteCalibration: async (id) => {
+    set({ loading: true });
+    try {
+      await axios.delete(`${BASE_URL}/calibrations/${id}`);
+      set((state) => ({
+        calibrations: state.calibrations.filter(cal => cal.id !== id),
+        loading: false
+      }));
+      message.success('Calibration deleted successfully');
+      return true;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to delete calibration');
+      throw error;
+    }
+  },
+
+  // Calibration History
+  fetchCalibrationHistory: async () => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`${BASE_URL}/calibration-history/`);
+      set({ calibrationHistory: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch calibration history');
+      throw error;
+    }
+  },
+
+  fetchCalibrationHistoryById: async (id) => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`${BASE_URL}/calibration-history/${id}`);
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch calibration history details');
+      throw error;
+    }
+  },
+
+  addCalibrationHistory: async (historyData) => {
+    set({ loading: true });
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/calibration-history/`,
+        {
+          ...historyData,
+          performed_by: 1 // You might want to get this from user context
+        }
+      );
+      set((state) => ({
+        calibrationHistory: [...state.calibrationHistory, response.data],
+        loading: false
+      }));
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to add calibration history');
+      throw error;
+    }
+  },
+
   // Selection handlers
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSelectedSubcategory: (subcategory) => set({ selectedSubcategory: subcategory }),
 
-  // Add this function to fetch all orders
+  // Add new functions
   fetchAllOrders: async () => {
     set({ loading: true });
     try {
-      const response = await axios.get('http://172.18.7.89:2222/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.85:4413/planning/all_orders');
       set({ 
         allOrders: response.data || [],
         loading: false 
@@ -342,28 +484,35 @@ const useInventoryStore = create((set, get) => ({
     }
   },
 
-  // Update the submit request function
   submitItemRequest: async (requestData) => {
     set({ loading: true });
     try {
-      // Get the auth token from localStorage
+      // Get token from localStorage
       const token = localStorage.getItem('token');
       
-      // Log the request for debugging
-      console.log('Request Payload:', {
-        expected_return_date: requestData.expected_return_date?.toISOString(),
-        inventory_item_id: parseInt(requestData.item_id),
-        operation_id: parseInt(requestData.operation_id),
-        order_id: parseInt(requestData.order_id),
-        purpose: requestData.purpose,
-        quantity: parseInt(requestData.quantity),
-        remarks: requestData.remarks || "",
-        status: "Pending"
+      // Validate token exists
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
+      // Validate token format
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) {
+        throw new Error('Invalid token format');
+      }
+
+      // Create axios instance with default headers
+      const axiosInstance = axios.create({
+        baseURL: 'http://172.18.7.85:4413/api/v1',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
-      const response = await axios.post(
-        // Updated URL to match your API endpoint structure
-        'http://172.18.7.89:2222/api/v1/api/inventory/requests',  // Added 'api' in the path
+      // Make the request
+      const response = await axiosInstance.post(
+        '/api/inventory/requests',
         {
           expected_return_date: requestData.expected_return_date?.toISOString(),
           inventory_item_id: parseInt(requestData.item_id),
@@ -373,12 +522,6 @@ const useInventoryStore = create((set, get) => ({
           quantity: parseInt(requestData.quantity),
           remarks: requestData.remarks || "",
           status: "Pending"
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
         }
       );
       
@@ -386,8 +529,16 @@ const useInventoryStore = create((set, get) => ({
       return response.data;
     } catch (error) {
       console.error('Error submitting request:', error);
-      // More detailed error message
-      message.error(`Failed to submit request: ${error.response?.data?.detail || error.message}`);
+      
+      // Handle different types of errors
+      if (error.response?.status === 401) {
+        message.error('Session expired. Please login again.');
+        // You might want to trigger a logout or redirect to login here
+      } else if (error.response?.data?.detail) {
+        message.error(`Failed to submit request: ${error.response.data.detail}`);
+      } else {
+        message.error(error.message || 'Failed to submit request');
+      }
       throw error;
     } finally {
       set({ loading: false });
@@ -397,8 +548,7 @@ const useInventoryStore = create((set, get) => ({
   fetchOperationsByPartNumber: async (partNumber) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`http://172.18.7.89:2222/api/v1/planning/search_order?part_number=${partNumber}`);
-      // Extract operations from the orders array
+      const response = await axios.get(`http://172.18.7.85:4413/planning/search_order?part_number=${partNumber}`);
       const operations = response.data?.orders?.[0]?.operations || [];
       set({ 
         operations: operations,
@@ -415,3 +565,4 @@ const useInventoryStore = create((set, get) => ({
 }));
 
 export default useInventoryStore;
+

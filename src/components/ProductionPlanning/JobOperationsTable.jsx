@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Table, Button, Space, Tooltip, Form, Input, 
-  Popconfirm, Select, Tag, TimePicker 
+  Popconfirm, Select, Tag, TimePicker, Modal, message,
+  Upload
 } from 'antd';
 import { 
   EditOutlined, DeleteOutlined, FileTextOutlined, 
-  SaveOutlined, PlusOutlined 
+  SaveOutlined, PlusOutlined, 
+  UploadOutlined,
+  InboxOutlined
 } from '@ant-design/icons';
 import EditableCell from './EditableCell';
 import dayjs from 'dayjs';
+import useIpidStore from '../../store/ipid-store';
+import usePlanningStore from '../../store/planning-store';
 
 const { Option } = Select;
 
@@ -26,19 +31,35 @@ const mockTools = [
   { id: 'T3', name: 'Tool 3' },
 ];
 
-const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperations, partNumber }) => {
+const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperations, partNumber, productionOrder ,orderNumber}) => {
   const [form] = Form.useForm();
   const [operations, setOperations] = useState(initialOperations || []);
   const [editingKey, setEditingKey] = useState('');
+  const [isIpidModalVisible, setIsIpidModalVisible] = useState(false);
+  const [ipidForm] = Form.useForm();
+  const [selectedOperation, setSelectedOperation] = useState(null);
+  const { uploadIpidDocument, isLoading: isUploading } = useIpidStore();
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(orderNumber);
+  const [machines, setMachines] = useState([]);
+  const { fetchMachines, fetchMachineDetails, updateMachine, fetchOperationDetails, updateOperation } = usePlanningStore();
 
   useEffect(() => {
     setOperations(initialOperations || []);
   }, [initialOperations]);
 
+  useEffect(() => {
+    setSelectedOrderNumber(orderNumber);
+  }, [orderNumber]);
+
   const isEditing = (record) => record.key === editingKey;
 
   const edit = (record) => {
-    form.setFieldsValue({ ...record });
+    form.setFieldsValue({
+      ...record,
+      primary_machine: {
+        name: record.primary_machine?.name
+      }
+    });
     setEditingKey(record.key);
   };
 
@@ -53,10 +74,21 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       const index = newData.findIndex(item => key === item.key);
       if (index > -1) {
         const item = newData[index];
+        
+        // Find the selected machine from work_center_machines
+        const selectedMachine = item.work_center_machines?.find(
+          m => m.make === row.primary_machine?.name
+        );
+
         newData.splice(index, 1, {
           ...item,
           ...row,
+          primary_machine: selectedMachine ? {
+            id: selectedMachine.id,
+            name: selectedMachine.make
+          } : item.primary_machine
         });
+        
         setOperations(newData);
         setEditingKey('');
       }
@@ -109,6 +141,119 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   // Handle Modal Cancel
   const handleCancel = () => {
     setIsModalVisible(false);
+  };
+
+  // Update the form submission
+  const handleIpidUpload = async (file) => {
+    try {
+      const values = await ipidForm.validateFields();
+      console.log('Uploading IPID for order number:', selectedOrderNumber);
+      
+      await uploadIpidDocument(
+        file,
+        values.documentName,
+        values.description,
+        selectedOrderNumber, // Use the selected order number
+        selectedOperation.operation_number
+      );
+      
+      message.success('IPID document uploaded successfully');
+      setIsIpidModalVisible(false);
+      ipidForm.resetFields();
+    } catch (error) {
+      message.error(error.message || 'Failed to upload IPID document');
+    }
+  };
+
+  // Function to fetch machines when work center changes
+  const handleWorkCenterChange = async (workCenterCode) => {
+    try {
+      const machinesList = await fetchMachines(workCenterCode);
+      console.log('Fetched machines for', workCenterCode, ':', machinesList);
+      setMachines(machinesList);
+    } catch (error) {
+      console.error('Error fetching machines:', error);
+      message.error('Failed to fetch machines');
+    }
+  };
+
+  // Update useEffect to fetch machines when work center changes
+  useEffect(() => {
+    const fetchMachinesForWorkCenter = async () => {
+      if (editingKey) {
+        const record = operations.find(op => op.key === editingKey);
+        if (record?.work_center) {
+          try {
+            const machinesList = await fetchMachines(record.work_center);
+            console.log('Fetched machines:', machinesList); // Debug log
+            setMachines(machinesList);
+          } catch (error) {
+            console.error('Error fetching machines:', error);
+          }
+        }
+      }
+    };
+
+    fetchMachinesForWorkCenter();
+  }, [editingKey, operations]);
+
+  // Update the useEffect for initializing machines
+  useEffect(() => {
+    const initializeMachines = async () => {
+      if (operations && operations.length > 0) {
+        // Get all unique work centers
+        const uniqueWorkCenters = [...new Set(operations.map(op => op.work_center))];
+        
+        let allMachines = [];
+        
+        // Fetch machines for each work center
+        for (const workCenter of uniqueWorkCenters) {
+          if (workCenter) {
+            try {
+              const machinesList = await fetchMachines(workCenter);
+              console.log('Fetched machines for', workCenter, ':', machinesList);
+              allMachines = [...allMachines, ...machinesList];
+              
+              // Update operations with machine types
+              const updatedOperations = operations.map(op => {
+                if (op.work_center === workCenter) {
+                  // Try to find matching machine by id or name
+                  const matchingMachine = machinesList.find(m => 
+                    m.id === op.machine?.id || 
+                    m.type === op.machine?.name?.split(' ')[0]
+                  );
+                  return {
+                    ...op,
+                    machine_type: matchingMachine?.type || op.machine?.name?.split(' ')[0] || '-'
+                  };
+                }
+                return op;
+              });
+              
+              setOperations(updatedOperations);
+            } catch (error) {
+              console.error('Error fetching machines for work center:', workCenter, error);
+            }
+          }
+        }
+        setMachines(allMachines);
+      }
+    };
+
+    initializeMachines();
+  }, [initialOperations]);
+
+  // Add this function to refresh data
+  const refreshData = async () => {
+    try {
+      // Fetch fresh data using the search endpoint
+      const response = await usePlanningStore.getState().searchOrders(partNumber);
+      if (response?.orders?.[0]?.operations) {
+        setOperations(response.orders[0].operations);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
   };
 
   // Define Columns for the Table
@@ -177,6 +322,127 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       dataIndex: 'work_center',
       width: 150,
       editable: true,
+      render: (text, record) => {
+        const editable = isEditing(record);
+        return editable ? (
+          <Form.Item
+            name="work_center"
+            style={{ margin: 0 }}
+            initialValue={text}
+          >
+            <Select 
+              onChange={(value) => handleWorkCenterChange(value)}
+              placeholder="Select work center"
+            >
+              <Option value="CNCM">CNCM</Option>
+              <Option value="MMC1">MMC1</Option>
+              <Option value="MMC2">MMC2</Option>
+            </Select>
+          </Form.Item>
+        ) : (
+          text || '-'
+        );
+      }
+    },
+    {
+      title: 'Machine',
+      dataIndex: ['primary_machine', 'name'],
+      width: 150,
+      editable: false,
+      render: (text, record) => {
+        const editable = isEditing(record);
+        if (editable) {
+          const workCenterMachines = record.work_center_machines || [];
+          
+          return (
+            <Form.Item
+              name={['primary_machine', 'name']}
+              style={{ margin: 0 }}
+            >
+              <Select 
+                open={true}
+                style={{ 
+                  width: '100%',
+                  position: 'relative'
+                }}
+                popupClassName="machine-select-dropdown"
+                dropdownStyle={{ 
+                  zIndex: 9999,
+                  minWidth: '200px',
+                  padding: '8px 0'
+                }}
+                placeholder="Select machine"
+                defaultActiveFirstOption={true}
+                defaultValue={ record.primary_machine?.make}
+                optionLabelProp="label"
+                optionFilterProp="children"
+                showSearch
+                onChange={async (value, option) => {
+                  try {
+                    // Get operation details using the new endpoint
+                    const operationDetails = await fetchOperationDetails(partNumber, record.operation_number);
+                    
+                    // Prepare update data
+                    const updateData = {
+                      ...operationDetails,
+                      primary_machine: {
+                        id: option.key,
+                        name: value,
+                        make: value
+                      }
+                    };
+
+                    // Update operation with new machine
+                    const updatedOperation = await updateOperation(partNumber, record.operation_number, updateData);
+
+                    // Update the operations state with the new machine value
+                    const newData = [...operations];
+                    const index = newData.findIndex(item => item.key === record.key);
+                    if (index > -1) {
+                      newData[index] = {
+                        ...newData[index],
+                        primary_machine: {
+                          id: option.key,
+                          name: value,
+                          make: value
+                        }
+                      };
+                      setOperations(newData);
+                    }
+
+                    message.success('Machine updated successfully');
+                  } catch (error) {
+                    console.error('Error updating operation:', error);
+                    message.error('Failed to update operation');
+                  }
+                }}
+              >
+                {workCenterMachines && workCenterMachines.length > 0 ? (
+                  workCenterMachines.map((machine) => (
+                    <Select.Option 
+                      key={machine.id} 
+                      value={machine.make}
+                      label={machine.make}
+                    >
+                      <div style={{ padding: '4px 8px' }}>
+                        <div>{machine.make}</div>
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          Type: {machine.type}
+                        </div>
+                      </div>
+                    </Select.Option>
+                  ))
+                ) : (
+                  <Select.Option value="" disabled>
+                    No machines available for this work center
+                  </Select.Option>
+                )}
+              </Select>
+            </Form.Item>
+          );
+        }
+        return record.primary_machine?.name || record.primary_machine?.make || '-';
+      }
     },
     {
       title: 'Actions',
@@ -199,7 +465,19 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
                 })}
               />
             </Tooltip>
-            
+
+            {/* IPID Upload button */}
+            <Tooltip title="Upload IPID File">
+              <Button 
+                type="link" 
+                icon={<UploadOutlined />} 
+                onClick={() => {
+                  setSelectedOperation(record);
+                  setIsIpidModalVisible(true);
+                }}
+              />
+            </Tooltip>
+
             {/* Edit/Save buttons */}
             {editable ? (
               <Space>
@@ -306,6 +584,97 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           rowKey="id"
         />
       </div>
+
+      {/* Add this modal to your JSX */}
+      <Modal
+        title="Upload IPID Document"
+        open={isIpidModalVisible}
+        onCancel={() => {
+          setIsIpidModalVisible(false);
+          ipidForm.resetFields();
+        }}
+        footer={null}
+        width={500}
+      >
+        <Form
+          form={ipidForm}
+          layout="vertical"
+          onFinish={async (values) => {
+            try {
+              const file = values.file?.fileList[0]?.originFileObj;
+              if (!file) {
+                message.error('Please select a file to upload');
+                return;
+              }
+              
+              await uploadIpidDocument(
+                file,
+                values.documentName,
+                values.description,
+                selectedOrderNumber, // Use the selected order number
+                selectedOperation.operation_number
+              );
+              
+              message.success('IPID document uploaded successfully');
+              setIsIpidModalVisible(false);
+              ipidForm.resetFields();
+            } catch (error) {
+              message.error(error.message || 'Failed to upload IPID document');
+            }
+          }}
+        >
+          <Form.Item
+            name="documentName"
+            label="Document Name"
+            rules={[{ required: true, message: 'Please enter document name' }]}
+          >
+            <Input placeholder="Enter document name" />
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="Description"
+            rules={[{ required: true, message: 'Please enter description' }]}
+          >
+            <Input.TextArea rows={4} placeholder="Enter document description" />
+          </Form.Item>
+
+          <Form.Item
+            name="file"
+            label="IPID Document"
+            rules={[{ required: true, message: 'Please select a file' }]}
+          >
+            <Upload.Dragger
+              name="file"
+              maxCount={1}
+              beforeUpload={() => false}
+              accept=".pdf,.doc,.docx"
+            >
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined />
+              </p>
+              <p className="ant-upload-text">Click or drag file to this area to upload</p>
+              <p className="ant-upload-hint">
+                Support for PDF, DOC, DOCX files
+              </p>
+            </Upload.Dragger>
+          </Form.Item>
+
+          <Form.Item className="mb-0 text-right">
+            <Space>
+              <Button onClick={() => {
+                setIsIpidModalVisible(false);
+                ipidForm.resetFields();
+              }}>
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit" loading={isUploading}>
+                Upload
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
     </Form>
   );
 };

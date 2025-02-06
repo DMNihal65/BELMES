@@ -13,7 +13,8 @@ import {
   CheckSquare,
   Archive,
   Files,
-  Box
+  Box,
+  File
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -53,6 +54,11 @@ function Sidebar() {
       label: 'Inventory Data',
     },
     {
+      key: '/operator/documents',
+      icon: <File size={20} />,
+      label: 'Documents',
+    },
+    {
       key: '/operator/help',
       icon: <HelpCircle size={20} />,
       label: 'Help and Support',
@@ -69,8 +75,17 @@ function Sidebar() {
       key: '/supervisor/order-management',
       icon: <Package size={20} />,
       label: 'Order Management',
+      children: [
+        {
+          key: '/supervisor/order-management/',
+          label: 'Order Lists',
+        },
+        {
+          key: '/supervisor/configuration',
+          label: 'Work Center',
+        },
+      ]
     },
-    
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,
@@ -101,18 +116,37 @@ function Sidebar() {
     //   icon: <Archive size={20} />,
     //   label: 'Inventory Management',
     // },
+    // {
+    //   key: 'inventory_master',
+    //   icon: <Archive size={20} />,
+    //   label: 'Inventory Management',
+    //   children: [
+    //     {
+    //       key: '/supervisor/inventory_master/inventory_usage_and_analytics',
+    //       label: 'Master Data',
+    //     },
+    //     {
+    //       key: '/supervisor/inventory_master/requests_calibration_history',
+    //       label: 'Overview ',
+    //     },
+    //   ],
+    // },
     {
-      key: 'inventory-management',
+      key: 'inventory_data_management',
       icon: <Archive size={20} />,
       label: 'Inventory Management',
       children: [
+        // {
+        //   key: '/supervisor/inventory_data_management/data_management',
+        //   label: 'Data Management',
+        // },
         {
-          key: '/supervisor/inventory-management/overview',
-          label: 'Overview',
+          key: '/supervisor/inventory_data_management/inventory_all_data',
+          label: 'Inventer Master ',
         },
         {
-          key: '/supervisor/inventory-management/master-data',
-          label: 'Master Data',
+          key: '/supervisor/inventory_data_management/inventory_analytics',
+          label: 'Overview Data',
         },
       ],
     },

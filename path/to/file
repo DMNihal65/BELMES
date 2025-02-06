@@ -1,0 +1,129 @@
+import React, { useEffect, useState } from 'react';
+import moment from 'moment';
+
+const Scheduling = () => {
+  const [scheduleData, setScheduleData] = useState(null);
+  const [selectedMachines, setSelectedMachines] = useState([]);
+  const [selectedComponents, setSelectedComponents] = useState([]);
+  const [selectedProductionOrders, setSelectedProductionOrders] = useState([]);
+  const [dateRange, setDateRange] = useState([moment().startOf('day'), moment().endOf('day')]);
+  const [filteredData, setFilteredData] = useState(null);
+  const [form] = useState(null); // Assuming a form state is set up
+
+  useEffect(() => {
+    if (scheduleData) {
+      let filtered = scheduleData;
+
+      if (selectedMachines.length > 0) {
+        filtered = filterScheduleByMachines(selectedMachines);
+      }
+
+      if (selectedComponents.length > 0) {
+        filtered = {
+          ...filtered,
+          scheduled_operations: filtered.scheduled_operations.filter(op => 
+            selectedComponents.includes(op.component)
+          )
+        };
+      }
+
+      if (selectedProductionOrders.length > 0) {
+        filtered = {
+          ...filtered,
+          scheduled_operations: filtered.scheduled_operations.filter(op => 
+            selectedProductionOrders.includes(op.production_order)
+          )
+        };
+      }
+
+      if (!form.getFieldValue('dateRange')) {
+        const operations = filtered.scheduled_operations;
+        if (operations.length > 0) {
+          const startTimes = operations.map(op => new Date(op.start_time));
+          const endTimes = operations.map(op => new Date(op.end_time));
+          const earliestStart = moment(Math.min(...startTimes));
+          const latestEnd = moment(Math.max(...endTimes));
+
+          setDateRange([
+            earliestStart.clone().subtract(1, 'day').startOf('day'),
+            latestEnd.clone().add(1, 'day').endOf('day')
+          ]);
+        } else {
+          const now = moment();
+          setDateRange([
+            now.clone().subtract(3, 'days').startOf('day'),
+            now.clone().add(3, 'days').endOf('day')
+          ]);
+        }
+      }
+
+      setFilteredData(filtered);
+    }
+  }, [scheduleData, selectedMachines, selectedComponents, selectedProductionOrders]);
+
+  const getTimeRange = (viewType, dateRange, selectedComponents, scheduleData) => {
+    if (selectedComponents?.length > 0 && scheduleData) {
+      const filteredOps = scheduleData.scheduled_operations.filter(op => 
+        selectedComponents.includes(op.component)
+      );
+
+      if (filteredOps.length > 0) {
+        const startTimes = filteredOps.map(op => new Date(op.start_time));
+        const endTimes = filteredOps.map(op => new Date(op.end_time));
+        const earliestStart = moment(Math.min(...startTimes));
+        const latestEnd = moment(Math.max(...endTimes));
+
+        return {
+          start: earliestStart.subtract(1, 'day').startOf('day').toDate(),
+          end: latestEnd.add(1, 'day').endOf('day').toDate()
+        };
+      }
+    }
+
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      return {
+        start: dateRange[0].toDate(),
+        end: dateRange[1].toDate()
+      };
+    }
+
+    const now = moment();
+    let start, end;
+
+    switch (viewType) {
+      case 'year':
+        start = now.clone().subtract(2, 'years').startOf('year');
+        end = now.clone().add(2, 'years').endOf('year');
+        break;
+      case 'month':
+        start = now.clone().subtract(6, 'months').startOf('month');
+        end = now.clone().add(6, 'months').endOf('month');
+        break;
+      case 'week':
+        start = now.clone().subtract(12, 'weeks').startOf('week');
+        end = now.clone().add(12, 'weeks').endOf('week');
+        break;
+      default: // day
+        start = now.clone().subtract(30, 'days').startOf('day');
+        end = now.clone().add(30, 'days').endOf('day');
+    }
+    return { start: start.toDate(), end: end.toDate() };
+  };
+
+  const handleApplyFilters = () => {
+    const values = form.getFieldsValue();
+    setSelectedMachines(values.machines || []);
+    setSelectedComponents(values.components || []);
+    setSelectedProductionOrders(values.productionOrders || []);
+    setViewMode(values.viewMode);
+    setScheduleView(values.scheduleView);
+
+    // If dateRange is manually cleared, it will be handled in the filtering useEffect
+  };
+
+  return (
+    // Rest of the component code
+  );
+};
+
+export default Scheduling; 

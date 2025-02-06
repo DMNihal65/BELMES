@@ -11,6 +11,9 @@ const useDocumentStore = create((set, get) => ({
   isLoading: false,
   error: null, 
   partNumbers: [],
+  metrics: null,
+  isLoadingMetrics: false,
+  metricsError: null,
 
   // Fetch document types
   fetchDocTypes: async () => {
@@ -22,7 +25,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.89:2222/api/v1/documents/types/?include_inactive=true', {
+      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/types/?include_inactive=true', {
         headers: {
           'accept': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -61,7 +64,7 @@ const useDocumentStore = create((set, get) => ({
         is_active: true
       };
 
-      const response = await fetch('http://172.18.7.89:2222/api/v1/documents/folders/', {
+      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +100,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.89:2222/api/v1/documents/folders/', {
+      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/folders/', {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -128,7 +131,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.89:2222/api/v1/planning/all_orders', {
+      const response = await fetch('http://172.18.7.85:4413/planning/all_orders', {
         headers: {
           'accept': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -177,7 +180,7 @@ const useDocumentStore = create((set, get) => ({
         description: formData.description
       });
 
-      const response = await fetch('http://172.18.7.89:2222/api/v1/documents/upload/', {
+      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -211,7 +214,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('Invalid request parameters');
       }
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/folder/${folderId}/documents?skip=0&limit=100`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/folder/${folderId}/documents?skip=0&limit=100`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json',
@@ -309,7 +312,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/folders/${folderId}`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/folders/${folderId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -355,7 +358,7 @@ const useDocumentStore = create((set, get) => ({
         is_active: docTypeData.is_active
       };
 
-      const response = await fetch('http://172.18.7.89:2222/api/v1/documents/types/', {
+      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/types/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -400,7 +403,9 @@ const useDocumentStore = create((set, get) => ({
         ...(searchParams.folder_id && { folder_id: searchParams.folder_id })
       });
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/search/?${queryParams}`, {
+      console.log('Search query params:', queryParams.toString()); // Debug log
+
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/search/?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json',
@@ -408,13 +413,18 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to search documents');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to search documents');
       }
 
       const data = await response.json();
+      console.log('Search response:', data); // Debug log
+      
+      // Update the documents in state
       set({ documents: data.documents || [] });
       return data;
     } catch (error) {
+      console.error('Search error:', error);
       message.error(error.message);
       throw error;
     }
@@ -423,6 +433,10 @@ const useDocumentStore = create((set, get) => ({
   // Search documents by part number
   searchByPartNumber: async (partNumber, docTypeId) => {
     try {
+      if (partNumber.length < 3) {
+        throw new Error('Please enter at least 3 characters for part number search');
+      }
+
       const token = useAuthStore.getState().token;
       
       if (!token) {
@@ -434,7 +448,9 @@ const useDocumentStore = create((set, get) => ({
         ...(docTypeId && { doc_type_id: docTypeId })
       });
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/by-part-number/?${queryParams}`, {
+      console.log('Part number search params:', queryParams.toString()); // Debug log
+
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/by-part-number/?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json',
@@ -442,13 +458,25 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to search documents by part number');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to search documents by part number');
       }
 
       const data = await response.json();
-      set({ documents: data || [] });
+      console.log('Part number search response:', data); // Debug log
+
+      // Make sure we're setting the documents array correctly
+      if (data && data.documents) {
+        set({ documents: data.documents });
+      } else if (Array.isArray(data)) {
+        set({ documents: data });
+      } else {
+        set({ documents: [] });
+      }
+      
       return data;
     } catch (error) {
+      console.error('Part number search error:', error);
       message.error(error.message);
       throw error;
     }
@@ -463,7 +491,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/${documentId}/download/${versionId}`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/${documentId}/download/${versionId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -491,7 +519,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/${documentId}/versions`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/${documentId}/versions`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -519,9 +547,9 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      console.log('Making DELETE request to:', `http://172.18.7.89:2222/api/v1/documents/folders/${folderId}`);
+      console.log('Making DELETE request to:', `http://172.18.7.85:4413/api/v1/documents/folders/${folderId}`);
       
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/folders/${folderId}`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/folders/${folderId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -561,7 +589,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/${copyData.document_id}/copy`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/${copyData.document_id}/copy`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -605,9 +633,9 @@ const useDocumentStore = create((set, get) => ({
       formData.append('version_number', newVersionNumber);
       formData.append('metadata', '{}');
 
-      console.log('Making POST request to:', `http://172.18.7.89:2222/api/v1/documents/${documentId}/versions/`);
+      console.log('Making POST request to:', `http://172.18.7.85:4413/api/v1/documents/${documentId}/versions/`);
       
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/${documentId}/versions/`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/${documentId}/versions/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -639,9 +667,9 @@ const useDocumentStore = create((set, get) => ({
       formData.append('version_number', currentVersionNumber);
       formData.append('metadata', '{}');
 
-      console.log('Making PUT request to:', `http://172.18.7.89:2222/api/v1/documents/${documentId}/versions/${versionId}/file`);
+      console.log('Making PUT request to:', `http://172.18.7.85:4413/api/v1/documents/${documentId}/versions/${versionId}/file`);
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/${documentId}/versions/${versionId}/file`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/${documentId}/versions/${versionId}/file`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -688,7 +716,7 @@ const useDocumentStore = create((set, get) => ({
     try {
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`http://172.18.7.89:2222/api/v1/documents/${documentId}/versions/${versionId}`, {
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/${documentId}/versions/${versionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -704,6 +732,145 @@ const useDocumentStore = create((set, get) => ({
     } catch (error) {
       console.error('Delete version error:', error);
       throw error;
+    }
+  },
+
+  // Add download tracking
+  incrementDownloadCount: async (documentId) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/${documentId}/download-count`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update download count');
+      }
+
+      // Update local state
+      set(state => ({
+        documents: state.documents.map(doc =>
+          doc.id === documentId
+            ? { ...doc, download_count: (doc.download_count || 0) + 1 }
+            : doc
+        )
+      }));
+
+    } catch (error) {
+      console.error('Failed to increment download count:', error);
+    }
+  },
+
+  // Update handleDownload to track downloads
+  handleDownload: async (documentId, versionId) => {
+    try {
+      const blob = await get().downloadDocumentVersion(documentId, versionId);
+      await get().incrementDownloadCount(documentId);
+      return blob;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Add view tracking
+  incrementViewCount: async (documentId) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`http://172.18.7.85:4413/api/v1/documents/${documentId}/view-count`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update view count');
+      }
+
+      // Update local state
+      set(state => ({
+        documents: state.documents.map(doc =>
+          doc.id === documentId
+            ? { ...doc, view_count: (doc.view_count || 0) + 1 }
+            : doc
+        )
+      }));
+
+    } catch (error) {
+      console.error('Failed to increment view count:', error);
+    }
+  },
+
+  // Update handlePreview to track views
+  handlePreview: async (documentId) => {
+    try {
+      await get().incrementViewCount(documentId);
+      // Your existing preview logic...
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Add fetchMetrics function
+  fetchMetrics: async () => {
+    set({ isLoadingMetrics: true });
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/analytics/metrics', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch metrics');
+      }
+
+      const data = await response.json();
+      set({ 
+        metrics: data,
+        isLoadingMetrics: false,
+        metricsError: null
+      });
+      return data;
+    } catch (error) {
+      console.error('Metrics fetch error:', error);
+      set({ 
+        metricsError: error.message,
+        isLoadingMetrics: false 
+      });
+      throw error;
+    }
+  },
+
+  // Add refresh metrics function
+  refreshMetrics: async () => {
+    try {
+      await get().fetchMetrics();
+    } catch (error) {
+      message.error('Failed to refresh metrics');
     }
   },
 }));

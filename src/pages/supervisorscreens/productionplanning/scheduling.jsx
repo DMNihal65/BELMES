@@ -464,11 +464,28 @@ const Scheduling = () => {
 
   const availableMachines = React.useMemo(() => {
     if (!scheduleData) return [];
-    // Use Set to get unique machines while preserving the order they first appear
-    return Array.from(new Set(scheduleData.scheduled_operations
-      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
-      .map(op => op.machine)
-    ));
+    
+    // Helper function to check if machine is running
+    const getMachineStatus = (machine) => {
+      const now = new Date();
+      const isRunning = scheduleData.scheduled_operations.some(op => {
+        const startTime = new Date(op.start_time);
+        const endTime = new Date(op.end_time);
+        return op.machine === machine && startTime <= now && endTime >= now;
+      });
+      return isRunning;
+    };
+
+    // Get unique machines and sort by running status
+    return Array.from(new Set(scheduleData.scheduled_operations.map(op => op.machine)))
+      .sort((a, b) => {
+        const isRunningA = getMachineStatus(a);
+        const isRunningB = getMachineStatus(b);
+        
+        if (isRunningA && !isRunningB) return -1; // Running machines first
+        if (!isRunningA && isRunningB) return 1;  // Running machines first
+        return a.localeCompare(b); // Alphabetical order for same status
+      });
   }, [scheduleData]);
 
   const availableComponents = React.useMemo(() => {

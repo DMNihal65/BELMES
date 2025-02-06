@@ -989,7 +989,7 @@ const InventoryAllData = () => {
             <Tooltip title={`Type: ${fieldConfig.type}${fieldConfig.unit ? `, Unit: ${fieldConfig.unit}` : ''}`}>
               <Space>
                 {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
-                {fieldConfig.required && <Tag color="red">Required</Tag>}
+                {/* {fieldConfig.required && <Tag color="red">Required</Tag>} */}
               </Space>
             </Tooltip>
           ),

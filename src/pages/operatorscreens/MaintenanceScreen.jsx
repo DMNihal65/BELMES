@@ -396,12 +396,12 @@ function MaintenanceScreen() {
     <div className="flex flex-col h-screen bg-gray-50">
       <div className="bg-white shadow-sm px-6 py-3">
         <div className="flex items-center gap-4">
-          <Button
+          {/* <Button
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate('/operator/dashboard')}
           >
             Back
-          </Button>
+          </Button> */}
           <Title level={4} style={{ margin: 0 }}>
             Machine Maintenance Guide
           </Title>

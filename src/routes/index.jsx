@@ -13,8 +13,13 @@ import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling
 import InventoryUsageAndAnalytics from '../pages/supervisorscreens/inventory/inventoryMaster';
 import RequestsCalibrationHistory from '../pages/supervisorscreens/inventory/requestsCalibrationHistory';
 
+import InventoryAllData from '../pages/supervisorscreens/InventoryDataManagement/InventoryAllData'
+import InventoryAnalytics from '../pages/supervisorscreens/InventoryDataManagement/InventoryAnalytics'
+
 import ProductionMonitoring from '../pages/supervisorscreens/ProductionMon'
 import OrderDashboard from '../pages/supervisorscreens/ordermanagement/orderdashboard';
+
+import ConfigurationDashboard from '../pages/supervisorscreens/configuration/WorkcenterDashboard';
 
 import MaintenanceScreen from '../pages/operatorscreens/MaintenanceScreen';
 import InspectionResult from '../pages/operatorscreens/InspectionResult';
@@ -126,8 +131,12 @@ export const router = createBrowserRouter([
           },
           {
             path: 'order-management',
-
             element: <OrderDashboard />,
+
+          },
+          {
+            path: 'configuration',
+            element: <ConfigurationDashboard />,
 
           },
           {
@@ -189,6 +198,19 @@ export const router = createBrowserRouter([
               },
             ]
 
+          },
+          {
+            path: 'inventory_data_management',
+            children: [
+              {
+                path: 'inventory_all_data',
+                element: <InventoryAllData />,
+              },
+              {
+                path: 'inventory_analytics',
+                element: <InventoryAnalytics />,
+              }
+            ]
           },
           {
             path: 'documents',

@@ -22,7 +22,7 @@ const useScheduleStore = create((set, get) => ({
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:4411/operations/schedule-batch/');
+      const response = await fetch('http://172.18.7.85:4413/operations/schedule-batch/');
       const data = await response.json();
 
         

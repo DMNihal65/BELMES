@@ -289,7 +289,13 @@ const Planning = () => {
                 key="jobDetails"
               >
                 <Card 
-                  className="shadow-sm mb-6 hover:shadow-md transition-shadow bg-white"
+                  className={`shadow-sm mb-6 hover:shadow-md transition-shadow ${
+                    getJobStatus(selectedJob.part_number) === 'active' 
+                      ? 'bg-green-50' 
+                      : getJobStatus(selectedJob.part_number) === 'inactive'
+                      ? 'bg-yellow-50'
+                      : 'bg-gray-50'
+                  }`}
                   size="small"
                 >
                   <Descriptions column={3}>
@@ -326,7 +332,9 @@ const Planning = () => {
                       {selectedJob.total_operations}
                     </Descriptions.Item>
                     <Descriptions.Item label="Start Date">
-                      {selectedJob.project?.start_date || 'N/A'}
+                      {selectedJob.project?.start_date 
+                        ? new Date(selectedJob.project.start_date).toLocaleDateString()
+                        : 'N/A'}
                     </Descriptions.Item>
                     <Descriptions.Item label="Status">
                       <div className="flex items-center space-x-2">
@@ -345,7 +353,7 @@ const Planning = () => {
                 />
               </TabPane>
 
-              <TabPane 
+              {/* <TabPane 
                 tab={
                   <span>
                     <BarChartOutlined />
@@ -358,7 +366,7 @@ const Planning = () => {
                   machines={mockMachines}
                   selectedJob={selectedJob}
                 />
-              </TabPane>
+              </TabPane> */}
 
               <TabPane 
                 tab={

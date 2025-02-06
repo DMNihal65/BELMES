@@ -517,7 +517,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         />
 
         <Row gutter={16}>
-        <Col span={12}>
+          <Col span={12}>
             <Form.Item
               name="production_order"
               label="Production Order"
@@ -622,70 +622,25 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         </Row>
 
         <Row gutter={16}>
-        <Col span={24}>
-        <Form.Item
-          name="delivery_date"
-          label="Delivery Date"
-          rules={[{ required: true, message: 'Please select Delivery Date' }]}
-        >
-          <DatePicker 
-            style={{ width: '100%' }} 
-            format="YYYY-MM-DD"
-            disabledDate={(current) => {
-              return current && current < dayjs().startOf('day');
-            }}
-          />
-        </Form.Item>
-      </Col>
+          <Col span={24}>
+            <Form.Item
+              name="delivery_date"
+              label="Delivery Date"
+              rules={[{ required: true, message: 'Please select Delivery Date' }]}
+            >
+              <DatePicker 
+                style={{ width: '100%' }} 
+                format="YYYY-MM-DD"
+                disabledDate={(current) => {
+                  return current && current < dayjs().startOf('day');
+                }}
+              />
+            </Form.Item>
+          </Col>
         </Row>
 
-        <Divider>MPP and Drawing Files</Divider>
-        <Row gutter={16} className="mb-4">
-          <Col span={12}>
-            <Form.Item
-              label={
-                <span>
-                  MPP File
-                  <span className="text-gray-400 text-sm ml-2"></span>
-                </span>
-              }
-              name="mppFile"
-            >
-              <Upload
-                maxCount={1}
-                onChange={handleMppFileChange}
-                beforeUpload={() => false}
-                showUploadList={{ showRemoveIcon: true }}
-              >
-                <Button icon={<UploadOutlined />} className="w-full">
-                  {mppFile ? 'Change MPP File' : 'Upload MPP File'}
-                </Button>
-              </Upload>
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              label={
-                <span>
-                  Engineering Drawing
-                  <span className="text-gray-400 text-sm ml-2"></span>
-                </span>
-              }
-              name="drawingFile"
-            >
-              <Upload
-                maxCount={1}
-                onChange={handleDrawingFileChange}
-                beforeUpload={() => false}
-                showUploadList={{ showRemoveIcon: true }}
-              >
-                <Button icon={<UploadOutlined />} className="w-full">
-                  {drawingFile ? 'Change Drawing File' : 'Upload Drawing'}
-                </Button>
-              </Upload>
-            </Form.Item>
-          </Col>
-        </Row>
+        {/* Add the same file upload section */}
+        {renderFileUploadSection()}
 
         <Form.Item className="mb-0 mt-6">
           <Space className="w-full justify-end">
@@ -704,7 +659,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     </Form>
   );
 
-  // Update handleManualSubmit to include file handling
+  // Update handleManualSubmit function
   const handleManualSubmit = async (values) => {
     try {
       if (!values.delivery_date) {
@@ -723,8 +678,11 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       }
 
       const deliveryDate = dayjs(values.delivery_date);
+      // Format the date as YYYY-MM-DD string
+      const formattedDeliveryDate = deliveryDate.format('YYYY-MM-DD');
       const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
 
+      // Format the payload according to the API requirements
       const payload = {
         production_order: values.production_order,
         sale_order: values.sale_order,
@@ -736,8 +694,12 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         launched_quantity: parseInt(values.launched_quantity),
         plant_id: parseInt(values.plant_id),
         project_name: values.project_name,
-        delivery_date: epochTimestamp,
-        raw_materials: [],
+        delivery_date: formattedDeliveryDate, // Send as YYYY-MM-DD string
+        project: {
+          name: values.project_name,
+          delivery_date: epochTimestamp
+        },
+        raw_materials: []
       };
 
       // Create the order first

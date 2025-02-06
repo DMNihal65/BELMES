@@ -282,10 +282,17 @@ const useOrderStore = create((set) => ({
   createOrder: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4413/create_order', {
+      // Get the token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch('http://172.18.7.85:4413/planning/create_order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });

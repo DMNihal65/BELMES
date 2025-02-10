@@ -17,12 +17,19 @@ const useScheduleStore = create((set, get) => ({
   leadTimeData: [],
   leadTimeLoading: false,
   leadTimeError: null,
+  productionStatusData: {
+    daily_production: [],
+    total_planned: {},
+    total_completed: {},
+  },
+  productionStatusLoading: false,
+  productionStatusError: null,
   
   // Fetch schedule data
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4413/operations/schedule-batch/');
+      const response = await fetch('http://172.18.7.85:4749/operations/schedule-batch/');
       const data = await response.json();
 
         
@@ -66,7 +73,7 @@ const useScheduleStore = create((set, get) => ({
   fetchLeadTimeData: async () => {
     set({ leadTimeLoading: true, leadTimeError: null });
     try {
-      const response = await axios.get('http://172.18.7.85:4413/component_status/');
+      const response = await axios.get('http://172.18.7.85:4749/component_status/');
       const formattedData = [
         ...response.data.early_complete,
         ...response.data.delayed_complete
@@ -120,7 +127,7 @@ const useScheduleStore = create((set, get) => ({
     // fetchScheduleData: async () => {
     //   set({ loading: true, error: null });
     //   try {
-    //     const response = await fetch('http://172.18.7.85:4413/operations/unit_schedule/');
+    //     const response = await fetch('http://172.18.7.85:4749/operations/unit_schedule/');
     //     const operations = await response.json();
         
     //     // Transform the array response into the expected format
@@ -385,7 +392,72 @@ const useScheduleStore = create((set, get) => ({
       averageDelay: delays.reduce((acc, curr) => acc + curr.delay, 0) / delays.length,
       criticalDelays: delays.filter(d => d.delay > 24) // Delays more than 24 hours
     };
-  }
+  },
+
+  fetchProductionStatus: async (partNumber) => {
+    set({ productionStatusLoading: true, productionStatusError: null });
+    try {
+      const url = partNumber 
+        ? `http://172.18.7.85:4749/production/daily/?part_number=${partNumber}`
+        : 'http://172.18.7.85:4749/production/daily/';
+      const response = await axios.get(url);
+      set({ 
+        productionStatusData: response.data,
+        productionStatusLoading: false 
+      });
+    } catch (error) {
+      set({ 
+        productionStatusError: error.message, 
+        productionStatusLoading: false 
+      });
+    }
+  },
+
+  fetchWeeklyProductionStatus: async (partNumber) => {
+    set({ productionStatusLoading: true, productionStatusError: null });
+    try {
+      const url = partNumber 
+        ? `http://172.18.7.85:4749/production/weekly/?part_number=${partNumber}`
+        : 'http://172.18.7.85:4749/production/weekly/';
+      const response = await axios.get(url);
+      set({ 
+        productionStatusData: {
+          daily_production: response.data.weekly_production,
+          total_planned: response.data.total_planned,
+          total_completed: response.data.total_completed,
+        },
+        productionStatusLoading: false 
+      });
+    } catch (error) {
+      set({ 
+        productionStatusError: error.message, 
+        productionStatusLoading: false 
+      });
+    }
+  },
+
+  fetchMonthlyProductionStatus: async (partNumber) => {
+    set({ productionStatusLoading: true, productionStatusError: null });
+    try {
+      const url = partNumber 
+        ? `http://172.18.7.85:4749/production/monthly/?part_number=${partNumber}`
+        : 'http://172.18.7.85:4749/production/monthly/';
+      const response = await axios.get(url);
+      set({ 
+        productionStatusData: {
+          daily_production: response.data.monthly_production,
+          total_planned: response.data.total_planned,
+          total_completed: response.data.total_completed,
+        },
+        productionStatusLoading: false 
+      });
+    } catch (error) {
+      set({ 
+        productionStatusError: error.message, 
+        productionStatusLoading: false 
+      });
+    }
+  },
 }));
 
 // Helper function to calculate progress

@@ -142,7 +142,7 @@ const useOrderStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4413/planning/all_orders');
+      const response = await fetch('http://172.18.7.85:4749/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -174,7 +174,7 @@ const useOrderStore = create((set) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.85:4413/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.85:4749/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -240,7 +240,7 @@ const useOrderStore = create((set) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.85:4413/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.85:4749/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -288,7 +288,7 @@ const useOrderStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch('http://172.18.7.85:4413/planning/create_order', {
+      const response = await fetch('http://172.18.7.85:4749/planning/create_order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -360,7 +360,7 @@ const useOrderStore = create((set) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.85:4413/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.85:4749/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -420,7 +420,7 @@ const useOrderStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/mpp/upload/', {
+      const response = await fetch('http://172.18.7.85:4749/api/v1/documents/mpp/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -457,7 +457,7 @@ const useOrderStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/engineering-drawing/upload/', {
+      const response = await fetch('http://172.18.7.85:4749/api/v1/documents/engineering-drawing/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -353,7 +353,7 @@ const Planning = () => {
                 />
               </TabPane>
 
-              {/* <TabPane 
+              <TabPane 
                 tab={
                   <span>
                     <BarChartOutlined />
@@ -366,7 +366,7 @@ const Planning = () => {
                   machines={mockMachines}
                   selectedJob={selectedJob}
                 />
-              </TabPane> */}
+              </TabPane>
 
               <TabPane 
                 tab={

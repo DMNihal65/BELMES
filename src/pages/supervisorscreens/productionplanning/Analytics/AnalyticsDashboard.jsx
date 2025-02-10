@@ -8,6 +8,7 @@ import {
    SearchOutlined
   } from '@ant-design/icons';
   import useScheduleStore from '../../../../store/schedule-store'; 
+import ProductionStatus from '../ProductionStatus/ProductionStatus';
 
 const { TabPane } = Tabs;
 
@@ -994,8 +995,8 @@ const AnalyticsDashboard = () => {
     const fetchData = async () => {
       try {
         const [componentResponse, scheduleResponse] = await Promise.all([
-          fetch('http://172.18.7.85:4413/component_status/'),
-          fetch('http://172.18.7.85:4413/operations/machine_schedules/')
+          fetch('http://172.18.7.85:4749/component_status/'),
+          fetch('http://172.18.7.85:4749/operations/machine_schedules/')
         ]);
         
         const componentResult = await componentResponse.json();
@@ -1045,6 +1046,9 @@ const AnalyticsDashboard = () => {
         </TabPane>
         <TabPane tab="Schedule Details" key="scheduleDetails">
           <ScheduleDetails data={scheduleData} />
+        </TabPane>
+        <TabPane tab="Production Status" key="productionStatus">
+          <ProductionStatus />
         </TabPane>
       </Tabs>
 

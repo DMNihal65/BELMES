@@ -1,3 +1,5 @@
+top
+
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Layout, Card, Row, Col, Button, Space, Input, Select, 
@@ -7,10 +9,7 @@ import {
 } from 'antd';
 
 import {
-  ScheduleOutlined, SyncOutlined, SearchOutlined,
-  HistoryOutlined, CalendarOutlined, ClockCircleOutlined,
-  BarChartOutlined, WarningOutlined, SwapOutlined,
-  ExclamationCircleOutlined, CheckCircleOutlined,
+  ScheduleOutlined, SyncOutlined, HistoryOutlined, CalendarOutlined, 
   ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined, LeftOutlined, 
   RightOutlined, InfoCircleOutlined
 } from '@ant-design/icons';
@@ -18,13 +17,9 @@ import { Timeline } from "vis-timeline/esnext";
 import { DataSet } from "vis-data/esnext";
 import "vis-timeline/dist/vis-timeline-graph2d.css";
 import useScheduleStore from '../../../store/schedule-store';
-import ReactApexChart from 'react-apexcharts';
 import moment from 'moment';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, LineChart,
-  Line } from 'recharts';
 import AnalyticsDashboard from './Analytics/AnalyticsDashboard';
 import { ComponentLegend, MachineStatusCards } from './Schedule/ComponentsAndStatus';
-import ReactECharts from "echarts-for-react";
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -206,25 +201,9 @@ const Scheduling = () => {
   const componentStatus = scheduleData?.component_status || {};
   const dailyProduction = scheduleData?.daily_production || {};
 
+  const [dateRange, setDateRange] = useState(null);
+
   const [visibleRange, setVisibleRange] = useState(() => {
-    const now = moment();
-    return [
-      now.clone().subtract(3, 'days').startOf('day'),
-      now.clone().add(3, 'days').endOf('day')
-    ];
-  });;
-
-  // const [dateRange, setDateRange] = useState(() => {
-  //   const now = moment();
-  //   // Set visible range to current month but load more data
-  //   return [
-  //     now.clone().subtract(12, 'months').startOf('month'),
-  //     now.clone().add(12, 'months').endOf('month')
-  //   ];
-
-  // });
-
-  const [dateRange, setDateRange] = useState(() => {
     const now = moment();
     return [
       now.clone().subtract(3, 'days').startOf('day'),
@@ -247,19 +226,14 @@ const Scheduling = () => {
       try {
         let operations = scheduleData.scheduled_operations;
         
-        // Apply all filters once
+        // Only filter by components, machines, and production orders
+        // Remove date range filter to show all data
         operations = operations.filter(op => {
           const matchesComponent = selectedComponents.length === 0 || selectedComponents.includes(op.component);
           const matchesOrder = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
           const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(op.machine);
           
-          // Apply date range filter if exists
-          const withinDateRange = !dateRange || !dateRange[0] || !dateRange[1] || (
-            new Date(op.start_time) >= dateRange[0] && 
-            new Date(op.end_time) <= dateRange[1]
-          );
-
-          return matchesComponent && matchesOrder && matchesMachine && withinDateRange;
+          return matchesComponent && matchesOrder && matchesMachine;
         });
 
         // Generate and store component colors for filtered operations
@@ -320,10 +294,10 @@ const Scheduling = () => {
           }))
         );
 
-        // Get time range based on view type
+        // Get time range based on view type and date range
         const timeRange = getTimeRange(viewType, dateRange, selectedComponents, selectedMachines, selectedProductionOrders, scheduleData);
 
-        // Configure options
+        // Configure options with extended min/max range
         const options = {
           stack: false,
           horizontalScroll: true,
@@ -336,8 +310,9 @@ const Scheduling = () => {
           },
           start: timeRange.start,
           end: timeRange.end,
-          min: timeRange.min,
-          max: timeRange.max,
+          // Set min/max to show full dataset range
+          min: timeRange.dataMin,
+          max: timeRange.dataMax,
           zoomMin: 1000 * 60 * 30,
           zoomMax: 1000 * 60 * 60 * 24 * 365 * 2,
           mousewheel: {
@@ -356,7 +331,7 @@ const Scheduling = () => {
                 <div class="timeline-tooltip">
                   <div class="tooltip-header">
                     <div class="info-row">
-                      <span class="label">Component:</span>
+                      <span class="label">Part Number:</span>
                       <span class="component">${op.component}</span>
                     </div>
                     <div class="info-row">
@@ -673,34 +648,11 @@ const Scheduling = () => {
     timelineRef.current.setWindow(newStart.toDate(), newEnd.toDate(), { animation: true });
   };
 
-  const renderTimelineControls = () => (
-    <Space>
-      <Button 
-        icon={<LeftOutlined />} 
-        onClick={() => handleTimelineNavigation('left')}
-        tooltip="Previous Period"
-      />
-      <Button 
-        icon={<CalendarOutlined />} 
-        onClick={() => handleTimelineNavigation('today')}
-        tooltip="Go to Today"
-      />
-      <Button 
-        icon={<RightOutlined />} 
-        onClick={() => handleTimelineNavigation('right')}
-        tooltip="Next Period"
-      />
-    </Space>
-  );
-
   const handleRefresh = () => {
     // Reset all filters
     setSelectedMachines([]);
     setSelectedComponents([]);
-    setDateRange([
-      moment().startOf('month'),
-      moment().endOf('month')
-    ]);
+    setDateRange(null);
     // Fetch fresh data
     fetchScheduleData();
   };
@@ -814,17 +766,29 @@ const Scheduling = () => {
                 </div>
               </div>
 
-              <div 
-                ref={timelineContainerRef} 
-                className="schedule-timeline"
-                style={{ 
-                  height: '590px',
-                  backgroundColor: '#fff',
-                  padding: '20px',
-                  borderRadius: '8px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                }}
-              />
+              <div className="relative">
+                <div className="absolute top-2 left-0 right-0 flex justify-between px-2 z-10">
+                  <Button
+                    icon={<LeftOutlined />}
+                    onClick={() => handleTimelineNavigation('left')}
+                  />
+                  <Button
+                    icon={<RightOutlined />}
+                    onClick={() => handleTimelineNavigation('right')}
+                  />
+                </div>
+                <div 
+                  ref={timelineContainerRef} 
+                  className="schedule-timeline"
+                  style={{ 
+                    height: '590px',
+                    backgroundColor: '#fff',
+                    padding: '20px',
+                    borderRadius: '8px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                  }}
+                />
+              </div>
 
               {scheduleData && componentColors && (
                 <>
@@ -846,15 +810,6 @@ const Scheduling = () => {
               </style>
 
               {/* Machine Status Cards */}
-              
-
-              {/* {scheduleData && (
-                <ProductionGraphs 
-                  componentStatus={componentStatus} 
-                  dailyProduction={dailyProduction} 
-                />
-              )} */}
-
 
             </Card>
           </TabPane>
@@ -1196,186 +1151,6 @@ const ScheduleHistory = () => {
   );
 };
 
-const ProductionGraphs = ({ componentStatus, dailyProduction }) => {
-  // Default values in case of undefined or null data
-  const validComponentStatus = componentStatus || {};
-  const validDailyProduction = dailyProduction || {};
-
-  // Prepare Component Status data for ECharts (Bar chart)
-  const componentStatusData = Object.entries(validComponentStatus).map(([partno, data]) => {
-    const completedQuantity = data?.completed_quantity || 0;
-    const totalQuantity = data?.total_quantity || 0;
-    const onTime = data?.on_time ? 'Yes' : 'No';
-    const completionRate = totalQuantity > 0 ? ((completedQuantity / totalQuantity) * 100).toFixed(1) : 0;
-
-    return {
-      partno,
-      completed: completedQuantity,
-      total: totalQuantity,
-      onTime,
-      completionRate,
-      scheduledEndTime: data.scheduled_end_time, // Add scheduled end time
-      leadTime: data.lead_time // Add lead time
-    };
-  });
-
-  // ECharts Option for Component Status (Bar chart)
-  const componentStatusOption = {
-    title: {
-      text: "Component Status",
-      left: "center",
-      top: "10",
-      textStyle: { fontSize: 16 }
-    },
-    tooltip: {
-      trigger: "item",
-      formatter: (params) => {
-        const data = params.data;
-        if (!data) {
-          return '<div>No data available</div>';
-        }
-
-        const partno = data.partno || 'N/A';
-        const completed = data.completed || 'N/A';
-        const total = data.total || 'N/A';
-        const completionRate = total > 0 ? ((completed / total) * 100).toFixed(1) : 0;
-        const onTime = data.onTime || 'N/A';
-        const scheduledEndTime = data.scheduledEndTime || 'N/A';
-        const leadTime = data.leadTime || 'N/A';
-
-        return `
-          <div>
-            <strong>Part Number: ${partno}</strong><br>
-            Completed: ${completed}<br>
-            Total: ${total}<br>
-            Completion Rate: ${completionRate}%<br>
-            On Time: ${onTime}<br>
-            Scheduled End Time: ${new Date(scheduledEndTime).toLocaleString()}<br>
-            Lead Time: ${new Date(leadTime).toLocaleString()}
-          </div>`;
-      }
-    },
-    xAxis: {
-      type: "category",
-      data: componentStatusData.map((item) => item.partno),
-      axisLabel: {
-        rotate: 45,
-        textStyle: { fontSize: 12 }
-      }
-    },
-    yAxis: {
-      type: "value"
-    },
-    series: [
-      {
-        name: "Completed",
-        type: "bar",
-        data: componentStatusData.map((item) => item.completed),
-        itemStyle: { color: "#4CAF50" }
-      },
-      {
-        name: "Total Required",
-        type: "bar",
-        data: componentStatusData.map((item) => item.total),
-        itemStyle: { color: "#2196F3" }
-      }
-    ]
-  };
-
-  // Prepare Daily Production data for ECharts (Line chart)
-  const dailyProductionData = [];
-  Object.entries(validDailyProduction).forEach(([partno, dateData]) => {
-    Object.entries(dateData).forEach(([date, quantity]) => {
-      const formattedDate = new Date(date).toLocaleDateString();
-      const existingEntry = dailyProductionData.find(entry => entry.date === formattedDate);
-      if (existingEntry) {
-        existingEntry.quantity += quantity;
-      } else {
-        dailyProductionData.push({
-          date: formattedDate,
-          quantity,
-          partno
-        });
-      }
-    });
-  });
-
-  // Sort the daily production data by date
-  dailyProductionData.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  // ECharts Option for Daily Production (Line chart)
-  const dailyProductionOption = {
-    title: {
-      text: "Daily Production Schedule",
-      left: "center",
-      top: "10",
-      textStyle: { fontSize: 16 }
-    },
-    tooltip: {
-      trigger: "item",
-      formatter: (params) => {
-        const data = params.data;
-        if (!data) {
-          return '<div>No data available</div>';
-        }
-
-        const date = data.date || 'N/A';
-        const partno = data.partno || 'N/A';
-        const quantity = data.quantity || 'N/A';
-
-        return `
-          <div>
-            <strong>Date: ${date}</strong><br>
-            Part Number: ${partno}<br>
-            Quantity: ${quantity}
-          </div>`;
-      }
-    },
-    xAxis: {
-      type: "category",
-      data: dailyProductionData.map((item) => item.date),
-      axisLabel: {
-        rotate: 45,
-        textStyle: { fontSize: 12 }
-      }
-    },
-    yAxis: {
-      type: "value"
-    },
-    series: [
-      {
-        name: "Production Quantity",
-        type: "line",
-        data: dailyProductionData.map((item) => item.quantity),
-        smooth: true,
-        lineStyle: { color: "#FF5722" },
-        itemStyle: { color: "#FF5722" }
-      }
-    ]
-  };
-
-  return (
-    <div className="mt-8 space-y-6">
-      {/* Component Status Graph */}
-      <div className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Component Status</h3>
-        <div style={{ height: "400px" }}>
-          <ReactECharts option={componentStatusOption} />
-        </div>
-      </div>
-
-      {/* Daily Production Graph */}
-      <div className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Daily Production Schedule</h3>
-        <div style={{ height: "400px" }}>
-          <ReactECharts option={dailyProductionOption} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
 const styles = {
   wrapper: `
     .machine-status-card {
@@ -1405,107 +1180,102 @@ const styles = {
   `
 };
 
-// Add helper function for time range calculation
-// const getTimeRange = (viewType, dateRange) => {
-//   if (dateRange && dateRange[0] && dateRange[1]) {
-//     return {
-//       start: dateRange[0].toDate(),
-//       end: dateRange[1].toDate()
-//     };
-//   }
-
-//   const now = new Date();
-//   let start = new Date(now);
-//   let end = new Date(now);
-
-//   switch (viewType) {
-//     case 'month':
-//       start.setDate(1);
-//       end.setMonth(end.getMonth() + 1, 0);
-//       break;
-//     case 'week':
-//       start.setDate(start.getDate() - start.getDay());
-//       end.setDate(end.getDate() + (6 - end.getDay()));
-//       break;
-//     default: // day
-//       start.setHours(0, 0, 0, 0);
-//       end.setHours(23, 59, 59, 999);
-//   }
-
-//   return { start, end };
-// };
-
 const getTimeRange = (viewType, dateRange, selectedComponents, selectedMachines, selectedProductionOrders, scheduleData) => {
-  // If date range is selected, use it as the primary window
-  if (dateRange && dateRange[0] && dateRange[1]) {
-    return {
-      start: dateRange[0].toDate(),
-      end: dateRange[1].toDate(),
-      min: dateRange[0].clone().subtract(1, 'year').toDate(),
-      max: dateRange[1].clone().add(1, 'year').toDate()
-    };
-  }
+  let start, end, min, max, dataMin, dataMax;
+  const now = moment();
 
-  // If any filters are applied, find the earliest operation start date
-  if ((selectedComponents?.length > 0 || selectedMachines?.length > 0 || selectedProductionOrders?.length > 0) && scheduleData) {
-    const filteredOps = scheduleData.scheduled_operations.filter(op => {
-      const matchesComponent = selectedComponents.length === 0 || selectedComponents.includes(op.component);
-      const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(op.machine);
-      const matchesOrder = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
-      return matchesComponent && matchesMachine && matchesOrder;
-    });
-
-    if (filteredOps.length > 0) {
-      const startTimes = filteredOps.map(op => new Date(op.start_time));
-      const endTimes = filteredOps.map(op => new Date(op.end_time));
-      const earliestStart = moment(Math.min(...startTimes));
-      const latestEnd = moment(Math.max(...endTimes));
-
-      // Add some padding before and after
-      return {
-        start: earliestStart.subtract(12, 'hours').startOf('hour').toDate(),
-        end: latestEnd.add(12, 'hours').endOf('hour').toDate(),
-        min: earliestStart.clone().subtract(1, 'month').toDate(),
-        max: latestEnd.clone().add(1, 'month').toDate()
-      };
+  // Calculate the full data range first
+  if (scheduleData && scheduleData.scheduled_operations.length > 0) {
+    const allStartTimes = scheduleData.scheduled_operations.map(op => new Date(op.start_time));
+    const allEndTimes = scheduleData.scheduled_operations.map(op => new Date(op.end_time));
+    
+    // Get the earliest and latest dates from the data
+    const earliestDate = moment(Math.min(...allStartTimes));
+    const latestDate = moment(Math.max(...allEndTimes));
+    
+    // Set scrollable range based on view type
+    switch (viewType) {
+      case 'year':
+        const twoYearsBeforeData = earliestDate.clone().subtract(2, 'years');
+        const twoYearsAfterData = latestDate.clone().add(2, 'years');
+        dataMin = moment.min(twoYearsBeforeData, now.clone().subtract(2, 'years')).toDate();
+        dataMax = moment.max(twoYearsAfterData, now.clone().add(2, 'years')).toDate();
+        break;
+      case 'month':
+        // 6 months before and after
+        const sixMonthsBeforeData = earliestDate.clone().subtract(6, 'months');
+        const sixMonthsAfterData = latestDate.clone().add(6, 'months');
+        dataMin = moment.min(sixMonthsBeforeData, now.clone().subtract(6, 'months')).toDate();
+        dataMax = moment.max(sixMonthsAfterData, now.clone().add(6, 'months')).toDate();
+        break;
+      case 'week':
+        // 4 weeks before and after
+        const fourWeeksBeforeData = earliestDate.clone().subtract(4, 'weeks');
+        const fourWeeksAfterData = latestDate.clone().add(4, 'weeks');
+        dataMin = moment.min(fourWeeksBeforeData, now.clone().subtract(4, 'weeks')).toDate();
+        dataMax = moment.max(fourWeeksAfterData, now.clone().add(4, 'weeks')).toDate();
+        break;
+      default: // day
+        // 15 days before and after
+        const fifteenDaysBeforeData = earliestDate.clone().subtract(15, 'days');
+        const fifteenDaysAfterData = latestDate.clone().add(15, 'days');
+        dataMin = moment.min(fifteenDaysBeforeData, now.clone().subtract(15, 'days')).toDate();
+        dataMax = moment.max(fifteenDaysAfterData, now.clone().add(15, 'days')).toDate();
+    }
+  } else {
+    // If no data, provide default ranges based on view type
+    switch (viewType) {
+      case 'year':
+        dataMin = now.clone().subtract(2, 'years').startOf('year').toDate();
+        dataMax = now.clone().add(2, 'years').endOf('year').toDate();
+        break;
+      case 'month':
+        dataMin = now.clone().subtract(6, 'months').startOf('month').toDate();
+        dataMax = now.clone().add(6, 'months').endOf('month').toDate();
+        break;
+      case 'week':
+        dataMin = now.clone().subtract(4, 'weeks').startOf('week').toDate();
+        dataMax = now.clone().add(4, 'weeks').endOf('week').toDate();
+        break;
+      default: // day
+        dataMin = now.clone().subtract(15, 'days').startOf('day').toDate();
+        dataMax = now.clone().add(15, 'days').endOf('day').toDate();
     }
   }
 
-  // Default ranges based on view type
-  const now = moment();
-  let start, end, min, max;
-  
-  switch (viewType) {
-    case 'year':
-      start = now.clone().startOf('year');
-      end = now.clone().endOf('year');
-      min = start.clone().subtract(1, 'year');
-      max = end.clone().add(1, 'year');
-      break;
-    case 'month':
-      start = now.clone().startOf('month');
-      end = now.clone().endOf('month');
-      min = start.clone().subtract(6, 'months');
-      max = end.clone().add(6, 'months');
-      break;
-    case 'week':
-      start = now.clone().startOf('week');
-      end = now.clone().endOf('week');
-      min = start.clone().subtract(1, 'month');
-      max = end.clone().add(1, 'month');
-      break;
-    default: // day
-      start = now.clone().startOf('day');
-      end = now.clone().endOf('day');
-      min = start.clone().subtract(2, 'weeks');
-      max = end.clone().add(2, 'weeks');
+  // Set the visible window based on date range or view type
+  if (dateRange && dateRange[0] && dateRange[1]) {
+    // Use date range for visible window
+    start = dateRange[0].toDate();
+    end = dateRange[1].toDate();
+  } else {
+    // Use view type for visible window
+    switch (viewType) {
+      case 'year':
+        start = now.clone().startOf('year').toDate();
+        end = now.clone().endOf('year').toDate();
+        break;
+      case 'month':
+        start = now.clone().startOf('month').toDate();
+        end = now.clone().endOf('month').toDate();
+        break;
+      case 'week':
+        // Show current day with 3 days before and after
+        start = now.clone().subtract(3, 'days').startOf('day').toDate();
+        end = now.clone().add(3, 'days').endOf('day').toDate();
+        break;
+      default: // day
+        start = now.clone().startOf('day').toDate();
+        end = now.clone().endOf('day').toDate();
+    }
   }
 
+  // Return both the visible window and the full data range
   return {
-    start: start.toDate(),
-    end: end.toDate(),
-    min: min.toDate(),
-    max: max.toDate()
+    start,
+    end,
+    dataMin,
+    dataMax
   };
 };
 

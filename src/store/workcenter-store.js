@@ -1,56 +1,252 @@
 import { create } from 'zustand';
+import { message } from 'antd';
 
-const useWorkcenterStore = create((set) => ({
+const useWorkcenterStore = create((set, get) => ({
   workcenters: [],
-  workcenterCodes: [], // State for unique workcenter codes
-  machineNames: [], // State for unique machine names
+  workcenterCodes: [],
+  machineNames: [],
+  workcentersList: [],
   isLoading: false,
   error: null,
 
   fetchWorkcenters: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:2223/master-order/all-machines/');
+      const response = await fetch('http://172.18.7.85:4723/master-order/all-machines/');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
       const data = await response.json();
-      console.log('Fetched workcenters:', data); // Log the fetched data
+      console.log('Fetched workcenters:', data);
 
-      set({ workcenters: data, isLoading: false });
+      // Ensure data is an array
+      const workcentersArray = Array.isArray(data) ? data : [];
 
-      // Extract unique workcenter codes and machine names
-      const uniqueCodes = [...new Set(data.map(item => item.work_center.code))];
-      const uniqueTypes = [...new Set(data.map(item => item.type))];
+      // Extract unique workcenter codes and their details
+      const uniqueWorkcenters = [...new Map(workcentersArray.map(item => 
+        [item.work_center?.code, item.work_center]
+      )).values()];
 
-      console.log('Unique Workcenter Codes:', uniqueCodes); // Log unique codes
-      console.log('Unique Machine Names:', uniqueTypes); // Log unique types
-
-      set({ workcenterCodes: uniqueCodes, machineNames: uniqueTypes });
+      set({ 
+        workcenters: workcentersArray,
+        isLoading: false,
+        // Extract unique codes and machine names
+        workcenterCodes: uniqueWorkcenters.map(wc => wc?.code).filter(Boolean),
+        machineNames: [...new Set(workcentersArray.map(item => item.type).filter(Boolean))]
+      });
     } catch (err) {
+      console.error('Error fetching workcenters:', err);
+      set({ error: err.message, isLoading: false });
+    }
+  },
+
+  fetchWorkcentersList: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('http://172.18.7.85:4723/master-order/workcenters/?skip=0&limit=100');
+      if (!response.ok) {
+        throw new Error('Failed to fetch workcenters list');
+      }
+      const data = await response.json();
+      console.log('Fetched workcenters list:', data);
+
+      set({ 
+        workcentersList: data,
+        isLoading: false 
+      });
+    } catch (err) {
+      console.error('Error fetching workcenters list:', err);
       set({ error: err.message, isLoading: false });
     }
   },
 
   updateWorkcenter: async (updatedItem) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true });
     try {
-      const response = await fetch(`http://172.18.7.88:2223/master-order/workcenters/${updatedItem.work_center_id}`, {
+      const requestBody = {
+        work_center_id: updatedItem.work_center_id,
+        type: updatedItem.type || '',
+        make: updatedItem.make || '',
+        model: updatedItem.model || '',
+        year_of_installation: updatedItem.year_of_installation ? parseInt(updatedItem.year_of_installation) : 0,
+        cnc_controller: updatedItem.cnc_controller || '',
+        cnc_controller_series: updatedItem.cnc_controller_series || '',
+        remarks: updatedItem.remarks || '',
+        calibration_date: updatedItem.calibration_date || null,
+        last_maintenance_date: updatedItem.last_maintenance_date || null
+      };
+
+      console.log('Sending update request with data:', requestBody);
+
+      const response = await fetch(`http://172.18.7.85:4723/master-order/machines/${updatedItem.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updatedItem),
+        body: JSON.stringify(requestBody)
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to update machine';
+        if (responseData.detail) {
+          errorMessage = typeof responseData.detail === 'object' 
+            ? JSON.stringify(responseData.detail) 
+            : responseData.detail;
+        } else if (responseData.message) {
+          errorMessage = responseData.message;
+        }
+        throw new Error(errorMessage);
+      }
+
+      console.log('Update response:', responseData);
+
+      // Fetch the updated data to refresh the table
+      await get().fetchWorkcenters();
+
+      set({ isLoading: false, error: null });
+      message.success('Machine updated successfully');
+      return responseData;
+
+    } catch (error) {
+      console.error('Error updating machine:', error);
+      set({ error: error.message, isLoading: false });
+      message.error(error.message || 'Failed to update machine');
+      throw error;
+    }
+  },
+
+  createMachine: async (machineData) => {
+    set({ isLoading: true, error: null });
+    try {
+      console.log('Creating machine with data:', machineData);
+
+      const newMachinePayload = {
+        work_center_id: machineData.work_center_id,
+        type: machineData.type,
+        make: machineData.make,
+        model: machineData.model,
+        year_of_installation: machineData.year_of_installation,
+        cnc_controller: machineData.cnc_controller || '',
+        cnc_controller_series: machineData.cnc_controller_series || '',
+        remarks: machineData.remarks || '',
+        calibration_date: machineData.calibration_date,
+        last_maintenance_date: machineData.last_maintenance_date
+      };
+
+      console.log('Sending payload to API:', newMachinePayload);
+
+      const response = await fetch('http://172.18.7.85:4723/master-order/machines/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(newMachinePayload)
+      }).catch(error => {
+        console.error('Network error:', error);
+        throw new Error('Network error: Please check your connection and try again');
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update workcenter');
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        let errorMessage = 'Failed to create machine';
+        if (errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail[0]?.msg || errorData.detail[0] || errorMessage;
+          } else if (typeof errorData.detail === 'object') {
+            errorMessage = JSON.stringify(errorData.detail);
+          } else {
+            errorMessage = errorData.detail;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
-      await fetchWorkcenters(); // Refetch workcenters after update
+      const data = await response.json();
+      
+      // Fetch updated data after successful creation
+      await get().fetchWorkcenters();
+      
       set({ isLoading: false });
-    } catch (err) {
-      set({ error: err.message, isLoading: false });
+      message.success('Machine added successfully');
+      
+      return data;
+    } catch (error) {
+      console.error('Error creating machine:', error);
+      set({ error: error.message, isLoading: false });
+      message.error(error.message || 'Failed to create machine');
+      throw error;
+    }
+  },
+
+  createWorkcenter: async (workcenterData) => {
+    set({ isLoading: true, error: null });
+    try {
+      // Prepare the request body according to API requirements
+      const requestBody = {
+        code: workcenterData.code,
+        plant_id: workcenterData.plant_id || 'PLANT001',
+        description: workcenterData.description,
+        operation: workcenterData.operation,
+        is_active: true,
+        type: "MACHINE",
+        work_center_name: workcenterData.work_center_name
+      };
+
+      console.log('Creating workcenter with payload:', requestBody);
+
+      // Create new workcenter
+      const response = await fetch('http://172.18.7.85:4723/master-order/workcenters/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to create workcenter');
+      }
+
+      const newWorkcenter = await response.json();
+      console.log('New workcenter created:', newWorkcenter);
+
+      // Fetch all updated data
+      const [workcentersResponse, allMachinesResponse] = await Promise.all([
+        fetch('http://172.18.7.85:4723/master-order/workcenters/?skip=0&limit=100'),
+        fetch('http://172.18.7.85:4723/master-order/all-machines/')
+      ]);
+
+      if (!workcentersResponse.ok || !allMachinesResponse.ok) {
+        throw new Error('Failed to fetch updated workcenter data');
+      }
+
+      const [workcentersData, allMachinesData] = await Promise.all([
+        workcentersResponse.json(),
+        allMachinesResponse.json()
+      ]);
+
+      // Update all relevant data in the store
+      set({
+        workcentersList: workcentersData,
+        workcenters: allMachinesData,
+        workcenterCodes: [...new Set(workcentersData.map(wc => wc.code))].filter(Boolean),
+        isLoading: false
+      });
+
+      message.success('Workcenter added successfully');
+      return newWorkcenter;
+
+    } catch (error) {
+      console.error('Error creating workcenter:', error);
+      set({ error: error.message, isLoading: false });
+      message.error(error.message || 'Failed to create workcenter');
+      throw error;
     }
   },
 }));

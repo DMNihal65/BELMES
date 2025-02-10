@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Card, message, Steps, Select, Radio, Typography, Modal, Alert } from 'antd';
 import { LockOutlined, UserOutlined, NumberOutlined, DesktopOutlined, SafetyCertificateOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import shopFloorBg from '../../../public/images/shop3.jpg';
+import shopFloorBg from '/images/shop3.jpg';
 import { motion } from 'framer-motion';
-import belLogo from '../../../public/images/BEL_Logo.png';
-import cmtiLogo from '../../../public/images/CMTI_Logo2.png';
+import belLogo from '/images/BEL_Logo.png';
+import cmtiLogo from '/images/CMTI_Logo2.png';
 import useAuthStore from '../../store/auth-store';
 
 const { Option } = Select;

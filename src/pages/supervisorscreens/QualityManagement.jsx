@@ -15,7 +15,7 @@ import {
   FileSearchOutlined, 
   FormOutlined,
   FolderOutlined, 
-  DownloadOutlined, 
+  DownloadOutlined,
   FilterOutlined,
   FileExcelOutlined, 
   FilePdfOutlined,
@@ -419,13 +419,15 @@ const QualityManagementDashboard = () => {
     }
   };
 
-  // Function to open QMS software
+  // Update the openQMSSoftware function
   const openQMSSoftware = () => {
     try {
-      window.open('file:///D:/HAJU/BEL/QMS', '_blank');
-      message.success('Opening QMS Software');
+      // Using registered myapp protocol to launch QMS
+      window.location.href = "myapp://launch-qms";
+      message.success('Launching QMS Software');
     } catch (error) {
-      message.error('Failed to open QMS Software');
+      console.error('Failed to launch QMS application:', error);
+      message.error('Failed to launch QMS. Please ensure the application is properly installed.');
     }
   };
 
@@ -747,9 +749,9 @@ const QualityManagementDashboard = () => {
                       size="large"
                       icon={<FileTextOutlined />}
                       onClick={openQMSSoftware}
-                      className="px-8"
+                      className="px-8 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
                     >
-                      Open QMS Software
+                      Launch QMS Software
                     </Button>
                   </div>
                 </Card>

@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import useAuthStore from './auth-store';
 import { message } from 'antd';
@@ -15,11 +16,32 @@ const useDocumentStore = create((set, get) => ({
   fetchDocTypes: async () => {
     set({ isLoading: true });
     try {
-      const response = await fetch('/api/documents/types');
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://172.18.7.85:4723/api/v1/documents/types/?include_inactive=true', {
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch document types');
+      }
+
       const data = await response.json();
-      set({ documentTypes: data, isLoading: false });
+      set({ 
+        documentTypes: data,  // API returns array directly
+        isLoading: false 
+      });
     } catch (error) {
       set({ error: error.message, isLoading: false });
+      message.error(error.message);
     }
   },
 
@@ -33,7 +55,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.88:2223/api/v1/documents/folders/', {
+      const response = await fetch('http://172.18.7.85:4723/api/v1/documents/folders/', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -84,7 +106,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.88:2223/api/v1/documents/folders/', {
+      const response = await fetch('http://172.18.7.85:4723/api/v1/documents/folders/', {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -110,7 +132,7 @@ const useDocumentStore = create((set, get) => ({
   uploadDocument: async (formData) => {
     set({ isLoading: true });
     try {
-      const response = await fetch('/api/documents/upload', {
+      const response = await fetch('http://172.18.7.85:4723/api/v1/documents/upload/', {
         method: 'POST',
         body: formData
       });
@@ -201,6 +223,51 @@ const useDocumentStore = create((set, get) => ({
         folders: state.folders.map(folder => 
           folder.id === folderId ? data : folder
         ),
+        isLoading: false
+      }));
+      return data;
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
+
+  // Create document type
+  createDocType: async (docTypeData) => {
+    set({ isLoading: true });
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Format the request body according to API specification
+      const requestBody = {
+        type_name: docTypeData.type_name,
+        description: docTypeData.description,
+        file_extensions: docTypeData.extensions.split(',').map(ext => ext.trim()),
+        is_active: docTypeData.is_active
+      };
+
+      const response = await fetch('http://172.18.7.85:4723/api/v1/documents/types/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create document type');
+      }
+
+      const data = await response.json();
+      set(state => ({
+        documentTypes: [...state.documentTypes, data],
         isLoading: false
       }));
       return data;

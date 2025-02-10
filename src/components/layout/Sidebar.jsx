@@ -102,8 +102,6 @@ function Sidebar() {
     //   label: 'Inventory Management',
     // },
     {
-
-
       key: 'inventory_master',
       icon: <Archive size={20} />,
       label: 'Inventory Management',
@@ -120,7 +118,6 @@ function Sidebar() {
     },
     {
       key: '/supervisor/documents',
-
       icon: <Files size={20} />,
       label: 'Document Management',
     },

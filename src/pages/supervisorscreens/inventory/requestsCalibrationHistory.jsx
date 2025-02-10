@@ -23,7 +23,7 @@ function RequestsCalibrationHistory() {
     return (
         <Tabs defaultActiveKey="analytics">
             <TabPane tab="Analytics" key="analytics">
-                <Analytics />
+                <Analytics/>
             </TabPane>
             <TabPane tab="Requests" key="requests">
                 <Requests />

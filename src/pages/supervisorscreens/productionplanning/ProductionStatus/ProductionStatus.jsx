@@ -348,17 +348,17 @@ const ProductionStatus = () => {
 
   return (
     <Card className="mt-4">
-      <div className="flex gap-4 mb-6">
+      <div className="flex flex-wrap gap-4 mb-6">
         <Form.Item
           label="Part Number"
-          className="mb-0"
-          style={{ minWidth: '300px' }}
+          className="mb-2 sm:mb-0"
+          style={{ minWidth: '250px', flex: '1 1 250px' }}
         >
           <Select
             showSearch
             value={partNumber}
             placeholder="Select Part Number"
-            style={{ width: '100%' }}
+            style={{ width: '200px' }}
             defaultActiveFirstOption={false}
             showArrow={true}
             onSearch={handlePartNumberSearch}
@@ -371,61 +371,73 @@ const ProductionStatus = () => {
             dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
           />
         </Form.Item>
-        <DatePicker
-          placeholder="Start Date"
-          onChange={(date) => setStartDate(date)}
-          style={{ width: 150 }}
-          value={startDate}
-        />
-        <DatePicker
-          placeholder="End Date"
-          onChange={(date) => setEndDate(date)}
-          style={{ width: 150 }}
-          value={endDate}
-        />
-        <Radio.Group value={timeRange} onChange={handleTimeRangeChange}>
-          <Radio.Button value="daily">Daily</Radio.Button>
-          <Radio.Button value="weekly">Weekly</Radio.Button>
-          <Radio.Button value="monthly">Monthly</Radio.Button>
-        </Radio.Group>
-        <Button type="primary" onClick={handleSearch}>
-          Search
-        </Button>
-        <Button 
-          icon={<ReloadOutlined />} 
-          onClick={handleReset}
-          title="Reset Filters"
-        />
+        <div className="flex flex-wrap gap-4 items-start" style={{ flex: '1 1 auto' }}>
+          <DatePicker
+            placeholder="Start Date"
+            onChange={(date) => setStartDate(date)}
+            className="w-[140px]"
+            value={startDate}
+          />
+          <DatePicker
+            placeholder="End Date"
+            onChange={(date) => setEndDate(date)}
+            className="w-[140px]"
+            value={endDate}
+          />
+          <Radio.Group value={timeRange} onChange={handleTimeRangeChange} className="flex-shrink-0">
+            <Radio.Button value="daily">Daily</Radio.Button>
+            <Radio.Button value="weekly">Weekly</Radio.Button>
+            <Radio.Button value="monthly">Monthly</Radio.Button>
+          </Radio.Group>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button type="primary" onClick={handleSearch}>
+              Search
+            </Button>
+            <Button 
+              icon={<ReloadOutlined />} 
+              onClick={handleReset}
+              title="Reset Filters"
+            />
+          </div>
+        </div>
       </div>
 
       {productionStatusLoading ? (
-        <div className="flex justify-center items-center h-[400px]">
+        <div className="flex justify-center items-center min-h-[400px]">
           <Spin size="large" />
         </div>
       ) : productionStatusError ? (
-        <div className="text-red-500 text-center">
+        <div className="text-red-500 text-center min-h-[400px] flex items-center justify-center">
           Error: {productionStatusError}
         </div>
       ) : !hasSearched ? (
-        <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
+        <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-500">
           <div className="text-lg mb-2">Welcome to Production Status Dashboard</div>
           <div>Please select date range and click search to view production data</div>
         </div>
       ) : productionStatusData?.daily_production?.length > 0 ? (
-        <Tabs defaultActiveKey="1">
+        <Tabs defaultActiveKey="1" className="production-status-tabs">
           <TabPane tab="Stacked Overview" key="1">
-            <ReactECharts
-              option={getStackedBarChartOption()}
-              style={{ height: '500px' }}
-              opts={{ renderer: 'svg' }}
-            />
+            <div className="chart-container">
+              <ReactECharts
+                option={getStackedBarChartOption()}
+                style={{ height: '500px', minHeight: '400px', width: '100%' }}
+                opts={{ renderer: 'svg' }}
+                onEvents={{
+                  resize: () => {
+                    // Force chart resize on container resize
+                    window.dispatchEvent(new Event('resize'));
+                  }
+                }}
+              />
+            </div>
           </TabPane>
           <TabPane tab="Detailed Analysis" key="2">
-            <div className="flex justify-end mb-4 items-center">
+            <div className="flex flex-wrap justify-end mb-4 items-center gap-4">
               <Form.Item
                 label="Filter by Part Number"
-                className="mb-0 mr-2"
-                style={{ minWidth: '350px' }}
+                className="mb-0 flex-1"
+                style={{ minWidth: '250px', maxWidth: '400px' }}
               >
                 <Select
                   style={{ width: '100%' }}
@@ -443,28 +455,42 @@ const ProductionStatus = () => {
               />
             </div>
             {!selectedDetailPartNumber ? (
-              <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
+              <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-500">
                 <div className="text-lg mb-2">Select a Part Number</div>
                 <div>Please select a part number from the dropdown above to view detailed analysis</div>
               </div>
             ) : (
-              <ReactECharts
-                option={getDetailedChartOption()}
-                style={{ height: '500px' }}
-                opts={{ renderer: 'svg' }}
-              />
+              <div className="chart-container">
+                <ReactECharts
+                  option={getDetailedChartOption()}
+                  style={{ height: '500px', minHeight: '400px', width: '100%' }}
+                  opts={{ renderer: 'svg' }}
+                  onEvents={{
+                    resize: () => {
+                      window.dispatchEvent(new Event('resize'));
+                    }
+                  }}
+                />
+              </div>
             )}
           </TabPane>
           <TabPane tab="Total Completion" key="3">
-            <ReactECharts
-              option={getPieChartOption()}
-              style={{ height: '500px' }}
-              opts={{ renderer: 'svg' }}
-            />
+            <div className="chart-container">
+              <ReactECharts
+                option={getPieChartOption()}
+                style={{ height: '500px', minHeight: '400px', width: '100%' }}
+                opts={{ renderer: 'svg' }}
+                onEvents={{
+                  resize: () => {
+                    window.dispatchEvent(new Event('resize'));
+                  }
+                }}
+              />
+            </div>
           </TabPane>
         </Tabs>
       ) : (
-        <div className="text-center text-gray-500">
+        <div className="text-center text-gray-500 min-h-[400px] flex items-center justify-center">
           No data available for the selected criteria.
         </div>
       )}

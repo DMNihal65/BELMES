@@ -338,7 +338,7 @@ const Scheduling = () => {
           horizontalScroll: true,
           zoomKey: 'ctrlKey',
           orientation: 'top',
-          height: '630px',
+          height: '670px',
           margin: {
             item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
             axis: 5
@@ -709,7 +709,7 @@ const Scheduling = () => {
 
   return (
     <Layout className="min-h-screen bg-gray-50">
-      <Content className="p-3">
+      <Content >
         <Tabs defaultActiveKey="schedule" type="card">
           <TabPane 
             tab={ 
@@ -720,153 +720,166 @@ const Scheduling = () => {
             key="schedule"
           >
             <Card>
-            <Title level={4}>Production Schedule</Title>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap gap-2">
-                <Select 
-                    value={viewType}
-                    onChange={handleViewTypeChange}
-                    style={{ width: 120 }}
-                  >
-                    <Option value="day">Daily</Option>
-                    <Option value="week">Weekly</Option>
-                    <Option value="month">Monthly</Option>
-                    <Option value="year">Yearly</Option>
-                  </Select>
-                  <DatePicker.RangePicker
-                    value={dateRange}
-                    onChange={setDateRange}
-                    placeholder={['Start Date', 'End Date']}
-                  />
-                  <Select 
-                    mode="multiple" 
-                    placeholder="Select Machines"
-                    value={selectedMachines}
-                    onChange={setSelectedMachines}
-                    style={{ minWidth: 200 }}
-                    allowClear
-                  >
-                    {availableMachines.map(machine => (
-                      <Option key={machine} value={machine}>{machine}</Option>
-                    ))}
-                  </Select>
+              <Tabs defaultActiveKey="schedule-graph" className="compact-tabs">
+                <TabPane 
+                  tab="Gantt Chart" 
+                  key="schedule-graph"
+                >
+                  {/* <Title level={4}>Production Schedule</Title> */}
+                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        <Select 
+                          value={viewType}
+                          onChange={handleViewTypeChange}
+                          style={{ width: 120 }}
+                        >
+                          <Option value="day">Daily</Option>
+                          <Option value="week">Weekly</Option>
+                          <Option value="month">Monthly</Option>
+                          <Option value="year">Yearly</Option>
+                        </Select>
+                        <DatePicker.RangePicker
+                          value={dateRange}
+                          onChange={setDateRange}
+                          placeholder={['Start Date', 'End Date']}
+                        />
+                        <Select 
+                          mode="multiple" 
+                          placeholder="Select Machines"
+                          value={selectedMachines}
+                          onChange={setSelectedMachines}
+                          style={{ minWidth: 200 }}
+                          allowClear
+                        >
+                          {availableMachines.map(machine => (
+                            <Option key={machine} value={machine}>{machine}</Option>
+                          ))}
+                        </Select>
 
-                  <Select
-                      mode="multiple"
-                      placeholder="Select Part Number"
-                      value={selectedComponents}
-                      onChange={setSelectedComponents}
-                      style={{ minWidth: 200 }}
-                      allowClear
-                      optionLabelProp="label"
-                    >
-                      {availableComponents.map(component => {
-                        const color = componentColors?.[component]?.backgroundColor || '#1890ff';
-                        return (
-                          <Option 
-                            key={component} 
-                            value={component}
-                            label={component}
+                        <Select
+                            mode="multiple"
+                            placeholder="Select Part Number"
+                            value={selectedComponents}
+                            onChange={setSelectedComponents}
+                            style={{ minWidth: 200 }}
+                            allowClear
+                            optionLabelProp="label"
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ 
-                                width: '16px', 
-                                height: '16px', 
-                                backgroundColor: color,
-                                borderRadius: '4px'
-                              }} />
-                              {component}
-                            </div>
-                          </Option>
-                        );
-                      })}
-                    </Select>
-                
-                    <Select
-                    mode="multiple"
-                    placeholder="Select Production Orders"
-                    value={selectedProductionOrders}
-                    onChange={setSelectedProductionOrders}
-                    style={{ minWidth: 200 }}
-                    allowClear
-                  >
-                    {availableProductionOrders.map(order => (
-                      <Option key={order} value={order}>{order}</Option>
-                    ))}
-                  </Select>
+                            {availableComponents.map(component => {
+                              const color = componentColors?.[component]?.backgroundColor || '#1890ff';
+                              return (
+                                <Option 
+                                  key={component} 
+                                  value={component}
+                                  label={component}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ 
+                                      width: '16px', 
+                                      height: '16px', 
+                                      backgroundColor: color,
+                                      borderRadius: '4px'
+                                    }} />
+                                    {component}
+                                  </div>
+                                </Option>
+                              );
+                            })}
+                          </Select>
+                      
+                          <Select
+                          mode="multiple"
+                          placeholder="Select Production Orders"
+                          value={selectedProductionOrders}
+                          onChange={setSelectedProductionOrders}
+                          style={{ minWidth: 200 }}
+                          allowClear
+                        >
+                          {availableProductionOrders.map(order => (
+                            <Option key={order} value={order}>{order}</Option>
+                          ))}
+                        </Select>
 
-                  <Button.Group>
-                    <Tooltip title="Zoom In">
-                      <Button 
-                        icon={<ZoomInOutlined />} 
-                        onClick={() => timelineRef.current?.zoomIn(0.5)} 
+                        <Button.Group>
+                          <Tooltip title="Zoom In">
+                            <Button 
+                              icon={<ZoomInOutlined />} 
+                              onClick={() => timelineRef.current?.zoomIn(0.5)} 
+                            />
+                          </Tooltip>
+                          <Tooltip title="Zoom Out">
+                            <Button 
+                              icon={<ZoomOutOutlined />} 
+                              onClick={() => timelineRef.current?.zoomOut(0.5)} 
+                            />
+                          </Tooltip>
+                          <Tooltip title="Fit Timeline">
+                            <Button 
+                              icon={<FullscreenOutlined />} 
+                              onClick={() => timelineRef.current?.fit()} 
+                            />
+                          </Tooltip>
+                        </Button.Group>
+                        <Tooltip title="How to use timeline">
+                          <Button
+                            className="bg-blue-500 text-white"
+                            icon={<InfoCircleOutlined />}
+                            onClick={() => setIsHelpModalVisible(true)}
+                          />
+                        </Tooltip>
+                        <Button 
+                          type="primary"
+                          icon={<SyncOutlined />}
+                          onClick={handleRefresh} 
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute top-2 left-0 right-0 flex justify-between px-2 z-10">
+                      <Button
+                        icon={<LeftOutlined />}
+                        onClick={() => handleTimelineNavigation('left')}
                       />
-                    </Tooltip>
-                    <Tooltip title="Zoom Out">
-                      <Button 
-                        icon={<ZoomOutOutlined />} 
-                        onClick={() => timelineRef.current?.zoomOut(0.5)} 
+                      <Button
+                        icon={<RightOutlined />}
+                        onClick={() => handleTimelineNavigation('right')}
                       />
-                    </Tooltip>
-                    <Tooltip title="Fit Timeline">
-                      <Button 
-                        icon={<FullscreenOutlined />} 
-                        onClick={() => timelineRef.current?.fit()} 
-                      />
-                    </Tooltip>
-                  </Button.Group>
-                  <Tooltip title="How to use timeline">
-                    <Button
-                      className="bg-blue-500 text-white"
-                      icon={<InfoCircleOutlined />}
-                      onClick={() => setIsHelpModalVisible(true)}
+                    </div>
+                    <div 
+                      ref={timelineContainerRef} 
+                      className="schedule-timeline"
+                      style={{ 
+                        height: '690px',
+                        backgroundColor: '#fff',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                      }}
                     />
-                  </Tooltip>
-                  <Button 
-                    type="primary"
-                    icon={<SyncOutlined />}
-                    onClick={handleRefresh} 
-                  >
-                    Refresh
-                  </Button>
-                </div>
-              </div>
+                  </div>
 
-              <div className="relative">
-                <div className="absolute top-2 left-0 right-0 flex justify-between px-2 z-10">
-                  <Button
-                    icon={<LeftOutlined />}
-                    onClick={() => handleTimelineNavigation('left')}
-                  />
-                  <Button
-                    icon={<RightOutlined />}
-                    onClick={() => handleTimelineNavigation('right')}
-                  />
-                </div>
-                <div 
-                  ref={timelineContainerRef} 
-                  className="schedule-timeline"
-                  style={{ 
-                    height: '650px',
-                    backgroundColor: '#fff',
-                    padding: '20px',
-                    borderRadius: '8px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                  }}
-                />
-              </div>
+                  {/* {scheduleData && componentColors && (
+                    <ComponentLegend componentColors={componentColors} />
+                  )} */}
+                </TabPane>
 
-              {scheduleData && componentColors && (
-                <>
-                  <ComponentLegend componentColors={componentColors} />
-                  <MachineStatusCards 
-                    machines={availableMachines}
-                    operations={scheduleData.scheduled_operations}
-                    componentStatus={scheduleData.component_status}
-                    componentColors={componentColors}
-                  />
-                </>
-              )}
+                <TabPane 
+                  tab="Machine Status" 
+                  key="machine-status"
+                >
+                  {scheduleData && componentColors && (
+                    <MachineStatusCards 
+                      machines={availableMachines}
+                      operations={scheduleData.scheduled_operations}
+                      componentStatus={scheduleData.component_status}
+                      componentColors={componentColors}
+                    />
+                  )}
+                </TabPane>
+              </Tabs>
+
               <style jsx global>
                 {Object.entries(timelineStyles).map(([selector, styles]) => `
                   ${selector} {
@@ -874,9 +887,6 @@ const Scheduling = () => {
                   }
                 `).join('\n')}
               </style>
-
-              {/* Machine Status Cards */}
-
             </Card>
           </TabPane>
 
@@ -1057,10 +1067,28 @@ const Scheduling = () => {
         }
 
         .timeline-help h4 {
-          margin-top: 16px;
-          margin-bottom: 8px;
+          margin-top: 2px;
+          margin-bottom: 2px;
           color: #1890ff;
         }
+
+        /* Add these new styles for compact tabs */
+        .compact-tabs .ant-tabs-nav {
+          margin-bottom: 8px !important;
+        }
+
+        .compact-tabs .ant-tabs-tab {
+          padding: 4px 12px !important;
+        }
+
+        .compact-tabs .ant-tabs-nav-list {
+          gap: 4px;
+        }
+
+        .compact-tabs .ant-tabs-content-holder {
+          margin-top: 8px;
+        }
+
         .timeline-help ul {
           list-style-type: none;
           padding-left: 0;

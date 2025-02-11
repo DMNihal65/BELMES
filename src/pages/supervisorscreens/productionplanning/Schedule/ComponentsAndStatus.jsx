@@ -63,44 +63,54 @@ export const MachineStatusCard = ({ machine, operations, componentStatus, compon
   return (
     <Card 
       size="small" 
-      className={`hover:shadow-md transition-shadow border-l-4 ${
+      className={`machine-status-card hover:shadow-md transition-all duration-300 border-l-4 ${
         status === 'running' ? 'border-green-500' : 'border-yellow-500'
       }`}
       style={{
-        height: '80px',
-        minWidth: '100px',
+        height: '100px',
+        width: '100%',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        backgroundColor: '#ffffff',
+        borderRadius: '8px',
+        overflow: 'hidden'
       }}
       bodyStyle={{
         flex: 1,
         padding: '16px',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        justifyContent: 'space-between'
       }}
     >
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="font-medium text-base">{machine}</div>
-          <div className="text-sm text-gray-500 flex items-center gap-2">
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-base truncate" title={machine}>{machine}</div>
+          <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
             {currentOperation && (
               <span 
-                className="inline-block w-3 h-3 rounded-sm"
+                className="inline-block flex-shrink-0 w-3 h-3 rounded-sm"
                 style={{ 
                   backgroundColor: componentColors?.[currentOperation.component]?.backgroundColor || '#999',
                 }} 
               />
             )}
-            <span className="font-normal text-base">
-              {currentOperation ? ` ${currentOperation.component}` : 'No active operation'}
+            <span className="font-normal text-base truncate" title={currentOperation ? currentOperation.component : 'No active operation'}>
+              {currentOperation ? currentOperation.component : 'No active operation'}
             </span>
           </div>
         </div>
         <Badge 
+          className="flex-shrink-0"
           status={status === 'running' ? 'success' : 'warning'} 
           text={status.toUpperCase()}
         />
       </div>
+      {currentOperation && (
+        <div className="text-xs text-gray-500 mt-2 truncate" title={currentOperation.description}>
+          {currentOperation.description}
+        </div>
+      )}
     </Card>
   );
 };
@@ -108,14 +118,15 @@ export const MachineStatusCard = ({ machine, operations, componentStatus, compon
 // Machine Status Cards Container Component
 export const MachineStatusCards = ({ machines, operations, componentStatus, componentColors }) => {
   return (
-    <div className="mt-6">
+    <div className="mt-2">
       <h2 className="text-xl font-semibold mb-4">Machine Status Cards</h2>
-      <div
-        className="overflow-x-auto"
-        style={{ display: 'flex', maxWidth: '1800px', whiteSpace: 'nowrap' }}
-      >
+      <div className="grid gap-4" style={{
+        gridTemplateColumns: `repeat(auto-fit, minmax(280px, 1fr))`,
+        maxWidth: '100%',
+        margin: '0 auto'
+      }}>
         {machines.map(machine => (
-          <div key={machine} style={{ flex: '0 0 auto', marginRight: '20px' }}>
+          <div key={machine}>
             <MachineStatusCard
               machine={machine}
               operations={operations.filter(op => op.machine === machine)}

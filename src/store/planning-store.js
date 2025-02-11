@@ -18,7 +18,7 @@ const usePlanningStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4749/planning/all_orders');
+      const response = await fetch('http://172.18.7.85:7744/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -55,7 +55,7 @@ const usePlanningStore = create((set) => ({
   searchOrders: async (partNumber) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.85:4749/planning/search_order2?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.85:7744/planning/search_order2?part_number=${partNumber}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -109,7 +109,7 @@ const usePlanningStore = create((set) => ({
     });
 
     try {
-      const response = await fetch(`http://172.18.7.85:4749/mpp/by-part/${partNumber}/${operationNumber}`);
+      const response = await fetch(`http://172.18.7.85:7744/mpp/by-part/${partNumber}/${operationNumber}`);
       
       // Handle 404 case explicitly
       if (response.status === 404) {
@@ -183,7 +183,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.85:4749/mpp', {
+      const response = await fetch('http://172.18.7.85:7744/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ const usePlanningStore = create((set) => ({
   // Add new function to fetch active parts
   fetchActiveParts: async () => {
     try {
-      const response = await fetch('http://172.18.7.85:4749/scheduling/active-parts');
+      const response = await fetch('http://172.18.7.85:7744/scheduling/active-parts');
       const data = await response.json();
       
       if (!response.ok) {
@@ -262,7 +262,7 @@ const usePlanningStore = create((set) => ({
   changePartStatus: async (partNumber, newStatus) => {
     try {
       // Ensure we're using the exact same URL format as the working endpoint
-      const response = await fetch(`http://172.18.7.85:4749/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
+      const response = await fetch(`http://172.18.7.85:7744/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
         method: 'POST',  // Changed to POST since GET is not allowed
         headers: {
           'Content-Type': 'application/json'
@@ -289,7 +289,7 @@ const usePlanningStore = create((set) => ({
   // Add this new function to fetch machine details
   fetchMachineDetails: async (machineId) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4749/master-order/machines/${machineId}`);
+      const response = await fetch(`http://172.18.7.85:7744/master-order/machines/${machineId}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -306,7 +306,7 @@ const usePlanningStore = create((set) => ({
   // Add the updateMachine function to the store
   updateMachine: async (machineId, updatedData) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4749/master-order/machines/${machineId}`, {
+      const response = await fetch(`http://172.18.7.85:7744/master-order/machines/${machineId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -330,7 +330,7 @@ const usePlanningStore = create((set) => ({
   // Function to update operation details
   updateOperationDetails: async (partNumber, operationNumber, updateData) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4749/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.85:7744/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -359,7 +359,7 @@ const usePlanningStore = create((set) => ({
   // Function to update machine for operation
   updateOperationMachine: async (partNumber, operationNumber, currentData, newMachineId) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4749/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.85:7744/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

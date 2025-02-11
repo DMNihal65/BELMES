@@ -1,3 +1,5 @@
+top
+
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Layout, Card, Row, Col, Button, Space, Input, Select, 
@@ -263,24 +265,15 @@ const Scheduling = () => {
 
         // Create groups with all available machines, regardless of operations
         const groups = new DataSet(
-          availableMachines.map(machine => {
-            // Find work center for this machine from production orders
-            const workCenter = Object.values(scheduleData.production_orders || {})
-              .flatMap(orders => orders)
-              .find(order => order.machine === machine)?.work_center || '';
-        
-            return {
-              id: machine,
-              content: `
-                <div class="machine-group">
-                  <span class="machine-name ">
-                    ${workCenter ? `${workCenter} - ` : ''}${machine}
-                  </span>
-                </div>
-              `,
-              className: operations.some(op => op.machine === machine) ? 'machine-with-ops' : 'machine-without-ops'
-            };
-          })
+          availableMachines.map(machine => ({
+            id: machine,
+            content: `
+              <div class="machine-group">
+                <span class="machine-name">${machine}</span>
+              </div>
+            `,
+            className: operations.some(op => op.machine === machine) ? 'machine-with-ops' : 'machine-without-ops'
+          }))
         );
 
         // Remove previous dynamic styles
@@ -758,28 +751,10 @@ const Scheduling = () => {
                       onChange={setSelectedComponents}
                       style={{ minWidth: 200 }}
                       allowClear
-                      optionLabelProp="label"
                     >
-                      {availableComponents.map(component => {
-                        const color = componentColors?.[component]?.backgroundColor || '#1890ff';
-                        return (
-                          <Option 
-                            key={component} 
-                            value={component}
-                            label={component}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ 
-                                width: '16px', 
-                                height: '16px', 
-                                backgroundColor: color,
-                                borderRadius: '4px'
-                              }} />
-                              {component}
-                            </div>
-                          </Option>
-                        );
-                      })}
+                      {availableComponents.map(component => (
+                        <Option key={component} value={component}>{component}</Option>
+                      ))}
                     </Select>
                 
                     <Select

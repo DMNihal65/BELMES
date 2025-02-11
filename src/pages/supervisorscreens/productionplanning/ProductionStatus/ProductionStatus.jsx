@@ -1,38 +1,144 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Input, Button, Spin, Radio, Tabs } from 'antd';
+import { Card, Input, Button, Spin, Radio, Tabs, DatePicker, message, Select, Form } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import useScheduleStore from '../../../../store/schedule-store';
+import debounce from 'lodash/debounce';
+import { ReloadOutlined } from '@ant-design/icons';
 
 const { TabPane } = Tabs;
 
 const ProductionStatus = () => {
   const [partNumber, setPartNumber] = useState('');
+  const [selectedDetailPartNumber, setSelectedDetailPartNumber] = useState('');
   const [timeRange, setTimeRange] = useState('daily');
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [partNumberOptions, setPartNumberOptions] = useState([]);
+  const [fetching, setFetching] = useState(false);
   const { 
     productionStatusData, 
     productionStatusLoading, 
     productionStatusError,
     fetchProductionStatus,
     fetchWeeklyProductionStatus,
-    fetchMonthlyProductionStatus
+    fetchMonthlyProductionStatus,
+    clearProductionStatus,
+    fetchPartNumberSuggestions
   } = useScheduleStore();
 
+  // Load initial part numbers when component mounts
+  useEffect(() => {
+    const loadInitialPartNumbers = async () => {
+      try {
+        const suggestions = await fetchPartNumberSuggestions('');
+        setPartNumberOptions(suggestions);
+      } catch (error) {
+        console.error('Error loading initial part numbers:', error);
+      }
+    };
+    loadInitialPartNumbers();
+  }, [fetchPartNumberSuggestions]);
+
+  // Handle part number search/select
+  const handlePartNumberSearch = async (value) => {
+    if (value) {
+      setFetching(true);
+      try {
+        const suggestions = await fetchPartNumberSuggestions(value);
+        setPartNumberOptions(suggestions);
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+      } finally {
+        setFetching(false);
+      }
+    } else {
+      const suggestions = await fetchPartNumberSuggestions('');
+      setPartNumberOptions(suggestions);
+    }
+  };
+
+  const handlePartNumberChange = (value) => {
+    setPartNumber(value);
+    
+    // If we have already searched and have valid dates, trigger a new search
+    if (hasSearched && startDate && endDate) {
+      const startEpoch = Math.floor(startDate.valueOf() / 1000);
+      const endEpoch = Math.floor(endDate.valueOf() / 1000);
+      
+      switch (timeRange) {
+        case 'daily':
+          fetchProductionStatus(value || '', startEpoch, endEpoch); // Pass empty string if value is null
+          break;
+        case 'weekly':
+          fetchWeeklyProductionStatus(value || '', startEpoch, endEpoch);
+          break;
+        case 'monthly':
+          fetchMonthlyProductionStatus(value || '', startEpoch, endEpoch);
+          break;
+      }
+    }
+  };
+
+  const handleTimeRangeChange = (e) => {
+    setTimeRange(e.target.value);
+    if (hasSearched && startDate && endDate) {
+      // If we have valid dates, automatically search with new time range
+      const startEpoch = Math.floor(startDate.valueOf() / 1000);
+      const endEpoch = Math.floor(endDate.valueOf() / 1000);
+      
+      switch (e.target.value) {
+        case 'daily':
+          fetchProductionStatus(partNumber, startEpoch, endEpoch);
+          break;
+        case 'weekly':
+          fetchWeeklyProductionStatus(partNumber, startEpoch, endEpoch);
+          break;
+        case 'monthly':
+          fetchMonthlyProductionStatus(partNumber, startEpoch, endEpoch);
+          break;
+      }
+    } else {
+      // If we don't have valid dates, just clear the data
+      setHasSearched(false);
+    }
+  };
+
   const handleSearch = () => {
+    if (!startDate || !endDate) {
+      message.error('Please select both start and end dates');
+      return;
+    }
+
+    const startEpoch = Math.floor(startDate.valueOf() / 1000);
+    const endEpoch = Math.floor(endDate.valueOf() / 1000);
+    setHasSearched(true);
+
     switch (timeRange) {
       case 'daily':
-        fetchProductionStatus(partNumber);
+        fetchProductionStatus(partNumber, startEpoch, endEpoch);
         break;
       case 'weekly':
-        fetchWeeklyProductionStatus(partNumber);
+        fetchWeeklyProductionStatus(partNumber, startEpoch, endEpoch);
         break;
       case 'monthly':
-        fetchMonthlyProductionStatus(partNumber);
+        fetchMonthlyProductionStatus(partNumber, startEpoch, endEpoch);
         break;
     }
   };
 
+  const handleReset = () => {
+    setPartNumber('');
+    setSelectedDetailPartNumber('');
+    setTimeRange('daily');
+    setStartDate(null);
+    setEndDate(null);
+    setHasSearched(false);
+    clearProductionStatus();
+  };
+
   const getStackedBarChartOption = () => {
-    if (!productionStatusData?.daily_production) return {};
+    if (!hasSearched || !productionStatusData?.daily_production) return null;
 
     const data = productionStatusData.daily_production;
     const uniquePartNumbers = [...new Set(data.map(item => item.part_number))];
@@ -47,7 +153,20 @@ const ProductionStatus = () => {
       },
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'shadow' }
+        axisPointer: { type: 'shadow' },
+        formatter: function(params) {
+          let tooltip = `${params[0].axisValue}<br/>`;
+          params.forEach(param => {
+            const record = data.find(item => 
+              item.part_number === param.seriesName && 
+              item[dateField] === param.axisValue
+            );
+            tooltip += `${param.marker} ${param.seriesName}<br/>`;
+            tooltip += `Operation: ${record?.operation_description || 'N/A'}<br/>`;
+            tooltip += `Completed: ${param.value}<br/><br/>`;
+          });
+          return tooltip;
+        }
       },
       legend: {
         data: uniquePartNumbers,
@@ -88,21 +207,40 @@ const ProductionStatus = () => {
   };
 
   const getDetailedChartOption = () => {
-    if (!productionStatusData?.daily_production) return {};
+    if (!hasSearched || !productionStatusData?.daily_production) return null;
 
-    const data = productionStatusData.daily_production;
+    let data = productionStatusData.daily_production;
+    
+    // Filter data if a specific part number is selected for detailed view
+    if (selectedDetailPartNumber) {
+      data = data.filter(item => item.part_number === selectedDetailPartNumber);
+    }
+
     const dateField = timeRange === 'daily' ? 'date' : 
                      timeRange === 'weekly' ? 'week_start_date' : 'month_start_date';
     const dates = [...new Set(data.map(item => item[dateField]))];
 
     return {
       title: {
-        text: `Detailed Production Analysis${partNumber ? ` for ${partNumber}` : ''}`,
+        text: `Detailed Production Analysis${selectedDetailPartNumber ? ` for ${selectedDetailPartNumber}` : ''}`,
         left: 'center'
       },
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'shadow' }
+        axisPointer: { type: 'shadow' },
+        formatter: function(params) {
+          const date = params[0].axisValue;
+          const record = data.find(item => item[dateField] === date);
+          let tooltip = `${date}<br/>`;
+          if (record) {
+            tooltip += `Part Number: ${record.part_number}<br/>`;
+            tooltip += `Operation: ${record.operation_description}<br/><br/>`;
+          }
+          params.forEach(param => {
+            tooltip += `${param.marker} ${param.seriesName}: ${param.value}<br/>`;
+          });
+          return tooltip;
+        }
       },
       legend: {
         data: ['Planned', 'Completed', 'Remaining'],
@@ -148,7 +286,7 @@ const ProductionStatus = () => {
   };
 
   const getPieChartOption = () => {
-    if (!productionStatusData?.total_planned || !productionStatusData?.total_completed) return {};
+    if (!hasSearched || !productionStatusData?.total_planned || !productionStatusData?.total_completed) return null;
 
     const partNumbers = Object.keys(productionStatusData.total_planned);
     const data = partNumbers.map(part => ({
@@ -202,16 +340,50 @@ const ProductionStatus = () => {
     };
   };
 
+  // Add function to get unique part numbers
+  const getUniquePartNumbers = () => {
+    if (!productionStatusData?.daily_production) return [];
+    return [...new Set(productionStatusData.daily_production.map(item => item.part_number))];
+  };
+
   return (
     <Card className="mt-4">
       <div className="flex gap-4 mb-6">
-        <Input
-          placeholder="Enter Part Number"
-          value={partNumber}
-          onChange={(e) => setPartNumber(e.target.value)}
-          style={{ width: 200 }}
+        <Form.Item
+          label="Part Number"
+          className="mb-0"
+          style={{ minWidth: '300px' }}
+        >
+          <Select
+            showSearch
+            value={partNumber}
+            placeholder="Select Part Number"
+            style={{ width: '100%' }}
+            defaultActiveFirstOption={false}
+            showArrow={true}
+            onSearch={handlePartNumberSearch}
+            onChange={handlePartNumberChange}
+            loading={fetching}
+            options={partNumberOptions}
+            allowClear
+            filterOption={false}
+            notFoundContent={fetching ? <Spin size="small" /> : 'No matches found'}
+            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+          />
+        </Form.Item>
+        <DatePicker
+          placeholder="Start Date"
+          onChange={(date) => setStartDate(date)}
+          style={{ width: 150 }}
+          value={startDate}
         />
-        <Radio.Group value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
+        <DatePicker
+          placeholder="End Date"
+          onChange={(date) => setEndDate(date)}
+          style={{ width: 150 }}
+          value={endDate}
+        />
+        <Radio.Group value={timeRange} onChange={handleTimeRangeChange}>
           <Radio.Button value="daily">Daily</Radio.Button>
           <Radio.Button value="weekly">Weekly</Radio.Button>
           <Radio.Button value="monthly">Monthly</Radio.Button>
@@ -219,6 +391,11 @@ const ProductionStatus = () => {
         <Button type="primary" onClick={handleSearch}>
           Search
         </Button>
+        <Button 
+          icon={<ReloadOutlined />} 
+          onClick={handleReset}
+          title="Reset Filters"
+        />
       </div>
 
       {productionStatusLoading ? (
@@ -228,6 +405,11 @@ const ProductionStatus = () => {
       ) : productionStatusError ? (
         <div className="text-red-500 text-center">
           Error: {productionStatusError}
+        </div>
+      ) : !hasSearched ? (
+        <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
+          <div className="text-lg mb-2">Welcome to Production Status Dashboard</div>
+          <div>Please select date range and click search to view production data</div>
         </div>
       ) : productionStatusData?.daily_production?.length > 0 ? (
         <Tabs defaultActiveKey="1">
@@ -239,11 +421,39 @@ const ProductionStatus = () => {
             />
           </TabPane>
           <TabPane tab="Detailed Analysis" key="2">
-            <ReactECharts
-              option={getDetailedChartOption()}
-              style={{ height: '500px' }}
-              opts={{ renderer: 'svg' }}
-            />
+            <div className="flex justify-end mb-4 items-center">
+              <Form.Item
+                label="Filter by Part Number"
+                className="mb-0 mr-2"
+                style={{ minWidth: '350px' }}
+              >
+                <Select
+                  style={{ width: '100%' }}
+                  placeholder="Select Part Number"
+                  value={selectedDetailPartNumber}
+                  onChange={setSelectedDetailPartNumber}
+                  allowClear
+                  options={getUniquePartNumbers().map(pn => ({ value: pn, label: pn }))}
+                />
+              </Form.Item>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={() => setSelectedDetailPartNumber('')}
+                title="Reset Part Number Filter"
+              />
+            </div>
+            {!selectedDetailPartNumber ? (
+              <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
+                <div className="text-lg mb-2">Select a Part Number</div>
+                <div>Please select a part number from the dropdown above to view detailed analysis</div>
+              </div>
+            ) : (
+              <ReactECharts
+                option={getDetailedChartOption()}
+                style={{ height: '500px' }}
+                opts={{ renderer: 'svg' }}
+              />
+            )}
           </TabPane>
           <TabPane tab="Total Completion" key="3">
             <ReactECharts
@@ -255,7 +465,7 @@ const ProductionStatus = () => {
         </Tabs>
       ) : (
         <div className="text-center text-gray-500">
-          No data available. Please search for production data.
+          No data available for the selected criteria.
         </div>
       )}
     </Card>

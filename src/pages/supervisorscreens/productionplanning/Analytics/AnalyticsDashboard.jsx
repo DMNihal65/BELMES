@@ -995,8 +995,8 @@ const AnalyticsDashboard = () => {
     const fetchData = async () => {
       try {
         const [componentResponse, scheduleResponse] = await Promise.all([
-          fetch('http://172.18.7.85:7737/component_status/'),
-          fetch('http://172.18.7.85:7737/operations/machine_schedules/')
+          fetch('http://172.18.7.85:7739/component_status/'),
+          fetch('http://172.18.7.85:7739/operations/machine_schedules/')
         ]);
         
         const componentResult = await componentResponse.json();

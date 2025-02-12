@@ -9,7 +9,7 @@ import {
 import {
   ScheduleOutlined, SyncOutlined, HistoryOutlined, CalendarOutlined, 
   ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined, LeftOutlined, 
-  RightOutlined, InfoCircleOutlined
+  RightOutlined, InfoCircleOutlined, UserOutlined 
 } from '@ant-design/icons';
 import { Timeline } from "vis-timeline/esnext";
 import { DataSet } from "vis-data/esnext";
@@ -18,6 +18,9 @@ import useScheduleStore from '../../../store/schedule-store';
 import moment from 'moment';
 import AnalyticsDashboard from './Analytics/AnalyticsDashboard';
 import { ComponentLegend, MachineStatusCards } from './Schedule/ComponentsAndStatus';
+import OrderStatusDashboard from './OrderStatus/OrderStatusDashboard';
+
+
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -910,6 +913,16 @@ const Scheduling = () => {
             key="analytics"
           >
             <AnalyticsDashboard  />
+          </TabPane>
+          <TabPane 
+            tab={ 
+              <span>
+                <UserOutlined /> Production Order Statuss
+              </span>
+            } 
+            key="order-status"
+          >
+            <OrderStatusDashboard scheduleData={scheduleData} />
           </TabPane>
         </Tabs>
       </Content>

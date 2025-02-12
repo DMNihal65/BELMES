@@ -672,7 +672,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.85:4413/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.85:7739/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -750,22 +750,47 @@ const Workcenter = () => {
                 }}
                 allowClear
                 filterOption={(input, option) =>
-                  (option?.children?.props?.children?.[0]?.props?.children || '').toLowerCase().includes(input.toLowerCase())
+                  (option?.label?.toLowerCase() || '').includes(input.toLowerCase())
                 }
-              >
-                {workcenterOptions.map(wc => (
-                  <Option 
-                    key={wc.id} 
-                    value={wc.code}
-                    data={{ id: wc.id }}
-                  >
-                    <div>
-                      <div>{wc.code}</div>
-                      <div className="text-xs text-gray-500">{wc.description || ''}</div>
-                    </div>
-                  </Option>
-                ))}
-              </Select>
+                dropdownStyle={{ 
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  zIndex: 1050
+                }}
+                style={{
+                  width: '100%'
+                }}
+                options={workcenterOptions.map(wc => ({
+                  value: wc.code,
+                  label: wc.code,
+                  key: wc.id,
+                  data: { id: wc.id },
+                  description: wc.description
+                }))}
+                optionRender={(option) => (
+                  <div style={{ 
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: '4px 0'
+                  }}>
+                    <span style={{ 
+                      fontWeight: 500,
+                      color: '#000000d9'
+                    }}>
+                      {option.data.label}
+                    </span>
+                    {option.data.description && (
+                      <span style={{ 
+                        fontSize: '12px',
+                        color: '#00000073'
+                      }}>
+                        {option.data.description}
+                      </span>
+                    )}
+                  </div>
+                )}
+                labelInValue
+              />
             </Form.Item>
           </Form>
 

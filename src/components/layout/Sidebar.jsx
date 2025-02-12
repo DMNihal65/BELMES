@@ -13,7 +13,8 @@ import {
   CheckSquare,
   Archive,
   Files,
-  Box
+  Box,
+  Settings
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -99,41 +100,23 @@ function Sidebar() {
       key: '/supervisor/production-monitoring',
       icon: <Activity size={20} />,
       label: 'Production Monitoring',
+      
+    },
+    {
+      key: '/supervisor/maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Maintenance',
     },
     {
       key: '/supervisor/quality-management',
       icon: <CheckSquare size={20} />,
       label: 'Quality Management',
     },
-    // {
-    //   key: '/supervisor/inventory_master',
-    //   icon: <Archive size={20} />,
-    //   label: 'Inventory Management',
-    // },
-    // {
-    //   key: 'inventory_master',
-    //   icon: <Archive size={20} />,
-    //   label: 'Inventory Management',
-    //   children: [
-    //     {
-    //       key: '/supervisor/inventory_master/inventory_usage_and_analytics',
-    //       label: 'Master Data',
-    //     },
-    //     {
-    //       key: '/supervisor/inventory_master/requests_calibration_history',
-    //       label: 'Overview ',
-    //     },
-    //   ],
-    // },
     {
       key: 'inventory_data_management',
       icon: <Archive size={20} />,
       label: 'Inventory Management',
       children: [
-        // {
-        //   key: '/supervisor/inventory_data_management/data_management',
-        //   label: 'Data Management',
-        // },
         {
           key: '/supervisor/inventory_data_management/inventory_all_data',
           label: 'Inventer Master ',

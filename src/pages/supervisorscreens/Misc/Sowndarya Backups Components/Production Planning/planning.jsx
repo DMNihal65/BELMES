@@ -40,6 +40,7 @@ const Planning = () => {
   const handleJobSelect = (jobId) => {
     const job = availableJobs.find(j => j.id === jobId);
     setSelectedJob(job);
+    usePlanningStore.setState({ selectedOrder: job.orderNumber });
   };
 
   const handleOperationEdit = (operation) => {
@@ -134,7 +135,7 @@ const Planning = () => {
         <Row gutter={24} align="middle">
           <Col span={16}>
             <Space size="large" className="w-full">
-              <Form.Item label="Select Job/Part Number" className="mb-0 flex-1">
+              <Form.Item label="Select Job////Part Number" className="mb-0 flex-1">
                 <Select
                   showSearch
                   placeholder="Search by Job ID or Part Number"

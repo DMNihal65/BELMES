@@ -24,6 +24,13 @@ import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagem
 import AlertScreens from './pages/operatorscreens/AlertScreens';
 import MaintenanceScreen from './pages/operatorscreens/MaintenanceScreen';
 import InspectionResult from './pages/operatorscreens/InspectionResult';
+import { maintenanceRoutes } from './routes/maintenanceRoutes';
+import MaintenanceDashboard from './pages/supervisorscreens/Monitoring/MaintenanceDashboard';
+import MachineMaintenance from './pages/supervisorscreens/Monitoring/MachineMaintenance';
+import MachineDowntime from './pages/supervisorscreens/Monitoring/MachineDowntime';
+import MaintenanceDocuments from './pages/supervisorscreens/Monitoring/MaintenanceDocuments';
+import MaintenanceSchedule from './pages/supervisorscreens/Monitoring/MaintenanceSchedule';
+import './styles/maintenance.css';
 
 const App = () => {
   return (
@@ -51,13 +58,18 @@ const App = () => {
             <Route path="inventory_data_management/data_management" element={<DataManagement />} />
             <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
             <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
+            <Route path="maintenance" element={<MaintenanceDashboard />} />
+            <Route path="maintenance/machines" element={<MachineMaintenance />} />
+            <Route path="maintenance/downtime" element={<MachineDowntime />} />
+            <Route path="maintenance/documents" element={<MaintenanceDocuments />} />
+            <Route path="maintenance/schedule" element={<MaintenanceSchedule />} />
           </Route>
 
           {/* Operator Routes */}
           <Route path="/operator" element={
-            // <ProtectedRoute>
+            <ProtectedRoute>
               <MainLayout />
-            // </ProtectedRoute>
+            </ProtectedRoute>
           }>
             <Route path="dashboard" element={<JobDetails />} />
             <Route path="alerts" element={<AlertScreens />} />

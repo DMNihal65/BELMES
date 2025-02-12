@@ -651,10 +651,10 @@ const ProductionMonitoring = () => {
           <TabPane tab="Production History" key="history">
             <ProductionHistory data={historicalData} />
           </TabPane>
-
+{/* 
           <TabPane tab="Maintenance" key="maintenance">
             <MaintenanceSchedule machines={getFilteredMachines()} />
-          </TabPane>
+          </TabPane> */}
 
           <TabPane 
             tab={

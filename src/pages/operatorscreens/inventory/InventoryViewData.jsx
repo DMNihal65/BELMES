@@ -144,7 +144,7 @@ const InventoryAllData = () => {
       const subcategoryItems = getTableData();
       
       const response = await axios({
-        url: 'http://172.18.7.89:2222/api/v1/api/inventory/items/bulk/',
+        url: 'http://172.18.7.85:7739/api/v1/api/inventory/items/bulk/',
         method: 'POST',
         responseType: 'blob',
         headers: {
@@ -191,7 +191,7 @@ const InventoryAllData = () => {
   };
 
   const handleDownloadTemplate = () => {
-    window.open('http://172.18.7.89:2222/api/v1/api/inventory/items/bulk/', '_blank');
+    window.open('http://172.18.7.85:7739/api/v1/api/inventory/items/bulk/', '_blank');
   };
 
   const handleExcelUpload = (file) => {
@@ -205,7 +205,7 @@ const InventoryAllData = () => {
     formData.append('created_by', 1);
     formData.append('subcategory_id', selectedCategory.id);
 
-    axios.post('http://172.18.7.89:2222/api/v1/api/inventory/items/bulk/', formData, {
+    axios.post('http://172.18.7.85:7739/api/v1/api/inventory/items/bulk/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

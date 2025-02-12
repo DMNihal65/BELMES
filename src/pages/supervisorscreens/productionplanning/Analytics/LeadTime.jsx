@@ -9,7 +9,7 @@ const LeadTime = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('http://172.18.7.85:5609/component_status/');
+        const response = await axios.get('http://172.18.7.85:7739/component_status/');
         const formattedData = [
           ...response.data.early_complete,
           ...response.data.delayed_complete

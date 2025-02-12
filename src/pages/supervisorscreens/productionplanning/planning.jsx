@@ -35,12 +35,12 @@ const Planning = () => {
   const { 
     fetchAllOrders, 
     searchOrders, 
-    partNumbers, 
+    productionOrders,
     searchResults,
     isLoading,
     fetchActiveParts,
     activeParts,
-    changePartStatus 
+    changePartStatus
   } = usePlanningStore();
 
   // Fetch part numbers and active parts on component mount
@@ -111,13 +111,13 @@ const Planning = () => {
     }
   };
 
-  const handleJobSelect = async (partNumber) => {
-    const results = await searchOrders(partNumber);
+  const handleJobSelect = async (productionOrder) => {
+    const results = await searchOrders(productionOrder);
     if (results.orders && results.orders.length > 0) {
       const selectedJobData = results.orders[0];
       setSelectedJob(selectedJobData);
-      setSelectedOrderNumber(selectedJobData?.orderNumber);
-      console.log('Selected Order Number:', selectedJobData?.orderNumber);
+      setSelectedOrderNumber(selectedJobData?.production_order);
+      console.log('Selected Order Number:', selectedJobData?.production_order);
     }
   };
 
@@ -221,21 +221,21 @@ const Planning = () => {
         <Row gutter={24} align="middle">
           <Col span={20}>
             <Space size="large" className="w-full">
-              <Form.Item label="Select Job/Part Number" className="mb-0" style={{ flex: 1 }}>
+              <Form.Item label="Select Job/Production Order" className="mb-0" style={{ flex: 1 }}>
                 <Space className="w-full">
                   <Select
                     className="job-select"
                     showSearch
                     loading={isLoading}
-                    placeholder="Search by Part Number"
+                    placeholder="Search by Production Order"
                     onChange={handleJobSelect}
                     optionFilterProp="children"
                     style={{ width: '500px' }}
                     allowClear
                   >
-                    {partNumbers.map(item => (
-                      <Option key={item.id} value={item.partNumber}>
-                        {item.partNumber}
+                    {productionOrders.map(item => (
+                      <Option key={item.id} value={item.production_order}>
+                        {item.production_order}
                       </Option>
                     ))}
                   </Select>

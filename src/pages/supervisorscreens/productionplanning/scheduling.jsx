@@ -882,9 +882,10 @@ const Scheduling = () => {
                     />
                   </div>
 
-                  {/* {scheduleData && componentColors && (
-                    <ComponentLegend componentColors={componentColors} />
-                  )} */}
+             
+             
+
+             
                 </TabPane>
 
                 <TabPane 

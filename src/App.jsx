@@ -24,6 +24,7 @@ import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagem
 import AlertScreens from './pages/operatorscreens/AlertScreens';
 import MaintenanceScreen from './pages/operatorscreens/MaintenanceScreen';
 import InspectionResult from './pages/operatorscreens/InspectionResult';
+import Maintenance from './pages/supervisorscreens/Maintenance/maintenance';
 
 const App = () => {
   return (
@@ -44,6 +45,7 @@ const App = () => {
             <Route path="production-planning/planning" element={<Planning />} />
             <Route path="production-planning/scheduling" element={<Scheduling />} />
             <Route path="production-monitoring" element={<ProductionMonitoring />} />
+            <Route path="maintenance" element={<Maintenance />} />
             <Route path="documents" element={<DocumentManagement />} />
             <Route path="quality-management" element={<QualityManagementDashboard />} />
             <Route path="inventory_master/inventory_usage_and_analytics" element={<InventoryUsageAndAnalytics />} />

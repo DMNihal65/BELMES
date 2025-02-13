@@ -98,7 +98,13 @@ function Sidebar() {
     {
       key: '/supervisor/production-monitoring',
       icon: <Activity size={20} />,
-      label: 'Production Monitoring',
+      label: 'Production Monitoring'
+    },
+    {
+      key: '/supervisor/maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Maintenance',
+     
     },
     {
       key: '/supervisor/quality-management',

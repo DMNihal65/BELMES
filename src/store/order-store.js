@@ -142,7 +142,7 @@ const useOrderStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4413/planning/all_orders');
+      const response = await fetch('http://172.18.7.85:6639/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -173,44 +173,58 @@ const useOrderStore = create((set) => ({
     try {
       const formData = new FormData();
       formData.append('file', file);
-  
-      const response = await fetch('http://172.18.7.85:4413/planning/upload-pdf', {
+
+      const response = await fetch('http://172.18.7.85:6639/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
-  
-      const data = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to upload PDF');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload PDF');
       }
 
-      // Transform the API response to match form fields
+      const data = await response.json();
+      
+      // Transform the response data to match our form fields
       const transformedData = {
-        id: data.order_details.id,
-        orderNumber: data.order_details.production_order,
-        salesOrderNumber: data.order_details.sale_order,
-        wbsElement: data.order_details.wbs_element,
-        partNumber: data.order_details.part_number,
-        materialDescription: data.order_details.part_description,
-        totalOperations: data.order_details.total_operations,
-        targetQuantity: data.order_details.required_quantity,
-        launchedQuantity: data.order_details.launched_quantity,
-        plant: data.order_details.plant_id.toString(),
-        // Convert delivery_date to ISO string
-        deliveryDate: data.order_details.project?.delivery_date 
-      ? dayjs(data.order_details.project.delivery_date) // Ensure it's a dayjs object
-      : null,
-        // Additional fields
-        projectName: data.order_details.project?.name,
-        priority: data.order_details.project?.priority,
-        rawMaterials: data.order_details.raw_materials || [],
+        orderDetails: {
+          orderNumber: data["Prod Order No"],
+          salesOrderNumber: data["Sale Order"],
+          projectName: data["Project Name"],
+          priority: "1", // Default priority if not provided
+          wbsElement: data["WBS"],
+          partNumber: data["Part No"],
+          materialDescription: data["Part Desc"],
+          totalOperations: data["Operations"]?.length || 0,
+          targetQuantity: parseInt(data["Required Qty"]) || 0,
+          launchedQuantity: parseInt(data["Launched Qty"]) || 0,
+          plant: data["Plant"],
+          rawMaterials: data["Raw Materials"]?.map(material => ({
+            child_part_number: material["Child Part No"],
+            description: material["Description"],
+            quantity: material["Qty Per Set"],
+            unit: { name: material["UoM"] },
+            status: { name: "Available" } // Default status
+          })) || [],
+          // Store the operations data for later use
+          operations: data["Operations"] || [],
+          rtgSeqNo: data["Rtg Seq No"],
+          sequenceNo: data["Sequence No"]
+        },
+        isLoading: false,
+        error: null
       };
 
-      set({ orderDetails: transformedData, isLoading: false });
-      return transformedData;
+      set(transformedData);
+      return data;
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      console.error('Upload PDF error:', error);
+      set({ 
+        orderDetails: null,
+        isLoading: false, 
+        error: error.message 
+      });
       throw error;
     }
   },
@@ -240,7 +254,7 @@ const useOrderStore = create((set) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.85:4413/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.85:6639/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -288,7 +302,7 @@ const useOrderStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch('http://172.18.7.85:4413/planning/create_order', {
+      const response = await fetch('http://172.18.7.85:6639/api/v1/planning/create_order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -360,7 +374,7 @@ const useOrderStore = create((set) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.85:4413/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -420,7 +434,7 @@ const useOrderStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/mpp/upload/', {
+      const response = await fetch('http://172.18.7.85:6639/api/v1/documents/mpp/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -457,7 +471,7 @@ const useOrderStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch('http://172.18.7.85:4413/api/v1/documents/engineering-drawing/upload/', {
+      const response = await fetch('http://172.18.7.85:6639/api/v1/documents/engineering-drawing/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

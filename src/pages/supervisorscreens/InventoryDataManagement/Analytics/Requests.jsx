@@ -298,11 +298,26 @@ const RequestTable = () => {
     {
       title: 'Actions',
       key: 'actions',
+      fixed: 'right',
       width: 120,
       render: (_, record) => (
-        <Space size="middle">
+        <Space size="middle" style={{ 
+          display: 'flex',
+          justifyContent: 'center' 
+        }}>
           <Tooltip title="View Details">
-            <Button icon={<EyeOutlined />} onClick={() => handleDetails(record)} />
+            <Button 
+              icon={<EyeOutlined />} 
+              onClick={() => handleDetails(record)}
+              style={{
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px'
+              }}
+            />
           </Tooltip>
           {record.status.toLowerCase() === 'pending' && (
             <Tooltip title="Approve">
@@ -310,6 +325,14 @@ const RequestTable = () => {
                 icon={<CheckOutlined />}
                 onClick={() => showApproveConfirm(record)}
                 className="text-green-500"
+                style={{
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px'
+                }}
               />
             </Tooltip>
           )}
@@ -347,14 +370,30 @@ const RequestTable = () => {
                 columns={columns}
                 dataSource={getFilteredData()}
                 rowKey="id"
-                rowClassName={(record) => (record.status.toLowerCase() === 'pending' ? 'bg-red-50' : '')}
+                rowClassName={(record) => 
+                  record.status.toLowerCase() === 'pending' 
+                    ? 'bg-red-50 hover:bg-red-100' 
+                    : 'hover:bg-gray-50'
+                }
                 pagination={{
                   defaultPageSize: 7,
                   showSizeChanger: true,
                   showTotal: (total) => `Total ${total} items`,
+                  style: {
+                    marginTop: '16px',
+                    padding: '8px 0'
+                  }
                 }}
-                scroll={{ x: 2500 }}
+                scroll={{ 
+                  x: 2500,
+                  y: 'calc(100vh - 400px)'
+                }}
                 size="middle"
+                style={{
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}
+                sticky
               />
             </Spin>
 

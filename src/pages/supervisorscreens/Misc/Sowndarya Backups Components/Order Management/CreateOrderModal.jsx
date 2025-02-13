@@ -212,7 +212,7 @@ const CreateOrderModal = ({ visible, onCancel }) => {
                 <Input placeholder="Enter part number" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            {/* <Col span={12}>
               <Form.Item
                 name="deliveryDate"
                 label="Delivery Date"
@@ -223,7 +223,7 @@ const CreateOrderModal = ({ visible, onCancel }) => {
                   placeholder="Select delivery date"
                 />
               </Form.Item>
-            </Col>
+            </Col> */}
           </Row>
 
           <Form.Item

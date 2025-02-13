@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import {
   Form, 
@@ -20,12 +21,12 @@ import usePlanningStore from '../../store/planning-store';
 const { Title, Text } = Typography;
 
 const defaultInstructions = [
-  { id: 1, title: 'Fixture Setup', content: '' },
-  { id: 2, title: 'Job Preparation', content: '' },
-  { id: 3, title: 'Post-Machining Steps', content: '' }
+  { id: 1, title: 'Add Title', content: '' },
+  // { id: 2, title: 'Job Preparation', content: '' },
+  // { id: 3, title: 'Post-Machining Steps', content: '' }
 ];
 
-const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
+const OperationMPPDetails = ({ operation, mppData, onSave }) => {
   const [form] = Form.useForm();
   const { fetchMPPDetails, saveMPPDetails, mppDetails, isLoading, clearMPPDetails } = usePlanningStore();
   const [workInstructions, setWorkInstructions] = useState(defaultInstructions);
@@ -46,12 +47,19 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
   }, [form, clearMPPDetails]);
 
   useEffect(() => {
-    if (partNumber && operation?.operation_number) {
-      form.resetFields();
-      setWorkInstructions(defaultInstructions);
-      fetchMPPDetails(partNumber, operation.operation_number);
+    if (mppData) {
+      form.setFieldsValue({
+        part_number: mppData.part_number,
+        operation_number: mppData.operation_number,
+        fixture_number: mppData.fixture_number,
+        ipid_number: mppData.ipid_number,
+        datum_x: mppData.datum_x,
+        datum_y: mppData.datum_y,
+        datum_z: mppData.datum_z,
+        work_instructions: mppData.work_instructions?.sections || []
+      });
     }
-  }, [partNumber, operation, fetchMPPDetails, form]);
+  }, [mppData, form]);
 
   useEffect(() => {
     if (mppDetails) {
@@ -116,7 +124,7 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
               sequence: index + 1
             }))
         },
-        part_number: partNumber,
+        part_number: operation?.part_number,
         operation_number: Number(operation?.operation_number),
         images: fileList.map(file => file.url)
       };
@@ -174,7 +182,12 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <Title level={4} editable>Operation Details - Operation Number: {operation?.operation_number}</Title>
       
-      <Form form={form} layout="vertical">
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={onSave}
+        initialValues={mppData}
+      >
         {/* Fixture & IPID Details */}
         <Card 
           title={
@@ -358,3 +371,4 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
 };
 
 export default OperationMPPDetails;
+

@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Table, Button, Space, Tooltip, Form, Input, 
-  Popconfirm, Select, Tag, TimePicker, Modal,
-  Upload, Drawer
+  Popconfirm, Select, Tag, TimePicker, Modal, message,
+  Upload
 } from 'antd';
 import { 
   EditOutlined, DeleteOutlined, FileTextOutlined, 
   SaveOutlined, PlusOutlined, 
   UploadOutlined,
   InboxOutlined,
-  LinkOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import EditableCell from './EditableCell';
 import dayjs from 'dayjs';
 import useIpidStore from '../../store/ipid-store';
 import usePlanningStore from '../../store/planning-store';
-import OperationMPPDetails from './OperationMPPDetails';
+import axios from 'axios';
 
 const { Option } = Select;
 
@@ -46,11 +46,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   const { fetchMachines, fetchMachineDetails, updateMachine, fetchOperationDetails, updateOperation, updateOperationDetails, updateOperationMachine } = usePlanningStore();
   const [isMachineLinkModalVisible, setIsMachineLinkModalVisible] = useState(false);
   const [selectedOperationForMachine, setSelectedOperationForMachine] = useState(null);
-  const [isNewMppModalVisible, setIsNewMppModalVisible] = useState(false);
-  const [mppForm] = Form.useForm();
-  const [mppFormData, setMppFormData] = useState(null);
-  const [mppData, setMppData] = useState(null);
-  const [showMPPDetails, setShowMPPDetails] = useState(false);
 
   useEffect(() => {
     setOperations(initialOperations || []);
@@ -277,131 +272,83 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   };
 
   // Add function to save machine selection
-  const handleMachineSave = async (newMachineId) => {
+  const handleMachineSave = async (values) => {
     try {
-      await updateOperationMachine(
-        partNumber,
-        selectedOperationForMachine.operation_number,
-        {
-          operation_description: selectedOperationForMachine.operation_description,
-          setup_time: selectedOperationForMachine.setup_time,
-          ideal_cycle_time: selectedOperationForMachine.ideal_cycle_time,
-          work_center: selectedOperationForMachine.work_center
-        },
-        newMachineId
-      );
-
-      message.success('Machine updated successfully');
-      
-      // Refresh the table data
-      const refreshedData = await usePlanningStore.getState().searchOrders(partNumber);
-      if (refreshedData?.orders?.[0]?.operations) {
-        const sortedOperations = refreshedData.orders[0].operations.sort(
-          (a, b) => a.operation_number - b.operation_number
-        );
-        setOperations(sortedOperations);
-      }
-
-      setIsMachineLinkModalVisible(false);
-    } catch (error) {
-      message.error('Failed to update machine');
-    }
-  };
-
-  // Update the handleViewMppDetails function
-  const handleViewMppDetails = async (record) => {
-    try {
-      // First get the production order from the search endpoint
-      const searchResponse = await usePlanningStore.getState().searchOrders(record.production_order);
-      
-      if (!searchResponse?.orders?.[0]?.production_order) {
-        message.error('Production order not found');
+      if (!selectedOperationForMachine) {
+        message.error('No operation selected');
         return;
       }
 
-      const productionOrderNumber = searchResponse.orders[0].production_order;
-      console.log('Production Order Number:', productionOrderNumber);
+      // Log the values being sent
+      console.log('Selected Operation:', selectedOperationForMachine);
+      console.log('Form Values:', values);
 
-      // Try to fetch MPP documents using production order
-      const mppDocs = await usePlanningStore.getState().fetchMppDocuments(productionOrderNumber);
-      
-      if (mppDocs && Array.isArray(mppDocs) && mppDocs.length > 0 && mppDocs[0].latest_version) {
-        // Case 1: MPP exists - show download confirmation
-        Modal.confirm({
-          title: 'MPP Document Available',
-          content: 'An MPP document exists for this operation. Would you like to download it?',
-          okText: 'Download',
-          cancelText: 'Cancel',
-          onOk: async () => {
-            const versionId = mppDocs[0].latest_version.id;
-            await usePlanningStore.getState().downloadMppDocument(versionId);
-          }
-        });
-      } else {
-        // Case 2: Check MPP details by identifier
-        const mppDetails = await usePlanningStore.getState().fetchMppByIdentifier(
-          record.production_order,
-          record.operation_number
-        );
+      // Correctly structure the update data
+      const updateData = {
+        operation_number: selectedOperationForMachine.operation_number,
+        machine_id: values.machineId, // Make sure this matches the form field name
+        work_center: selectedOperationForMachine.work_center,
+        setup_time: selectedOperationForMachine.setup_time,
+        ideal_cycle_time: selectedOperationForMachine.ideal_cycle_time,
+        operation_description: selectedOperationForMachine.operation_description
+      };
 
-        if (mppDetails && Array.isArray(mppDetails) && mppDetails.length > 0) {
-          // MPP details exist - show in drawer with data
-          const existingMpp = mppDetails[0];
-          setMppData(existingMpp);
+      console.log('Update Data:', updateData);
 
-          // Show drawer with existing data
-          setSelectedOperation({
-            ...record,
-            ...existingMpp,
-            isExistingMpp: true,
-            fixture_number: existingMpp.fixture_number,
-            ipid_number: existingMpp.ipid_number,
-            datum_x: existingMpp.datum_x,
-            datum_y: existingMpp.datum_y,
-            datum_z: existingMpp.datum_z,
-            work_instructions: existingMpp.work_instructions?.sections || []
-          });
-          setShowMPPDetails(true);
-        } else {
-          // No MPP exists - show empty drawer
-          setMppData(null);
-          setSelectedOperation({
-            ...record,
-            operation_number: record.operation_number,
-            production_order: record.production_order,
-            isExistingMpp: false
-          });
-          setShowMPPDetails(true);
-        }
+      // Call the API
+      await updateOperationMachine(
+        partNumber,
+        selectedOperationForMachine.operation_number,
+        updateData
+      );
+
+      message.success('Machine linked successfully');
+      setIsMachineLinkModalVisible(false);
+
+      // Refresh the operations data
+      const refreshedData = await usePlanningStore.getState().searchOrders(partNumber);
+      if (refreshedData?.orders?.[0]?.operations) {
+        setOperations(refreshedData.orders[0].operations);
       }
     } catch (error) {
-      console.error('Error handling MPP details:', error);
-      message.error('Failed to handle MPP document');
+      console.error('Error linking machine:', error);
+      // Show more detailed error message
+      message.error(
+        error.response?.data?.message || 
+        error.message || 
+        'Failed to link machine'
+      );
     }
   };
 
-  // Update the form submission handler
   const handleSaveChanges = async (values) => {
     try {
-      const result = await usePlanningStore.getState().createNewMpp({
-        ...values,
+      // Format the data
+      const formData = {
         part_number: partNumber,
-        work_instructions: {
-          sections: values.work_instructions.map((instruction, index) => ({
-            ...instruction,
-            sequence: index
-          }))
-        }
-      });
+        operation_number: values.operation_number,
+        production_order: values.production_order,
+        fixture_number: values.fixture_number,
+        ipid_number: values.ipid_number,
+        datum_x: values.datum_x,
+        datum_y: values.datum_y,
+        datum_z: values.datum_z,
+        work_instructions: values.work_instructions || []
+      };
+
+      console.log('Submitting MPP data:', formData);
+
+      // Save MPP using the store
+      const result = await usePlanningStore.getState().saveMPPDetails(formData);
 
       if (result) {
-        setMppData(result);
         message.success('MPP created successfully');
-        setShowMPPDetails(false);
+        setIsNewMppModalVisible(false);
+        mppForm.resetFields();
       }
     } catch (error) {
-      console.error('Error creating MPP:', error);
-      // message.error('Failed to create MPP');
+      console.error('Error saving MPP:', error);
+      message.error(error.message || 'Failed to save MPP');
     }
   };
 
@@ -413,7 +360,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       width: 80,
       fixed: 'left',
       editable: false,
-      render: (text, record, index) => index + 1,
     },
     {
       title: 'Operation Number',
@@ -483,12 +429,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
     },
     {
-      title: 'Production Order',
-      dataIndex: 'production_order',
-      width: 150,
-      editable: false,
-    },
-    {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
@@ -502,7 +442,11 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
               <Button 
                 type="link" 
                 icon={<FileTextOutlined />} 
-                onClick={() => handleViewMppDetails(record)}
+                onClick={() => onOperationEdit({
+                  ...record,
+                  operation_number: record.operation_number,
+                  partNumber: partNumber
+                })}
               />
             </Tooltip>
 
@@ -726,28 +670,34 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         </Form>
       </Modal>
 
-      {/* Add Machine Linking Modal */}
+      {/* Machine Linking Modal */}
       <Modal
         title={
-          <div className="flex items-center gap-2">
-            <LinkOutlined />
-            <span>Machine-WorkCenter Linking</span>
+          <div className="flex items-center gap-3 py-2">
+            <LinkOutlined className="text-xl text-green-600" />
+            <div>
+              <h3 className="text-lg font-semibold mb-1">Machine-WorkCenter Linking</h3>
+              <p className="text-sm text-gray-500">
+                Link machine to operation {selectedOperationForMachine?.operation_number}
+              </p>
+            </div>
           </div>
         }
         open={isMachineLinkModalVisible}
         onCancel={() => setIsMachineLinkModalVisible(false)}
         footer={null}
-        width={500}
+        width={600}
       >
         {selectedOperationForMachine && (
           <Form
-            onFinish={(values) => handleMachineSave(values.machineId)}
+            onFinish={handleMachineSave}
             initialValues={{
               machineId: selectedOperationForMachine.primary_machine?.id
             }}
             layout="vertical"
+            className="p-6"
           >
-            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-gray-600">Operation Number</label>
@@ -762,7 +712,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
             <Form.Item
               name="machineId"
-              label="Select Machine"
+              label={<span className="font-medium">Select Machine</span>}
               rules={[{ required: true, message: 'Please select a machine' }]}
             >
               <Select
@@ -785,111 +735,24 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
               </Select>
             </Form.Item>
 
-            <div className="flex justify-end gap-2 mt-6">
-              <Button onClick={() => setIsMachineLinkModalVisible(false)}>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button 
+                onClick={() => setIsMachineLinkModalVisible(false)}
+                className="h-9"
+              >
                 Cancel
               </Button>
-              <Button type="primary" htmlType="submit">
+              <Button 
+                type="primary" 
+                htmlType="submit"
+                className="h-9 bg-blue-600 hover:bg-blue-700"
+              >
                 Save Changes
               </Button>
             </div>
           </Form>
         )}
       </Modal>
-
-      {/* Add the New MPP Modal */}
-      <Modal
-        title={mppData ? "View/Edit MPP" : "Create New MPP"}
-        open={isNewMppModalVisible}
-        onCancel={() => {
-          setIsNewMppModalVisible(false);
-          if (!mppData) {
-            mppForm.resetFields();
-          }
-        }}
-        footer={null}
-        width={600}
-      >
-        <Form
-          form={mppForm}
-          layout="vertical"
-          onFinish={handleSaveChanges}
-          initialValues={mppData}
-          onValuesChange={(_, allValues) => {
-            setMppFormData(allValues);
-          }}
-        >
-          {/* Add hidden field for production order */}
-          <Form.Item name="production_order" hidden>
-            <Input />
-          </Form.Item>
-          
-          {/* Rest of your form fields */}
-          <Form.Item name="part_number" label="Part Number" rules={[{ required: true }]}>
-            <Input disabled />
-          </Form.Item>
-          <Form.Item name="operation_number" label="Operation Number" rules={[{ required: true }]}>
-            <Input disabled />
-          </Form.Item>
-          <Form.Item name="fixture_number" label="Fixture Number" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="ipid_number" label="IPID Number" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="datum_x" label="Datum X" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="datum_y" label="Datum Y" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="datum_z" label="Datum Z" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.List name="work_instructions">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map((field, index) => (
-                  <div key={field.key} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <Form.Item {...field} name={[field.name, 'title']} rules={[{ required: true }]}>
-                      <Input placeholder="Title" />
-                    </Form.Item>
-                    <Form.Item {...field} name={[field.name, 'instructions']} rules={[{ required: true }]}>
-                      <Input placeholder="Instructions" />
-                    </Form.Item>
-                    <Button onClick={() => remove(field.name)} type="link" danger>
-                      Delete
-                    </Button>
-                  </div>
-                ))}
-                <Button type="dashed" onClick={() => add()} block>
-                  Add Work Instruction
-                </Button>
-              </>
-            )}
-          </Form.List>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
-              {mppData ? "Update MPP" : "Create MPP"}
-            </Button>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Replace Modal with Drawer */}
-      <Drawer
-        title={`Operation Details - ${selectedOperation?.operation_number}`}
-        width={1200}
-        open={showMPPDetails}
-        onClose={() => setShowMPPDetails(false)}
-        destroyOnClose
-      >
-        <OperationMPPDetails 
-          operation={selectedOperation}
-          mppData={mppData}
-          onSave={handleSaveChanges}
-        />
-      </Drawer>
     </Form>
   );
 };

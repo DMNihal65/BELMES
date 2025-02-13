@@ -8,32 +8,37 @@ const usePlanningStore = create((set) => ({
   error: null,
   mppDetails: null,
   activeParts: [],
+  selectedOrder: null,
   machines: [
     { id: 1, name: 'Machine A', status: 'Available' },
     { id: 2, name: 'Machine B', status: 'In Use' },
     { id: 3, name: 'Machine C', status: 'Under Maintenance' },
   ],
+  mppDocuments: [],
+  selectedMppDocument: null,
+  mppData: null,
+  setMppData: (data) => set({ mppData: data }),
 
   // Fetch all orders to get part numbers for dropdown
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:4413/planning/all_orders');
+      const response = await fetch('http://172.18.7.85:6639/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
         throw new Error(data.detail || 'Failed to fetch all orders');
       }
 
-      // Extract part numbers from orders
-      const partNumbers = Array.isArray(data) ? data.map(item => ({
+      // Extract production orders from orders
+      const productionOrders = Array.isArray(data) ? data.map(item => ({
         id: item.id || String(Math.random()),
-        partNumber: item.part_number
+        productionOrder: item.production_order
       })) : [];
 
       set({ 
         allOrders: data,
-        partNumbers,
+        partNumbers: productionOrders, // We'll keep the same state variable but store production orders
         isLoading: false,
         error: null
       });
@@ -43,7 +48,7 @@ const usePlanningStore = create((set) => ({
       console.error('Fetch all orders error:', error);
       set({ 
         allOrders: [],
-        partNumbers: [],
+        partNumbers: [], // This will now store production orders
         error: error.message, 
         isLoading: false 
       });
@@ -52,10 +57,10 @@ const usePlanningStore = create((set) => ({
   },
 
   // Search for specific order details
-  searchOrders: async (partNumber) => {
+  searchOrders: async (productionOrder) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.85:4413/planning/search_order2?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/planning/search_order2?production_order=${productionOrder}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -69,11 +74,13 @@ const usePlanningStore = create((set) => ({
           ...order,
           operations: order.operations?.map(op => ({
             ...op,
-            key: op.id.toString() // Ensure each operation has a key
+            key: op.id.toString(),
+            production_order: order.production_order // Map the production_order from the order level
           })) || []
         }))
       };
 
+      console.log('Search Response:', transformedData); // Debug log
       set({ 
         searchResults: transformedData,
         isLoading: false,
@@ -100,59 +107,52 @@ const usePlanningStore = create((set) => ({
   },
 
   // Fetch MPP details
-  fetchMPPDetails: async (partNumber, operationNumber) => {
-    // Clear existing MPP details before fetching new ones
-    set({ 
-      mppDetails: null,
-      isLoading: true, 
-      error: null 
-    });
-
+  fetchMPPDetails: async (productionOrder) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4413/mpp/by-part/${partNumber}/${operationNumber}`);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      console.log('Fetching MPP for production order:', productionOrder); // Debug log
+
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/documents/mpp/${selectedOrder}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': 'application/json'
+        }
+      });
       
-      // Handle 404 case explicitly
+      console.log('Response status:', response.status); // Debug log
+
       if (response.status === 404) {
-        set({ 
-          mppDetails: null,
-          isLoading: false,
-          error: null
-        });
         return null;
       }
 
-      const data = await response.json();
-      
-      // Enhanced error checking
       if (!response.ok) {
-        throw new Error(data.detail || `Error ${response.status}: Failed to fetch MPP details`);
+        throw new Error('Failed to fetch MPP documents');
       }
+      
+      const data = await response.json();
+      console.log('MPP data:', data); // Debug log
 
-      // Validate data structure before setting state
-      if (data && (Array.isArray(data) ? data.length > 0 : true)) {
-        const mppDetail = Array.isArray(data) ? data[0] : data;
-        set({ 
-          mppDetails: mppDetail,
-          isLoading: false,
-          error: null
-        });
-        return mppDetail;
-      } else {
-        set({ 
-          mppDetails: null,
-          isLoading: false,
-          error: null
-        });
-        return null;
+      // Check if we have documents and get the latest version
+      if (data && Array.isArray(data) && data.length > 0) {
+        const latestDoc = data[0]; // Get the first document
+        const latestVersion = latestDoc.latest_version;
+        
+        if (latestVersion) {
+          // If we have a latest version, download it
+          await downloadMppDocument(latestVersion.id);
+        }
+
+        return latestDoc;
       }
+      
+      return null;
     } catch (error) {
       console.error('MPP details fetch error:', error);
-      set({ 
-        mppDetails: null,
-        isLoading: false,
-        error: error.message
-      });
-      return null;
+      throw error;
     }
   },
 
@@ -183,7 +183,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.85:4413/mpp', {
+      const response = await fetch('http://172.18.7.85:6639/api/v1/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ const usePlanningStore = create((set) => ({
   // Add new function to fetch active parts
   fetchActiveParts: async () => {
     try {
-      const response = await fetch('http://172.18.7.85:4413/scheduling/active-parts');
+      const response = await fetch('http://172.18.7.85:6639/api/v1/scheduling/active-parts');
       const data = await response.json();
       
       if (!response.ok) {
@@ -262,7 +262,7 @@ const usePlanningStore = create((set) => ({
   changePartStatus: async (partNumber, newStatus) => {
     try {
       // Ensure we're using the exact same URL format as the working endpoint
-      const response = await fetch(`http://172.18.7.85:4413/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
         method: 'POST',  // Changed to POST since GET is not allowed
         headers: {
           'Content-Type': 'application/json'
@@ -289,7 +289,7 @@ const usePlanningStore = create((set) => ({
   // Add this new function to fetch machine details
   fetchMachineDetails: async (machineId) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4413/master-order/machines/${machineId}`);
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/master-order/machines/${machineId}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -306,7 +306,7 @@ const usePlanningStore = create((set) => ({
   // Add the updateMachine function to the store
   updateMachine: async (machineId, updatedData) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4413/master-order/machines/${machineId}`, {
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/master-order/machines/${machineId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -330,7 +330,7 @@ const usePlanningStore = create((set) => ({
   // Function to update operation details
   updateOperationDetails: async (partNumber, operationNumber, updateData) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4413/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -359,7 +359,7 @@ const usePlanningStore = create((set) => ({
   // Function to update machine for operation
   updateOperationMachine: async (partNumber, operationNumber, currentData, newMachineId) => {
     try {
-      const response = await fetch(`http://172.18.7.85:4413/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -383,8 +383,126 @@ const usePlanningStore = create((set) => ({
       console.error('Error updating machine:', error);
       throw error;
     }
-  }
+  },
+
+  // Function to fetch MPP documents using production order
+  fetchMppDocuments: async (productionOrder) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      // First try to get MPP documents using production order
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/documents/mpp/${productionOrder}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch MPP documents');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching MPP documents:', error);
+      throw error;
+    }
+  },
+
+  // Function to fetch MPP by identifier (production order and operation)
+  fetchMppByIdentifier: async (productionOrder, operationNumber) => {
+    try {
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/mpp/by-identifier?operation_number=${operationNumber}&production_order=${productionOrder}`, {
+        headers: {
+          'accept': 'application/json'
+        }
+      });
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch MPP details');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching MPP by identifier:', error);
+      return null;
+    }
+  },
+
+  // Function to create new MPP
+  createNewMpp: async (mppData) => {
+    try {
+      const response = await fetch('http://172.18.7.85:6639/api/v1/mpp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          part_number: mppData.part_number,
+          operation_number: mppData.operation_number,
+          fixture_number: mppData.fixture_number,
+          ipid_number: mppData.ipid_number,
+          datum_x: mppData.datum_x,
+          datum_y: mppData.datum_y,
+          datum_z: mppData.datum_z,
+          work_instructions: mppData.work_instructions
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create MPP');
+      }
+
+      const data = await response.json();
+      // Store the data in the global state
+      set({ mppData: data });
+      return data;
+    } catch (error) {
+      console.error('Error creating MPP:', error);
+      throw error;
+    }
+  },
+
+  // Update downloadMppDocument to use the correct endpoint
+  downloadMppDocument: async (versionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/documents/${versionId}/download`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      throw error;
+    }
+  },
 }));
 
 export default usePlanningStore;
-

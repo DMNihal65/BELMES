@@ -72,7 +72,7 @@ const Planning = () => {
         <Col span={4}>
           <Card bordered={false} className="hover:shadow-md transition-shadow">
             <Statistic 
-              title="Total Jobs"
+              title="Total Jccobs"
               value={planningStats.totalJobs}
               prefix={<FileTextOutlined />}
             />
@@ -134,7 +134,7 @@ const Planning = () => {
         <Row gutter={24} align="middle">
           <Col span={16}>
             <Space size="large" className="w-full">
-              <Form.Item label="Select Job/Part Number" className="mb-0 flex-1">
+              <Form.Item label="Select Jhhhob/Part Number" className="mb-0 flex-1">
                 <Select
                   showSearch
                   placeholder="Search by Job ID or Part Number"
@@ -155,7 +155,7 @@ const Planning = () => {
                 </Select>
               </Form.Item>
               {/* <Upload 
-                accept=".pdf"
+                accept=".pdf"F
                 onChange={handleUpload}
                 customRequest={({ onSuccess }) => setTimeout(() => onSuccess("ok"), 0)}
               >

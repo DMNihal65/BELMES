@@ -40,6 +40,11 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   const [drawingVersion, setDrawingVersion] = useState('v1');
   const [mppDescription, setMppDescription] = useState('');
   const [drawingDescription, setDrawingDescription] = useState('');
+  
+  // Add new state variables for additional fields
+  const [rtgSeqNo, setRtgSeqNo] = useState('0');
+  const [sequenceNo, setSequenceNo] = useState('0');
+  const [operations, setOperations] = useState([]);
 
   const steps = [
     {
@@ -66,13 +71,31 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         return false;
       }
 
-      await uploadPDF(file);
-      setCurrentStep(1); // Move to order details after successful upload
-      return false;
-
       const result = await uploadPDF(file);
-      setRawMaterials(result.raw_materials || []);
-      setCurrentStep(1);
+      
+      if (result) {
+        // Set form values
+        form.setFieldsValue({
+          orderNumber: result["Prod Order No"],
+          salesOrderNumber: result["Sale Order"],
+          projectName: result["Project Name"],
+          wbsElement: result["WBS"],
+          partNumber: result["Part No"],
+          materialDescription: result["Part Desc"],
+          totalOperations: parseInt(result["Operations"]?.length) || 0,
+          targetQuantity: parseInt(result["Required Qty"]) || 0,
+          launchedQuantity: parseInt(result["Launched Qty"]) || 0,
+          plant: result["Plant"],
+          rtgSeqNo: parseInt(result["Rtg Seq No"]) || 0,
+          sequenceNo: parseInt(result["Sequence No"]) || 0
+        });
+
+        // Set operations data
+        setOperations(result["Operations"] || []);
+
+        setCurrentStep(1);
+      }
+
       return false;
     } catch (error) {
       message.error(error.message || 'Failed to upload file');
@@ -86,17 +109,17 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       {rawMaterials.map((material, index) => (
         <div key={index} className="p-2 bg-gray-50 rounded mb-2">
           <Row gutter={16}>
-            <Col span={8}>
-              <strong>Part Number:</strong> {material.child_part_number}
+            <Col span={6}>
+              <strong>Part Number:</strong> {material["Child Part No"]}
             </Col>
             <Col span={8}>
-              <strong>Description:</strong> {material.description}
+              <strong>Description:</strong> {material["Description"]}
             </Col>
-            <Col span={4}>
-              <strong>Quantity:</strong> {material.quantity} {material.unit.name}
+            <Col span={5}>
+              <strong>Quantity:</strong> {material["Qty Per Set"]} {material["UoM"]}
             </Col>
-            <Col span={4}>
-              <strong>Status:</strong> {material.status.name}
+            <Col span={5}>
+              <strong>Total Qty:</strong> {material["Total Qty"]}
             </Col>
           </Row>
         </div>
@@ -285,9 +308,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       {/* Order Information Section */}
       <Divider>Order Information</Divider>
       
-      {/* Existing form fields */}
       <Row gutter={16}>
-        <Col span={12}>
+        <Col span={8}>
           <Form.Item
             name="orderNumber"
             label="Production Order"
@@ -295,7 +317,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             <Input disabled />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col span={8}>
           <Form.Item
             name="salesOrderNumber"
             label="Sales Order"
@@ -303,12 +325,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             <Input disabled />
           </Form.Item>
         </Col>
-      </Row>
-
-      {/* Project Information - Read Only */}
-      <Divider>Project Information</Divider>
-      <Row gutter={16}>
-        <Col span={12}>
+        <Col span={8}>
           <Form.Item
             name="projectName"
             label="Project Name"
@@ -316,93 +333,37 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             <Input disabled />
           </Form.Item>
         </Col>
-        <Col span={12}>
+      </Row>
+
+      <Row gutter={16}>
+        <Col span={8}>
           <Form.Item
-            name="priority"
-            label="Priority"
+            name="wbsElement"
+            label="WBS Element"
+          >
+            <Input disabled />
+          </Form.Item>
+        </Col>
+        <Col span={8}>
+          <Form.Item
+            name="partNumber"
+            label="Part Number"
+          >
+            <Input disabled />
+          </Form.Item>
+        </Col>
+        <Col span={8}>
+          <Form.Item
+            name="materialDescription"
+            label="Part Description"
           >
             <Input disabled />
           </Form.Item>
         </Col>
       </Row>
 
-      {/* Raw Materials Section - Read Only */}
-      {orderDetails?.rawMaterials && orderDetails.rawMaterials.length > 0 && (
-        <>
-          <Divider>Raw Materials</Divider>
-          {orderDetails.rawMaterials.map((material, index) => (
-            <div key={index}>
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    label="Part Number"
-                  >
-                    <Input value={material.child_part_number} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="Description"
-                  >
-                    <Input value={material.description} disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    label="Quantity"
-                  >
-                    <Input value={`${material.quantity} ${material.unit.name}`} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="Status"
-                  >
-                    <Input value={material.status.name} disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-              {index < orderDetails.rawMaterials.length - 1 && <Divider dashed />}
-            </div>
-          ))}
-        </>
-      )}
-
-      <Divider/>
-      {/* Editable fields */}
       <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            name="wbsElement"
-            label="WBS Element"
-            rules={[{ required: true, message: 'Please enter WBS Element' }]}
-          >
-            <Input />
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item
-            name="partNumber"
-            label="Part Number"
-            rules={[{ required: true, message: 'Please enter Part Number' }]}
-          >
-            <Input />
-          </Form.Item>
-        </Col>
-      </Row>
-  
-      <Form.Item
-        name="materialDescription"
-        label="Part Description"
-        rules={[{ required: true, message: 'Please enter Part Description' }]}
-      >
-        <Input />
-      </Form.Item>
-  
-      <Row gutter={16}>
-        <Col span={8}>
+        <Col span={6}>
           <Form.Item
             name="totalOperations"
             label="Total Operations"
@@ -415,7 +376,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={6}>
           <Form.Item
             name="targetQuantity"
             label="Required Quantity"
@@ -428,7 +389,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={6}>
           <Form.Item
             name="launchedQuantity"
             label="Launched Quantity"
@@ -441,43 +402,48 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             />
           </Form.Item>
         </Col>
-      </Row>
-  
-      <Row gutter={16}>
-        <Col span={12}>
+        <Col span={6}>
           <Form.Item
             name="plant"
             label="Plant ID"
-            rules={[{ required: true, message: 'Please enter Plant ID' }]}
+          >
+            <Input disabled />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item
+            name="rtgSeqNo"
+            label="Routing Sequence No"
+            rules={[{ required: true, message: 'Please enter Routing Sequence No' }]}
           >
             <InputNumber 
               style={{ width: '100%' }} 
-              min={1}
+              min={0}
               parser={value => parseInt(value) || 0}
             />
           </Form.Item>
         </Col>
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item
-              name="deliveryDate"
-              label="Delivery Date"
-              rules={[{ required: true, message: 'Please select Delivery Date' }]}
-            >
-              <DatePicker 
-                style={{ width: '100%' }} 
-                format="YYYY-MM-DD"
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-        
+        <Col span={12}>
+          <Form.Item
+            name="sequenceNo"
+            label="Sequence No"
+            rules={[{ required: true, message: 'Please enter Sequence No' }]}
+          >
+            <InputNumber 
+              style={{ width: '100%' }} 
+              min={0}
+              parser={value => parseInt(value) || 0}
+            />
+          </Form.Item>
+        </Col>
       </Row>
 
-      {/* Optional File Uploads Section - Moved to bottom */}
+      {/* Remove raw materials section */}
       {renderFileUploadSection()}
 
-      {/* Form Actions */}
       <Form.Item className="mb-0">
         <Space className="w-full justify-end">
           <Button onClick={handleCancel}>Cancel</Button>
@@ -621,24 +587,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
           </Col>
         </Row>
 
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item
-              name="delivery_date"
-              label="Delivery Date"
-              rules={[{ required: true, message: 'Please select Delivery Date' }]}
-            >
-              <DatePicker 
-                style={{ width: '100%' }} 
-                format="YYYY-MM-DD"
-                disabledDate={(current) => {
-                  return current && current < dayjs().startOf('day');
-                }}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
         {/* Add the same file upload section */}
         {renderFileUploadSection()}
 
@@ -662,11 +610,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   // Update handleManualSubmit function
   const handleManualSubmit = async (values) => {
     try {
-      if (!values.delivery_date) {
-        message.error('Please select a delivery date');
-        return;
-      }
-
       // Validate document names if files are selected
       if (mppFile && !mppDocName.trim()) {
         message.error('Please enter MPP document name');
@@ -676,11 +619,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         message.error('Please enter Engineering Drawing document name');
         return;
       }
-
-      const deliveryDate = dayjs(values.delivery_date);
-      // Format the date as YYYY-MM-DD string
-      const formattedDeliveryDate = deliveryDate.format('YYYY-MM-DD');
-      const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
 
       // Format the payload according to the API requirements
       const payload = {
@@ -694,10 +632,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         launched_quantity: parseInt(values.launched_quantity),
         plant_id: parseInt(values.plant_id),
         project_name: values.project_name,
-        delivery_date: formattedDeliveryDate, // Send as YYYY-MM-DD string
         project: {
-          name: values.project_name,
-          delivery_date: epochTimestamp
+          name: values.project_name
         },
         raw_materials: []
       };
@@ -857,12 +793,32 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
               <Upload
                 maxCount={1}
                 onChange={handleDrawingFileChange}
-                beforeUpload={() => false}
+                beforeUpload={(file) => {
+                  const isValidFormat = [
+                    'application/pdf',
+                    'application/x-autocad',  // For .dwg files
+                    'image/vnd.dxf',          // For .dxf files
+                    '.dwg',
+                    '.dxf'
+                  ].includes(file.type) || 
+                  file.name.toLowerCase().endsWith('.dwg') || 
+                  file.name.toLowerCase().endsWith('.dxf');
+                  
+                  if (!isValidFormat) {
+                    message.error('You can only upload PDF, DWG, or DXF files!');
+                    return false;
+                  }
+                  return false; // Return false to prevent auto upload
+                }}
+                accept=".pdf,.dwg,.dxf"
                 showUploadList={{ showRemoveIcon: true }}
               >
                 <Button icon={<UploadOutlined />} className="w-full">
                   {drawingFile ? 'Change Drawing File' : 'Upload Drawing'}
                 </Button>
+                <div className="mt-2 text-xs text-gray-500 text-center">
+                  Supported formats: PDF, DWG, DXF
+                </div>
               </Upload>
             </Form.Item>
           </div>

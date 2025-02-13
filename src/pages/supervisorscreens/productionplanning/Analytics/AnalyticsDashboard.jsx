@@ -995,8 +995,8 @@ const AnalyticsDashboard = () => {
     const fetchData = async () => {
       try {
         const [componentResponse, scheduleResponse] = await Promise.all([
-          fetch('http://172.18.7.85:7739/component_status/'),
-          fetch('http://172.18.7.85:7739/operations/machine_schedules/')
+          fetch('http://172.18.7.85:6639/api/v1/component_status/'),
+          fetch('http://172.18.7.85:6639/api/v1/operations/machine_schedules/')
         ]);
         
         const componentResult = await componentResponse.json();
@@ -1032,8 +1032,8 @@ const AnalyticsDashboard = () => {
         {/* <TabPane tab="Delivery Date Analysis" key="leadTime">
           <LeadTimeAnalytics  />
         </TabPane> */} 
-        <TabPane tab="Part Number Status" key="componentStatus">
-          <ComponentStatusAnalytics data={data} />
+        {/* <TabPane tab="Part Number Status" key="componentStatus">
+          <ComponentStatusAnalytics data={data} /> */}
           {/* <div>
             <h3 className="text-xl font-semibold mb-4">Delayed Components Detail</h3>
             <Table
@@ -1043,10 +1043,10 @@ const AnalyticsDashboard = () => {
               rowKey="component"
             />
           </div> */}
-        </TabPane>
-        <TabPane tab="Schedule Details" key="scheduleDetails">
+        {/* </TabPane> */}
+        {/* <TabPane tab="Schedule Details" key="scheduleDetails">
           <ScheduleDetails data={scheduleData} />
-        </TabPane>
+        </TabPane> */}
         <TabPane tab="Production Status" key="productionStatus">
           <ProductionStatus />
         </TabPane>

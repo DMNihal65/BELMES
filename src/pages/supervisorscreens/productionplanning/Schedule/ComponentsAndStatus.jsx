@@ -85,7 +85,7 @@ export const MachineStatusCard = ({ machine, operations, componentStatus, compon
     >
       <div className="flex justify-between items-start gap-2">
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-base truncate" title={machine}>{machine}</div>
+          <div className="font-medium text-base truncate" title={machine.displayName}>{machine.displayName}</div>
           <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
             {currentOperation && (
               <span 
@@ -126,10 +126,10 @@ export const MachineStatusCards = ({ machines, operations, componentStatus, comp
         margin: '0 auto'
       }}>
         {machines.map(machine => (
-          <div key={machine}>
+          <div key={machine.machineId}>
             <MachineStatusCard
               machine={machine}
-              operations={operations.filter(op => op.machine === machine)}
+              operations={operations.filter(op => op.machine === machine.machineId)}
               componentStatus={componentStatus}
               componentColors={componentColors} 
             />

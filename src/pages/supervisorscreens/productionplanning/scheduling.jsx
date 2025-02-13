@@ -214,6 +214,64 @@ const Scheduling = () => {
   
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
 
+  // Get unique machines from schedule data
+  const availableMachines = React.useMemo(() => {
+    if (!scheduleData?.work_centers) return [];
+    
+    // Get all machines from work_centers and format them as WORK_CENTER_CODE-MACHINE_ID
+    const workCenterMachines = scheduleData.work_centers.flatMap(wc => 
+      wc.machines.map(machine => ({
+        id: machine.id,  // Original machine ID
+        machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work center code and machine ID
+        name: machine.name,
+        work_center_code: wc.work_center_code,
+        work_center_name: wc.work_center_name,
+        displayName: `${wc.work_center_code} - ${machine.name}`  // Display format
+      }))
+    );
+    
+    // Get machines from scheduled operations to check which ones are running
+    const scheduledMachines = new Set(scheduleData.scheduled_operations?.map(op => op.machine) || []);
+    
+    // Helper function to check if machine is running
+    const getMachineStatus = (machineId) => {
+      const now = new Date();
+      const isRunning = scheduleData.scheduled_operations?.some(op => {
+        const startTime = new Date(op.start_time);
+        const endTime = new Date(op.end_time);
+        return op.machine === machineId && startTime <= now && endTime >= now;
+      });
+      return isRunning;
+    };
+
+    // Sort machines: running machines first, then by work center code and machine name
+    return workCenterMachines.sort((a, b) => {
+      const isRunningA = getMachineStatus(a.machineId);
+      const isRunningB = getMachineStatus(b.machineId);
+      
+      if (isRunningA && !isRunningB) return -1;
+      if (!isRunningA && isRunningB) return 1;
+      
+      // If running status is the same, sort by work center code then machine name
+      if (a.work_center_code !== b.work_center_code) {
+        return a.work_center_code.localeCompare(b.work_center_code);
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [scheduleData]);
+
+  // Create machine mapping at component level
+  const machineMapping = React.useMemo(() => {
+    if (!scheduleData?.work_centers || !availableMachines) return new Map();
+    
+    const mapping = new Map();
+    availableMachines.forEach(machine => {
+      mapping.set(machine.machineId, machine.machineId);
+      mapping.set(`${machine.work_center_code}-${machine.name}`, machine.machineId);
+    });
+    return mapping;
+  }, [scheduleData?.work_centers, availableMachines]);
+
   useEffect(() => {
     fetchScheduleData();
   }, [fetchScheduleData]);
@@ -231,7 +289,7 @@ const Scheduling = () => {
         operations = operations.filter(op => {
           const matchesComponent = selectedComponents.length === 0 || selectedComponents.includes(op.component);
           const matchesOrder = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
-          const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(op.machine);
+          const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(machineMapping.get(op.machine));
           
           return matchesComponent && matchesOrder && matchesMachine;
         });
@@ -244,7 +302,7 @@ const Scheduling = () => {
         const items = new DataSet(
           operations.map((op, index) => ({
             id: index,
-            group: op.machine,
+            group: machineMapping.get(op.machine) || op.machine,  // Map to our internal machine ID
             content: `
               <div class="timeline-item">
                 <div class="item-header">${op.component}</div>
@@ -264,26 +322,19 @@ const Scheduling = () => {
           }))
         );
 
-        // Create groups with all available machines, regardless of operations
+        // Create groups with all available machines
         const groups = new DataSet(
-          availableMachines.map(machine => {
-            // Find work center for this machine from production orders
-            const workCenter = Object.values(scheduleData.production_orders || {})
-              .flatMap(orders => orders)
-              .find(order => order.machine === machine)?.work_center || '';
-        
-            return {
-              id: machine,
-              content: `
-                <div class="machine-group">
-                  <span class="machine-name ">
-                    ${workCenter ? `${workCenter} - ` : ''}${machine}
-                  </span>
-                </div>
-              `,
-              className: operations.some(op => op.machine === machine) ? 'machine-with-ops' : 'machine-without-ops'
-            };
-          })
+          availableMachines.map(machine => ({
+            id: machine.machineId,  // Use our unique internal machine ID
+            content: `
+              <div class="machine-group">
+                <span class="machine-name">
+                  ${machine.displayName}
+                </span>
+              </div>
+            `,
+            className: operations.some(op => machineMapping.get(op.machine) === machine.machineId) ? 'machine-with-ops' : 'machine-without-ops'
+          }))
         );
 
         // Remove previous dynamic styles
@@ -480,52 +531,6 @@ const Scheduling = () => {
       ? 'timeline-item-delayed' 
       : 'timeline-item-warning';
   };
-
-  // Get unique machines from schedule data
-  const availableMachines = React.useMemo(() => {
-    if (!scheduleData) return [];
-    
-    // Get machines from scheduled operations
-    const scheduledMachines = new Set(scheduleData.scheduled_operations.map(op => op.machine));
-    
-    // Get machines from production orders
-    const productionOrderMachines = new Set();
-    if (scheduleData.production_orders) {
-      Object.values(scheduleData.production_orders).forEach(operations => {
-        if (Array.isArray(operations)) {
-          operations.forEach(op => {
-            if (op.machine) {
-              productionOrderMachines.add(op.machine);
-            }
-          });
-        }
-      });
-    }
-    
-    // Combine both sets of machines and convert to array
-    const allMachines = [...new Set([...scheduledMachines, ...productionOrderMachines])];
-    
-    // Helper function to check if machine is running
-    const getMachineStatus = (machine) => {
-      const now = new Date();
-      const isRunning = scheduleData.scheduled_operations.some(op => {
-        const startTime = new Date(op.start_time);
-        const endTime = new Date(op.end_time);
-        return op.machine === machine && startTime <= now && endTime >= now;
-      });
-      return isRunning;
-    };
-
-    // Sort machines: running machines first, then alphabetically
-    return allMachines.sort((a, b) => {
-      const isRunningA = getMachineStatus(a);
-      const isRunningB = getMachineStatus(b);
-      
-      if (isRunningA && !isRunningB) return -1; // Running machines first
-      if (!isRunningA && isRunningB) return 1;  // Running machines first
-      return a.localeCompare(b); // Alphabetical order for same status
-    });
-  }, [scheduleData]);
 
   const availableComponents = React.useMemo(() => {
     if (!scheduleData) return [];
@@ -755,8 +760,10 @@ const Scheduling = () => {
                           allowClear
                         >
                           {availableMachines.map(machine => (
-                            <Option key={machine} value={machine}>{machine}</Option>
-                          ))}
+                            <Option key={machine.machineId} value={machine.machineId}>
+                              {machine.displayName}
+                            </Option>
+                          )) || []}
                         </Select>
 
                         <Select
@@ -872,10 +879,13 @@ const Scheduling = () => {
                   tab="Machine Status" 
                   key="machine-status"
                 >
-                  {scheduleData && componentColors && (
+                  {scheduleData && componentColors && availableMachines && (
                     <MachineStatusCards 
                       machines={availableMachines}
-                      operations={scheduleData.scheduled_operations}
+                      operations={scheduleData.scheduled_operations.map(op => ({
+                        ...op,
+                        machine: machineMapping.get(op.machine) || op.machine
+                      }))}
                       componentStatus={scheduleData.component_status}
                       componentColors={componentColors}
                     />
@@ -893,7 +903,7 @@ const Scheduling = () => {
             </Card>
           </TabPane>
 
-          <TabPane 
+          {/* <TabPane 
             tab={ 
               <span>
                 <HistoryOutlined /> Schedule History
@@ -902,7 +912,7 @@ const Scheduling = () => {
             key="history"
           >
             <ScheduleHistory />
-          </TabPane>
+          </TabPane> */}
 
           <TabPane 
             tab={ 
@@ -914,7 +924,7 @@ const Scheduling = () => {
           >
             <AnalyticsDashboard  />
           </TabPane>
-          <TabPane 
+          {/* <TabPane 
             tab={ 
               <span>
                 <UserOutlined /> Production Order Statuss
@@ -923,7 +933,7 @@ const Scheduling = () => {
             key="order-status"
           >
             <OrderStatusDashboard scheduleData={scheduleData} />
-          </TabPane>
+          </TabPane> */}
         </Tabs>
       </Content>
 
@@ -956,7 +966,7 @@ const Scheduling = () => {
               {scheduleData?.scheduled_operations.map((op, index) => (
                 <Option 
                   key={`${op.component}-${op.description}-${index}`}
-                  value={`${op.component}-${op.description}-${index}`}
+                  value={`${op.machine} - ${op.component} - ${op.description}`}
                 >
                   {`${op.machine} - ${op.component} - ${op.description}`}
                 </Option>

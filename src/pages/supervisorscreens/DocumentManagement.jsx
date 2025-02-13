@@ -1614,7 +1614,7 @@ const DocumentManagement = () => {
           }
 
           const response = await fetch(
-            `http://172.18.7.85:7739/api/v1/documents/search/by-partnumber/?part_number_query=${encodeURIComponent(value)}&skip=0&limit=100`,
+            `http://172.18.7.85:6639/api/v1/documents/search/by-partnumber/?part_number_query=${encodeURIComponent(value)}&skip=0&limit=100`,
             {
               method: 'GET',
               headers: {

@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import axios from 'axios';
 import { message } from 'antd';
 
-const BASE_URL = 'http://172.18.7.85:7739/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:6639/api/v1/api/inventory';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -509,7 +509,7 @@ const useInventoryStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ loading: true });
     try {
-      const response = await axios.get('http://172.18.7.85:7739/planning/all_orders');
+      const response = await axios.get('http://172.18.7.85:6639/api/v1/planning/all_orders');
       set({ 
         allOrders: response.data || [],
         loading: false 
@@ -542,7 +542,7 @@ const useInventoryStore = create((set, get) => ({
 
       // Create axios instance with default headers
       const axiosInstance = axios.create({
-        baseURL: 'http://172.18.7.85:7739/api/v1',
+        baseURL: 'http://172.18.7.85:6639/api/v1/',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -587,7 +587,7 @@ const useInventoryStore = create((set, get) => ({
   fetchOperationsByPartNumber: async (partNumber) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`http://172.18.7.85:7739/planning/search_order?part_number=${partNumber}`);
+      const response = await axios.get(`http://172.18.7.85:6639/api/v1/planning/search_order?part_number=${partNumber}`);
       const operations = response.data?.orders?.[0]?.operations || [];
       set({ 
         operations: operations,

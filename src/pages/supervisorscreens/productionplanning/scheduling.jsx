@@ -477,7 +477,19 @@ const Scheduling = () => {
               hour: 'ddd D MMM',
               minute: 'HH:00'
             }
-          }
+          },
+          hiddenDates: [
+            {
+              start: '1970-01-01 00:00:00',
+              end: '1970-01-01 09:00:00',
+              repeat: 'daily'
+            },
+            {
+              start: '1970-01-01 17:00:00',
+              end: '1970-01-01 23:59:59',
+              repeat: 'daily'
+            }
+          ]
         };
 
         // Cleanup previous timeline instance
@@ -913,6 +925,9 @@ const Scheduling = () => {
           >
             <ScheduleHistory />
           </TabPane> */}
+
+
+          
 
           <TabPane 
             tab={ 
@@ -1363,31 +1378,29 @@ const getTimeRange = (viewType, dateRange, selectedComponents, selectedMachines,
   // Set the visible window based on date range or view type
   if (dateRange && dateRange[0] && dateRange[1]) {
     // Use date range for visible window
-    start = dateRange[0].toDate();
-    end = dateRange[1].toDate();
+    start = dateRange[0].clone().hour(9).minute(0).second(0).toDate();
+    end = dateRange[1].clone().hour(17).minute(0).second(0).toDate();
   } else {
     // Use view type for visible window
     switch (viewType) {
       case 'year':
-        start = now.clone().startOf('year').toDate();
-        end = now.clone().endOf('year').toDate();
+        start = now.clone().startOf('year').hour(9).minute(0).second(0).toDate();
+        end = now.clone().endOf('year').hour(17).minute(0).second(0).toDate();
         break;
       case 'month':
-        start = now.clone().startOf('month').toDate();
-        end = now.clone().endOf('month').toDate();
+        start = now.clone().startOf('month').hour(9).minute(0).second(0).toDate();
+        end = now.clone().endOf('month').hour(17).minute(0).second(0).toDate();
         break;
       case 'week':
-        // Show current day with 3 days before and after
-        start = now.clone().subtract(3, 'days').startOf('day').toDate();
-        end = now.clone().add(3, 'days').endOf('day').toDate();
+        start = now.clone().startOf('week').hour(9).minute(0).second(0).toDate();
+        end = now.clone().endOf('week').hour(17).minute(0).second(0).toDate();
         break;
       default: // day
-        start = now.clone().startOf('day').toDate();
-        end = now.clone().endOf('day').toDate();
+        start = now.clone().startOf('day').hour(9).minute(0).second(0).toDate();
+        end = now.clone().endOf('day').hour(17).minute(0).second(0).toDate();
     }
   }
 
-  // Return both the visible window and the full data range
   return {
     start,
     end,

@@ -8,8 +8,8 @@ import { ReloadOutlined } from '@ant-design/icons';
 const { TabPane } = Tabs;
 
 const ProductionStatus = () => {
-  const [partNumber, setPartNumber] = useState('');
-  const [selectedDetailPartNumber, setSelectedDetailPartNumber] = useState('');
+  const [partNumber, setPartNumber] = useState([]);
+  const [selectedDetailPartNumber, setSelectedDetailPartNumber] = useState([]);
   const [timeRange, setTimeRange] = useState('daily');
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
@@ -355,9 +355,9 @@ const ProductionStatus = () => {
           style={{ minWidth: '250px', flex: '1 1 250px' }}
         >
           <Select
+            placeholder="Select Part Number"
             showSearch
             value={partNumber}
-            placeholder="Select Part Number"
             style={{ width: '200px' }}
             defaultActiveFirstOption={false}
             showArrow={true}
@@ -440,8 +440,8 @@ const ProductionStatus = () => {
                 style={{ minWidth: '250px', maxWidth: '400px' }}
               >
                 <Select
-                  style={{ width: '100%' }}
                   placeholder="Select Part Number"
+                  style={{ width: '100%' }}
                   value={selectedDetailPartNumber}
                   onChange={setSelectedDetailPartNumber}
                   allowClear

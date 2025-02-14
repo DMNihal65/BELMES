@@ -81,6 +81,11 @@ function Sidebar() {
       ]
     },
     {
+      key: '/supervisor/machine-maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Machine Maintenance',
+    },
+    {
       key: 'production-planning',
       icon: <Calendar size={20} />,
       label: 'Production Planning',

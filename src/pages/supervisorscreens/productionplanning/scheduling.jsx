@@ -9,7 +9,7 @@ import {
 import {
   ScheduleOutlined, SyncOutlined, HistoryOutlined, CalendarOutlined, 
   ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined, LeftOutlined, 
-  RightOutlined, InfoCircleOutlined, UserOutlined 
+  RightOutlined, InfoCircleOutlined, UserOutlined ,   
 } from '@ant-design/icons';
 import { Timeline } from "vis-timeline/esnext";
 import { DataSet } from "vis-data/esnext";
@@ -882,7 +882,9 @@ const Scheduling = () => {
                     />
                   </div>
 
-             
+                  {scheduleData && componentColors && (
+                    <ComponentLegend componentColors={componentColors} />
+                  )}
              
 
              

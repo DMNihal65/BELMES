@@ -4,6 +4,8 @@ import OperatorDashboard from '../pages/operatorscreens/dashboard';
 import Inventory from '../pages/operatorscreens/inventory/inventoryRequest';
 import SupervisorDashboard from '../pages/supervisorscreens/dashboard';
 
+import MachineMaintenance from '../pages/supervisorscreens/MachineMaintenance/MachineMaintenance';
+
 import JobDetails from '../pages/operatorscreens/jobdetails';
 import AlertScreens from '../pages/operatorscreens/AlertScreens';
 import Login from '../pages/auth/Login';
@@ -132,6 +134,11 @@ export const router = createBrowserRouter([
           {
             path: 'order-management',
             element: <OrderDashboard />,
+
+          },
+          {
+            path: 'machine-maintenance',
+            element: <MachineMaintenance />,
 
           },
           {

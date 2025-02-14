@@ -129,9 +129,13 @@ function Sidebar() {
     },
     {
       key: '/supervisor/documents',
-
       icon: <Files size={20} />,
       label: 'Document Management',
+    },
+    {
+      key: '/supervisor/final-document',
+      icon: <FileText size={20} />,
+      label: 'Final Doc_Management',
     },
   ];
 

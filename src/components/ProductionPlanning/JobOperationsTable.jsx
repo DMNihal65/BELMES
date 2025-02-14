@@ -312,7 +312,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   const handleViewMppDetails = async (record) => {
     try {
       // First get the production order from the search endpoint
-      const searchResponse = await usePlanningStore.getState().searchOrders(partNumber);
+      const searchResponse = await usePlanningStore.getState().searchOrders(record.production_order);
       
       if (!searchResponse?.orders?.[0]?.production_order) {
         message.error('Production order not found');
@@ -340,7 +340,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       } else {
         // Case 2: Check MPP details by identifier
         const mppDetails = await usePlanningStore.getState().fetchMppByIdentifier(
-          partNumber,
+          record.production_order,
           record.operation_number
         );
 
@@ -368,7 +368,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           setSelectedOperation({
             ...record,
             operation_number: record.operation_number,
-            partNumber: partNumber,
+            production_order: record.production_order,
             isExistingMpp: false
           });
           setShowMPPDetails(true);
@@ -481,12 +481,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       render: (text, record) => {
         return record.primary_machine?.name || record.primary_machine?.make || '-';
       }
-    },
-    {
-      title: 'Production Order',
-      dataIndex: 'production_order',
-      width: 150,
-      editable: false,
     },
     {
       title: 'Actions',

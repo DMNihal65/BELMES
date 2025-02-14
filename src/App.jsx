@@ -31,6 +31,7 @@ import MachineDowntime from './pages/supervisorscreens/Monitoring/MachineDowntim
 import MaintenanceDocuments from './pages/supervisorscreens/Monitoring/MaintenanceDocuments';
 import MaintenanceSchedule from './pages/supervisorscreens/Monitoring/MaintenanceSchedule';
 import './styles/maintenance.css';
+import FinalDocument from './pages/supervisorscreens/FinalDocument';
 
 const App = () => {
   return (
@@ -52,6 +53,7 @@ const App = () => {
             <Route path="production-planning/scheduling" element={<Scheduling />} />
             <Route path="production-monitoring" element={<ProductionMonitoring />} />
             <Route path="documents" element={<DocumentManagement />} />
+            <Route path="final-document" element={<FinalDocument />} />
             <Route path="quality-management" element={<QualityManagementDashboard />} />
             <Route path="inventory_master/inventory_usage_and_analytics" element={<InventoryUsageAndAnalytics />} />
             <Route path="inventory_master/requests_calibration_history" element={<RequestsCalibrationHistory />} />

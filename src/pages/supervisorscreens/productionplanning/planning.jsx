@@ -35,12 +35,12 @@ const Planning = () => {
   const { 
     fetchAllOrders, 
     searchOrders, 
-    productionOrders,
+    partNumbers, 
     searchResults,
     isLoading,
     fetchActiveParts,
     activeParts,
-    changePartStatus
+    changePartStatus 
   } = usePlanningStore();
 
   // Fetch part numbers and active parts on component mount
@@ -111,13 +111,13 @@ const Planning = () => {
     }
   };
 
-  const handleJobSelect = async (productionOrder) => {
-    const results = await searchOrders(productionOrder);
+  const handleJobSelect = async (partNumber) => {
+    const results = await searchOrders(partNumber);
     if (results.orders && results.orders.length > 0) {
       const selectedJobData = results.orders[0];
       setSelectedJob(selectedJobData);
-      setSelectedOrderNumber(selectedJobData?.production_order);
-      console.log('Selected Order Number:', selectedJobData?.production_order);
+      setSelectedOrderNumber(selectedJobData?.orderNumber);
+      console.log('Selected Order Number:', selectedJobData?.orderNumber);
     }
   };
 
@@ -233,9 +233,9 @@ const Planning = () => {
                     style={{ width: '500px' }}
                     allowClear
                   >
-                    {productionOrders.map(item => (
-                      <Option key={item.id} value={item.production_order}>
-                        {item.production_order}
+                    {partNumbers.map(item => (
+                      <Option key={item.id} value={item.productionOrder}>
+                        {item.productionOrder}
                       </Option>
                     ))}
                   </Select>
@@ -460,7 +460,3 @@ const Planning = () => {
 };
 
 export default Planning;
-
-
-
-

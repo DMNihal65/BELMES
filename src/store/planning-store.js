@@ -17,7 +17,6 @@ const usePlanningStore = create((set) => ({
   mppDocuments: [],
   selectedMppDocument: null,
   mppData: null,
-  productionOrders: [],
   setMppData: (data) => set({ mppData: data }),
 
   // Fetch all orders to get part numbers for dropdown
@@ -34,12 +33,12 @@ const usePlanningStore = create((set) => ({
       // Extract production orders from orders
       const productionOrders = Array.isArray(data) ? data.map(item => ({
         id: item.id || String(Math.random()),
-        production_order: item.production_order
+        productionOrder: item.production_order
       })) : [];
 
       set({ 
         allOrders: data,
-        productionOrders, // Store production orders in state
+        partNumbers: productionOrders, // We'll keep the same state variable but store production orders
         isLoading: false,
         error: null
       });
@@ -49,7 +48,7 @@ const usePlanningStore = create((set) => ({
       console.error('Fetch all orders error:', error);
       set({ 
         allOrders: [],
-        productionOrders: [], // Clear production orders on error
+        partNumbers: [], // This will now store production orders
         error: error.message, 
         isLoading: false 
       });
@@ -57,7 +56,7 @@ const usePlanningStore = create((set) => ({
     }
   },
 
-  // Update search function to use production order
+  // Search for specific order details
   searchOrders: async (productionOrder) => {
     set({ isLoading: true, error: null });
     try {
@@ -414,10 +413,10 @@ const usePlanningStore = create((set) => ({
     }
   },
 
-  // Function to fetch MPP by identifier (part number and operation)
-  fetchMppByIdentifier: async (partNumber, operationNumber) => {
+  // Function to fetch MPP by identifier (production order and operation)
+  fetchMppByIdentifier: async (productionOrder, operationNumber) => {
     try {
-      const response = await fetch(`http://172.18.7.85:6639/api/v1/mpp/by-identifier?operation_number=${operationNumber}&part_number=${partNumber}`, {
+      const response = await fetch(`http://172.18.7.85:6639/api/v1/mpp/by-identifier?operation_number=${operationNumber}&production_order=${productionOrder}`, {
         headers: {
           'accept': 'application/json'
         }
@@ -507,4 +506,3 @@ const usePlanningStore = create((set) => ({
 }));
 
 export default usePlanningStore;
-

@@ -221,21 +221,21 @@ const Planning = () => {
         <Row gutter={24} align="middle">
           <Col span={20}>
             <Space size="large" className="w-full">
-              <Form.Item label="Select Job/Part Number" className="mb-0" style={{ flex: 1 }}>
+              <Form.Item label="Select Job/Production Order" className="mb-0" style={{ flex: 1 }}>
                 <Space className="w-full">
                   <Select
                     className="job-select"
                     showSearch
                     loading={isLoading}
-                    placeholder="Search by Part Number"
+                    placeholder="Search by Production Order"
                     onChange={handleJobSelect}
                     optionFilterProp="children"
                     style={{ width: '500px' }}
                     allowClear
                   >
                     {partNumbers.map(item => (
-                      <Option key={item.id} value={item.partNumber}>
-                        {item.partNumber}
+                      <Option key={item.id} value={item.productionOrder}>
+                        {item.productionOrder}
                       </Option>
                     ))}
                   </Select>
@@ -353,7 +353,7 @@ const Planning = () => {
                 />
               </TabPane>
 
-              <TabPane 
+              {/* <TabPane 
                 tab={
                   <span>
                     <BarChartOutlined />
@@ -366,7 +366,7 @@ const Planning = () => {
                   machines={mockMachines}
                   selectedJob={selectedJob}
                 />
-              </TabPane>
+              </TabPane> */}
 
               <TabPane 
                 tab={
@@ -460,7 +460,3 @@ const Planning = () => {
 };
 
 export default Planning;
-
-
-
-

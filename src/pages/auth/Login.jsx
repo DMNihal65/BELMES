@@ -127,7 +127,7 @@ const Login = () => {
             >
               {(machines || []).map(machine => (
                 <Option key={machine.id} value={machine.id}>
-                  {machine.model} ({machine.work_center.code})
+                   ({machine.work_center.code}) {machine.make}
                 </Option>
               ))}
             </Select>

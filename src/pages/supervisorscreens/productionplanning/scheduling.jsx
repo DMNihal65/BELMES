@@ -19,7 +19,7 @@ import moment from 'moment';
 import AnalyticsDashboard from './Analytics/AnalyticsDashboard';
 import { ComponentLegend, MachineStatusCards } from './Schedule/ComponentsAndStatus';
 import OrderStatusDashboard from './OrderStatus/OrderStatusDashboard';
-
+import DynamicSchedulingGraph from './DynamicScheduling/DynamicSchedulingGraph';
 
 
 const { Sider, Content } = Layout;
@@ -889,7 +889,12 @@ const Scheduling = () => {
 
              
                 </TabPane>
-
+                <TabPane 
+                  tab="Dynamic Scheduling Graph" 
+                  key="dynamic-scheduling"
+                >
+                  <DynamicSchedulingGraph />
+                </TabPane>
                 <TabPane 
                   tab="Machine Status" 
                   key="machine-status"

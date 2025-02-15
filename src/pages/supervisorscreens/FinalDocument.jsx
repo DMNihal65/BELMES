@@ -72,7 +72,8 @@ import {
   CloudDownloadOutlined,
   UsergroupAddOutlined,
   ClockCircleOutlined,
-  FolderOpenOutlined
+  FolderOpenOutlined,
+  DatabaseOutlined
 } from '@ant-design/icons';
 import useDocumentStore from '../../store/finalDocument-store';
 import ReactDOM from 'react-dom';
@@ -422,7 +423,187 @@ const AnalyticsCards = ({ metrics, isLoading, error }) => {
   );
 };
 
+// Update MetricsCards to accept props
+const MetricsCards = ({ documents, folders, documentTypes }) => {
+  return (
+    <div className="grid grid-cols-7 gap-4 mb-4">
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <div className="flex items-center gap-2">
+          <FileTextOutlined className="text-blue-500" />
+          <div>
+            <div className="text-2xl font-semibold">{documents?.length || 0}</div>
+            <div className="text-sm text-gray-600">Total Documents</div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-green-50 p-4 rounded-lg">
+        <div className="flex items-center gap-2">
+          <CloudDownloadOutlined className="text-green-500" />
+          <div>
+            <div className="text-2xl font-semibold">0</div>
+            <div className="text-sm text-gray-600">Downloads</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-purple-50 p-4 rounded-lg">
+        <div className="flex items-center gap-2">
+          <DatabaseOutlined className="text-purple-500" />
+          <div>
+            <div className="text-2xl font-semibold">0.0MB</div>
+            <div className="text-sm text-gray-600">Storage Used</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-cyan-50 p-4 rounded-lg">
+        <div className="flex items-center gap-2">
+          <HistoryOutlined className="text-cyan-500" />
+          <div>
+            <div className="text-2xl font-semibold">2</div>
+            <div className="text-sm text-gray-600">Total Versions</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-amber-50 p-4 rounded-lg">
+        <div className="flex items-center gap-2">
+          <FolderOutlined className="text-amber-500" />
+          <div>
+            <div className="text-2xl font-semibold">{folders?.length || 0}</div>
+            <div className="text-sm text-gray-600">Active Folders</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-indigo-50 p-4 rounded-lg">
+        <div className="flex items-center gap-2">
+          <ClockCircleOutlined className="text-indigo-500" />
+          <div>
+            <div className="text-2xl font-semibold">2</div>
+            <div className="text-sm text-gray-600">Recent Activity</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-rose-50 p-4 rounded-lg">
+        <div className="flex items-center gap-2">
+          <FileOutlined className="text-rose-500" />
+          <div>
+            <div className="text-2xl font-semibold">{documentTypes?.length || 0}</div>
+            <div className="text-sm text-gray-600">Doc Types</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DocumentManagement = () => {
+  // Define columns at the top of the component
+  const tableColumns = [  // Renamed to avoid conflicts
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text, record) => (
+        <Space>
+          <FileOutlined />
+          <span>{text}</span>
+          <span className="text-gray-400 text-sm">
+            {record.latest_version?.file_size ? 
+              `(${(record.latest_version.file_size / (1024 * 1024)).toFixed(2)} MB)` : ''}
+          </span>
+        </Space>
+      ),
+    },
+    {
+      title: 'Version',
+      dataIndex: 'latest_version',
+      key: 'version',
+      render: (version) => (
+        <Tag color="blue">v{version?.version_number || '1.0'}</Tag>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'is_active',
+      key: 'status',
+      render: (isActive) => (
+        <Tag color={isActive ? 'success' : 'default'}>
+          {isActive ? 'ACTIVE' : 'INACTIVE'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Modified',
+      dataIndex: 'created_at',
+      key: 'modified',
+      render: (date, record) => (
+        <Space direction="vertical" size={0}>
+          <span>{new Date(date).toLocaleDateString()}</span>
+          <span className="text-gray-400 text-sm">
+            by {record.created_by_id}
+          </span>
+        </Space>
+      ),
+    },
+    {
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="View">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={() => handlePreview(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Download">
+            <Button
+              type="text"
+              icon={<DownloadOutlined />}
+              onClick={() => handleDownload(record)}
+            />
+          </Tooltip>
+          <Dropdown
+            overlay={
+              <Menu>
+                <Menu.Item 
+                  key="versions" 
+                  icon={<HistoryOutlined />}
+                  onClick={() => {
+                    setSelectedVersionDoc(record);
+                    setVersionModalVisible(true);
+                  }}
+                >
+                  Versions
+                </Menu.Item>
+                <Menu.Item 
+                  key="delete" 
+                  icon={<DeleteOutlined />}
+                  danger
+                  onClick={() => handleDelete(record)}
+                >
+                  Delete
+                </Menu.Item>
+              </Menu>
+            }
+          >
+            <Button type="text" icon={<MoreOutlined />} />
+          </Dropdown>
+        </Space>
+      ),
+    },
+  ];
+
   const [selectedFolder, setSelectedFolder] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [favorites, setFavorites] = useState(['DOC001']);
@@ -452,6 +633,8 @@ const DocumentManagement = () => {
     downloadDocumentVersion,
     fetchDocumentVersions,
     folders,
+    columns,
+    filteredDocuments,
     deleteFolder,
     fetchFolders,
     createFolder,
@@ -461,7 +644,8 @@ const DocumentManagement = () => {
     isLoadingMetrics,
     metricsError,
     fetchMetrics,
-    refreshMetrics
+    refreshMetrics,
+    totalDocuments,
   } = useDocumentStore();
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, folder: null });
   const [isNewFolderModalVisible, setIsNewFolderModalVisible] = useState(false);
@@ -502,6 +686,19 @@ const DocumentManagement = () => {
 
   // Add new state for view mode
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+
+  const [expandedKeys, setExpandedKeys] = useState([]);
+  const [selectedFolderPath, setSelectedFolderPath] = useState([]);
+
+  // Add new state for selected part number details
+  const [selectedPartNumber, setSelectedPartNumber] = useState(null);
+
+  // Add this state to track the current folder context
+  const [currentFolderContext, setCurrentFolderContext] = useState({
+    folderId: null,
+    folderPath: [],
+    folderName: null
+  });
 
   useEffect(() => {
     if (selectedDocument?.document_name.toLowerCase().endsWith('.pdf')) {
@@ -567,8 +764,7 @@ const DocumentManagement = () => {
       const docTypeData = {
         type_name: newDocType.type_name,
         description: newDocType.description,
-        extensions: newDocType.extensions.split(',').map(ext => ext.trim()).join(','),
-        is_active: newDocType.is_active
+        extensions: newDocType.extensions
       };
 
       await createDocType(docTypeData);
@@ -582,77 +778,122 @@ const DocumentManagement = () => {
     }
   };
 
-  // Update the convertFoldersToTree function
-  const convertFoldersToTree = (folders) => {
-    const folderMap = new Map();
-    const tree = [];
-
-    // First pass: create all nodes
-    folders.forEach(folder => {
-      const node = {
-        title: (
-          <div className="flex items-center justify-between w-full py-1">
-            <div className="flex items-center space-x-2">
-              <FolderOutlined className="text-blue-500" />
-              <span className="font-medium">{folder.folder_name}</span>
-            </div>
-            {folder.document_count > 0 && (
-              <Tag className="ml-2" color="blue">
-                {folder.document_count}
-              </Tag>
-            )}
-          </div>
-        ),
-        key: folder.id.toString(),
-        parentId: folder.parent_folder_id,
-        children: []
-      };
-      folderMap.set(folder.id, node);
-    });
-
-    // Second pass: build tree structure
-    folders.forEach(folder => {
-      const node = folderMap.get(folder.id);
-      if (!folder.parent_folder_id) {
-        tree.push(node);
-      } else {
-        const parentNode = folderMap.get(folder.parent_folder_id);
-        if (parentNode) {
-          if (!parentNode.children) parentNode.children = [];
-          parentNode.children.push(node);
-        }
+  // Add this function to handle folder expansion
+  const onExpand = async (expandedKeys, { expanded, node }) => {
+    setExpandedKeys(expandedKeys);
+    if (expanded) {
+      try {
+        await fetchFolders(node.key);
+      } catch (error) {
+        message.error('Failed to load subfolders');
       }
-    });
-
-    return tree;
-  };
-
-  const handleContextMenu = (event, folder) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!folder) return;
-    
-    console.log('Opening context menu for folder:', folder);
-    setContextMenu({
-      visible: true,
-      x: event.clientX,
-      y: event.clientY,
-      folder: folder
-    });
-  };
-
-  const handleFolderSelect = (selectedKeys, info) => {
-    if (selectedKeys.length === 0) {
-      setSelectedFolder('all');
-      setSelectedParentId(null);
-    } else if (info.node) {
-      const folderId = info.node.key;
-      setSelectedFolder(folderId);
-      setSelectedParentId(folderId);
-      fetchFolderDocuments(folderId);
     }
   };
 
+  // Update folder selection handler to track correct path
+  const handleFolderSelect = async (selectedKeys, info) => {
+    // Handle clicking outside the tree
+    if (!selectedKeys.length) {
+      setSelectedFolder(null);
+      setCurrentFolderContext({
+        folderId: null,
+        folderPath: [],
+        folderName: null
+      });
+      return;
+    }
+
+    const folderId = selectedKeys[0];
+    setSelectedFolder(folderId);
+    
+    // Build folder path
+    let currentNode = info?.node;
+    const path = [];
+    while (currentNode) {
+      path.unshift({
+        key: currentNode.key,
+        title: currentNode.title,
+        id: currentNode.key
+      });
+      const parentFolder = folders.find(f => f.id === currentNode.parent_folder_id);
+      currentNode = parentFolder ? {
+        key: parentFolder.id.toString(),
+        title: parentFolder.folder_name,
+        parent_folder_id: parentFolder.parent_folder_id
+      } : null;
+    }
+
+    setCurrentFolderContext({
+      folderId: folderId,
+      folderPath: path,
+      folderName: folders.find(f => f.id === Number(folderId))?.folder_name
+    });
+
+    await fetchFolderDocuments(folderId);
+  };
+
+  // Update the folder tree rendering
+  const renderFolderTree = (folders) => {
+    return folders.map(folder => ({
+      key: folder.id.toString(),
+      title: folder.folder_name,
+      icon: <FolderOutlined />,
+      children: folder.children && folder.children.length > 0 
+        ? renderFolderTree(folder.children) 
+        : undefined,
+      isLeaf: false,
+      parent_folder_id: folder.parent_folder_id
+    }));
+  };
+
+  // Restore original left sidebar with buttons
+  const renderLeftSidebar = () => (
+    <div className="folder-tree-container">
+      <div className="flex items-center space-x-2 mb-4">
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => setIsNewFolderModalVisible(true)}
+        >
+          New Folder
+        </Button>
+        <Button
+          type="primary"
+          icon={<CloudUploadOutlined />}
+          onClick={() => setIsUploadModalVisible(true)}
+        >
+          Upload
+        </Button>
+      </div>
+      <Tree
+        showIcon
+        defaultExpandAll={false}
+        expandedKeys={expandedKeys}
+        onExpand={onExpand}
+        onSelect={handleFolderSelect}
+        treeData={renderFolderTree(folders)}
+        className="custom-tree"
+      />
+    </div>
+  );
+
+  // Update breadcrumb to show correct path
+  const renderBreadcrumb = () => (
+    <Breadcrumb className="mb-4">
+      <Breadcrumb.Item onClick={() => handleFolderSelect(['all'])}>
+        <HomeOutlined /> Documents
+      </Breadcrumb.Item>
+      {currentFolderContext.folderPath.map((item) => (
+        <Breadcrumb.Item key={item.key}>
+          <span className="cursor-pointer" onClick={() => handleFolderSelect([item.key])}>
+            {item.title}
+          </span>
+        </Breadcrumb.Item>
+      ))}
+    </Breadcrumb>
+  );
+
+  // Update create folder handler to handle root/child folder creation
   const handleCreateFolder = async () => {
     try {
       if (!newFolderName.trim()) {
@@ -661,20 +902,20 @@ const DocumentManagement = () => {
       }
 
       const folderData = {
-        folder_name: newFolderName.trim(),
-        parent_folder_id: targetFolderId || 0, // Use 0 as default if no parent folder
+        name: newFolderName.trim(), // Ensure this is set
+        parent_folder_id: currentFolderContext.folderId || null
       };
 
       await createFolder(folderData);
       setIsNewFolderModalVisible(false);
       setNewFolderName('');
-      setTargetFolderId(null);
-      await fetchFolders();
       message.success('Folder created successfully');
       
-      // Refresh the current folder's contents
-      if (targetFolderId) {
-        await fetchFolderDocuments(targetFolderId);
+      // Refresh folders based on context
+      if (currentFolderContext.folderId) {
+        await fetchFolders(currentFolderContext.folderId);
+      } else {
+        await fetchFolders();
       }
     } catch (error) {
       message.error('Failed to create folder: ' + error.message);
@@ -715,7 +956,7 @@ const DocumentManagement = () => {
             // Reset selected folder if deleted folder was selected
             if (selectedFolder === folder.id) {
               setSelectedFolder('all');
-              setSelectedParentId(null);
+              setSelectedFolderPath([]);
             }
           } catch (error) {
             console.error('Error deleting folder:', error);
@@ -894,563 +1135,30 @@ const DocumentManagement = () => {
     );
   };
 
-  // Update the New Folder Modal to show correct parent folder
-  const renderNewFolderModal = () => (
-    <Modal
-      title="Create New Folder"
-      visible={isNewFolderModalVisible}
-      onOk={handleCreateFolder}
-      onCancel={() => {
-        setIsNewFolderModalVisible(false);
-        setNewFolderName('');
-        setTargetFolderId(null);
-      }}
-      okButtonProps={{ disabled: !newFolderName.trim() }}
-    >
-      <Form layout="vertical">
-        <Form.Item 
-          label="Folder Name" 
-          required
-          validateStatus={!newFolderName.trim() && 'error'}
-          help={!newFolderName.trim() && 'Please enter a folder name'}
-        >
-          <Input
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            placeholder="Enter folder name"
-            autoFocus
-            maxLength={50}
-          />
-        </Form.Item>
-        <Form.Item label="Parent Folder">
-          <Input 
-            value={
-              targetFolderId ? 
-                folders.find(f => f.id.toString() === targetFolderId?.toString())?.folder_name 
-                : 'Root'
-            }
-            disabled
-          />
-        </Form.Item>
-      </Form>
-    </Modal>
-  );
-
-  // Update the handleUploadClick function
+  // Update the Upload button click handler
   const handleUploadClick = () => {
-    if (!selectedFolder || selectedFolder === 'all') {
-      message.warning('Please select a folder before uploading');
+    if (!currentFolderContext.folderId) {
+      message.warning('Please select a folder first');
       return;
     }
     setIsUploadModalVisible(true);
-    setTargetFolderId(selectedFolder);
   };
 
-  const handleUpload = async (file, values) => {
-    try {
-      if (!targetFolderId) {
-        message.error('Please select a folder before uploading.');
-        return;
-      }
-
-      // Check if document with same name exists in folder
-      const existingDoc = documents.find(
-        doc => doc.document_name === values.document_name && 
-               doc.folder_id.toString() === targetFolderId.toString()
-      );
-
-      const uploadData = {
-        file: file,
-        folder_id: targetFolderId,
-        document_name: values.document_name || file.name,
-        doc_type_id: values.doc_type_id,
-        part_number_id: values.part_number_id,
-        description: values.description || '',
-        version_number: existingDoc ? `1.${parseInt(existingDoc.version_number.split('.')[1] || '0') + 1}` : '1.0'
-      };
-
-      await uploadDocument(uploadData);
-      setIsUploadModalVisible(false);
-      uploadForm.resetFields();
-      setSelectedFile(null);
-      setTargetFolderId(null);
-      message.success('File uploaded successfully');
-      
-      if (selectedFolder && selectedFolder !== 'all') {
-        await fetchFolderDocuments(selectedFolder);
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      message.error(
-        error.message === '[object Object]' 
-          ? 'Failed to upload file. Please check all required fields are filled correctly.'
-          : `Upload failed: ${error.message}`
-      );
+  // Add handleUploadSuccess function
+  const handleUploadSuccess = async (response) => {
+    message.success('Document uploaded successfully');
+    setIsUploadModalVisible(false);
+    uploadForm.resetFields();
+    setSelectedFile(null);
+    setSelectedPartNumber(null);
+    
+    // Refresh documents in current folder
+    if (currentFolderContext.folderId) {
+      await fetchFolderDocuments(currentFolderContext.folderId);
     }
   };
 
-  // Handle delete
-  const handleDelete = (record) => {
-    Modal.confirm({
-      title: 'Delete Document',
-      content: `Are you sure you want to delete "${record.name}"?`,
-      okText: 'Yes',
-      okType: 'danger',
-      cancelText: 'No',
-      onOk() {
-        setDocuments(prev => prev.filter(doc => doc.id !== record.id));
-        message.success('Document deleted successfully');
-      }
-    });
-  };
-
-  // Filter documents based on search and selected folder
-  const filteredDocuments = Array.isArray(documents) ? documents.filter(doc => {
-    const matchesSearch = doc.document_name?.toLowerCase().includes(searchText.toLowerCase());
-    const matchesFolder = selectedFolder === 'all' || doc.folder_id.toString() === selectedFolder.toString();
-    return matchesSearch && matchesFolder;
-  }) : [];
-
-  const getFileIcon = (fileName) => {
-    const extension = fileName.split('.').pop().toLowerCase();
-    const iconProps = { className: 'text-lg' };
-
-    switch (extension) {
-      case 'pdf':
-        return <FilePdfOutlined {...iconProps} className="text-red-500" />;
-      case 'doc':
-      case 'docx':
-        return <FileWordOutlined {...iconProps} className="text-blue-500" />;
-      case 'xls':
-      case 'xlsx':
-        return <FileExcelOutlined {...iconProps} className="text-green-500" />;
-      case 'txt':
-      case 'js':
-      case 'jsx':
-      case 'css':
-      case 'html':
-        return <FileTextOutlined {...iconProps} className="text-gray-500" />;
-      case 'stp':
-      case 'step':
-        return <FileImageOutlined {...iconProps} className="text-purple-500" />;
-      default:
-        return <FileOutlined {...iconProps} className="text-gray-400" />;
-    }
-  };
-
-  // Add download version selection modal
-  const renderDownloadVersionModal = () => (
-    <Modal
-      title={`Select Versions to Download - ${selectedDocument?.document_name}`}
-      visible={downloadModalVisible}
-      onCancel={handleDownloadModalClose}
-      onOk={async () => {
-        try {
-          // Download selected versions
-          for (const version of selectedVersions) {
-            const blob = await downloadDocumentVersion(selectedDocument.id, version.id);
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${selectedDocument.document_name}_v${version.version_number}`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-          }
-          message.success('Documents downloaded successfully');
-          setDownloadModalVisible(false);
-          setSelectedVersions([]);
-        } catch (error) {
-          message.error('Failed to download documents');
-        }
-      }}
-      okButtonProps={{ disabled: selectedVersions.length === 0 }}
-    >
-      <Checkbox.Group
-        value={selectedVersions.map(v => v.id)}
-        onChange={(values) => {
-          setSelectedVersions(
-            downloadVersions.filter(v => values.includes(v.id))
-          );
-        }}
-      >
-        <List
-          dataSource={downloadVersions}
-          renderItem={version => (
-            <List.Item>
-              <Checkbox value={version.id}>
-                Version {version.version_number} 
-                ({new Date(version.created_at).toLocaleDateString()})
-              </Checkbox>
-            </List.Item>
-          )}
-        />
-      </Checkbox.Group>
-    </Modal>
-  );
-
-  // Update the handleDownload function
-  const handleDownload = async (record) => {
-    try {
-      // Get all versions of the document
-      const versions = await fetchDocumentVersions(record.id);
-      
-      if (versions.length > 1) {
-        // If multiple versions exist, show selection modal
-        setSelectedDocument(record);
-        setDownloadVersions(versions);
-        setDownloadModalVisible(true);
-      } else {
-        // If only one version, download it directly
-        const blob = await downloadDocumentVersion(record.id, versions[0].id);
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = record.document_name;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        message.success('Document downloaded successfully');
-      }
-    } catch (error) {
-      message.error('Failed to download document');
-    }
-  };
-
-  const handleShare = (record) => {
-    Modal.confirm({
-      title: 'Share Document',
-      content: (
-        <div>
-          <p>Share "{record.name}" with:</p>
-          <Input placeholder="Enter email addresses" />
-        </div>
-      ),
-      onOk() {
-        message.success('Document shared successfully');
-      }
-    });
-  };
-
-  const toggleFavorite = (docId) => {
-    setFavorites(prev => 
-      prev.includes(docId) 
-        ? prev.filter(id => id !== docId)
-        : [...prev, docId]
-    );
-    message.success('Favorites updated');
-  };
-
-  // Update the columns definition
-  const columns = [
-    {
-      title: 'Name',
-      dataIndex: 'document_name',
-      key: 'document_name',
-      render: (text, record) => (
-        <div className="flex items-center space-x-2">
-          {getFileIcon(record.document_name)}
-          <div>
-            <span className="font-medium">{text}</span>
-            <div className="text-xs text-gray-500">
-              {record.description || ''}
-              {record.latest_version?.file_size && 
-                ` • ${(record.latest_version.file_size / (1024 * 1024)).toFixed(2)} MB`}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Version',
-      dataIndex: 'version_number',
-      key: 'version',
-      width: 200,
-      render: (version, record) => {
-        const versions = record.versions || [];
-        return (
-          <Space wrap>
-            {versions.map((ver) => (
-              <Tag
-                key={ver.id}
-                color={ver.status === 'active' ? 'blue' : 'default'}
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleVersionClick(record, ver)}
-              >
-                v{ver.version_number}
-              </Tag>
-            ))}
-            {versions.length === 0 && version && (
-              <Tag color="blue">
-                v{version}
-              </Tag>
-            )}
-          </Space>
-        );
-      }
-    },
-    {
-      title: 'Status',
-      dataIndex: ['latest_version', 'status'],
-      key: 'status',
-      width: 120,
-      render: (status) => (
-        <Tag color={
-          status === 'active' ? 'success' : 
-          status === 'under_review' ? 'processing' : 
-          'default'
-        }>
-          {status?.toUpperCase()}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Modified',
-      dataIndex: 'created_at',
-      key: 'modified',
-      width: 150,
-      render: (date, record) => (
-        <div>
-          <div>{new Date(date).toLocaleDateString()}</div>
-          <div className="text-xs text-gray-500">by {record.created_by}</div>
-        </div>
-      ),
-    },
-    {
-      title: 'Part Number',
-      dataIndex: 'part_number',
-      key: 'part_number',
-      width: 150,
-      render: (partNumber) => (
-        <div>
-          {partNumber || 'N/A'}
-        </div>
-      ),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 150,
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            onClick={() => handlePreview(record)}
-          />
-          <Button
-            type="text"
-            icon={<DownloadOutlined />}
-            onClick={() => handleDownload(record)}
-          />
-          <Dropdown 
-            overlay={renderQuickActions(record)} 
-            trigger={['click']}
-          >
-            <Button type="text" icon={<MoreOutlined />} />
-          </Dropdown>
-        </Space>
-      ),
-    },
-  ];
-
-  const documentTypeButton = (
-    <Col>
-      <Button 
-        icon={<FileTextOutlined />}
-        onClick={() => setIsDocTypeModalVisible(true)}
-      >
-        Document Types
-      </Button>
-    </Col>
-  );
-
-  const documentTypeModals = (
-    <>
-      <Modal
-        title="Document Types"
-        visible={isDocTypeModalVisible}
-        onCancel={() => setIsDocTypeModalVisible(false)}
-        footer={[
-          <Button 
-            key="create" 
-            type="primary" 
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setIsDocTypeModalVisible(false);
-              setIsCreateDocTypeModalVisible(true);
-            }}
-          >
-            Create New Type
-          </Button>
-        ]}
-        width={800}
-      >
-        <Table
-          dataSource={documentTypes}
-          rowKey="id"
-          loading={isLoading}
-          columns={[
-            {
-              title: 'Type Name',
-              dataIndex: 'type_name',
-              key: 'type_name',
-              sorter: (a, b) => a.type_name.localeCompare(b.type_name)
-            },
-            {
-              title: 'Description',
-              dataIndex: 'description',
-              key: 'description',
-              ellipsis: true
-            },
-            {
-              title: 'Extensions',
-              dataIndex: 'file_extensions',
-              key: 'file_extensions',
-              render: (extensions) => (
-                <Space wrap>
-                  {extensions?.map(ext => (
-                    <Tag key={ext} color="blue">
-                      {ext}
-                    </Tag>
-                  ))}
-                </Space>
-              ),
-            },
-            {
-              title: 'Status',
-              dataIndex: 'is_active',
-              key: 'is_active',
-              render: (isActive) => (
-                <Badge
-                  status={isActive ? 'success' : 'default'}
-                  text={isActive ? 'Active' : 'Inactive'}
-                />
-              ),
-              filters: [
-                { text: 'Active', value: true },
-                { text: 'Inactive', value: false }
-              ],
-              onFilter: (value, record) => record.is_active === value,
-            }
-          ]}
-          pagination={{
-            defaultPageSize: 5,
-            showSizeChanger: true,
-            showTotal: (total) => `Total ${total} items`
-          }}
-        />
-      </Modal>
-
-      {/* Create Document Type Modal */}
-      <Modal
-        title="Create Document Type"
-        visible={isCreateDocTypeModalVisible}
-        onCancel={() => setIsCreateDocTypeModalVisible(false)}
-        onOk={handleCreateDocType}
-      >
-        <Form layout="vertical">
-          <Form.Item 
-            label="Type Name" 
-            required
-            rules={[{ required: true, message: 'Please enter type name' }]}
-          >
-            <Input
-              value={newDocType.type_name}
-              onChange={(e) => setNewDocType(prev => ({ ...prev, type_name: e.target.value }))}
-              placeholder="Enter type name"
-            />
-          </Form.Item>
-          <Form.Item label="Description">
-            <Input.TextArea
-              value={newDocType.description}
-              onChange={(e) => setNewDocType(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Enter description"
-            />
-          </Form.Item>
-          <Form.Item 
-            label="File Extensions" 
-            required
-            rules={[{ required: true, message: 'Please enter file extensions' }]}
-          >
-            <Input
-              value={newDocType.extensions}
-              onChange={(e) => setNewDocType(prev => ({ ...prev, extensions: e.target.value }))}
-              placeholder=".pdf, .doc, etc."
-            />
-          </Form.Item>
-          <Form.Item>
-            <Checkbox
-              checked={newDocType.is_active}
-              onChange={(e) => setNewDocType(prev => ({ ...prev, is_active: e.target.checked }))}
-            >
-              Active
-            </Checkbox>
-          </Form.Item>
-        </Form>
-      </Modal>
-    </>
-  );
-
-  // Update the left sidebar content
-  const renderLeftSidebar = () => {
-    return (
-      <Card className="h-full" bodyStyle={{ padding: '16px' }}>
-        <div className="flex items-center space-x-4 mb-6">
-          <Button
-            type="primary"
-            icon={<CloudUploadOutlined />}
-            onClick={handleUploadClick}
-            id="upload-button"
-            className="flex-1"
-          >
-            Upload
-          </Button>
-          <Button 
-            type="default" 
-            icon={<FolderOutlined />}
-            onClick={() => {
-              setIsNewFolderModalVisible(true);
-              setTargetFolderId(selectedParentId);
-            }}
-            id="new-folder-button"
-          >
-            New Folder
-          </Button>
-          {/* <Button 
-            type="default" 
-            icon={<StarOutlined />}
-          >
-            Favorites
-          </Button> */}
-        </div>
-        
-        <Divider className="my-4" />
-
-        <div className="folder-tree-container">
-          <Tree
-            className="custom-tree document-tree"
-            treeData={convertFoldersToTree(folders)}
-            selectedKeys={[selectedFolder].filter(Boolean)}
-            onSelect={handleFolderSelect}
-            onRightClick={({ event, node }) => {
-              event.preventDefault();
-              const folder = folders.find(f => f.id.toString() === node.key);
-              if (folder) {
-                handleContextMenu(event, folder);
-              }
-            }}
-            showIcon={false}
-            defaultExpandAll
-          />
-        </div>
-      </Card>
-    );
-  };
-
-  // Update the Upload Modal
+  // Update the upload form onFinish handler in renderUploadModal
   const renderUploadModal = () => (
     <Modal
       title="Upload Document"
@@ -1459,7 +1167,7 @@ const DocumentManagement = () => {
         setIsUploadModalVisible(false);
         uploadForm.resetFields();
         setSelectedFile(null);
-        setTargetFolderId(null);
+        setSelectedPartNumber(null);
       }}
       footer={null}
     >
@@ -1467,31 +1175,35 @@ const DocumentManagement = () => {
         form={uploadForm}
         layout="vertical"
         onFinish={async (values) => {
-          if (!selectedFile) {
-            message.error('Please select a file to upload');
-            return;
-          }
-          
-          // Use the selected folder ID
-          const folderId = targetFolderId || selectedFolder;
-          if (!folderId || folderId === 'all') {
-            message.error('Please select a folder for upload');
-            return;
-          }
+          try {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('name', values.document_name);
+            formData.append('folder_id', currentFolderContext.folderId);
+            formData.append('doc_type_id', values.doc_type_id);
+            formData.append('description', values.description || '');
+            formData.append('part_number', selectedPartNumber?.part_number || '');
+            formData.append('production_order_id', selectedPartNumber?.id?.toString() || '');
+            formData.append('version_number', values.version_number || '1.0');
+            formData.append('metadata', '{}');
 
-          await handleUpload(selectedFile, values);
+            const response = await uploadDocument(formData);
+            await handleUploadSuccess(response);
+          } catch (error) {
+            message.error(error.message || 'Failed to upload document');
+          }
         }}
       >
-        <Form.Item 
-          label="Selected Folder" 
-          required
-          className="mb-4"
-        >
-          <Input 
-            value={folders.find(f => f.id.toString() === (targetFolderId || selectedFolder)?.toString())?.folder_name}
+        <Form.Item label="Selected Folder">
+          <Input
+            value={currentFolderContext.folderName}
             disabled
-            placeholder="Please select a folder first"
           />
+          {currentFolderContext.folderPath.length > 0 && (
+            <div className="text-sm text-gray-500 mt-1">
+              Path: {currentFolderContext.folderPath.map(f => f.title).join(' / ')}
+            </div>
+          )}
         </Form.Item>
 
         <Form.Item
@@ -1502,7 +1214,6 @@ const DocumentManagement = () => {
           <Upload.Dragger
             beforeUpload={(file) => {
               setSelectedFile(file);
-              // Set default document name from file name
               uploadForm.setFieldsValue({
                 document_name: file.name
               });
@@ -1522,9 +1233,6 @@ const DocumentManagement = () => {
             <p className="ant-upload-text">
               Click or drag file to this area to upload
             </p>
-            <p className="ant-upload-hint">
-              Selected folder: {folders.find(f => f.id.toString() === (targetFolderId || selectedFolder)?.toString())?.folder_name}
-            </p>
           </Upload.Dragger>
         </Form.Item>
 
@@ -1535,48 +1243,67 @@ const DocumentManagement = () => {
         >
           <Input />
         </Form.Item>
-  
+
         <Form.Item
           name="description"
           label="Description"
         >
           <Input.TextArea />
         </Form.Item>
-  
+
         <Form.Item
           name="doc_type_id"
           label="Document Type"
-          rules={[{ required: true, message: 'Please select document type' }]}
+          rules={[{ required: true }]}
         >
           <Select>
             {documentTypes.map(type => (
               <Select.Option key={type.id} value={type.id}>
-                {type.type_name}
+                {type.name}
               </Select.Option>
             ))}
           </Select>
         </Form.Item>
-  
+
         <Form.Item
-          name="part_number_id"
+          name="part_number"
           label="Part Number"
-          rules={[{ required: true, message: 'Please select part number' }]}
+          rules={[{ required: true }]}
         >
-          <Select>
+          <Select
+            showSearch
+            placeholder="Select part number"
+            optionFilterProp="children"
+            onChange={(value) => {
+              const selected = partNumbers.find(p => p.id === value);
+              console.log('Selected part number details:', selected); // Debug log
+              setSelectedPartNumber(selected);
+            }}
+            filterOption={(input, option) =>
+              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+            }
+          >
             {partNumbers.map(part => (
               <Select.Option key={part.id} value={part.id}>
-                {part.part_number}
+                {part.part_number} - {part.part_description}
               </Select.Option>
             ))}
           </Select>
         </Form.Item>
-  
+
+        <Form.Item
+          name="version_number"
+          label="Version Number"
+          initialValue="1.0"
+        >
+          <Input placeholder="e.g. 1.0" />
+        </Form.Item>
+
         <Form.Item>
           <Button 
             type="primary" 
             htmlType="submit" 
             block
-            disabled={!selectedFile}
           >
             Upload Document
           </Button>
@@ -1844,7 +1571,7 @@ const DocumentManagement = () => {
       }
       
       setSelectedFolder('all');
-      setSelectedParentId(null);
+      setSelectedFolderPath([]);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -1960,114 +1687,295 @@ const DocumentManagement = () => {
     setSelectedVersions([]);
   };
 
-  // Add this function inside DocumentManagement component
-  const renderBreadcrumb = () => {
-    const getFolderPath = (folderId) => {
-      const path = [];
-      let currentFolder = folders.find(f => f.id.toString() === folderId?.toString());
-      
-      while (currentFolder) {
-        path.unshift(currentFolder);
-        currentFolder = folders.find(f => f.id === currentFolder.parent_folder_id);
-      }
-      
-      return path;
-    };
-
-    const folderPath = selectedFolder !== 'all' ? getFolderPath(selectedFolder) : [];
-
-    return (
-      <Breadcrumb className="mb-4">
-        <Breadcrumb.Item href="#" onClick={() => setSelectedFolder('all')}>
-          <HomeOutlined /> Home
-        </Breadcrumb.Item>
-        {folderPath.map(folder => (
-          <Breadcrumb.Item 
-            key={folder.id}
-            href="#"
-            onClick={() => setSelectedFolder(folder.id.toString())}
-          >
-            {folder.folder_name}
-          </Breadcrumb.Item>
-        ))}
-      </Breadcrumb>
-    );
-  };
-
-  // Add this function to render grid view
-  const renderGridView = () => (
-    <List
-      grid={{ gutter: 16, column: 4 }}
-      dataSource={filteredDocuments}
-      renderItem={document => (
-        <List.Item>
-          <Card
-            hoverable
-            className="document-card"
-            actions={[
-              <Tooltip title="Preview">
-                <EyeOutlined key="preview" onClick={() => handlePreview(document)} />
-              </Tooltip>,
-              <Tooltip title="Download">
-                <DownloadOutlined key="download" onClick={() => handleDownload(document)} />
-              </Tooltip>
-            ]}
-          >
-            <Card.Meta
-              avatar={getFileIcon(document.document_name)}
-              title={document.document_name}
-              description={
-                <Space direction="vertical" size="small">
-                  <Text type="secondary">{document.description}</Text>
-                  <Space>
-                    {document.versions?.map(ver => (
-                      <Tag 
-                        key={ver.id}
-                        color={ver.status === 'active' ? 'blue' : 'default'}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => handleVersionClick(document, ver)}
-                      >
-                        v{ver.version_number}
-                      </Tag>
-                    ))}
-                  </Space>
-                  <Text type="secondary">
-                    Modified: {new Date(document.created_at).toLocaleDateString()}
-                  </Text>
-                </Space>
-              }
-            />
-          </Card>
-        </List.Item>
-      )}
-    />
+  const documentTypeButton = (
+    <Col>
+      <Button 
+        icon={<FileTextOutlined />}
+        onClick={() => setIsDocTypeModalVisible(true)}
+      >
+        Document Types
+      </Button>
+    </Col>
   );
 
-  // Update the metrics loading effect
-  useEffect(() => {
-    const loadMetrics = async () => {
-      try {
-        await fetchMetrics();
-      } catch (error) {
-        message.error('Failed to load analytics metrics');
-      }
-    };
-    loadMetrics();
+  const documentTypeModals = (
+    <>
+      <Modal
+        title="Document Types"
+        visible={isDocTypeModalVisible}
+        onCancel={() => setIsDocTypeModalVisible(false)}
+        footer={[
+          <Button 
+            key="create" 
+            type="primary" 
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setIsDocTypeModalVisible(false);
+              setIsCreateDocTypeModalVisible(true);
+            }}
+          >
+            Create New Type
+          </Button>
+        ]}
+        width={800}
+      >
+        <Table
+          dataSource={documentTypes}
+          rowKey="id"
+          loading={isLoading}
+          columns={[
+            {
+              title: 'Type Name',
+              dataIndex: 'name',
+              key: 'name',
+              sorter: (a, b) => a.name.localeCompare(b.name)
+            },
+            {
+              title: 'Description',
+              dataIndex: 'description',
+              key: 'description',
+              ellipsis: true
+            },
+            {
+              title: 'Extensions',
+              dataIndex: 'allowed_extensions',
+              key: 'allowed_extensions',
+              render: (extensions) => (
+                <Space wrap>
+                  {extensions?.map(ext => (
+                    <Tag key={ext} color="blue">
+                      {ext}
+                    </Tag>
+                  ))}
+                </Space>
+              ),
+            },
+            {
+              title: 'Status',
+              dataIndex: 'is_active',
+              key: 'is_active',
+              render: (isActive) => (
+                <Badge
+                  status={isActive ? 'success' : 'default'}
+                  text={isActive ? 'Active' : 'Inactive'}
+                />
+              ),
+              filters: [
+                { text: 'Active', value: true },
+                { text: 'Inactive', value: false }
+              ],
+              onFilter: (value, record) => record.is_active === value,
+            }
+          ]}
+          pagination={{
+            defaultPageSize: 5,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} items`
+          }}
+        />
+      </Modal>
 
-    // Set up periodic refresh every 30 seconds
-    const refreshInterval = setInterval(refreshMetrics, 30000);
+      {/* Create Document Type Modal */}
+      <Modal
+        title="Create Document Type"
+        visible={isCreateDocTypeModalVisible}
+        onCancel={() => setIsCreateDocTypeModalVisible(false)}
+        onOk={handleCreateDocType}
+      >
+        <Form layout="vertical">
+          <Form.Item 
+            label="Type Name" 
+            required
+            rules={[{ required: true, message: 'Please enter type name' }]}
+          >
+            <Input
+              value={newDocType.type_name}
+              onChange={(e) => setNewDocType(prev => ({ ...prev, type_name: e.target.value }))}
+              placeholder="Enter type name"
+            />
+          </Form.Item>
+          <Form.Item label="Description">
+            <Input.TextArea
+              value={newDocType.description}
+              onChange={(e) => setNewDocType(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Enter description"
+            />
+          </Form.Item>
+          <Form.Item 
+            label="File Extensions" 
+            required
+            rules={[{ required: true, message: 'Please enter file extensions' }]}
+          >
+            <Input
+              value={newDocType.extensions}
+              onChange={(e) => setNewDocType(prev => ({ ...prev, extensions: e.target.value }))}
+              placeholder=".pdf, .doc, etc."
+            />
+          </Form.Item>
+          <Form.Item>
+            <Checkbox
+              checked={newDocType.is_active}
+              onChange={(e) => setNewDocType(prev => ({ ...prev, is_active: e.target.checked }))}
+            >
+              Active
+            </Checkbox>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  );
 
-    return () => clearInterval(refreshInterval);
-  }, [fetchMetrics, refreshMetrics]);
+  // Update the renderNewFolderModal function
+  const renderNewFolderModal = () => (
+    <Modal
+      title="Create New Folder"
+      visible={isNewFolderModalVisible}
+      onOk={handleCreateFolder}
+      onCancel={() => {
+        setIsNewFolderModalVisible(false);
+        setNewFolderName('');
+      }}
+      okText="Create"
+      cancelText="Cancel"
+    >
+      <Form layout="vertical">
+        <Form.Item
+          label={<span>Folder Name <span style={{ color: '#ff4d4f' }}>*</span></span>}
+          required
+          validateStatus={!newFolderName.trim() && 'error'}
+          help={!newFolderName.trim() && 'Please enter a folder name'}
+        >
+          <Input
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            placeholder="Enter folder name"
+            maxLength={50}
+          />
+        </Form.Item>
+
+        <Form.Item label="Parent Folder">
+          <Input 
+            value={currentFolderContext.folderName || 'Root'}
+            disabled
+          />
+          {currentFolderContext.folderPath.length > 0 && (
+            <div className="text-sm text-gray-500 mt-1">
+              Path: {currentFolderContext.folderPath.map(f => f.title).join(' / ')}
+            </div>
+          )}
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+
+  // Add this function to render the download version modal
+  const renderDownloadVersionModal = () => (
+    <Modal
+      title="Download Document Versions"
+      visible={downloadModalVisible}
+      onCancel={() => {
+        setDownloadModalVisible(false);
+        setSelectedVersions([]);
+      }}
+      footer={[
+        <Button 
+          key="cancel" 
+          onClick={() => {
+            setDownloadModalVisible(false);
+            setSelectedVersions([]);
+          }}
+        >
+          Cancel
+        </Button>,
+        <Button
+          key="download"
+          type="primary"
+          disabled={selectedVersions.length === 0}
+          onClick={() => {
+            // Handle download of selected versions
+            selectedVersions.forEach(version => {
+              downloadDocumentVersion(version.id);
+            });
+            setDownloadModalVisible(false);
+            setSelectedVersions([]);
+          }}
+        >
+          Download Selected
+        </Button>
+      ]}
+    >
+      <div className="mb-4">
+        <Text type="secondary">
+          Select the versions you want to download:
+        </Text>
+      </div>
+      <Table
+        rowSelection={{
+          type: 'checkbox',
+          onChange: (_, selectedRows) => {
+            setSelectedVersions(selectedRows);
+          }
+        }}
+        dataSource={downloadVersions}
+        columns={[
+          {
+            title: 'Version',
+            dataIndex: 'version_number',
+            key: 'version_number',
+            render: v => `v${v}`
+          },
+          {
+            title: 'Created',
+            dataIndex: 'created_at',
+            key: 'created_at',
+            render: date => new Date(date).toLocaleDateString()
+          },
+          {
+            title: 'Size',
+            dataIndex: 'file_size',
+            key: 'file_size',
+            render: size => {
+              const kb = size / 1024;
+              if (kb < 1024) {
+                return `${kb.toFixed(2)} KB`;
+              }
+              const mb = kb / 1024;
+              return `${mb.toFixed(2)} MB`;
+            }
+          }
+        ]}
+        pagination={false}
+        rowKey="id"
+      />
+    </Modal>
+  );
+
+  // Update the renderDocumentTable function
+  const renderDocumentTable = () => (
+    <div className="bg-white rounded-lg shadow">
+      <Table
+        columns={tableColumns}
+        dataSource={documents}
+        rowKey="id"
+        loading={isLoading}
+        pagination={{
+          total: totalDocuments,
+          pageSize: 10,
+          showSizeChanger: true,
+          showTotal: (total) => `Total ${total} items`,
+        }}
+        className="custom-table"
+      />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      {/* Compact Header with Metrics */}
       <div className="bg-white rounded-lg shadow-sm mb-4 p-4">
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-xl font-semibold text-gray-800">
-              Final Document Management
+              Document Management
             </h1>
             <p className="text-gray-500 text-sm">
               Manage and organize your documents
@@ -2078,37 +1986,31 @@ const DocumentManagement = () => {
               type="primary"
               icon={<CloudUploadOutlined />}
               onClick={handleUploadClick}
-              className="flex items-center"
             >
               Upload
             </Button>
             <Button
               icon={<FolderOutlined />}
               onClick={() => setIsNewFolderModalVisible(true)}
-              className="flex items-center"
             >
               New Folder
             </Button>
           </div>
         </div>
-
-        {/* Compact Analytics */}
-        <AnalyticsCards 
-          metrics={metrics} 
-          isLoading={isLoadingMetrics}
-          error={metricsError}
+        
+        <MetricsCards 
+          documents={documents}
+          folders={folders}
+          documentTypes={documentTypes}
         />
       </div>
 
-      {/* Main Document Management Area */}
       <Card bordered={false} className="shadow-sm" bodyStyle={{ padding: '16px' }}>
         <Row gutter={[16, 16]}>
-          {/* Left Sidebar */}
           <Col flex="220px">
             {renderLeftSidebar()}
           </Col>
 
-          {/* Document Area */}
           <Col flex="auto">
             <div className="flex flex-col h-[calc(100vh-230px)]">
               {renderBreadcrumb()}
@@ -2116,30 +2018,7 @@ const DocumentManagement = () => {
                 {renderSearchSection()}
               </div>
 
-              <Card 
-                className="flex-1 overflow-hidden"
-                bodyStyle={{ 
-                  padding: viewMode === 'table' ? '0' : '16px',
-                  height: '100%',
-                  overflow: 'auto'
-                }}
-              >
-                {viewMode === 'table' ? (
-                  <Table
-                    columns={columns}
-                    dataSource={filteredDocuments}
-                    rowKey="id"
-                    pagination={{
-                      pageSize: 10,
-                      showSizeChanger: true,
-                      showQuickJumper: true
-                    }}
-                    className="custom-table"
-                  />
-                ) : (
-                  renderGridView()
-                )}
-              </Card>
+              {renderDocumentTable()}
             </div>
           </Col>
         </Row>
@@ -2150,7 +2029,6 @@ const DocumentManagement = () => {
 
       {renderUploadModal()}
 
-      {/* Document Preview Modal */}
       <Modal
         title={`Preview - ${selectedDocument?.document_name} (v${selectedDocument?.version_number})`}
         visible={isPreviewModalVisible}

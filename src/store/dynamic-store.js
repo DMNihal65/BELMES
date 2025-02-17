@@ -6,10 +6,14 @@ const useDynamicStore = create((set) => ({
   loading: false,
   error: null,
 
+  clearScheduleData: () => {
+    set({ scheduleData: null, loading: false, error: null });
+  },
+
   fetchDynamicScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.get('http://172.18.7.88:7780/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://172.18.7.88:7783/api/v1/rescheduling/reschedule-actual-planned-combined');
       set({ 
         scheduleData: response.data,
         loading: false 

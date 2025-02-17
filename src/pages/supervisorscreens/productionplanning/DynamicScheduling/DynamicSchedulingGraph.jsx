@@ -374,21 +374,6 @@ const DynamicSchedulingGraph = () => {
         end: getTimeRange(viewType, dateRange).end,
         zoomMin: viewType === 'year' ? 1000 * 60 * 60 * 24 * 30 : 1000 * 60 * 30,
         zoomMax: viewType === 'year' ? 1000 * 60 * 60 * 24 * 366 : 1000 * 60 * 60 * 24 * 31,
-        editable: false,
-        selectable: true,
-        multiselect: false,
-        showCurrentTime: true,
-        showMajorLabels: true,
-        showMinorLabels: true,
-        verticalAlign: 'middle',
-        snap: null,
-        rollingMode: {
-          follow: true,
-          offset: 0.5
-        },
-        onMoving: function(item, callback) {
-          callback(item);
-        },
         tooltip: {
           followMouse: true,
           overflowMethod: 'cap',
@@ -471,18 +456,6 @@ const DynamicSchedulingGraph = () => {
               month: 'YYYY',
               year: ''
             }
-          }
-        },
-        grid: {
-          horizontal: {
-            display: true,
-            color: '#f0f0f0',
-            strokeWidth: 1
-          },
-          vertical: {
-            display: true,
-            color: '#f0f0f0',
-            strokeWidth: 1
           }
         }
       };
@@ -723,7 +696,7 @@ const DynamicSchedulingGraph = () => {
         }
 
         .timeline-item {
-          padding: 6px 10px;
+          padding: 4px 8px;
           height: 100%;
           display: flex;
           flex-direction: column;
@@ -733,14 +706,6 @@ const DynamicSchedulingGraph = () => {
         .item-header {
           font-weight: 500;
           font-size: 12px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .item-body {
-          font-size: 11px;
-          opacity: 0.85;
         }
 
         .item-desc, .item-order, .item-qty {
@@ -755,60 +720,17 @@ const DynamicSchedulingGraph = () => {
           background-color: #ffffff;
         }
 
-        .vis-item {
-          border-radius: 4px;
-          border-width: 1px;
-          font-size: 12px;
-          color: #fff;
-          height: 34px !important;
-          background-color: #fff;
-          border: 1px solid #e8e8e8;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        .vis-panel.vis-center {
+          border-left: 1px solid #e8e8e8;
+          border-right: 1px solid #e8e8e8;
         }
 
-        .vis-item.single-machine {
-          height: 80px !important;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        .vis-grid.vis-vertical {
+          border-left: 1px solid #f0f0f0;
         }
 
-        .vis-item .timeline-item {
-          padding: 4px 8px;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .vis-item .item-header {
-          font-weight: 500;
-          font-size: 14px;
-        }
-
-        .vis-item.vis-selected {
-          border-color: #1890ff;
-          box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-        }
-
-        .timeline-item-normal {
-          background-color: #1890ff;
-          border-color: #096dd9;
-        }
-
-        .timeline-item-ontime {
-          background-color: #52c41a;
-          border-color: #389e0d;
-        }
-
-        .timeline-item-delayed {
-          background-color: #ff4d4f;
-          border-color: #cf1322;
-        }
-
-        .timeline-item-warning {
-          background-color: #faad14;
-          border-color: #d48806;
+        .vis-grid.vis-horizontal {
+          border-bottom: 1px solid #f0f0f0;
         }
 
         .vis-time-axis .vis-grid.vis-minor {
@@ -821,118 +743,91 @@ const DynamicSchedulingGraph = () => {
           border-width: 1px;
         }
 
-        .vis-labelset {
-          background: #fafafa;
+        .vis-time-axis .vis-text {
+          color: #666;
+          padding: 3px;
+          font-size: 12px;
         }
 
-        .vis-label {
-          padding: 0 !important;
+        .vis-time-axis .vis-text.vis-major {
+          font-weight: bold;
         }
 
-        .vis-group {
-          border-bottom: 1px solid #f0f0f0;
-          background: white;
+        .vis-item {
+          border-radius: 4px;
+          border-width: 1px;
+          font-size: 12px;
+          color: #fff;
+          height: 34px !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
-        .header-group {
-          background: #f5f5f5;
-          border-bottom: 2px solid #e8e8e8;
+        .vis-item.vis-selected {
+          border-color: #1890ff;
+          box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
         }
 
-        .machine-group {
-          background: white;
+        .vis-labelset .vis-label {
           border-bottom: 1px solid #e8e8e8;
+          background-color: #fafafa;
+          padding: 8px;
         }
 
-        /* Additional styles for better visualization */
-        .vis-panel.vis-center {
-          border-left: 1px solid #e8e8e8;
-          border-right: 1px solid #e8e8e8;
-        }
-
-        .vis-panel.vis-left {
-          border-right: 1px solid #e8e8e8;
-        }
-
-        .vis-panel.vis-top {
-          border-bottom: 1px solid #e8e8e8;
+        .vis-labelset .vis-label.machine-group {
+          font-weight: 500;
+          background-color: #f5f5f5;
         }
 
         .vis-foreground .vis-group {
           border-bottom: 1px solid #f0f0f0;
         }
 
-        /* Hover effects */
-        .vis-item:hover {
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          transition: box-shadow 0.3s ease;
+        .machine-row {
+          padding: 8px;
+          background: #f5f5f5;
+          border-bottom: 1px solid #e8e8e8;
         }
 
-        /* Tooltip styles */
-        .vis-tooltip {
-          background-color: white;
-          border: 1px solid #e8e8e8;
-          border-radius: 4px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          padding: 8px 12px;
-          font-size: 12px;
-          color: rgba(0,0,0,0.85);
-        }
-
-        /* Timeline tooltip styles */
-        .timeline-tooltip {
-          background: white;
-          border-radius: 4px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          padding: 12px;
-          max-width: 300px;
-          z-index: 1000;
-        }
-
-        .tooltip-header {
-          border-bottom: 1px solid #f0f0f0;
-          padding-bottom: 8px;
-          margin-bottom: 8px;
-        }
-
-        .info-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 4px;
-        }
-
-        .info-row .label {
-          color: #666;
+        .machine-name {
+          font-size: 14px;
+          color: #333;
           font-weight: 500;
         }
 
-        .info-row .value {
-          color: #333;
-        }
-
-        .progress-section {
-          margin-top: 8px;
-          padding-top: 8px;
-          border-top: 1px solid #f0f0f0;
-        }
-
-        .progress-bar {
-          height: 6px;
-          background: #f0f0f0;
-          border-radius: 3px;
-          overflow: hidden;
-          margin: 4px 0;
-        }
-
-        .progress-fill {
+        .timeline-item {
+          padding: 6px 10px;
           height: 100%;
-          background: #1890ff;
-          transition: width 0.3s ease;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
         }
 
-        .progress-text {
+        .timeline-item.planned {
+          background-color: ${COLORS.PLANNED};
+          border-color: ${COLORS.PLANNED};
+        }
+
+        .timeline-item.actual {
+          background-color: ${COLORS.ACTUAL};
+          border-color: ${COLORS.ACTUAL};
+        }
+
+        .timeline-item.reschedule {
+          background-color: ${COLORS.RESCHEDULE};
+          border-color: ${COLORS.RESCHEDULE};
+        }
+
+        .item-header {
+          font-weight: 500;
           font-size: 12px;
-          color: #666;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .item-body {
+          font-size: 11px;
+          opacity: 0.85;
         }
 
         .status-badge {
@@ -966,7 +861,7 @@ const DynamicSchedulingGraph = () => {
           padding: 2px 6px;
           border-radius: 10px;
           font-size: 11px;
-          margin-left: 8px;
+          margin-left: 4px;
         }
 
         .item-stats {
@@ -980,186 +875,66 @@ const DynamicSchedulingGraph = () => {
           font-family: monospace;
         }
 
-        .machine-name-container {
-          padding: 8px 16px;
-          background: #f5f5f5;
-          border-bottom: 1px solid #e8e8e8;
+        .progress-bar {
+          height: 4px;
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 2px;
+          overflow: hidden;
+          margin: 4px 0;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: rgba(255, 255, 255, 0.8);
+          transition: width 0.3s ease;
+        }
+
+        .progress-text {
+          display: flex;
+          justify-content: space-between;
+          font-size: 10px;
+          opacity: 0.9;
+        }
+
+        /* Timeline tooltip styles */
+        .timeline-tooltip {
+          background: white;
+          border-radius: 4px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          padding: 12px;
+          max-width: 300px;
+        }
+
+        .tooltip-header {
+          border-bottom: 1px solid #f0f0f0;
+          padding-bottom: 8px;
+          margin-bottom: 8px;
+        }
+
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 4px;
+        }
+
+        .info-row .label {
+          color: #666;
           font-weight: 500;
         }
 
-        .machine-name {
-          font-size: 14px;
+        .info-row .value {
           color: #333;
         }
 
-        .operation-row {
-          padding: 8px;
-          background: white;
-          border-bottom: 1px solid #f0f0f0;
+        .progress-section {
+          margin-top: 8px;
+          padding-top: 8px;
+          border-top: 1px solid #f0f0f0;
         }
 
-        .operation-label {
-          font-size: 13px;
-          color: #666;
-        }
-
-        .operation-row.planned {
-          background: rgba(24, 144, 255, 0.05);
-        }
-
-        .operation-row.actual {
-          background: rgba(82, 196, 26, 0.05);
-        }
-
-        .operation-row.reschedule {
-          background: rgba(255, 77, 79, 0.05);
-        }
-
-        .vis-labelset .vis-label {
-          border-bottom: 1px solid #e8e8e8;
-        }
-
-        .vis-labelset .vis-label.machine-group {
-          background: #f5f5f5;
-          font-weight: 500;
-        }
-
-        .vis-labelset .vis-label.operation-group {
-          background: white;
-        }
-
-        .vis-foreground .vis-group {
-          border-bottom: 1px solid #f0f0f0;
-        }
-
-        /* Adjust spacing and borders */
-        .vis-panel.vis-left {
-          border-right: 2px solid #e8e8e8;
-        }
-
-        .vis-panel.vis-center {
-          border-left: none;
-        }
-
-        .vis-panel.vis-content {
-          padding-left: 0;
-        }
-
-        /* Timeline grid adjustments */
-        .vis-time-axis .vis-grid.vis-minor {
-          border-color: rgba(0,0,0,0.05);
-        }
-
-        .vis-time-axis .vis-grid.vis-major {
-          border-color: rgba(0,0,0,0.1);
-        }
-
-        .vis-grid.vis-vertical {
-          border-left: 1px solid #f0f0f0;
-        }
-
-        .vis-grid.vis-horizontal {
-          border-bottom: 1px solid #f0f0f0;
-        }
-
-        .vis-time-axis .vis-text {
-          color: #666;
-          padding: 3px;
-          font-size: 12px;
-        }
-
-        .vis-time-axis .vis-text.vis-major {
-          font-weight: bold;
-        }
-
-        .vis-current-time {
-          background-color: #ff4d4f;
-          width: 2px;
-        }
-
-        .vis-rolling-mode-btn {
-          background-color: #1890ff;
-          color: white;
-        }
-
-        .vis-content {
-          align-items: center;
-        }
-
-        .vis-item.planned-operation {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .vis-item.actual-operation {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .vis-item.reschedule-operation {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .machine-row {
-          padding: 8px;
-          background: #f5f5f5;
-          border-bottom: 1px solid #e8e8e8;
-        }
-
-        .operation-row {
-          padding: 8px;
-          background: white;
-          border-bottom: 1px solid #f0f0f0;
-        }
-
-        .timeline-item {
-          padding: 6px 10px;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-
-        .item-header {
-          font-weight: 500;
-          font-size: 12px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .item-body {
-          font-size: 11px;
-          opacity: 0.85;
-        }
-
-        .status-badge {
-          padding: 2px 6px;
-          border-radius: 10px;
-          font-size: 11px;
-          margin-left: 4px;
-        }
-
-        .status-badge.on-time {
-          background: #f6ffed;
-          border: 1px solid #b7eb8f;
-          color: #52c41a;
-        }
-
-        .status-badge.delayed {
-          background: #fff1f0;
-          border: 1px solid #ffa39e;
-          color: #f5222d;
-        }
-
-        .status-badge.warning {
-          background: #fffbe6;
-          border: 1px solid #ffe58f;
-          color: #faad14;
+        .vis-item:hover {
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          transition: box-shadow 0.3s ease;
         }
       `}</style>
     </Card>

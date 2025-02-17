@@ -20,6 +20,7 @@ import AnalyticsDashboard from './Analytics/AnalyticsDashboard';
 import { ComponentLegend, MachineStatusCards } from './Schedule/ComponentsAndStatus';
 import OrderStatusDashboard from './OrderStatus/OrderStatusDashboard';
 import DynamicSchedulingGraph from './DynamicScheduling/DynamicSchedulingGraph';
+import DynamicSchedulingGraph2 from './DynamicScheduling/DynamicSchedulingGraph2';
 
 
 const { Sider, Content } = Layout;
@@ -894,6 +895,12 @@ const Scheduling = () => {
                   key="dynamic-scheduling"
                 >
                   <DynamicSchedulingGraph />
+                </TabPane>
+                <TabPane 
+                  tab="Dynamic Scheduling Graph2" 
+                  key="dynamic-scheduling2"
+                >
+                  <DynamicSchedulingGraph2 />
                 </TabPane>
                 <TabPane 
                   tab="Machine Status" 

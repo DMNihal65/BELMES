@@ -211,14 +211,19 @@ const useDocumentStore = create((set, get) => ({
       const data = await response.json();
       
       // Format the documents data
-      const formattedDocuments = data.items.map(doc => ({
-        ...doc,
-        key: doc.id,
-        file_size: doc.latest_version?.file_size 
-          ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
-          : null,
-        created_at: new Date(doc.created_at).toISOString(),
-        version_number: doc.latest_version?.version_number || '1.0'
+      const formattedDocuments = await Promise.all(data.items.map(async doc => {
+        // Fetch versions for each document
+        const versions = await get().fetchDocumentVersions(doc.id);
+        return {
+          ...doc,
+          key: doc.id,
+          versions,
+          file_size: doc.latest_version?.file_size 
+            ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+            : null,
+          created_at: new Date(doc.created_at).toISOString(),
+          version_number: doc.latest_version?.version_number || '1.0'
+        };
       }));
 
       set({ 
@@ -463,7 +468,7 @@ const useDocumentStore = create((set, get) => ({
   },
 
   // Download document version
-  downloadDocumentVersion: async (documentId, versionId) => {
+  downloadDocumentVersion: async (documentId, versionId = null) => {
     try {
       const token = useAuthStore.getState().token;
       
@@ -471,7 +476,12 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:6639/api/v1/documents/${documentId}/download/${versionId}`, {
+      // Construct URL based on whether versionId is provided
+      const url = versionId 
+        ? `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download-latest`;
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -499,12 +509,15 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:6639/api/v1/documents/${documentId}/versions`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
+      const response = await fetch(
+        `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/versions`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'accept': 'application/json'
+          }
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch document versions');
@@ -595,34 +608,26 @@ const useDocumentStore = create((set, get) => ({
   },
 
   // Update the uploadNewVersion method
-  uploadNewVersion: async (documentId, file) => {
+  uploadNewVersion: async (documentId, file, versionNumber) => {
     try {
       const token = useAuthStore.getState().token;
       const formData = new FormData();
       
-      // Add required fields to formData
       formData.append('file', file);
-      
-      // Get the latest version number and increment it
-      const versions = await get().fetchDocumentVersions(documentId);
-      const latestVersion = versions.length > 0 
-        ? Math.max(...versions.map(v => parseInt(v.version_number))) 
-        : 0;
-      const newVersionNumber = (latestVersion + 1).toString();
-      
-      formData.append('version_number', newVersionNumber);
+      formData.append('version_number', versionNumber || 'v2');
       formData.append('metadata', '{}');
 
-      console.log('Making POST request to:', `http://172.18.7.85:6639/api/v1/documents/${documentId}/versions/`);
-      
-      const response = await fetch(`http://172.18.7.85:6639/api/v1/documents/${documentId}/versions/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
-        },
-        body: formData
-      });
+      const response = await fetch(
+        `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/versions`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'accept': 'application/json'
+          },
+          body: formData
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -630,7 +635,6 @@ const useDocumentStore = create((set, get) => ({
       }
 
       const data = await response.json();
-      console.log('Upload response:', data);
       return data;
     } catch (error) {
       console.error('Upload version error:', error);
@@ -638,25 +642,25 @@ const useDocumentStore = create((set, get) => ({
     }
   },
 
-  updateVersion: async (documentId, versionId, file, currentVersionNumber) => {
+  updateVersion: async (documentId, versionId, file, metadata = {}) => {
     try {
       const token = useAuthStore.getState().token;
       const formData = new FormData();
       
       formData.append('file', file);
-      formData.append('version_number', currentVersionNumber);
-      formData.append('metadata', '{}');
+      formData.append('metadata', JSON.stringify(metadata));
 
-      console.log('Making PUT request to:', `http://172.18.7.85:6639/api/v1/documents/${documentId}/versions/${versionId}/file`);
-
-      const response = await fetch(`http://172.18.7.85:6639/api/v1/documents/${documentId}/versions/${versionId}/file`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
-        },
-        body: formData
-      });
+      const response = await fetch(
+        `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/version/${versionId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'accept': 'application/json'
+          },
+          body: formData
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -664,25 +668,14 @@ const useDocumentStore = create((set, get) => ({
       }
 
       const data = await response.json();
-      console.log('Update version response:', data);
-
-      // Get the current folder ID from state
-      const currentFolderId = get().selectedFolder;
       
-      // Wait for both operations to complete
+      // Refresh document versions after successful update
+      await get().fetchDocumentVersions(documentId);
+      
+      // If we're in a folder, refresh the folder documents
+      const currentFolderId = get().selectedFolder;
       if (currentFolderId && currentFolderId !== 'all') {
-        // First fetch the latest document versions
-        const updatedVersions = await get().fetchDocumentVersions(documentId);
-        
-        // Then fetch and update the folder documents
-        const folderDocs = await get().fetchFolderDocuments(currentFolderId);
-        
-        // Update the specific document's versions in the state
-        set(state => ({
-          documents: state.documents.map(doc => 
-            doc.id === documentId ? { ...doc, versions: updatedVersions } : doc
-          )
-        }));
+        await get().fetchFolderDocuments(currentFolderId);
       }
 
       return data;
@@ -835,6 +828,38 @@ const useDocumentStore = create((set, get) => ({
       throw error;
     }
   },
+
+  // Add a new function to get preview URL
+  getPreviewUrl: async (documentId, versionId = null) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const url = versionId 
+        ? `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download-latest`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get preview URL');
+      }
+
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Preview error:', error);
+      throw error;
+    }
+  }
 }));
 
 export default useDocumentStore;

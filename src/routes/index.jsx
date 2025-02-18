@@ -28,6 +28,7 @@ import InspectionResult from '../pages/operatorscreens/InspectionResult';
 import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
 import DocumentManagement from '../pages/supervisorscreens/documentmanagement';
 import QualityManagement from '../pages/supervisorscreens/qualitymanagement';
+import MaintenanceDashboard from '../pages/supervisorscreens/MachineMaintenance/MaintenanceDashboard';
 // import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
 
 
@@ -137,8 +138,8 @@ export const router = createBrowserRouter([
 
           },
           {
-            path: 'machine-maintenance',
-            element: <MachineMaintenance />,
+            path: 'maintenance',
+            element: <MaintenanceDashboard />,
 
           },
           {

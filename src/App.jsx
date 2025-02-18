@@ -7,7 +7,7 @@ import SupervisorDashboard from './pages/supervisorscreens/dashboard';
 import OperatorDashboard from './pages/operatorscreens/dashboard';
 import OrderDashboard from './pages/supervisorscreens/ordermanagement/orderdashboard';
 import WorkcenterDashboard from './pages/supervisorscreens/configuration/WorkcenterDashboard';
-import MachineMaintenance from './pages/supervisorscreens/MachineMaintenance/MachineMaintenance';
+import Maintenance from './pages/supervisorscreens/MachineMaintenance/MaintenanceDashboard';
 import Planning from './pages/supervisorscreens/productionplanning/planning';
 import Scheduling from './pages/supervisorscreens/productionplanning/scheduling';
 import ProductionMonitoring from './pages/supervisorscreens/ProductionMon';
@@ -42,7 +42,7 @@ const App = () => {
             <Route path="dashboard" element={<SupervisorDashboard />} />
             <Route path="order-management" element={<OrderDashboard />} />
             <Route path="configuration" element={<WorkcenterDashboard />} />
-            <Route path="machine-maintenance" element={<MachineMaintenance />} />
+            <Route path="maintenance" element={<Maintenance />} />
             <Route path="production-planning/planning" element={<Planning />} />
             <Route path="production-planning/scheduling" element={<Scheduling />} />
             <Route path="production-monitoring" element={<ProductionMonitoring />} />

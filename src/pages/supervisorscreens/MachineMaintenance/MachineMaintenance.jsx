@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import useMachineMaintenanceStore from '../../../store/machine-maintenance';
+import useMachineMaintenanceStore from '../../../store/maintenance';
 import { format } from 'date-fns';
 import { Table, Switch, Select, Card, Button, Form, Space, Row, Col, DatePicker, Tag } from 'antd';
 import { ToolOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
@@ -217,7 +217,6 @@ export default function MachineMaintenance() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">Machine Maintenance</h1>
         <Row gutter={16}>
           <Col span={8}>
             <Form.Item label="Machine Name" style={{ marginBottom: 0 }}>

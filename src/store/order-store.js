@@ -187,24 +187,41 @@ const useOrderStore = create((set) => ({
 
       // Transform the API response to match form fields
       const transformedData = {
-        id: data.order_details.id,
-        orderNumber: data.order_details.production_order,
-        salesOrderNumber: data.order_details.sale_order,
-        wbsElement: data.order_details.wbs_element,
-        partNumber: data.order_details.part_number,
-        materialDescription: data.order_details.part_description,
-        totalOperations: data.order_details.total_operations,
-        targetQuantity: data.order_details.required_quantity,
-        launchedQuantity: data.order_details.launched_quantity,
-        plant: data.order_details.plant_id.toString(),
-        // Convert delivery_date to ISO string
-        deliveryDate: data.order_details.project?.delivery_date 
-      ? dayjs(data.order_details.project.delivery_date) // Ensure it's a dayjs object
-      : null,
+        orderNumber: data['Prod Order No'],
+        salesOrderNumber: data['Sale Order'],
+        wbsElement: data['WBS'],
+        partNumber: data['Part No'],
+        materialDescription: data['Part Desc'],
+        totalOperations: data.Operations?.length || 0,
+        targetQuantity: parseInt(data['Required Qty']),
+        launchedQuantity: parseInt(data['Launched Qty']),
+        plant: data['Plant'],
+        projectName: data['Project Name'],
+        // Since delivery date is not in the response, we'll set it to null
+        deliveryDate: null,
         // Additional fields
-        projectName: data.order_details.project?.name,
-        priority: data.order_details.project?.priority,
-        rawMaterials: data.order_details.raw_materials || [],
+        priority: 'normal', // Default priority since it's not in the response
+        rawMaterials: data['Raw Materials']?.map(material => ({
+          child_part_number: material['Child Part No'],
+          description: material['Description'],
+          quantity: material['Qty Per Set'],
+          unit: { name: material['UoM'] },
+          status: { name: 'Available' } // Default status
+        })) || [],
+        // Add operations data
+        operations: data.Operations?.map(op => ({
+          operation_number: op['Oprn No'],
+          workcenter: op['Wc/Plant'],
+          plant_number: op['Plant Number'],
+          operation_description: op['Operation'],
+          setup_time: parseFloat(op['Setup Time']),
+          per_piece_time: parseFloat(op['Per Pc Time']),
+          jump_quantity: parseInt(op['Jmp Qty']),
+          total_quantity: parseInt(op['Tot Qty']),
+          allowed_time: parseFloat(op['Allowed Time']),
+          confirmation_number: op['Confirm No'],
+          long_text: op['Long Text']
+        })) || []
       };
 
       set({ orderDetails: transformedData, isLoading: false });

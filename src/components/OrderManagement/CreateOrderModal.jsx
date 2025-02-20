@@ -155,10 +155,28 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       const deliveryDate = dayjs(values.deliveryDate);
       const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
   
-      // First update the order
+      // Format the payload according to the API requirements
       const payload = {
-        ...values,
-        delivery_date: epochTimestamp,
+        production_order: values.orderNumber,
+        sale_order: values.salesOrderNumber,
+        wbs_element: values.wbsElement,
+        part_number: values.partNumber,
+        part_description: values.materialDescription,
+        total_operations: parseInt(values.totalOperations),
+        required_quantity: parseInt(values.targetQuantity),
+        launched_quantity: parseInt(values.launchedQuantity),
+        plant_id: values.plant,
+        project_name: values.projectName,
+        delivery_date: deliveryDate.format('YYYY-MM-DD'),
+        priority: values.priority || 'normal',
+        operations: orderDetails?.operations || [],
+        raw_materials: orderDetails?.rawMaterials?.map(material => ({
+          child_part_number: material.child_part_number,
+          description: material.description,
+          qty_per_set: material.quantity,
+          uom: material.unit.name,
+          total_qty: (material.quantity * values.targetQuantity).toString()
+        })) || []
       };
   
       let response;
@@ -285,7 +303,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       {/* Order Information Section */}
       <Divider>Order Information</Divider>
       
-      {/* Existing form fields */}
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
@@ -305,7 +322,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         </Col>
       </Row>
 
-      {/* Project Information - Read Only */}
+      {/* Project Information */}
       <Divider>Project Information</Divider>
       <Row gutter={16}>
         <Col span={12}>
@@ -326,8 +343,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         </Col>
       </Row>
 
-      {/* Raw Materials Section - Read Only */}
-      {orderDetails?.rawMaterials && orderDetails.rawMaterials.length > 0 && (
+      {/* Raw Materials Section */}
+      {/* {orderDetails?.rawMaterials && orderDetails.rawMaterials.length > 0 && (
         <>
           <Divider>Raw Materials</Divider>
           {orderDetails.rawMaterials.map((material, index) => (
@@ -368,7 +385,65 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             </div>
           ))}
         </>
-      )}
+      )} */}
+
+      {/* Operations Section */}
+      {/* {orderDetails?.operations && orderDetails.operations.length > 0 && (
+        <>
+          <Divider>Operations</Divider>
+          {orderDetails.operations.map((operation, index) => (
+            <div key={index}>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item label="Operation Number">
+                    <Input value={operation.operation_number} disabled />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item label="Workcenter">
+                    <Input value={operation.workcenter} disabled />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item label="Plant Number">
+                    <Input value={operation.plant_number} disabled />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={24}>
+                  <Form.Item label="Operation Description">
+                    <Input value={operation.operation_description} disabled />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={6}>
+                  <Form.Item label="Setup Time">
+                    <Input value={`${operation.setup_time} hrs`} disabled />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="Per Piece Time">
+                    <Input value={`${operation.per_piece_time} hrs`} disabled />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="Jump Quantity">
+                    <Input value={operation.jump_quantity} disabled />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="Total Quantity">
+                    <Input value={operation.total_quantity} disabled />
+                  </Form.Item>
+                </Col>
+              </Row>
+              {index < orderDetails.operations.length - 1 && <Divider dashed />}
+            </div>
+          ))}
+        </>
+      )} */}
 
       <Divider/>
       {/* Editable fields */}
@@ -457,24 +532,21 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             />
           </Form.Item>
         </Col>
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item
-              name="deliveryDate"
-              label="Delivery Date"
-              rules={[{ required: true, message: 'Please select Delivery Date' }]}
-            >
-              <DatePicker 
-                style={{ width: '100%' }} 
-                format="YYYY-MM-DD"
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-        
+        <Col span={12}>
+          <Form.Item
+            name="deliveryDate"
+            label="Delivery Date"
+            rules={[{ required: true, message: 'Please select Delivery Date' }]}
+          >
+            <DatePicker 
+              style={{ width: '100%' }} 
+              format="YYYY-MM-DD"
+            />
+          </Form.Item>
+        </Col>
       </Row>
 
-      {/* Optional File Uploads Section - Moved to bottom */}
+      {/* Optional File Uploads Section */}
       {renderFileUploadSection()}
 
       {/* Form Actions */}

@@ -21,10 +21,11 @@ import JobDetails from './pages/operatorscreens/jobdetails';
 // import Inventory from './pages/operatorscreens/inventory/inventoryRequest';
 import Inventory from './pages/operatorscreens/inventory/InventoryViewData';
 import HelpAndSupport from './pages/operatorscreens/HelpAndSupport';
-import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagement';
+import QualityManagementDashboard from './pages/supervisorscreens/QualityManagement';
 import AlertScreens from './pages/operatorscreens/AlertScreens';
-import MaintenanceScreen from './pages/operatorscreens/MaintenanceScreen';
+import MaintenanceDashboard from './pages/operatorscreens/maintanance/MaintenanceDashboard';
 import InspectionResult from './pages/operatorscreens/InspectionResult';
+import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
 
 const App = () => {
   return (
@@ -53,6 +54,7 @@ const App = () => {
             <Route path="inventory_data_management/data_management" element={<DataManagement />} />
             <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
             <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
+            <Route path="energy-monitoring" element={<EnergyMonitoring />} />
           </Route>
 
           {/* Operator Routes */}
@@ -63,7 +65,7 @@ const App = () => {
           }>
             <Route path="dashboard" element={<JobDetails />} />
             <Route path="alerts" element={<AlertScreens />} />
-            <Route path="maintenance" element={<MaintenanceScreen />} />
+            <Route path="maintenance" element={<MaintenanceDashboard />} />
             <Route path="inspection" element={<InspectionResult />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="help" element={<HelpAndSupport />} />

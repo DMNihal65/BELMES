@@ -40,7 +40,7 @@ function Sidebar() {
     {
       key: '/operator/maintenance',
       icon: <Wrench size={20} />,
-      label: 'Maintenance Guide',
+      label: 'Maintenance',
     },
     {
       key: '/operator/inspection',
@@ -148,6 +148,11 @@ function Sidebar() {
           label: 'Overview Data',
         },
       ],
+    },
+    {
+      key: '/supervisor/energy-monitoring',
+      icon: <BarChart2 size={20} />,
+      label: 'Energy Monitoring',
     },
     {
       key: '/supervisor/documents',

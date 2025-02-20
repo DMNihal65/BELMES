@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import { format } from 'date-fns';
-import { Table, Switch, Select, Card, Button, Form, Space, Row, Col, DatePicker, Tag } from 'antd';
+import { Table, Switch, Select, Card, Button, Form, Space, Row, Col, DatePicker, Tag, Input } from 'antd';
 import { ToolOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -53,6 +53,7 @@ export default function MachineMaintenance() {
       status_id: statusId,
       available_from: availableFrom,
       machine_make: record.machine_make,
+      description: record.description
     });
     setEditingKey(record.machine_make);
   };
@@ -72,10 +73,15 @@ export default function MachineMaintenance() {
   const save = async (record) => {
     try {
       const values = await form.validateFields();
+      const description = values.description?.trim();
+      
       const formattedData = {
         status_id: values.status_id === '1' ? 1 : 2,
-        available_from: dayjs(values.available_from).utc().format()
+        available_from: dayjs(values.available_from).utc().format(),
+        description: description || '' // Ensure description is never undefined or null
       };
+      
+      console.log('Saving with data:', formattedData); // Add logging to verify data
       
       await updateMachineStatus(record.id, formattedData);
       setEditingKey('');
@@ -100,7 +106,7 @@ export default function MachineMaintenance() {
       dataIndex: 'machine_make',
       key: 'machine_make',
       sorter: (a, b) => a.machine_make.localeCompare(b.machine_make),
-      width: '25%',
+      width: '20%',
     },
     {
       title: 'Available From',
@@ -162,6 +168,37 @@ export default function MachineMaintenance() {
               {record.status_name}
             </Tag>
           </div>
+        );
+      },
+    },
+    {
+      title: 'Remarks',
+      dataIndex: 'description',
+      key: 'description',
+      width: '25%',
+      render: (_, record) => {
+        const editable = isEditing(record);
+        return editable ? (
+          <Form.Item
+            name="description"
+            style={{ margin: 0 }}
+            rules={[
+              {
+                required: true,
+                message: 'Please enter a remarks',
+                transform: (value) => value?.trim()
+              }
+            ]}
+          >
+            <Input.TextArea
+              rows={2}
+              placeholder="Enter remarks"
+              maxLength={200}
+              defaultValue={record.description || ''}
+            />
+          </Form.Item>
+        ) : (
+          <span>{record.description || '-'}</span>
         );
       },
     },

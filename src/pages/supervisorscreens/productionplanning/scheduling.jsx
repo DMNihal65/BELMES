@@ -890,14 +890,14 @@ const Scheduling = () => {
 
              
                 </TabPane>
-                <TabPane 
+                {/* <TabPane 
                   tab="Dynamic Scheduling Graph" 
                   key="dynamic-scheduling"
                 >
                   <DynamicSchedulingGraph />
-                </TabPane>
+                </TabPane> */}
                 <TabPane 
-                  tab="Dynamic Scheduling Graph2" 
+                  tab="Dynamic Scheduling Graph" 
                   key="dynamic-scheduling2"
                 >
                   <DynamicSchedulingGraph2 />

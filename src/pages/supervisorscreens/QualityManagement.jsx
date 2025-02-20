@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Form, Statistic,
   Typography, Tag, Badge, Alert, DatePicker, TimePicker, message,
-  Tree, Radio, Upload
+  Tree, Radio, Upload, Spin
 } from 'antd';
 import {
   FileTextOutlined, 
@@ -27,6 +27,8 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
+import { qualityStore } from '../../store/Quality-store';
+import QualityInspectionDetails from '../supervisorscreens/QualityManagement/QualityInspectionDetails';
 
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -58,6 +60,11 @@ const QualityManagementDashboard = () => {
     },
     // ... more mock data
   ]);
+  const [orderOptions, setOrderOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [inspectionDetails, setInspectionDetails] = useState(null);
+  const [selectedOperation, setSelectedOperation] = useState(null);
 
   // Stats data
   const qualityStats = {
@@ -69,12 +76,39 @@ const QualityManagementDashboard = () => {
     deviations: 8
   };
 
-  // Sample part options
-  const partOptions = [
-    { value: 'PART-001', label: 'PART-001 Aluminium Housing' },
-    { value: 'PART-002', label: 'PART-002 Steel Bracket' },
-    { value: 'PART-003', label: 'PART-003 Copper Fitting' }
-  ];
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoading(true);
+      try {
+        const data = await qualityStore.fetchAllOrders();
+        setOrderOptions(data);
+        setError(null);
+      } catch (err) {
+        setError(err.message);
+        message.error('Failed to load orders');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
+  // Fetch inspection details when part is selected
+  const handlePartSelect = async (value) => {
+    setSelectedPart(value);
+    setLoading(true);
+    try {
+      const details = await qualityStore.fetchInspectionDetails(value);
+      setInspectionDetails(details);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+      message.error('Failed to load inspection details');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // IPID Table columns
   const ipidColumns = [
@@ -267,7 +301,7 @@ const QualityManagementDashboard = () => {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="font-semibold">Part No.:</div>
-              <div>{ipid.ipidNo}</div>
+              <div>{ipid.partNo}</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="font-semibold">Date:</div>
@@ -656,248 +690,38 @@ const QualityManagementDashboard = () => {
         </Col>
       </Row>
 
-      {/* Part Selection Section */}
+      {/* Part Selection */}
       <Card className="shadow-sm">
         <Row gutter={24} align="middle">
           <Col span={16}>
-            <Form.Item label="Select Job/Part Number" className="mb-0 flex-1">
+            <Form.Item label="Select Part Number/Production Order" className="mb-0 flex-1">
               <Select
                 showSearch
-                placeholder="Search by Job ID or Part Number"
-                onChange={(value) => setSelectedPart(value)}
+                placeholder="Search by Production Order or Part Number"
+                onChange={handlePartSelect}
                 optionFilterProp="children"
                 className="w-full"
-                options={partOptions}
+                loading={loading}
+                options={orderOptions}
+                filterOption={(input, option) =>
+                  option.label.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                }
+                notFoundContent={loading ? 'Loading...' : (error ? 'Error loading data' : 'No data found')}
               />
             </Form.Item>
           </Col>
         </Row>
       </Card>
 
-      {selectedPart && (
-        <Card className="shadow-sm">
-          <Tabs activeKey={activeTab} onChange={setActiveTab}>
-            <TabPane tab="Quality Overview" key="qualityOverview">
-              <Table 
-                columns={qualityOverviewColumns}
-                dataSource={qualityOverviewData}
-                bordered
-                size="small"
-              />
-            </TabPane>
-
-            <TabPane tab="Create New IPID" key="ipidManagement">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Left Column */}
-                <Card className="shadow-sm">
-                  <div className="mb-6">
-                    <Alert
-                      message="Important Pre-requisite"
-                      description={
-                        <div>
-                          <p>Before creating a new IPID, please ensure:</p>
-                          <ul className="list-disc pl-5 mt-2">
-                            <li>You have the latest GDNT_updates2[1] file in your system</li>
-                            <li>Location: D:\HAJU\BEL</li>
-                            <li>File is accessible and up to date</li>
-                            <li>You have knowledge of auto-ballooning process in QMS software</li>
-                          </ul>
-                        </div>
-                      }
-                      type="warning"
-                      showIcon
-                    />
-                  </div>
-
-                  <Card title="File Verification" className="bg-gray-50 mb-6">
-                    <Space direction="vertical" size="middle" className="w-full">
-                      <div className="flex items-center justify-between">
-                        <span>Check GDNT File Availability:</span>
-                        <Button
-                          type="primary"
-                          icon={<FileSearchOutlined />}
-                          onClick={() => {
-                            const exists = checkGDNTFile();
-                            if (exists) {
-                              message.success('GDNT file found at D:\\HAJU\\BEL\\GDNT_updates2[1]');
-                            } else {
-                              message.error('GDNT file not found. Please check the location.');
-                            }
-                          }}
-                        >
-                          Click to Check File
-                        </Button>
-                      </div>
-                      {/* <div className="flex items-center justify-between">
-                        <span>Open GDNT File:</span>
-                        <Button
-                          type="primary"
-                          icon={<FolderOpenOutlined />}
-                          onClick={openGDNTFile}
-                        >
-                          Open GDNT File
-                        </Button>
-                      </div> */}
-                    </Space>
-                  </Card>
-
-                  <div className="flex justify-center">
-                    <Button
-                      type="primary"
-                      size="large"
-                      icon={<FileTextOutlined />}
-                      onClick={openQMSSoftware}
-                      className="px-8"
-                    >
-                      Open QMS Software
-                    </Button>
-                  </div>
-                </Card>
-
-                {/* Right Column */}
-                <Card 
-                  title="IPID Creation Guide" 
-                  className="shadow-sm"
-                  extra={
-                    <Tag color="blue" icon={<InfoCircleOutlined />}>
-                      Step by Step Guide
-                    </Tag>
-                  }
-                >
-                  <div className="space-y-6">
-                    <Card className="bg-gray-50">
-                      <h4 className="font-semibold mb-2 flex items-center">
-                        <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2">1</span>
-                        Auto Ballooning
-                      </h4>
-                      <ul className="list-disc pl-5 ml-8">
-                        <li>Open QMS software using the button on the left</li>
-                        <li>Use auto ballooning feature to mark dimensions</li>
-                        <li>Ensure all critical dimensions are properly marked</li>
-                      </ul>
-                    </Card>
-
-                    <Card className="bg-gray-50">
-                      <h4 className="font-semibold mb-2 flex items-center">
-                        <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2">2</span>
-                        Operation Setup
-                      </h4>
-                      <ul className="list-disc pl-5 ml-8">
-                        <li>Drag the part for the first operation</li>
-                        <li>Set up operation parameters as required</li>
-                        <li>Define measurement points and tolerances</li>
-                      </ul>
-                    </Card>
-
-                    <Card className="bg-gray-50">
-                      <h4 className="font-semibold mb-2 flex items-center">
-                        <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-2">3</span>
-                        IPID Creation
-                      </h4>
-                      <ul className="list-disc pl-5 ml-8">
-                        <li>Create individual IPIDs for each operation</li>
-                        <li>Verify all measurements and parameters</li>
-                        <li>Use the Save/Create IPID button in QMS software</li>
-                      </ul>
-                    </Card>
-
-                    <Alert
-                      message="Note"
-                      description="All IPID creation and editing operations must be performed within the QMS software. This guide is for reference only."
-                      type="info"
-                      showIcon
-                    />
-                  </div>
-                </Card>
-              </div>
-            </TabPane>
-
-            <TabPane tab="Quality Reports" key="qualityReports">
-              <Card className="shadow-sm">
-                {/* Filters Section */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <Row gutter={[16, 16]} align="middle">
-                    <Col span={8}>
-                      <div className="font-semibold mb-2">Date Range</div>
-                      <RangePicker 
-                        className="w-full" 
-                        onChange={(dates) => setDateRange(dates)}
-                      />
-                    </Col>
-                    <Col span={8}>
-                      <div className="font-semibold mb-2">Report Type</div>
-                      <Select
-                        className="w-full"
-                        defaultValue="all"
-                        onChange={(value) => setSelectedReportType(value)}
-                        options={[
-                          { value: 'all', label: 'All Reports' },
-                          { value: 'metrics', label: 'Quality Metrics' },
-                          { value: 'nonconformance', label: 'Non-conformance' },
-                          { value: 'yield', label: 'Yield Analysis' },
-                        ]}
-                      />
-                    </Col>
-                    <Col span={8}>
-                      <div className="font-semibold mb-2">Export Options</div>
-                      <Radio.Group defaultValue="pdf">
-                        <Radio.Button value="pdf">PDF</Radio.Button>
-                        <Radio.Button value="excel">Excel</Radio.Button>
-                        <Radio.Button value="csv">CSV</Radio.Button>
-                      </Radio.Group>
-                    </Col>
-                  </Row>
-                </div>
-
-                {/* Content Section */}
-                <Row gutter={16}>
-                  {/* Folder Tree */}
-                  <Col span={6}>
-                    <Card title="Report Categories" className="h-full">
-                      <Tree
-                        treeData={treeData}
-                        showIcon
-                        defaultExpandAll
-                        onSelect={(selectedKeys) => setSelectedFolder(selectedKeys[0])}
-                      />
-                    </Card>
-                  </Col>
-
-                  {/* Reports Table */}
-                  <Col span={18}>
-                    <Card 
-                      title="Reports List"
-                      extra={
-                        <Space>
-                          <Input
-                            placeholder="Search files..."
-                            prefix={<SearchOutlined />}
-                            onChange={(e) => setSearchText(e.target.value)}
-                            style={{ width: 200 }}
-                          />
-                          <Button 
-                            icon={<UploadOutlined />} 
-                            type="primary"
-                            onClick={() => setUploadModalVisible(true)}
-                            disabled={!selectedFolder}
-                          >
-                            Upload
-                          </Button>
-                        </Space>
-                      }
-                    >
-                      <Table
-                        columns={reportColumns}
-                        dataSource={filteredReports}
-                        size="middle"
-                      />
-                    </Card>
-                  </Col>
-                </Row>
-              </Card>
-            </TabPane>
-          </Tabs>
-        </Card>
+      {/* Display Operations and Inspections */}
+      {selectedPart && inspectionDetails && (
+        <QualityInspectionDetails
+          selectedPart={selectedPart}
+          inspectionDetails={inspectionDetails}
+          loading={loading}
+          selectedOperation={selectedOperation}
+          setSelectedOperation={setSelectedOperation}
+        />
       )}
 
       {/* IPID Detail Modal */}
@@ -952,49 +776,5 @@ const QualityManagementDashboard = () => {
     </div>
   );
 };
-
-// Add this CSS to your styles file
-const styles = `
-  .ipid-modal .ant-modal-body {
-    padding: 24px;
-  }
-
-  .ipid-table .ant-table-thead > tr > th {
-    background-color: #f0f2f5;
-    text-align: center;
-    padding: 12px 8px;
-  }
-
-  .ipid-table .ant-table-tbody > tr > td {
-    padding: 8px;
-  }
-
-  .ipid-container {
-    max-width: 100%;
-    margin: 0 auto;
-  }
-
-  .ant-steps-item-description {
-    padding-bottom: 16px;
-  }
-
-  .file-check-section {
-    background-color: #f5f5f5;
-    padding: 16px;
-    border-radius: 4px;
-    margin-bottom: 24px;
-  }
-
-  .ant-tree {
-    background: transparent;
-  }
-  
-  .report-filters {
-    background: #f5f5f5;
-    padding: 16px;
-    border-radius: 8px;
-    margin-bottom: 24px;
-  }
-`;
 
 export default QualityManagementDashboard;

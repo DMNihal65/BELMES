@@ -23,11 +23,12 @@ import OrderDashboard from '../pages/supervisorscreens/ordermanagement/orderdash
 
 import ConfigurationDashboard from '../pages/supervisorscreens/configuration/WorkcenterDashboard';
 
-import MaintenanceScreen from '../pages/operatorscreens/MaintenanceScreen';
+import MaintenanceScreen from '../pages/operatorscreens/maintanance/MaintenanceDashboard';
 import InspectionResult from '../pages/operatorscreens/InspectionResult';
 import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
-import DocumentManagement from '../pages/supervisorscreens/documentmanagement';
-import QualityManagement from '../pages/supervisorscreens/qualitymanagement';
+import DocumentManagement from '../pages/supervisorscreens/DocumentManagement';
+import QualityManagement from '../pages/supervisorscreens/QualityManagement';
+import EnergyMonitoring from '../pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
 import MaintenanceDashboard from '../pages/supervisorscreens/MachineMaintenance/MaintenanceDashboard';
 // import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
 
@@ -219,6 +220,14 @@ export const router = createBrowserRouter([
                 element: <InventoryAnalytics />,
               }
             ]
+          },
+          {
+            path: 'energy-monitoring',
+            element: (
+              <ProtectedRoute allowedRole="supervisor">
+                <EnergyMonitoring />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'documents',

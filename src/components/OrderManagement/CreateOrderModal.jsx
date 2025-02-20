@@ -137,11 +137,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   // Handle form submission
   const handleSubmit = async (values) => {
     try {
-      if (!values.deliveryDate) {
-        message.error('Please select a delivery date');
-        return;
-      }
-
       // Validate document names if files are selected
       if (mppFile && !mppDocName.trim()) {
         message.error('Please enter MPP document name');
@@ -151,93 +146,90 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         message.error('Please enter Engineering Drawing document name');
         return;
       }
-  
-      const deliveryDate = dayjs(values.deliveryDate);
-      const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
-  
-      // Format the payload according to the API requirements
-      const payload = {
-        production_order: values.orderNumber,
-        sale_order: values.salesOrderNumber,
-        wbs_element: values.wbsElement,
-        part_number: values.partNumber,
-        part_description: values.materialDescription,
-        total_operations: parseInt(values.totalOperations),
-        required_quantity: parseInt(values.targetQuantity),
-        launched_quantity: parseInt(values.launchedQuantity),
-        plant_id: values.plant,
-        project_name: values.projectName,
-        delivery_date: deliveryDate.format('YYYY-MM-DD'),
-        priority: values.priority || 'normal',
-        operations: orderDetails?.operations || [],
-        raw_materials: orderDetails?.rawMaterials?.map(material => ({
-          child_part_number: material.child_part_number,
-          description: material.description,
-          qty_per_set: material.quantity,
-          uom: material.unit.name,
-          total_qty: (material.quantity * values.targetQuantity).toString()
-        })) || []
+
+      // Format the data according to the backend API requirements
+      const requestData = {
+        data: {
+          "Project Name": values.projectName,
+          "Sale Order": values.salesOrderNumber,
+          "Part No": values.partNumber,
+          "Part Desc": values.materialDescription,
+          "Required Qty": values.targetQuantity.toString(),
+          "Plant": values.plant.toString(),
+          "WBS": values.wbsElement,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Launched Qty": values.launchedQuantity.toString(),
+          "Prod Order No": values.orderNumber,
+          "Operations": orderDetails?.operations?.map(op => ({
+            "Oprn No": op.operation_number,
+            "Wc/Plant": op.workcenter,
+            "Plant Number": op.plant_number,
+            "Operation": op.operation_description,
+            "Setup Time": op.setup_time.toString(),
+            "Per Pc Time": op.per_piece_time.toString(),
+            "Jmp Qty": op.jump_quantity.toString(),
+            "Tot Qty": op.total_quantity.toString(),
+            "Allowed Time": op.allowed_time.toString(),
+            "Confirm No": op.confirmation_number,
+            "Long Text": op.long_text
+          })) || [],
+          "Document Verification": {},
+          "Raw Materials": orderDetails?.rawMaterials?.map(material => ({
+            "Sl.No": "0010",
+            "Child Part No": material.child_part_number,
+            "Description": material.description,
+            "Qty Per Set": material.quantity.toString(),
+            "UoM": material.unit.name,
+            "Total Qty": (material.quantity * values.targetQuantity).toString()
+          })) || []
+        }
       };
-  
-      let response;
-      if (orderDetails?.id) {
-        response = await updateOrder(orderDetails.id, payload);
-      } else {
-        response = await createOrder(payload);
+
+      // Save to database
+      const response = await fetch('http://172.18.7.88:7780/api/v1/planning/save-to-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save order');
       }
 
-      // After order is created/updated, handle file uploads
-      const productionOrder = values.orderNumber || response.production_order;
-      
+      const savedData = await response.json();
+
+      // Handle file uploads after successful order creation
       try {
-        // Upload MPP file if exists
         if (mppFile) {
-          try {
-            await uploadMppFile(
-              mppFile.originFileObj || mppFile, 
-              productionOrder,
-              mppDocName.trim(),
-              mppDescription.trim(),
-              mppVersion.trim()
-            );
-          } catch (mppError) {
-            if (mppError.message.includes('Authentication token not found')) {
-              message.error('Please log in again to upload files');
-              return;
-            }
-            throw mppError;
-          }
+          await uploadMppFile(
+            mppFile.originFileObj || mppFile, 
+            values.orderNumber,
+            mppDocName.trim(),
+            mppDescription.trim(),
+            mppVersion.trim()
+          );
         }
         
-        // Upload engineering drawing if exists
         if (drawingFile) {
-          try {
-            await uploadEngineeringDrawing(
-              drawingFile.originFileObj || drawingFile, 
-              productionOrder,
-              drawingDocName.trim(),
-              drawingDescription.trim(),
-              drawingVersion.trim()
-            );
-          } catch (drawingError) {
-            if (drawingError.message.includes('Authentication token not found')) {
-              message.error('Please log in again to upload files');
-              return;
-            }
-            throw drawingError;
-          }
+          await uploadEngineeringDrawing(
+            drawingFile.originFileObj || drawingFile, 
+            values.orderNumber,
+            drawingDocName.trim(),
+            drawingDescription.trim(),
+            drawingVersion.trim()
+          );
         }
       } catch (fileError) {
         console.error('File upload error:', fileError);
-        if (fileError.message.includes('401') || fileError.message.includes('Unauthorized')) {
-          message.error('Your session has expired. Please log in again to upload files.');
-        } else {
-          message.warning('Order was created but there was an issue uploading some files: ' + fileError.message);
-        }
-        return;
+        message.warning('Order was saved but there was an issue uploading some files: ' + fileError.message);
       }
-      
-      message.success(orderDetails?.id ? 'Order updated successfully' : 'Order created successfully');
+
+      message.success('Order saved successfully');
       handleCancel();
     } catch (error) {
       console.error('Submit Error:', error);
@@ -532,18 +524,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
             />
           </Form.Item>
         </Col>
-        <Col span={12}>
-          <Form.Item
-            name="deliveryDate"
-            label="Delivery Date"
-            rules={[{ required: true, message: 'Please select Delivery Date' }]}
-          >
-            <DatePicker 
-              style={{ width: '100%' }} 
-              format="YYYY-MM-DD"
-            />
-          </Form.Item>
-        </Col>
       </Row>
 
       {/* Optional File Uploads Section */}
@@ -693,24 +673,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
           </Col>
         </Row>
 
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item
-              name="delivery_date"
-              label="Delivery Date"
-              rules={[{ required: true, message: 'Please select Delivery Date' }]}
-            >
-              <DatePicker 
-                style={{ width: '100%' }} 
-                format="YYYY-MM-DD"
-                disabledDate={(current) => {
-                  return current && current < dayjs().startOf('day');
-                }}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
         {/* Add the same file upload section */}
         {renderFileUploadSection()}
 
@@ -734,11 +696,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   // Update handleManualSubmit function
   const handleManualSubmit = async (values) => {
     try {
-      if (!values.delivery_date) {
-        message.error('Please select a delivery date');
-        return;
-      }
-
       // Validate document names if files are selected
       if (mppFile && !mppDocName.trim()) {
         message.error('Please enter MPP document name');
@@ -749,90 +706,74 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         return;
       }
 
-      const deliveryDate = dayjs(values.delivery_date);
-      // Format the date as YYYY-MM-DD string
-      const formattedDeliveryDate = deliveryDate.format('YYYY-MM-DD');
-      const epochTimestamp = Math.floor(deliveryDate.valueOf() / 1000);
-
-      // Format the payload according to the API requirements
-      const payload = {
-        production_order: values.production_order,
-        sale_order: values.sale_order,
-        wbs_element: values.wbs_element,
-        part_number: values.part_number,
-        part_description: values.part_description,
-        total_operations: parseInt(values.total_operations),
-        required_quantity: parseInt(values.required_quantity),
-        launched_quantity: parseInt(values.launched_quantity),
-        plant_id: parseInt(values.plant_id),
-        project_name: values.project_name,
-        delivery_date: formattedDeliveryDate, // Send as YYYY-MM-DD string
-        project: {
-          name: values.project_name,
-          delivery_date: epochTimestamp
-        },
-        raw_materials: []
+      // Format the data according to the backend API requirements
+      const requestData = {
+        data: {
+          "Project Name": values.project_name,
+          "Sale Order": values.sale_order,
+          "Part No": values.part_number,
+          "Part Desc": values.part_description,
+          "Required Qty": values.required_quantity.toString(),
+          "Plant": values.plant_id.toString(),
+          "WBS": values.wbs_element,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Launched Qty": values.launched_quantity.toString(),
+          "Prod Order No": values.production_order,
+          "Operations": [],
+          "Document Verification": {},
+          "Raw Materials": []
+        }
       };
 
-      // Create the order first
-      const response = await createOrder(payload);
-      const productionOrder = response.production_order || values.production_order;
+      // Save to database
+      const response = await fetch('http://172.18.7.88:7780/api/v1/planning/save-to-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(requestData)
+      });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save order');
+      }
+
+      const savedData = await response.json();
+
+      // Handle file uploads after successful order creation
       try {
-        // Upload MPP file if exists
         if (mppFile) {
-          try {
-            await uploadMppFile(
-              mppFile.originFileObj || mppFile, 
-              productionOrder,
-              mppDocName.trim(),
-              mppDescription.trim(),
-              mppVersion.trim()
-            );
-          } catch (mppError) {
-            if (mppError.message.includes('Authentication token not found')) {
-              message.error('Please log in again to upload files');
-              return;
-            }
-            throw mppError;
-          }
+          await uploadMppFile(
+            mppFile.originFileObj || mppFile, 
+            values.production_order,
+            mppDocName.trim(),
+            mppDescription.trim(),
+            mppVersion.trim()
+          );
         }
         
-        // Upload engineering drawing if exists
         if (drawingFile) {
-          try {
-            await uploadEngineeringDrawing(
-              drawingFile.originFileObj || drawingFile, 
-              productionOrder,
-              drawingDocName.trim(),
-              drawingDescription.trim(),
-              drawingVersion.trim()
-            );
-          } catch (drawingError) {
-            if (drawingError.message.includes('Authentication token not found')) {
-              message.error('Please log in again to upload files');
-              return;
-            }
-            throw drawingError;
-          }
+          await uploadEngineeringDrawing(
+            drawingFile.originFileObj || drawingFile, 
+            values.production_order,
+            drawingDocName.trim(),
+            drawingDescription.trim(),
+            drawingVersion.trim()
+          );
         }
       } catch (fileError) {
         console.error('File upload error:', fileError);
-        if (fileError.message.includes('401') || fileError.message.includes('Unauthorized')) {
-          message.error('Your session has expired. Please log in again to upload files.');
-        } else {
-          message.warning('Order was created but there was an issue uploading some files: ' + fileError.message);
-        }
-        return;
+        message.warning('Order was saved but there was an issue uploading some files: ' + fileError.message);
       }
 
-      message.success('Order created successfully');
+      message.success('Order saved successfully');
       handleCancel();
-      return response;
     } catch (error) {
       console.error('Submit Error:', error);
-      message.error(error.message || 'Failed to create order');
-      throw error;
+      message.error(error.message || 'Failed to save order');
     }
   };
   

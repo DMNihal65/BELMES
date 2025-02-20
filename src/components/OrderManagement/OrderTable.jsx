@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Table, Tag, Badge, Button, Space, Tooltip } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
@@ -94,17 +93,6 @@ const OrderTable = ({ orders, onRefresh }) => {
           </Tag>
         </div>
       ),
-    },
-    {
-      title: 'Delivery Date',
-      dataIndex: 'deliveryDate', // Ensure this matches the transformed field
-      key: 'deliveryDate',
-      render: (date) => date ? dayjs(date).format('MM/DD/YYYY') : 'N/A',
-      sorter: (a, b) => {
-        const dateA = a.deliveryDate ? dayjs(a.deliveryDate).unix() : 0;
-        const dateB = b.deliveryDate ? dayjs(b.deliveryDate).unix() : 0;
-        return dateA - dateB;
-      },
     },
     {
       title: 'Status',

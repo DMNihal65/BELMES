@@ -136,13 +136,6 @@ const DraggableReorderTable = ({ orders: initialOrders }) => {
         dataIndex: 'salesOrderNumber',
         key: 'salesOrderNumber',
       },
-      {
-        title: 'Delivery Date',
-        dataIndex: 'deliveryDate',
-        key: 'deliveryDate',
-        render: (date) => new Date(date).toLocaleDateString(),
-        sorter: (a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate),
-      },
     {
       title: 'Status',
       key: 'status',

@@ -4,7 +4,7 @@ import { PlusOutlined, InboxOutlined, WarningOutlined, SearchOutlined } from '@a
 import axios from 'axios';
 import moment from 'moment';
 
-const BASE_URL = 'http://172.18.7.88:7780/api/v1/maintainance';
+const BASE_URL = 'http://172.18.7.88:7783/api/v1/maintainance';
 
 export default function RawMaterialsMaintenance() {
   const [form] = Form.useForm();
@@ -16,6 +16,7 @@ export default function RawMaterialsMaintenance() {
   const [filteredMaterials, setFilteredMaterials] = useState([]);
   const [units, setUnits] = useState([]);
   const [statuses, setStatuses] = useState([]);
+  const { Search } = Input;
 
   useEffect(() => {
     fetchRawMaterials();
@@ -304,13 +305,16 @@ export default function RawMaterialsMaintenance() {
   return (
     <div className="p-6">
       <div className="mb-4">
-        <Input
-          placeholder="Search across all columns..."
+        <Search
+          placeholder="Search in all columns..."
+          allowClear
+          enterButton
+          size="large"
+          onSearch={handleSearch}
           prefix={<SearchOutlined />}
           onChange={(e) => setSearchText(e.target.value)}
           value={searchText}
-          style={{ width: 300 }}
-          allowClear
+          style={{ maxWidth: 500 }}
         />
       </div>
 

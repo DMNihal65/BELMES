@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, DatePicker, Select, message, Tabs, Badge, Space } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, DatePicker, Select, message, Tabs, Badge, Space, Tag } from 'antd';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import dayjs from 'dayjs';
 
@@ -12,25 +12,43 @@ function MachineMaintenance() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [searchText, setSearchText] = useState('');
-  const [notifications, setNotifications] = useState([
-    { id: 1, message: 'Machine M1 status changed to Maintenance', read: false, timestamp: new Date() },
-    { id: 2, message: 'Machine M2 will be available from tomorrow', read: true, timestamp: new Date() },
-  ]);
   
   const { 
     machines, 
     statuses, 
     loading, 
     error,
+    notifications,
     fetchOperatorMachineStatuses, 
     fetchAvailableStatuses,
-    requestMachineStatusChange 
+    requestMachineStatusChange,
+    fetchNotifications,
+    updateNotificationStatus
   } = useMachineMaintenanceStore();
 
   useEffect(() => {
+    // Initial fetch
     fetchOperatorMachineStatuses();
     fetchAvailableStatuses();
-  }, []);
+    fetchNotifications();
+
+    // Set up intervals for automatic updates every minute
+    const machineStatusInterval = setInterval(() => {
+      fetchOperatorMachineStatuses();
+    }, 10000);
+
+    const notificationsInterval = setInterval(() => {
+      fetchNotifications();
+    }, 10000);
+
+    // Cleanup intervals on component unmount
+    return () => {
+      clearInterval(machineStatusInterval);
+      clearInterval(notificationsInterval);
+    };
+  }, [fetchOperatorMachineStatuses, fetchAvailableStatuses, fetchNotifications]);
+
+  
 
   const columns = [
     {
@@ -114,9 +132,58 @@ function MachineMaintenance() {
       ),
     },
     {
-      title: 'Message',
-      dataIndex: 'message',
-      key: 'message',
+      title: 'Machine ID',
+      dataIndex: 'machine_id',
+      key: 'machine_id',
+    },
+    {
+      title: 'Type',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type) => {
+        if (!type) return '-';
+        return type === 'rejection' ? (
+          <Tag color="red">Rejected</Tag>
+        ) : (
+          <Tag color="green">Approved</Tag>
+        );
+      },
+    },
+    {
+      title: 'Status Change',
+      key: 'status_change',
+      render: (_, record) => {
+        if (record.type === 'rejection') {
+          return record.requested_status ? (
+            <Tag color={record.requested_status === 'ON' ? 'green' : 'red'}>
+              {record.requested_status}
+            </Tag>
+          ) : '-';
+        }
+        return (
+          <Space>
+            <Tag color={record.old_status === 'ON' ? 'green' : 'red'}>
+              {record.old_status || '-'}
+            </Tag>
+            →
+            <Tag color={record.new_status === 'ON' ? 'green' : 'red'}>
+              {record.new_status || '-'}
+            </Tag>
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      render: (description) => description || '-',
+    },
+    {
+      title: 'Reason',
+      dataIndex: 'reason',
+      key: 'reason',
+      render: (reason) => reason || '-',
     },
     {
       title: 'Time',
@@ -129,29 +196,26 @@ function MachineMaintenance() {
       key: 'actions',
       render: (_, record) => (
         <Space>
-          {!record.read && (
-            <Button type="link" onClick={() => markNotificationAsRead(record.id)}>
-              Mark as Read
-            </Button>
-          )}
-          <Button type="link" danger onClick={() => deleteNotification(record.id)}>
-            Delete
+          <Button 
+            type="link" 
+            onClick={() => handleMarkAsRead(record.machine_id, record.timestamp)}
+          >
+            Mark as Read
           </Button>
         </Space>
       ),
     },
   ];
 
-  const markNotificationAsRead = (id) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
-    message.success('Notification marked as read');
-  };
-
-  const deleteNotification = (id) => {
-    setNotifications(notifications.filter(n => n.id !== id));
-    message.success('Notification deleted');
+  const handleMarkAsRead = async (machineId, timestamp) => {
+    try {
+      await updateNotificationStatus(machineId, timestamp, true, false);
+      message.success('Notification marked as read');
+      // Refresh notifications
+      await fetchNotifications();
+    } catch (error) {
+      message.error('Failed to mark notification as read');
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -191,7 +255,7 @@ function MachineMaintenance() {
     <Table 
       dataSource={notifications}
       columns={notificationColumns}
-      rowKey="id"
+      rowKey={(record) => `${record.machine_id}-${record.timestamp}`}
       pagination={{
         pageSize: 8,
         showSizeChanger: false,

@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.88:7780/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.88:7780/api/v1/operator';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.88:7783/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.88:7783/api/v1/operator';
 
 const extractMachineId = (machineMake) => {
   // Extract numeric ID from machine make (e.g., "m1" -> 1)
@@ -20,6 +20,7 @@ const useMachineMaintenanceStore = create((set, get) => ({
   totalPendingRequests: 0,
   operatorPendingRequests: [],
   operatorTotalPendingRequests: 0,
+  notifications: [],
 
   // Operator: Fetch all machine statuses
   fetchOperatorMachineStatuses: async () => {
@@ -207,6 +208,60 @@ const useMachineMaintenanceStore = create((set, get) => ({
         loading: false 
       });
       throw error;
+    }
+  },
+
+  // Fetch machine status notifications
+  fetchNotifications: async () => {
+    set({ loading: true, error: null });
+    try {
+      const response = await axios.get(`${OPERATOR_BASE_URL}/Machine-status-Notification`);
+      set({
+        notifications: response.data.messages || [],
+        loading: false
+      });
+    } catch (error) {
+      set({ 
+        error: error.response?.data?.detail || error.message, 
+        loading: false 
+      });
+    }
+  },
+
+  // Update notification status
+  updateNotificationStatus: async (machineId, timestamp, read, retain) => {
+    set({ loading: true, error: null });
+    try {
+      // Ensure timestamp is properly encoded for URL
+      const encodedTimestamp = encodeURIComponent(timestamp);
+      
+      // Make PUT request with path parameters and query parameters
+      const response = await axios.put(
+        `${OPERATOR_BASE_URL}/Machine-status-Notification/${machineId}/${encodedTimestamp}`,
+        null,  // no body needed
+        {
+          params: {
+            read: read,
+            retain: retain
+          }
+        }
+      );
+
+      if (response.data.message === "Message status updated successfully") {
+        // Refresh notifications after successful update
+        await get().fetchNotifications();
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error updating notification status:', error);
+      set({ 
+        error: error.response?.data?.detail || error.message, 
+        loading: false 
+      });
+      throw error;
+    } finally {
+      set({ loading: false });
     }
   },
 }));

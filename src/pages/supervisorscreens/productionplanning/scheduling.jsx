@@ -219,7 +219,7 @@ const Scheduling = () => {
   const availableMachines = React.useMemo(() => {
     if (!scheduleData?.work_centers) return [];
     
-    // Get all machines from work_centers and format them as WORK_CENTER_CODE-MACHINE_ID
+    // Get all machines from work_centers in the order they appear in the API
     const workCenterMachines = scheduleData.work_centers.flatMap(wc => 
       wc.machines.map(machine => ({
         id: machine.id,  // Original machine ID
@@ -227,7 +227,8 @@ const Scheduling = () => {
         name: machine.name,
         work_center_code: wc.work_center_code,
         work_center_name: wc.work_center_name,
-        displayName: `${wc.work_center_code} - ${machine.name}`  // Display format
+        displayName: `${wc.work_center_code} - ${machine.name}`,  // Display format
+        order: scheduleData.work_centers.indexOf(wc) * 100 + wc.machines.indexOf(machine) // Preserve order
       }))
     );
     
@@ -245,19 +246,21 @@ const Scheduling = () => {
       return isRunning;
     };
 
-    // Sort machines: running machines first, then by work center code and machine name
+    // Sort machines: first by their original order, then by running status
     return workCenterMachines.sort((a, b) => {
+      // First sort by the original order from the API
+      if (a.order !== b.order) {
+        return a.order - b.order;
+      }
+      
+      // If order is the same, sort by running status
       const isRunningA = getMachineStatus(a.machineId);
       const isRunningB = getMachineStatus(b.machineId);
       
       if (isRunningA && !isRunningB) return -1;
       if (!isRunningA && isRunningB) return 1;
       
-      // If running status is the same, sort by work center code then machine name
-      if (a.work_center_code !== b.work_center_code) {
-        return a.work_center_code.localeCompare(b.work_center_code);
-      }
-      return a.name.localeCompare(b.name);
+      return 0;
     });
   }, [scheduleData]);
 
@@ -323,7 +326,7 @@ const Scheduling = () => {
           }))
         );
 
-        // Create groups with all available machines
+        // Create groups with all available machines in the correct order
         const groups = new DataSet(
           availableMachines.map(machine => ({
             id: machine.machineId,  // Use our unique internal machine ID
@@ -334,7 +337,8 @@ const Scheduling = () => {
                 </span>
               </div>
             `,
-            className: operations.some(op => machineMapping.get(op.machine) === machine.machineId) ? 'machine-with-ops' : 'machine-without-ops'
+            className: operations.some(op => machineMapping.get(op.machine) === machine.machineId) ? 'machine-with-ops' : 'machine-without-ops',
+            order: machine.order // Add order property to maintain sorting
           }))
         );
 

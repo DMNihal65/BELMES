@@ -3,6 +3,8 @@ import { Table, Button, Modal, Input, message, Form } from 'antd';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import { SearchOutlined } from '@ant-design/icons';
 
+const { Search } = Input;
+
 const OperatorRequests = () => {
   const [searchText, setSearchText] = useState('');
   const { 
@@ -16,7 +18,16 @@ const OperatorRequests = () => {
   const [form] = Form.useForm();
 
   useEffect(() => {
+    // Initial fetch
     fetchOperatorPendingRequests();
+
+    // Set up interval for automatic updates every minute
+    const intervalId = setInterval(() => {
+      fetchOperatorPendingRequests();
+    }, 10000); // 10000 ms = 1 minute
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
   }, [fetchOperatorPendingRequests]);
 
   const handleApprove = async (machineId) => {
@@ -165,13 +176,17 @@ const OperatorRequests = () => {
   return (
     <div className="w-full">
       <div className="mb-4 flex flex-wrap gap-4">
-        <Input
-          placeholder="Search across all columns..."
+        <Search
+          placeholder="Search in all columns..."
+          allowClear
+          enterButton
+          size="large"
+          onSearch={handleSearch}
           prefix={<SearchOutlined />}
           onChange={(e) => setSearchText(e.target.value)}
           value={searchText}
           style={{ maxWidth: '300px', width: '100%' }}
-          allowClear
+       
         />
       </div>
 

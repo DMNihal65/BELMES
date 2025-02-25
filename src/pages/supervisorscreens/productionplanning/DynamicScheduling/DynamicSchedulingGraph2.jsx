@@ -123,20 +123,33 @@ const DynamicSchedulingGraph2 = () => {
   const fetchScheduleData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://172.18.7.88:7222/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://172.18.7.85:6641/api/v1/rescheduling/reschedule-actual-planned-combined');
       setScheduleData(response.data);
       
-      // Extract unique production orders and components
+      // Extract unique production orders and components from all operation types
       const uniqueProductionOrders = new Set();
       const uniqueComponents = new Set();
       
+      // From scheduled operations
       response.data.scheduled_operations.forEach(op => {
         if (op.production_order) uniqueProductionOrders.add(op.production_order);
         if (op.component) uniqueComponents.add(op.component);
       });
       
-      setProductionOrders(Array.from(uniqueProductionOrders));
-      setComponents(Array.from(uniqueComponents));
+      // From production logs
+      response.data.production_logs.forEach(log => {
+        if (log.production_order) uniqueProductionOrders.add(log.production_order);
+        if (log.part_number) uniqueComponents.add(log.part_number);
+      });
+      
+      // From rescheduled operations
+      response.data.reschedule.forEach(reschedule => {
+        if (reschedule.production_order) uniqueProductionOrders.add(reschedule.production_order);
+        if (reschedule.part_number) uniqueComponents.add(reschedule.part_number);
+      });
+      
+      setProductionOrders(Array.from(uniqueProductionOrders).sort());
+      setComponents(Array.from(uniqueComponents).sort());
       
       setLoading(false);
     } catch (err) {
@@ -221,20 +234,30 @@ const DynamicSchedulingGraph2 = () => {
       });
     });
 
-    // Filter operations based on selected production order and component
-    const filterOperation = (op) => {
+    // Update the filter operation function to handle all operation types
+    const filterOperation = (op, type) => {
       if (selectedProductionOrder && op.production_order !== selectedProductionOrder) {
         return false;
       }
-      if (selectedComponent && op.component !== selectedComponent) {
-        return false;
+      
+      if (selectedComponent) {
+        switch (type) {
+          case 'planned':
+            if (op.component !== selectedComponent) return false;
+            break;
+          case 'actual':
+          case 'rescheduled':
+            if (op.part_number !== selectedComponent) return false;
+            break;
+        }
       }
+      
       return true;
     };
 
     // Add scheduled operations (Planned) with filters
     scheduleData.scheduled_operations.forEach((op, index) => {
-      if (filterOperation(op)) {
+      if (filterOperation(op, 'planned')) {
         items.add({
           id: `planned-${index}`,
           group: `${op.machine}-planned`,
@@ -245,10 +268,10 @@ const DynamicSchedulingGraph2 = () => {
           title: `
             <div>
               <strong>Planned Operation</strong><br/>
-              Component: ${op.component}<br/>
+              Part Number: ${op.component}<br/>
+              Production Order: ${op.production_order}<br/>
               Description: ${op.description}<br/>
               Quantity: ${op.quantity}<br/>
-              Production Order: ${op.production_order}<br/>
               Start: ${moment(op.start_time).format('DD/MM/YYYY HH:mm')}<br/>
               End: ${moment(op.end_time).format('DD/MM/YYYY HH:mm')}
             </div>
@@ -257,34 +280,37 @@ const DynamicSchedulingGraph2 = () => {
       }
     });
 
-    // Add production logs (Actual)
+    // Add production logs (Actual) with filters
     scheduleData.production_logs.forEach((log, index) => {
-      items.add({
-        id: `actual-${index}`,
-        group: `${log.machine_name}-actual`,
-        start: new Date(log.start_time),
-        end: new Date(log.end_time),
-        content: '',
-        className: 'actual-bar',
-        title: `
-          <div>
-            <strong>Actual Production</strong><br/>
-            Part: ${log.part_number}<br/>
-            Operation: ${log.operation_description}<br/>
-            Completed: ${log.quantity_completed}<br/>
-            Rejected: ${log.quantity_rejected}<br/>
-            Notes: ${log.notes}<br/>
-            Start: ${moment(log.start_time).format('DD/MM/YYYY HH:mm')}<br/>
-            End: ${moment(log.end_time).format('DD/MM/YYYY HH:mm')}
-          </div>
-        `
-      });
+      if (filterOperation(log, 'actual')) {
+        items.add({
+          id: `actual-${index}`,
+          group: `${log.machine_name}-actual`,
+          start: new Date(log.start_time),
+          end: new Date(log.end_time),
+          content: '',
+          className: 'actual-bar',
+          title: `
+            <div>
+              <strong>Actual Production</strong><br/>
+              Part Number: ${log.part_number}<br/>
+              Production Order: ${log.production_order}<br/>
+              Operation: ${log.operation_description}<br/>
+              Completed: ${log.quantity_completed}<br/>
+              Rejected: ${log.quantity_rejected}<br/>
+              Notes: ${log.notes}<br/>
+              Start: ${moment(log.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+              End: ${moment(log.end_time).format('DD/MM/YYYY HH:mm')}
+            </div>
+          `
+        });
+      }
     });
 
-    // Add rescheduled operations
+    // Add rescheduled operations with filters
     scheduleData.reschedule.forEach((reschedule, index) => {
       const machineName = machineMapping[reschedule.machine_id.toString()];
-      if (machineName) {
+      if (machineName && filterOperation(reschedule, 'rescheduled')) {
         items.add({
           id: `rescheduled-${index}`,
           group: `${machineName}-rescheduled`,
@@ -295,6 +321,8 @@ const DynamicSchedulingGraph2 = () => {
           title: `
             <div>
               <strong>Rescheduled Operation</strong><br/>
+              Part Number: ${reschedule.part_number}<br/>
+              Production Order: ${reschedule.production_order}<br/>
               Version: ${reschedule.new_version} (from ${reschedule.old_version})<br/>
               Completed Qty: ${reschedule.completed_qty}<br/>
               Remaining Qty: ${reschedule.remaining_qty}<br/>

@@ -187,7 +187,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       };
 
       // Save to database
-      const response = await fetch('http://172.18.7.88:7222/api/v1/planning/save-to-db', {
+      const response = await fetch('http://172.18.7.85:6641/api/v1/planning/save-to-db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -727,7 +727,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       };
 
       // Save to database
-      const response = await fetch('http://172.18.7.88:7222/api/v1/planning/save-to-db', {
+      const response = await fetch('http://172.18.7.85:6641/api/v1/planning/save-to-db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

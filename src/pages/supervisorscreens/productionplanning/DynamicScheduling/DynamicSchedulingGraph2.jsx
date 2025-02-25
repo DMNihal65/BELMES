@@ -115,12 +115,29 @@ const DynamicSchedulingGraph2 = () => {
   const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState(null);
   const [viewType, setViewType] = useState('week');
+  const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
+  const [selectedComponent, setSelectedComponent] = useState(null);
+  const [productionOrders, setProductionOrders] = useState([]);
+  const [components, setComponents] = useState([]);
 
   const fetchScheduleData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://172.18.7.88:7783/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://172.18.7.88:7222/api/v1/rescheduling/reschedule-actual-planned-combined');
       setScheduleData(response.data);
+      
+      // Extract unique production orders and components
+      const uniqueProductionOrders = new Set();
+      const uniqueComponents = new Set();
+      
+      response.data.scheduled_operations.forEach(op => {
+        if (op.production_order) uniqueProductionOrders.add(op.production_order);
+        if (op.component) uniqueComponents.add(op.component);
+      });
+      
+      setProductionOrders(Array.from(uniqueProductionOrders));
+      setComponents(Array.from(uniqueComponents));
+      
       setLoading(false);
     } catch (err) {
       setError('Failed to fetch schedule data');
@@ -204,27 +221,40 @@ const DynamicSchedulingGraph2 = () => {
       });
     });
 
-    // Add scheduled operations (Planned)
+    // Filter operations based on selected production order and component
+    const filterOperation = (op) => {
+      if (selectedProductionOrder && op.production_order !== selectedProductionOrder) {
+        return false;
+      }
+      if (selectedComponent && op.component !== selectedComponent) {
+        return false;
+      }
+      return true;
+    };
+
+    // Add scheduled operations (Planned) with filters
     scheduleData.scheduled_operations.forEach((op, index) => {
-      items.add({
-        id: `planned-${index}`,
-        group: `${op.machine}-planned`,
-        start: new Date(op.start_time),
-        end: new Date(op.end_time),
-        content: '',
-        className: 'planned-bar',
-        title: `
-          <div>
-            <strong>Planned Operation</strong><br/>
-            Component: ${op.component}<br/>
-            Description: ${op.description}<br/>
-            Quantity: ${op.quantity}<br/>
-            Production Order: ${op.production_order}<br/>
-            Start: ${moment(op.start_time).format('DD/MM/YYYY HH:mm')}<br/>
-            End: ${moment(op.end_time).format('DD/MM/YYYY HH:mm')}
-          </div>
-        `
-      });
+      if (filterOperation(op)) {
+        items.add({
+          id: `planned-${index}`,
+          group: `${op.machine}-planned`,
+          start: new Date(op.start_time),
+          end: new Date(op.end_time),
+          content: '',
+          className: 'planned-bar',
+          title: `
+            <div>
+              <strong>Planned Operation</strong><br/>
+              Component: ${op.component}<br/>
+              Description: ${op.description}<br/>
+              Quantity: ${op.quantity}<br/>
+              Production Order: ${op.production_order}<br/>
+              Start: ${moment(op.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+              End: ${moment(op.end_time).format('DD/MM/YYYY HH:mm')}
+            </div>
+          `
+        });
+      }
     });
 
     // Add production logs (Actual)
@@ -288,10 +318,14 @@ const DynamicSchedulingGraph2 = () => {
       groups,
       {
         stack: false,
-        horizontalScroll: true,
+        horizontalScroll: false,
+        verticalScroll: true,
         zoomKey: 'ctrlKey',
         orientation: 'top',
         height: '670px',
+        margin: { item: { vertical: 10 } },
+        groupHeightMode: 'fixed',
+        maxHeight: '670px',
         groupOrder: function(a, b) {
           const aOrder = a.order || 0;
           const bOrder = b.order || 0;
@@ -353,6 +387,22 @@ const DynamicSchedulingGraph2 = () => {
       .vis-nested-group {
         background-color: #f5f5f5;
       }
+      .vis-panel.vis-center {
+        overflow: hidden !important;
+      }
+      .vis-panel.vis-left {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+      }
+      .vis-labelset {
+        overflow-x: hidden !important;
+      }
+      .vis-panel.vis-bottom {
+        overflow: hidden !important;
+      }
+      .vis-timeline {
+        overflow: hidden !important;
+      }
       .planned-group {
         border-left: 4px solid #1890ff;
         background-color: rgba(24, 144, 255, 0.05);
@@ -383,7 +433,7 @@ const DynamicSchedulingGraph2 = () => {
       timeline.destroy();
       document.head.removeChild(style);
     };
-  }, [timelineContainerRef, scheduleData, viewType, dateRange]);
+  }, [timelineContainerRef, scheduleData, viewType, dateRange, selectedProductionOrder, selectedComponent]);
 
   const handleViewTypeChange = (newViewType) => {
     setViewType(newViewType);
@@ -484,6 +534,19 @@ const DynamicSchedulingGraph2 = () => {
     fetchScheduleData();
   };
 
+  const handleProductionOrderChange = (value) => {
+    setSelectedProductionOrder(value);
+  };
+
+  const handleComponentChange = (value) => {
+    setSelectedComponent(value);
+  };
+
+  const handleClearFilters = () => {
+    setSelectedProductionOrder(null);
+    setSelectedComponent(null);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -517,6 +580,34 @@ const DynamicSchedulingGraph2 = () => {
             <Option value="month">Monthly</Option>
             <Option value="year">Yearly</Option>
           </Select>
+          
+          <Select
+            placeholder="Select Production Order"
+            value={selectedProductionOrder}
+            onChange={handleProductionOrderChange}
+            style={{ width: 200 }}
+            allowClear
+          >
+            {productionOrders.map(po => (
+              <Option key={po} value={po}>{po}</Option>
+            ))}
+          </Select>
+
+          <Select
+            placeholder="Select Component"
+            value={selectedComponent}
+            onChange={handleComponentChange}
+            style={{ width: 200 }}
+            allowClear
+          >
+            {components.map(component => (
+              <Option key={component} value={component}>{component}</Option>
+            ))}
+          </Select>
+
+          <Button onClick={handleClearFilters}>
+            Clear Filters
+          </Button>
           
           <DatePicker.RangePicker
             value={dateRange}
@@ -583,6 +674,9 @@ const DynamicSchedulingGraph2 = () => {
           <span>Rescheduled</span>
         </div>
       </div>
+
+
+      
     </Card>
   );
 };

@@ -24,7 +24,7 @@ const OperatorRequests = () => {
     // Set up interval for automatic updates every minute
     const intervalId = setInterval(() => {
       fetchOperatorPendingRequests();
-    }, 10000); // 10000 ms = 1 minute
+    }, 1000); // 10000 ms = 1 minute
 
     // Cleanup interval on component unmount
     return () => clearInterval(intervalId);

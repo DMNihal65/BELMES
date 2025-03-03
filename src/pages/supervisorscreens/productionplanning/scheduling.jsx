@@ -19,8 +19,8 @@ import moment from 'moment';
 import AnalyticsDashboard from './Analytics/AnalyticsDashboard';
 import { ComponentLegend, MachineStatusCards } from './Schedule/ComponentsAndStatus';
 import OrderStatusDashboard from './OrderStatus/OrderStatusDashboard';
+import DynamicSchedulingGraphCopy from './DynamicScheduling/DynamicSchedulingGraphCopy';
 import DynamicSchedulingGraph from './DynamicScheduling/DynamicSchedulingGraph';
-import DynamicSchedulingGraph2 from './DynamicScheduling/DynamicSchedulingGraph2';
 
 
 const { Sider, Content } = Layout;
@@ -694,30 +694,89 @@ const Scheduling = () => {
 
   const handleTimelineNavigation = (direction) => {
     if (!timelineRef.current) return;
-
+  
     const currentWindow = timelineRef.current.getWindow();
     const start = moment(currentWindow.start);
     const end = moment(currentWindow.end);
-    const duration = moment.duration(end.diff(start));
-
+  
     let newStart, newEnd;
-    switch (direction) {
-      case 'left':
-        newStart = start.clone().subtract(duration);
-        newEnd = end.clone().subtract(duration);
+    
+    // Handle navigation based on viewType without limitations
+    switch (viewType) {
+      case 'day':
+        // For daily view, move exactly one day at a time
+        switch (direction) {
+          case 'left':
+            newStart = start.clone().subtract(1, 'day').hour(9).minute(0).second(0);
+            newEnd = end.clone().subtract(1, 'day').hour(17).minute(0).second(0);
+            break;
+          case 'right':
+            newStart = start.clone().add(1, 'day').hour(9).minute(0).second(0);
+            newEnd = end.clone().add(1, 'day').hour(17).minute(0).second(0);
+            break;
+          case 'today':
+            newStart = moment().startOf('day').hour(9).minute(0).second(0);
+            newEnd = moment().endOf('day').hour(17).minute(0).second(0);
+            break;
+        }
         break;
-      case 'right':
-        newStart = start.clone().add(duration);
-        newEnd = end.clone().add(duration);
+      
+      case 'week':
+        // For weekly view, move exactly one week at a time
+        switch (direction) {
+          case 'left':
+            newStart = start.clone().subtract(1, 'week');
+            newEnd = end.clone().subtract(1, 'week');
+            break;
+          case 'right':
+            newStart = start.clone().add(1, 'week');
+            newEnd = end.clone().add(1, 'week');
+            break;
+          case 'today':
+            newStart = moment().startOf('week');
+            newEnd = moment().endOf('week');
+            break;
+        }
         break;
-      case 'today':
-        const now = moment();
-        const halfDuration = duration.asMilliseconds() / 2;
-        newStart = now.clone().subtract(halfDuration, 'milliseconds');
-        newEnd = now.clone().add(halfDuration, 'milliseconds');
+  
+      case 'month':
+        // For monthly view, move exactly one month at a time
+        switch (direction) {
+          case 'left':
+            newStart = start.clone().subtract(1, 'month');
+            newEnd = end.clone().subtract(1, 'month');
+            break;
+          case 'right':
+            newStart = start.clone().add(1, 'month');
+            newEnd = end.clone().add(1, 'month');
+            break;
+          case 'today':
+            newStart = moment().startOf('month');
+            newEnd = moment().endOf('month');
+            break;
+        }
+        break;
+  
+      case 'year':
+        // For yearly view, move exactly one year at a time
+        switch (direction) {
+          case 'left':
+            newStart = start.clone().subtract(1, 'year');
+            newEnd = end.clone().subtract(1, 'year');
+            break;
+          case 'right':
+            newStart = start.clone().add(1, 'year');
+            newEnd = end.clone().add(1, 'year');
+            break;
+          case 'today':
+            newStart = moment().startOf('year');
+            newEnd = moment().endOf('year');
+            break;
+        }
         break;
     }
-
+  
+    // Set the new window with animation
     timelineRef.current.setWindow(newStart.toDate(), newEnd.toDate(), { animation: true });
   };
 
@@ -902,9 +961,9 @@ const Scheduling = () => {
                 </TabPane> */}
                 <TabPane 
                   tab="Dynamic Scheduling Graph" 
-                  key="dynamic-scheduling2"
+                  key="dynamic-scheduling"
                 >
-                  <DynamicSchedulingGraph2 />
+                  <DynamicSchedulingGraph />
                 </TabPane>
                 <TabPane 
                   tab="Machine Status" 
@@ -1332,7 +1391,7 @@ const styles = {
 };
 
 const getTimeRange = (viewType, dateRange, selectedComponents, selectedMachines, selectedProductionOrders, scheduleData) => {
-  let start, end, min, max, dataMin, dataMax;
+  let start, end, dataMin, dataMax;
   const now = moment();
 
   // Calculate the full data range first
@@ -1344,54 +1403,13 @@ const getTimeRange = (viewType, dateRange, selectedComponents, selectedMachines,
     const earliestDate = moment(Math.min(...allStartTimes));
     const latestDate = moment(Math.max(...allEndTimes));
     
-    // Set scrollable range based on view type
-    switch (viewType) {
-      case 'year':
-        const twoYearsBeforeData = earliestDate.clone().subtract(2, 'years');
-        const twoYearsAfterData = latestDate.clone().add(2, 'years');
-        dataMin = moment.min(twoYearsBeforeData, now.clone().subtract(2, 'years')).toDate();
-        dataMax = moment.max(twoYearsAfterData, now.clone().add(2, 'years')).toDate();
-        break;
-      case 'month':
-        // 6 months before and after
-        const sixMonthsBeforeData = earliestDate.clone().subtract(6, 'months');
-        const sixMonthsAfterData = latestDate.clone().add(6, 'months');
-        dataMin = moment.min(sixMonthsBeforeData, now.clone().subtract(6, 'months')).toDate();
-        dataMax = moment.max(sixMonthsAfterData, now.clone().add(6, 'months')).toDate();
-        break;
-      case 'week':
-        // 4 weeks before and after
-        const fourWeeksBeforeData = earliestDate.clone().subtract(4, 'weeks');
-        const fourWeeksAfterData = latestDate.clone().add(4, 'weeks');
-        dataMin = moment.min(fourWeeksBeforeData, now.clone().subtract(4, 'weeks')).toDate();
-        dataMax = moment.max(fourWeeksAfterData, now.clone().add(4, 'weeks')).toDate();
-        break;
-      default: // day
-        // 15 days before and after
-        const fifteenDaysBeforeData = earliestDate.clone().subtract(15, 'days');
-        const fifteenDaysAfterData = latestDate.clone().add(15, 'days');
-        dataMin = moment.min(fifteenDaysBeforeData, now.clone().subtract(15, 'days')).toDate();
-        dataMax = moment.max(fifteenDaysAfterData, now.clone().add(15, 'days')).toDate();
-    }
+    // Set data range without limitations
+    dataMin = earliestDate.clone().subtract(10, 'years').toDate();
+    dataMax = latestDate.clone().add(10, 'years').toDate();
   } else {
-    // If no data, provide default ranges based on view type
-    switch (viewType) {
-      case 'year':
-        dataMin = now.clone().subtract(2, 'years').startOf('year').toDate();
-        dataMax = now.clone().add(2, 'years').endOf('year').toDate();
-        break;
-      case 'month':
-        dataMin = now.clone().subtract(6, 'months').startOf('month').toDate();
-        dataMax = now.clone().add(6, 'months').endOf('month').toDate();
-        break;
-      case 'week':
-        dataMin = now.clone().subtract(4, 'weeks').startOf('week').toDate();
-        dataMax = now.clone().add(4, 'weeks').endOf('week').toDate();
-        break;
-      default: // day
-        dataMin = now.clone().subtract(15, 'days').startOf('day').toDate();
-        dataMax = now.clone().add(15, 'days').endOf('day').toDate();
-    }
+    // If no data, provide wide default ranges
+    dataMin = now.clone().subtract(10, 'years').toDate();
+    dataMax = now.clone().add(10, 'years').toDate();
   }
 
   // Set the visible window based on date range or view type

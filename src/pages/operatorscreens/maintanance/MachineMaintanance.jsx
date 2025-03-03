@@ -35,11 +35,11 @@ function MachineMaintenance() {
     // Set up intervals for automatic updates every minute
     const machineStatusInterval = setInterval(() => {
       fetchOperatorMachineStatuses();
-    }, 10000);
+    }, 1000);
 
     const notificationsInterval = setInterval(() => {
       fetchNotifications();
-    }, 10000);
+    }, 1000);
 
     // Cleanup intervals on component unmount
     return () => {

@@ -1,77 +1,59 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Card, Typography, Space, Button, Select, DatePicker, message, Spin } from 'antd';
-import { BarChartOutlined, ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined, SyncOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from 'react';
+import { Card, Row, Col, Select, DatePicker, Button, Tooltip, message, Spin, Alert } from 'antd';
 import { Timeline } from "vis-timeline/esnext";
 import { DataSet } from "vis-data/esnext";
-import 'vis-timeline/styles/vis-timeline-graph2d.css';
-import useDynamicStore from '../../../../store/dynamic-store';
+import "vis-timeline/dist/vis-timeline-graph2d.css";
+import {
+  ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined,
+  InfoCircleOutlined, SyncOutlined, LeftOutlined, RightOutlined
+} from '@ant-design/icons';
 import moment from 'moment';
+import axios from 'axios';
 
-const { Title, Text } = Typography;
 const { Option } = Select;
 
-// Constants for timeline colors and status
-const COLORS = {
-  PLANNED: '#1890ff',  // Blue for planned operations
-  ACTUAL: '#52c41a',   // Green for actual operations
-  RESCHEDULE: '#ff4d4f', // Red for rescheduled operations
-  ON_TIME: '#52c41a',    // Green for on-time status
-  DELAYED: '#ff4d4f',    // Red for delayed status
-  WARNING: '#faad14'     // Yellow for warning status
-};
-
-const STATUS = {
-  ON_TIME: 'on-time',
-  DELAYED: 'delayed',
-  WARNING: 'warning'
-};
-
-const ROW_TYPES = {
-  PLANNED: 'planned',
-  ACTUAL: 'actual',
-  RESCHEDULE: 'reschedule'
-};
-
-// Helper function to get time range
-const getTimeRange = (viewType, dateRange) => {
-  if (dateRange && dateRange[0] && dateRange[1]) {
-    return {
-      start: dateRange[0].toDate(),
-      end: dateRange[1].toDate()
-    };
-  }
-
-  const now = new Date();
-  const start = new Date(now);
-  const end = new Date(now);
-
-  switch (viewType) {
-    case 'day':
-      start.setHours(0, 0, 0);
-      end.setHours(23, 59, 59);
-      break;
-    case 'week':
-      start.setDate(now.getDate() - now.getDay());
-      end.setDate(start.getDate() + 6);
-      end.setHours(23, 59, 59);
-      break;
-    case 'month':
-      start.setDate(1);
-      end.setMonth(start.getMonth() + 1);
-      end.setDate(0);
-      end.setHours(23, 59, 59);
-      break;
-    case 'year':
-      start.setMonth(0, 1);
-      start.setHours(0, 0, 0);
-      start.setMinutes(0);
-      start.setSeconds(0);
-      end.setMonth(11, 31);
-      end.setHours(23, 59, 59);
-      break;
-  }
-
-  return { start, end };
+// Add timeline styles
+const timelineStyles = {
+  '.vis-timeline': {
+    border: 'none',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  },
+  '.vis-item': {
+    borderRadius: '4px',
+    borderWidth: '1px',
+    fontSize: '12px',
+    color: '#fff',
+    height: '34px !important',
+  },
+  '.vis-item.single-machine': {
+    height: '80px !important',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  '.vis-item .timeline-item': {
+    padding: '4px 8px',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  '.vis-item .item-header': {
+    fontWeight: '500',
+    fontSize: '14px',
+  },
+  '.vis-item.vis-selected': {
+    borderColor: '#1890ff',
+    boxShadow: '0 0 0 2px rgba(24, 144, 255, 0.2)',
+  },
+  '.vis-time-axis .vis-grid.vis-minor': {
+    borderWidth: '1px',
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  '.vis-time-axis .vis-grid.vis-major': {
+    borderWidth: '1px',
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
 };
 
 // Helper functions for timeline
@@ -95,441 +77,502 @@ const getTimeAxisStep = (viewType) => {
   }
 };
 
-// Helper function to calculate operation status
-const getOperationStatus = (operation) => {
-  if (!operation.start_time || !operation.end_time) return null;
-  
+const getTimeRange = (viewType, dateRange) => {
+  let start, end;
   const now = moment();
-  const start = moment(operation.start_time);
-  const end = moment(operation.end_time);
-  const duration = moment.duration(end.diff(start));
-  const threshold = duration.asHours() * 0.1; // 10% of total duration
 
-  if (now.isBefore(start)) {
-    return STATUS.ON_TIME;
-  } else if (now.isAfter(end)) {
-    return STATUS.DELAYED;
+  if (dateRange && dateRange[0] && dateRange[1]) {
+    start = dateRange[0].clone().hour(9).minute(0).second(0).toDate();
+    end = dateRange[1].clone().hour(17).minute(0).second(0).toDate();
   } else {
-    const progress = moment.duration(now.diff(start)).asHours();
-    const shouldBeComplete = progress / duration.asHours();
-    const actualComplete = (operation.quantity_completed || 0) / (operation.quantity || 1);
-
-    if (actualComplete < shouldBeComplete - threshold) {
-      return STATUS.WARNING;
+    switch (viewType) {
+      case 'year':
+        start = now.clone().startOf('year').hour(9).minute(0).second(0).toDate();
+        end = now.clone().endOf('year').hour(17).minute(0).second(0).toDate();
+        break;
+      case 'month':
+        start = now.clone().startOf('month').hour(9).minute(0).second(0).toDate();
+        end = now.clone().endOf('month').hour(17).minute(0).second(0).toDate();
+        break;
+      case 'week':
+        start = now.clone().startOf('week').hour(9).minute(0).second(0).toDate();
+        end = now.clone().endOf('week').hour(17).minute(0).second(0).toDate();
+        break;
+      default:
+        start = now.clone().startOf('day').hour(9).minute(0).second(0).toDate();
+        end = now.clone().endOf('day').hour(17).minute(0).second(0).toDate();
     }
-    return STATUS.ON_TIME;
   }
+
+  return { start, end };
 };
 
-// Helper function to format duration
-const formatDuration = (start, end) => {
-  const duration = moment.duration(moment(end).diff(moment(start)));
-  const hours = Math.floor(duration.asHours());
-  const minutes = duration.minutes();
-  return `${hours}h ${minutes}m`;
-};
-
-const DynamicSchedulingGraph = () => {
-  const { scheduleData, loading, error, fetchDynamicScheduleData, clearScheduleData } = useDynamicStore();
-  const [viewType, setViewType] = useState('week');
+const DynamicSchedulingGraph2 = () => {
+  const [timelineRef, setTimelineRef] = useState(null);
+  const [timelineContainerRef, setTimelineContainerRef] = useState(null);
+  const [scheduleData, setScheduleData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState(null);
-  const timelineRef = useRef(null);
-  const timelineContainerRef = useRef(null);
+  const [viewType, setViewType] = useState('week');
+  const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
+  const [selectedComponent, setSelectedComponent] = useState(null);
+  const [productionOrders, setProductionOrders] = useState([]);
+  const [components, setComponents] = useState([]);
 
-  // Initial data fetch and cleanup
+  const fetchScheduleData = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get('http://172.18.7.88:7599/api/v1/rescheduling/reschedule-actual-planned-combined');
+      setScheduleData(response.data);
+      
+      // Extract unique production orders and components from all operation types
+      const uniqueProductionOrders = new Set();
+      const uniqueComponents = new Set();
+      
+      // From scheduled operations
+      response.data.scheduled_operations.forEach(op => {
+        if (op.production_order) uniqueProductionOrders.add(op.production_order);
+        if (op.component) uniqueComponents.add(op.component);
+      });
+      
+      // From production logs
+      response.data.production_logs.forEach(log => {
+        if (log.production_order) uniqueProductionOrders.add(log.production_order);
+        if (log.part_number) uniqueComponents.add(log.part_number);
+      });
+      
+      // From rescheduled operations
+      response.data.reschedule.forEach(reschedule => {
+        if (reschedule.production_order) uniqueProductionOrders.add(reschedule.production_order);
+        if (reschedule.part_number) uniqueComponents.add(reschedule.part_number);
+      });
+      
+      setProductionOrders(Array.from(uniqueProductionOrders).sort());
+      setComponents(Array.from(uniqueComponents).sort());
+      
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to fetch schedule data');
+      setLoading(false);
+    }
+  };
+
+  // Initialize timeline container ref
   useEffect(() => {
-    fetchDynamicScheduleData();
+    setTimelineContainerRef(document.createElement('div'));
+    fetchScheduleData();
+  }, []);
 
-    // Cleanup function when component unmounts
-    return () => {
-      if (timelineRef.current) {
-        try {
-          timelineRef.current.destroy();
-          timelineRef.current = null;
-        } catch (error) {
-          console.error('Error destroying timeline:', error);
+  // Initialize timeline when container is ready
+  useEffect(() => {
+    if (!timelineContainerRef || !scheduleData) return;
+
+    const container = timelineContainerRef;
+    container.style.height = '690px';
+    container.style.backgroundColor = '#fff';
+    container.style.padding = '20px';
+    container.style.borderRadius = '8px';
+    container.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+
+    // Create items for planned, actual, and rescheduled operations
+    const items = new DataSet();
+    const groups = new DataSet();
+
+    
+    
+    // Create a mapping of machine IDs to their full names
+    const machineMapping = {};
+    scheduleData.work_centers.forEach(wc => {
+      wc.machines.forEach(machine => {
+        const machineFullName = `${wc.work_center_code}-${machine.name}`;
+        machineMapping[machine.id] = machineFullName;
+      });
+    });
+
+    // Add groups for each machine with subgroups
+    scheduleData.work_centers.forEach(wc => {
+      wc.machines.forEach(machine => {
+        const machineFullName = `${wc.work_center_code}-${machine.name}`;
+        const machineLabel = `${wc.work_center_code} - ${machine.name}`;
+        
+        // Add machine header group
+        groups.add({
+          id: machineFullName,
+          content: `<strong>${machineLabel}</strong>`,
+          title: wc.work_center_name,
+          nestedGroups: [
+            `${machineFullName}-planned`,
+            `${machineFullName}-actual`,
+            `${machineFullName}-rescheduled`
+          ],
+          showNested: true
+        });
+
+        // Add subgroups for each type in order
+        groups.add({
+          id: `${machineFullName}-planned`,
+          content: 'Planned',
+          className: 'planned-group',
+          title: 'Planned Operations',
+          order: 1
+        });
+        groups.add({
+          id: `${machineFullName}-actual`,
+          content: 'Actual',
+          className: 'actual-group',
+          title: 'Actual Production',
+          order: 2
+        });
+        groups.add({
+          id: `${machineFullName}-rescheduled`,
+          content: 'Rescheduled',
+          className: 'rescheduled-group',
+          title: 'Rescheduled Operations',
+          order: 3
+        });
+      });
+    });
+
+    // Update the filter operation function to handle all operation types
+    const filterOperation = (op, type) => {
+      if (selectedProductionOrder && op.production_order !== selectedProductionOrder) {
+        return false;
+      }
+      
+      if (selectedComponent) {
+        switch (type) {
+          case 'planned':
+            if (op.component !== selectedComponent) return false;
+            break;
+          case 'actual':
+          case 'rescheduled':
+            if (op.part_number !== selectedComponent) return false;
+            break;
         }
       }
-      // Clear the schedule data from store when unmounting
-      clearScheduleData();
       
-      // Clean up the container
-      if (timelineContainerRef.current) {
-        timelineContainerRef.current.innerHTML = '';
-      }
+      return true;
     };
-  }, [fetchDynamicScheduleData, clearScheduleData]);
 
-  // Timeline creation and update
-  useEffect(() => {
-    if (!scheduleData || !timelineContainerRef.current) return;
-
-    // Safety cleanup of previous timeline
-    if (timelineRef.current) {
-      try {
-        timelineRef.current.destroy();
-        timelineRef.current = null;
-      } catch (error) {
-        console.error('Error cleaning up previous timeline:', error);
-      }
-    }
-
-    // Clean container before creating new timeline
-    timelineContainerRef.current.innerHTML = '';
-
-    try {
-      let itemId = 0;
-      const items = new DataSet();
-      const groups = new DataSet();
-      
-      // Track unique machine combinations to prevent duplicates
-      const processedMachines = new Set();
-      
-      // Create groups for each workcenter and its machines
-      scheduleData.work_centers?.forEach((workCenter) => {
-        workCenter.machines?.forEach((machine) => {
-          if (!workCenter.work_center_code || !machine.name) return;
-          
-          const machineKey = `${workCenter.work_center_code}_${machine.name}`;
-          
-          // Skip if we've already processed this machine combination
-          if (processedMachines.has(machineKey)) return;
-          processedMachines.add(machineKey);
-          
-          // Create a nested structure for machine and its operations
-          groups.add({
-            id: `${machineKey}`,
-            content: `
-              <div class="machine-row">
-                <div class="machine-name">${workCenter.work_center_code} - ${machine.name}</div>
-              </div>
-            `,
-            className: 'machine-group'
-          });
-
-          // Add operation rows
-          groups.add({
-            id: `${machineKey}_planned`,
-            content: `
-              <div class="operation-row planned">
-                <div class="operation-label">Planned</div>
-              </div>
-            `,
-            className: 'operation-group'
-          });
-
-          groups.add({
-            id: `${machineKey}_actual`,
-            content: `
-              <div class="operation-row actual">
-                <div class="operation-label">Actual</div>
-              </div>
-            `,
-            className: 'operation-group'
-          });
-
-          groups.add({
-            id: `${machineKey}_reschedule`,
-            content: `
-              <div class="operation-row reschedule">
-                <div class="operation-label">Reschedule</div>
-              </div>
-            `,
-            className: 'operation-group'
-          });
-        });
-      });
-
-      // Process scheduled operations (Blue)
-      scheduleData.scheduled_operations?.forEach(op => {
-        if (!op.machine) return;
-        
-        const workCenter = scheduleData.work_centers?.find(wc => 
-          wc.machines?.some(m => m.name === op.machine)
-        );
-        
-        if (!workCenter?.work_center_code) return;
-        
-        const machineKey = `${workCenter.work_center_code}_${op.machine}`;
-        
+    // Add scheduled operations (Planned) with filters
+    scheduleData.scheduled_operations.forEach((op, index) => {
+      if (filterOperation(op, 'planned')) {
         items.add({
-          id: `item_planned_${itemId++}`,
-          group: `${machineKey}_planned`,
-          content: `
-            <div class="timeline-item">
-              <div class="item-header">
-                <span>${op.component || ''}</span>
-                ${op.priority ? `<span class="priority-badge">${op.priority}</span>` : ''}
-              </div>
-              <div class="item-body">
-                <div class="item-desc">${op.description || ''}</div>
-                <div class="item-order">${op.production_order || ''}</div>
-                <div class="item-stats">
-                  <span class="item-qty">Qty: ${op.quantity || '0'}</span>
-                  <span class="item-duration">${formatDuration(op.start_time, op.end_time)}</span>
-                </div>
-              </div>
-            </div>
-          `,
+          id: `planned-${index}`,
+          group: `${op.machine}-planned`,
           start: new Date(op.start_time),
           end: new Date(op.end_time),
-          type: 'range',
-          className: `planned-operation ${getOperationStatus(op)}`,
-          style: `background-color: ${COLORS.PLANNED}; border-color: ${COLORS.PLANNED}; color: white;`
-        });
-      });
-
-      // Process production logs (Green)
-      scheduleData.production_logs?.forEach(log => {
-        if (!log.machine_name) return;
-        
-        const workCenter = scheduleData.work_centers?.find(wc => 
-          wc.machines?.some(m => m.name === log.machine_name)
-        );
-        
-        if (!workCenter?.work_center_code) return;
-        
-        const machineKey = `${workCenter.work_center_code}_${log.machine_name}`;
-        
-        items.add({
-          id: `item_actual_${itemId++}`,
-          group: `${machineKey}_actual`,
-          content: `
-            <div class="timeline-item">
-              <div class="item-header">
-                <span>${log.part_number || ''}</span>
-                <span class="status-badge ${getOperationStatus(log)}">${getOperationStatus(log)}</span>
-              </div>
-              <div class="item-body">
-                <div class="item-desc">${log.operation_description || ''}</div>
-                <div class="item-progress">
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${(log.quantity_completed / log.quantity) * 100}%"></div>
-                  </div>
-                  <div class="progress-text">
-                    <span>Completed: ${log.quantity_completed || 0}</span>
-                    <span>Rejected: ${log.quantity_rejected || 0}</span>
-                  </div>
-                </div>
-              </div>
+          content: '',
+          className: 'planned-bar',
+          title: `
+            <div>
+              <strong>Planned Operation</strong><br/>
+              Part Number: ${op.component}<br/>
+              Production Order: ${op.production_order}<br/>
+              Description: ${op.description}<br/>
+              Quantity: ${op.quantity}<br/>
+              Start: ${moment(op.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+              End: ${moment(op.end_time).format('DD/MM/YYYY HH:mm')}
             </div>
-          `,
+          `
+        });
+      }
+    });
+
+    // Add production logs (Actual) with filters
+    scheduleData.production_logs.forEach((log, index) => {
+      if (filterOperation(log, 'actual')) {
+        items.add({
+          id: `actual-${index}`,
+          group: `${log.machine_name}-actual`,
           start: new Date(log.start_time),
           end: new Date(log.end_time),
-          type: 'range',
-          className: `actual-operation ${getOperationStatus(log)}`,
-          style: `background-color: ${COLORS.ACTUAL}; border-color: ${COLORS.ACTUAL}; color: white;`
-        });
-      });
-
-      // Process rescheduled operations (Red)
-      scheduleData.reschedule?.forEach(update => {
-        if (!update.machine_id) return;
-        
-        const workCenter = scheduleData.work_centers?.find(wc => 
-          wc.machines?.some(m => m.id === update.machine_id.toString())
-        );
-        
-        if (!workCenter?.work_center_code) return;
-        
-        const machine = workCenter.machines?.find(m => m.id === update.machine_id.toString());
-        if (!machine?.name) return;
-        
-        const machineKey = `${workCenter.work_center_code}_${machine.name}`;
-        
-        items.add({
-          id: `item_reschedule_${itemId++}`,
-          group: `${machineKey}_reschedule`,
-          content: `
-            <div class="timeline-item">
-              <div class="item-header">v${update.new_version || '1'}</div>
-              <div class="item-qty">Completed: ${update.completed_qty || 0}</div>
-              <div class="item-remaining">Remaining: ${update.remaining_qty || 0}</div>
-              <div class="item-op">Op: ${update.operation_number || 0}</div>
+          content: '',
+          className: 'actual-bar',
+          title: `
+            <div>
+              <strong>Actual Production</strong><br/>
+              Part Number: ${log.part_number}<br/>
+              Production Order: ${log.production_order}<br/>
+              Operation: ${log.operation_description}<br/>
+              Completed: ${log.quantity_completed}<br/>
+              Rejected: ${log.quantity_rejected}<br/>
+              Notes: ${log.notes}<br/>
+              Start: ${moment(log.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+              End: ${moment(log.end_time).format('DD/MM/YYYY HH:mm')}
             </div>
-          `,
-          start: new Date(update.start_time),
-          end: new Date(update.end_time),
-          type: 'range',
-          className: 'reschedule-operation',
-          style: `background-color: ${COLORS.RESCHEDULE}; border-color: ${COLORS.RESCHEDULE}; color: white;`
+          `
         });
-      });
+      }
+    });
 
-      // Configure timeline options with enhanced features
-      const options = {
+    // Add rescheduled operations with filters
+    scheduleData.reschedule.forEach((reschedule, index) => {
+      const machineName = machineMapping[reschedule.machine_id.toString()];
+      if (machineName && filterOperation(reschedule, 'rescheduled')) {
+        items.add({
+          id: `rescheduled-${index}`,
+          group: `${machineName}-rescheduled`,
+          start: new Date(reschedule.start_time),
+          end: new Date(reschedule.end_time),
+          content: '',
+          className: 'rescheduled-bar',
+          title: `
+            <div>
+              <strong>Rescheduled Operation</strong><br/>
+              Part Number: ${reschedule.part_number}<br/>
+              Production Order: ${reschedule.production_order}<br/>
+              Version: ${reschedule.new_version} (from ${reschedule.old_version})<br/>
+              Completed Qty: ${reschedule.completed_qty}<br/>
+              Remaining Qty: ${reschedule.remaining_qty}<br/>
+              Raw Material: ${reschedule.raw_material_status}<br/>
+              Operation #: ${reschedule.operation_number}<br/>
+              Start: ${moment(reschedule.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+              End: ${moment(reschedule.end_time).format('DD/MM/YYYY HH:mm')}
+            </div>
+          `
+        });
+      }
+    });
+
+    // Get time range based on view type and date range
+    const timeRange = getTimeRange(viewType, dateRange);
+
+    // Initialize timeline with updated options
+    const timeline = new Timeline(
+      container,
+      items,
+      groups,
+      {
         stack: false,
-        horizontalScroll: true,
+        horizontalScroll: false,
         verticalScroll: true,
         zoomKey: 'ctrlKey',
         orientation: 'top',
         height: '670px',
+        margin: { item: { vertical: 10 } },
         groupHeightMode: 'fixed',
-        groupMinHeight: 35,
-        margin: {
-          item: { horizontal: 10, vertical: 5 },
-          axis: 5
+        maxHeight: '670px',
+        groupOrder: function(a, b) {
+          const aOrder = a.order || 0;
+          const bOrder = b.order || 0;
+          return aOrder - bOrder;
         },
-        start: getTimeRange(viewType, dateRange).start,
-        end: getTimeRange(viewType, dateRange).end,
-        zoomMin: viewType === 'year' ? 1000 * 60 * 60 * 24 * 30 : 1000 * 60 * 30,
-        zoomMax: viewType === 'year' ? 1000 * 60 * 60 * 24 * 366 : 1000 * 60 * 60 * 24 * 31,
-        tooltip: {
-          followMouse: true,
-          overflowMethod: 'cap',
-          template: function(item) {
-            const data = item.data || {};
-            const status = getOperationStatus(data);
-            return `
-              <div class="timeline-tooltip">
-                <div class="tooltip-header">
-                  <div class="info-row">
-                    <span class="label">Part Number:</span>
-                    <span class="value">${data.component || data.part_number || ''}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="label">Machine:</span>
-                    <span class="value">${data.machine || data.machine_name || ''}</span>
-                  </div>
-                  ${status ? `
-                    <div class="info-row">
-                      <span class="label">Status:</span>
-                      <span class="status-badge ${status}">${status}</span>
-                    </div>
-                  ` : ''}
-                </div>
-                <div class="tooltip-body">
-                  <div class="info-row">
-                    <span class="label">Production Order:</span>
-                    <span class="value">${data.production_order || ''}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="label">Operation:</span>
-                    <span class="value">${data.description || data.operation_description || ''}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="label">Duration:</span>
-                    <span class="value">${formatDuration(data.start_time, data.end_time)}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="label">Quantity:</span>
-                    <span class="value">${data.quantity || data.quantity_completed || '0'}</span>
-                  </div>
-                  ${data.quantity_completed ? `
-                    <div class="progress-section">
-                      <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${(data.quantity_completed / data.quantity) * 100}%"></div>
-                      </div>
-                      <div class="progress-text">
-                        <span>Progress: ${Math.round((data.quantity_completed / data.quantity) * 100)}%</span>
-                      </div>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-            `;
-          }
-        },
-        timeAxis: {
+        start: timeRange.start,
+        end: timeRange.end,
+        timeAxis: { 
           scale: getTimeAxisScale(viewType),
-          step: getTimeAxisStep(viewType),
-          format: {
-            minorLabels: {
-              millisecond: 'SSS',
-              second: 'HH:mm:ss',
-              minute: 'HH:mm',
-              hour: 'HH:mm',
-              weekday: 'ddd D',
-              day: 'D',
-              week: 'w',
-              month: 'MMM',
-              year: 'YYYY'
-            },
-            majorLabels: {
-              millisecond: 'HH:mm:ss',
-              second: 'D MMMM HH:mm',
-              minute: 'ddd D MMMM',
-              hour: 'ddd D MMMM',
-              weekday: 'MMMM YYYY',
-              day: 'MMMM YYYY',
-              week: 'MMMM YYYY',
-              month: 'YYYY',
-              year: ''
-            }
+          step: getTimeAxisStep(viewType)
+        },
+        format: {
+          minorLabels: {
+            hour: 'HH:00',
+            minute: 'HH:mm'
+          },
+          majorLabels: {
+            hour: 'ddd D MMM',
+            minute: 'HH:00'
           }
+        },
+        hiddenDates: [
+          {
+            start: '1970-01-01 00:00:00',
+            end: '1970-01-01 09:00:00',
+            repeat: 'daily'
+          },
+          {
+            start: '1970-01-01 17:00:00',
+            end: '1970-01-01 23:59:59',
+            repeat: 'daily'
+          }
+        ]
+      }
+    );
+
+    setTimelineRef(timeline);
+
+    // Add custom styles for the bars and timeline
+    const style = document.createElement('style');
+    style.textContent = `
+      .planned-bar {
+        background-color: #1890ff !important;
+        border-color: #1890ff !important;
+      }
+      .actual-bar {
+        background-color: #52c41a !important;
+        border-color: #52c41a !important;
+      }
+      .rescheduled-bar {
+        background-color: #f5222d !important;
+        border-color: #f5222d !important;
+      }
+      .vis-item {
+        height: 20px;
+        border-width: 1px;
+        border-radius: 2px;
+      }
+      .vis-nested-group {
+        background-color: #f5f5f5;
+      }
+      .vis-panel.vis-center {
+        overflow: hidden !important;
+      }
+      .vis-panel.vis-left {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+      }
+      .vis-labelset {
+        overflow-x: hidden !important;
+      }
+      .vis-panel.vis-bottom {
+        overflow: hidden !important;
+      }
+      .vis-timeline {
+        overflow: hidden !important;
+      }
+      .planned-group {
+        border-left: 4px solid #1890ff;
+        background-color: rgba(24, 144, 255, 0.05);
+        font-weight: 500;
+      }
+      .actual-group {
+        border-left: 4px solid #52c41a;
+        background-color: rgba(82, 196, 26, 0.05);
+        font-weight: 500;
+      }
+      .rescheduled-group {
+        border-left: 4px solid #f5222d;
+        background-color: rgba(245, 34, 45, 0.05);
+        font-weight: 500;
+      }
+      .vis-label {
+        padding: 4px 8px;
+      }
+      ${Object.entries(timelineStyles).map(([selector, styles]) => `
+        ${selector} {
+          ${Object.entries(styles).map(([prop, value]) => `${prop}: ${value};`).join('\n')}
         }
-      };
+      `).join('\n')}
+    `;
+    document.head.appendChild(style);
 
-      // Create new timeline
-      const timeline = new Timeline(
-        timelineContainerRef.current,
-        items,
-        groups,
-        options
-      );
-
-      timelineRef.current = timeline;
-
-    } catch (error) {
-      console.error('Timeline initialization error:', error);
-      message.error('Failed to initialize timeline');
-    }
-  }, [scheduleData, viewType, dateRange]);
+    return () => {
+      timeline.destroy();
+      document.head.removeChild(style);
+    };
+  }, [timelineContainerRef, scheduleData, viewType, dateRange, selectedProductionOrder, selectedComponent]);
 
   const handleViewTypeChange = (newViewType) => {
     setViewType(newViewType);
-    if (timelineRef.current) {
+    if (timelineRef) {
       const timeRange = getTimeRange(newViewType, dateRange);
-      timelineRef.current.setWindow(timeRange.start, timeRange.end, { animation: true });
+      timelineRef.setWindow(timeRange.start, timeRange.end, { animation: true });
+      
+      // Update time axis
+      timelineRef.setOptions({
+        timeAxis: { 
+          scale: getTimeAxisScale(newViewType),
+          step: getTimeAxisStep(newViewType)
+        }
+      });
     }
-  };
-
-  const handleZoom = (direction) => {
-    if (!timelineRef.current) return;
-    if (direction === 'in') {
-      timelineRef.current.zoomIn(0.5);
-    } else {
-      timelineRef.current.zoomOut(0.5);
-    }
-  };
-
-  const handleFit = () => {
-    if (timelineRef.current) {
-      timelineRef.current.fit();
-    }
-  };
-
-  const handleRefresh = () => {
-    fetchDynamicScheduleData();
   };
 
   const handleTimelineNavigation = (direction) => {
-    if (!timelineRef.current) return;
+    if (!timelineRef) return;
+    const window = timelineRef.getWindow();
 
-    const currentWindow = timelineRef.current.getWindow();
-    const start = moment(currentWindow.start);
-    const end = moment(currentWindow.end);
-    const duration = moment.duration(end.diff(start));
-
-    let newStart, newEnd;
-    switch (direction) {
-      case 'left':
-        newStart = start.clone().subtract(duration);
-        newEnd = end.clone().subtract(duration);
-        break;
-      case 'right':
-        newStart = start.clone().add(duration);
-        newEnd = end.clone().add(duration);
-        break;
-      case 'today':
-        const now = moment();
-        const halfDuration = duration.asMilliseconds() / 2;
-        newStart = now.clone().subtract(halfDuration, 'milliseconds');
-        newEnd = now.clone().add(halfDuration, 'milliseconds');
-        break;
+    // Handle 'today' case separately
+    if (direction === 'today') {
+      const now = moment();
+      const currentWindow = timelineRef.getWindow();
+      const duration = moment.duration(moment(currentWindow.end).diff(moment(currentWindow.start)));
+      const halfDuration = duration.asMilliseconds() / 2;
+      
+      timelineRef.setWindow(
+        moment(now).subtract(halfDuration, 'milliseconds').toDate(),
+        moment(now).add(halfDuration, 'milliseconds').toDate(),
+        { animation: { duration: 500, easingFunction: 'easeInOutQuad' } }
+      );
+      return;
     }
 
-    timelineRef.current.setWindow(newStart.toDate(), newEnd.toDate(), { animation: true });
+    // Move window based on view type
+    const start = moment(window.start);
+    const end = moment(window.end);
+    let newStart, newEnd;
+
+    switch (viewType) {
+      case 'year':
+        if (direction === 'left') {
+          newStart = start.clone().subtract(1, 'year');
+          newEnd = end.clone().subtract(1, 'year');
+        } else {
+          newStart = start.clone().add(1, 'year');
+          newEnd = end.clone().add(1, 'year');
+        }
+        break;
+      case 'month':
+        if (direction === 'left') {
+          newStart = start.clone().subtract(1, 'month');
+          newEnd = end.clone().subtract(1, 'month');
+        } else {
+          newStart = start.clone().add(1, 'month');
+          newEnd = end.clone().add(1, 'month');
+        }
+        break;
+      case 'week':
+        if (direction === 'left') {
+          newStart = start.clone().subtract(1, 'week');
+          newEnd = end.clone().subtract(1, 'week');
+        } else {
+          newStart = start.clone().add(1, 'week');
+          newEnd = end.clone().add(1, 'week');
+        }
+        break;
+      case 'day':
+        if (direction === 'left') {
+          newStart = start.clone().subtract(1, 'day');
+          newEnd = end.clone().subtract(1, 'day');
+        } else {
+          newStart = start.clone().add(1, 'day');
+          newEnd = end.clone().add(1, 'day');
+        }
+        break;
+      default:
+        if (direction === 'left') {
+          newStart = start.clone().subtract(1, 'day');
+          newEnd = end.clone().subtract(1, 'day');
+        } else {
+          newStart = start.clone().add(1, 'day');
+          newEnd = end.clone().add(1, 'day');
+        }
+    }
+
+    timelineRef.setWindow(
+      newStart.toDate(),
+      newEnd.toDate(),
+      { animation: { duration: 500, easingFunction: 'easeInOutQuad' } }
+    );
+  };
+
+  const handleRefresh = () => {
+    setDateRange(null);
+    fetchScheduleData();
+  };
+
+  const handleProductionOrderChange = (value) => {
+    setSelectedProductionOrder(value);
+  };
+
+  const handleComponentChange = (value) => {
+    setSelectedComponent(value);
+  };
+
+  const handleClearFilters = () => {
+    setSelectedProductionOrder(null);
+    setSelectedComponent(null);
   };
 
   if (loading) {
@@ -542,403 +585,128 @@ const DynamicSchedulingGraph = () => {
 
   if (error) {
     return (
-      <Card className="text-center p-8">
-        <Space direction="vertical" size="large" className="w-full">
-          <Title level={2}>Error Loading Schedule</Title>
-          <Text className="text-lg text-red-500">{error}</Text>
-          <Button type="primary" onClick={handleRefresh}>
-            Retry
-          </Button>
-        </Space>
-      </Card>
+      <Alert
+        message="Error Loading Schedule"
+        description={error}
+        type="error"
+        showIcon
+      />
     );
   }
 
   return (
-    <Card className="dynamic-schedule">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-2 justify-between items-center">
-          <Space>
-            <Select 
-              value={viewType}
-              onChange={handleViewTypeChange}
-              style={{ width: 120 }}
-            >
-              <Option value="day">Daily</Option>
-              <Option value="week">Weekly</Option>
-              <Option value="month">Monthly</Option>
-              <Option value="year">Yearly</Option>
-            </Select>
-            <DatePicker.RangePicker
-              value={dateRange}
-              onChange={setDateRange}
-              placeholder={['Start Date', 'End Date']}
-            />
-            <Button.Group>
-              <Button onClick={() => handleTimelineNavigation('left')} icon={<LeftOutlined />} />
-              <Button onClick={() => handleTimelineNavigation('today')}>Today</Button>
-              <Button onClick={() => handleTimelineNavigation('right')} icon={<RightOutlined />} />
-            </Button.Group>
-          </Space>
-          <Space>
-            <Button.Group>
-              <Button icon={<ZoomOutOutlined />} onClick={() => handleZoom('out')} />
-              <Button icon={<ZoomInOutlined />} onClick={() => handleZoom('in')} />
-              <Button icon={<FullscreenOutlined />} onClick={handleFit} />
-            </Button.Group>
-            <Button 
-              type="primary"
-              icon={<SyncOutlined />}
-              onClick={handleRefresh}
-            >
-              Refresh
-            </Button>
-          </Space>
-        </div>
-        
-        <div 
-          ref={timelineContainerRef} 
-          className="schedule-timeline"
-          style={{ 
-            height: '690px',
-            backgroundColor: '#fff',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}
-        />
+    <Card>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <Select 
+            value={viewType}
+            onChange={handleViewTypeChange}
+            style={{ width: 120 }}
+          >
+            <Option value="day">Daily</Option>
+            <Option value="week">Weekly</Option>
+            <Option value="month">Monthly</Option>
+            <Option value="year">Yearly</Option>
+          </Select>
+          
+          <Select
+            placeholder="Select Production Order"
+            value={selectedProductionOrder}
+            onChange={handleProductionOrderChange}
+            style={{ width: 200 }}
+            allowClear
+          >
+            {productionOrders.map(po => (
+              <Option key={po} value={po}>{po}</Option>
+            ))}
+          </Select>
 
-        {/* Legend */}
-        <div className="timeline-legend">
-          <div className="legend-item">
-            <div className="color-box" style={{ backgroundColor: COLORS.PLANNED }}></div>
-            <span>Planned</span>
-          </div>
-          <div className="legend-item">
-            <div className="color-box" style={{ backgroundColor: COLORS.ACTUAL }}></div>
-            <span>Actual</span>
-          </div>
-          <div className="legend-item">
-            <div className="color-box" style={{ backgroundColor: COLORS.RESCHEDULE }}></div>
-            <span>Reschedule</span>
-          </div>
+          <Select
+            placeholder="Select Part Number"
+            value={selectedComponent}
+            onChange={handleComponentChange}
+            style={{ width: 200 }}
+            allowClear
+          >
+            {components.map(component => (
+              <Option key={component} value={component}>{component}</Option>
+            ))}
+          </Select>
+
+          <Button onClick={handleClearFilters}>
+            Clear Filters
+          </Button>
+          
+          <DatePicker.RangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            placeholder={['Start Date', 'End Date']}
+          />
+
+          <Button.Group>
+            <Tooltip title="Zoom In">
+              <Button 
+                icon={<ZoomInOutlined />} 
+                onClick={() => timelineRef?.zoomIn(0.5)} 
+              />
+            </Tooltip>
+            <Tooltip title="Zoom Out">
+              <Button 
+                icon={<ZoomOutOutlined />} 
+                onClick={() => timelineRef?.zoomOut(0.5)} 
+              />
+            </Tooltip>
+            <Tooltip title="Fit Timeline">
+              <Button 
+                icon={<FullscreenOutlined />} 
+                onClick={() => timelineRef?.fit()} 
+              />
+            </Tooltip>
+          </Button.Group>
+
+          <Button 
+            type="primary"
+            icon={<SyncOutlined />}
+            onClick={handleRefresh}
+          >
+            Refresh
+          </Button>
         </div>
       </div>
 
-      <style jsx global>{`
-        .timeline-header {
-          display: flex;
-          width: 100%;
-          height: 40px;
-          background: #f5f5f5;
-          border-bottom: 2px solid #e8e8e8;
-        }
+      <div className="relative mt-4">
+        <div className="absolute top-2 left-0 right-0 flex justify-between px-2 z-10">
+          <Button
+            icon={<LeftOutlined />}
+            onClick={() => handleTimelineNavigation('left')}
+          />
+          <Button
+            icon={<RightOutlined />}
+            onClick={() => handleTimelineNavigation('right')}
+          />
+        </div>
+        {timelineContainerRef && <div ref={node => node?.appendChild(timelineContainerRef)} />}
+      </div>
 
-        .machine-column {
-          width: 200px;
-          padding: 8px 16px;
-          font-weight: 600;
-          border-right: 2px solid #e8e8e8;
-        }
+      <div className="mt-4 flex gap-4 justify-end">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-[#1890ff]"></div>
+          <span>Planned</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-[#52c41a]"></div>
+          <span>Actual</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-[#f5222d]"></div>
+          <span>Rescheduled</span>
+        </div>
+      </div>
 
-        .operations-column {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
 
-        .operation-header {
-          height: 35px;
-          padding: 8px 16px;
-          font-weight: 600;
-          border-bottom: 1px solid #e8e8e8;
-        }
-
-        .machine-container {
-          display: flex;
-          width: 100%;
-          height: 105px;
-        }
-
-        .machine-name {
-          width: 200px;
-          padding: 8px 16px;
-          font-weight: 500;
-          background: #fafafa;
-          border-right: 2px solid #e8e8e8;
-        }
-
-        .operations-container {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .operation-row {
-          height: 35px;
-          padding: 8px 16px;
-          border-bottom: 1px solid #f0f0f0;
-        }
-
-        .operation-row.planned {
-          border-left: 3px solid ${COLORS.PLANNED};
-          background: rgba(24, 144, 255, 0.05);
-        }
-
-        .operation-row.actual {
-          border-left: 3px solid ${COLORS.ACTUAL};
-          background: rgba(82, 196, 26, 0.05);
-        }
-
-        .operation-row.reschedule {
-          border-left: 3px solid ${COLORS.RESCHEDULE};
-          background: rgba(255, 77, 79, 0.05);
-        }
-
-        .timeline-item {
-          padding: 4px 8px;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-
-        .item-header {
-          font-weight: 500;
-          font-size: 12px;
-        }
-
-        .item-desc, .item-order, .item-qty {
-          font-size: 11px;
-          opacity: 0.8;
-        }
-
-        /* Timeline Specific Styles */
-        .vis-timeline {
-          border: none !important;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-          background-color: #ffffff;
-        }
-
-        .vis-panel.vis-center {
-          border-left: 1px solid #e8e8e8;
-          border-right: 1px solid #e8e8e8;
-        }
-
-        .vis-grid.vis-vertical {
-          border-left: 1px solid #f0f0f0;
-        }
-
-        .vis-grid.vis-horizontal {
-          border-bottom: 1px solid #f0f0f0;
-        }
-
-        .vis-time-axis .vis-grid.vis-minor {
-          border-color: #f5f5f5;
-          border-width: 1px;
-        }
-
-        .vis-time-axis .vis-grid.vis-major {
-          border-color: #e8e8e8;
-          border-width: 1px;
-        }
-
-        .vis-time-axis .vis-text {
-          color: #666;
-          padding: 3px;
-          font-size: 12px;
-        }
-
-        .vis-time-axis .vis-text.vis-major {
-          font-weight: bold;
-        }
-
-        .vis-item {
-          border-radius: 4px;
-          border-width: 1px;
-          font-size: 12px;
-          color: #fff;
-          height: 34px !important;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .vis-item.vis-selected {
-          border-color: #1890ff;
-          box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-        }
-
-        .vis-labelset .vis-label {
-          border-bottom: 1px solid #e8e8e8;
-          background-color: #fafafa;
-          padding: 8px;
-        }
-
-        .vis-labelset .vis-label.machine-group {
-          font-weight: 500;
-          background-color: #f5f5f5;
-        }
-
-        .vis-foreground .vis-group {
-          border-bottom: 1px solid #f0f0f0;
-        }
-
-        .machine-row {
-          padding: 8px;
-          background: #f5f5f5;
-          border-bottom: 1px solid #e8e8e8;
-        }
-
-        .machine-name {
-          font-size: 14px;
-          color: #333;
-          font-weight: 500;
-        }
-
-        .timeline-item {
-          padding: 6px 10px;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-
-        .timeline-item.planned {
-          background-color: ${COLORS.PLANNED};
-          border-color: ${COLORS.PLANNED};
-        }
-
-        .timeline-item.actual {
-          background-color: ${COLORS.ACTUAL};
-          border-color: ${COLORS.ACTUAL};
-        }
-
-        .timeline-item.reschedule {
-          background-color: ${COLORS.RESCHEDULE};
-          border-color: ${COLORS.RESCHEDULE};
-        }
-
-        .item-header {
-          font-weight: 500;
-          font-size: 12px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .item-body {
-          font-size: 11px;
-          opacity: 0.85;
-        }
-
-        .status-badge {
-          padding: 2px 6px;
-          border-radius: 10px;
-          font-size: 11px;
-          margin-left: 4px;
-        }
-
-        .status-badge.on-time {
-          background: #f6ffed;
-          border: 1px solid #b7eb8f;
-          color: #52c41a;
-        }
-
-        .status-badge.delayed {
-          background: #fff1f0;
-          border: 1px solid #ffa39e;
-          color: #f5222d;
-        }
-
-        .status-badge.warning {
-          background: #fffbe6;
-          border: 1px solid #ffe58f;
-          color: #faad14;
-        }
-
-        .priority-badge {
-          background: #faad14;
-          color: white;
-          padding: 2px 6px;
-          border-radius: 10px;
-          font-size: 11px;
-          margin-left: 4px;
-        }
-
-        .item-stats {
-          display: flex;
-          justify-content: space-between;
-          font-size: 11px;
-          opacity: 0.9;
-        }
-
-        .item-duration {
-          font-family: monospace;
-        }
-
-        .progress-bar {
-          height: 4px;
-          background: rgba(255, 255, 255, 0.2);
-          border-radius: 2px;
-          overflow: hidden;
-          margin: 4px 0;
-        }
-
-        .progress-fill {
-          height: 100%;
-          background: rgba(255, 255, 255, 0.8);
-          transition: width 0.3s ease;
-        }
-
-        .progress-text {
-          display: flex;
-          justify-content: space-between;
-          font-size: 10px;
-          opacity: 0.9;
-        }
-
-        /* Timeline tooltip styles */
-        .timeline-tooltip {
-          background: white;
-          border-radius: 4px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          padding: 12px;
-          max-width: 300px;
-        }
-
-        .tooltip-header {
-          border-bottom: 1px solid #f0f0f0;
-          padding-bottom: 8px;
-          margin-bottom: 8px;
-        }
-
-        .info-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 4px;
-        }
-
-        .info-row .label {
-          color: #666;
-          font-weight: 500;
-        }
-
-        .info-row .value {
-          color: #333;
-        }
-
-        .progress-section {
-          margin-top: 8px;
-          padding-top: 8px;
-          border-top: 1px solid #f0f0f0;
-        }
-
-        .vis-item:hover {
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          transition: box-shadow 0.3s ease;
-        }
-      `}</style>
+      
     </Card>
   );
 };
 
-export default DynamicSchedulingGraph; 
+export default DynamicSchedulingGraph2;

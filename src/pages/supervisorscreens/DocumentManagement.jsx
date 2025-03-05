@@ -72,7 +72,8 @@ import {
   CloudDownloadOutlined,
   UsergroupAddOutlined,
   ClockCircleOutlined,
-  FolderOpenOutlined
+  FolderOpenOutlined,
+  DatabaseOutlined
 } from '@ant-design/icons';
 import useDocumentStore from '../../store/document-store';
 import ReactDOM from 'react-dom';
@@ -94,17 +95,19 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
   const [loading, setLoading] = useState(false);
   const { fetchDocumentVersions, uploadNewVersion, deleteVersion, updateVersion, fetchFolderDocuments } = useDocumentStore();
 
-  useEffect(() => {
-    if (visible && document) {
-      loadVersions();
-    }
-  }, [visible, document]);
-
   const loadVersions = async () => {
+    if (!document) return;
+    
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await fetchDocumentVersions(document?.id);
-      setVersions(data);
+      const data = await fetchDocumentVersions(document.id);
+      // Sort versions by version number
+      const sortedVersions = data.sort((a, b) => {
+        const aNum = parseInt(a.version_number.replace('v', ''));
+        const bNum = parseInt(b.version_number.replace('v', ''));
+        return aNum - bNum;
+      });
+      setVersions(sortedVersions);
     } catch (error) {
       message.error('Failed to load versions');
     } finally {
@@ -112,76 +115,39 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
     }
   };
 
-  const handleVersionUpload = async (file, version) => {
-    try {
-      let response;
-      if (version) {
-        response = await updateVersion(document.id, version.id, file, version.version_number);
-        if (response) {
-          await loadVersions();
-          if (selectedFolder && selectedFolder !== 'all') {
-            await fetchFolderDocuments(selectedFolder);
-          }
-          message.success('Version updated successfully');
-          return true;
-        }
-      } else {
-        response = await uploadNewVersion(document.id, file);
-        if (response) {
-          await loadVersions();
-          if (selectedFolder && selectedFolder !== 'all') {
-            await fetchFolderDocuments(selectedFolder);
-          }
-          message.success('New version uploaded successfully');
-          return true;
-        }
-      }
-      return false;
-    } catch (error) {
-      console.error('Version upload error:', error);
-      message.error('Failed to upload version');
-      return false;
-    }
-  };
-
-  const handleVersionDelete = async (versionId) => {
-    try {
-      await deleteVersion(document.id, versionId);
-      message.success('Version deleted successfully');
-      await loadVersions();
-    } catch (error) {
-      message.error('Failed to delete version');
-    }
-  };
-
-  // Add auto-refresh functionality for versions
   useEffect(() => {
-    let intervalId;
-    
     if (visible && document) {
-      // Initial load
       loadVersions();
-      
-      // Set up periodic refresh every 5 seconds while modal is open
-      intervalId = setInterval(() => {
-        loadVersions();
-      }, 5000);
     }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
   }, [visible, document]);
+
+  const handleFileUpdate = async (file, versionId) => {
+    try {
+      await updateVersion(document.id, versionId, file);
+      message.success('Version updated successfully');
+      loadVersions(); // Refresh the versions list
+    } catch (error) {
+      message.error('Failed to update version');
+    }
+  };
+
+  const handleNewVersion = async (file) => {
+    try {
+      await uploadNewVersion(document.id, file);
+      message.success('New version uploaded successfully');
+      loadVersions(); // Refresh the versions list
+    } catch (error) {
+      message.error('Failed to upload new version');
+    }
+  };
 
   return (
     <Modal
-      title={`Versions - ${document?.document_name}`}
+      title="Version Management"
       visible={visible}
       onCancel={onClose}
-      width={800}
       footer={null}
+      width={800}
     >
       <div className="mb-4">
         <Upload
@@ -189,14 +155,8 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
           beforeUpload={(file) => {
             Modal.confirm({
               title: 'Upload New Version',
-              content: 'Are you sure you want to upload a new version?',
-              onOk: async () => {
-                const success = await handleVersionUpload(file);
-                if (success) {
-                  await loadVersions(); // Refresh versions immediately after successful upload
-                  onClose();
-                }
-              },
+              content: `Are you sure you want to upload version ${versions.length + 1}?`,
+              onOk: () => handleNewVersion(file),
             });
             return false;
           }}
@@ -215,21 +175,20 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
           {
             title: 'Version',
             dataIndex: 'version_number',
-            render: v => `v${v}`,
+            key: 'version',
+            render: (text) => text.startsWith('v') ? text : `${text}`,
           },
           {
             title: 'Created',
             dataIndex: 'created_at',
-            render: date => new Date(date).toLocaleDateString(),
+            key: 'created',
+            render: (date) => new Date(date).toLocaleDateString(),
           },
           {
-            title: 'Status',
-            dataIndex: 'status',
-            render: (status, record) => (
-              <Tag color={status === 'active' ? 'green' : 'default'}>
-                {status?.toUpperCase() || 'PENDING'}
-              </Tag>
-            ),
+            title: 'Size',
+            dataIndex: 'file_size',
+            key: 'size',
+            render: (size) => `${(size / (1024 * 1024)).toFixed(2)} MB`,
           },
           {
             title: 'Actions',
@@ -241,30 +200,37 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
                   beforeUpload={(file) => {
                     Modal.confirm({
                       title: 'Update Version',
-                      content: 'Are you sure you want to update this version?',
-                      onOk: async () => {
-                        const success = await handleVersionUpload(file, record);
-                        if (success) {
-                          await loadVersions(); // Refresh versions immediately after successful update
-                          onClose();
-                        }
-                      },
+                      content: `Are you sure you want to update version ${record.version_number} with a new file?`,
+                      onOk: () => handleFileUpdate(file, record.id),
                     });
                     return false;
                   }}
                 >
-                  <Button icon={<EditOutlined />} type="text" />
+                  <Button
+                    icon={<EditOutlined />}
+                    type="text"
+                    title="Edit Version"
+                  />
                 </Upload>
                 <Button
                   icon={<DeleteOutlined />}
                   type="text"
                   danger
+                  title="Delete Version"
                   onClick={() => {
                     Modal.confirm({
                       title: 'Delete Version',
                       content: 'Are you sure you want to delete this version?',
                       okType: 'danger',
-                      onOk: () => handleVersionDelete(record.id),
+                      onOk: async () => {
+                        try {
+                          await deleteVersion(document.id, record.id);
+                          message.success('Version deleted successfully');
+                          loadVersions();
+                        } catch (error) {
+                          message.error('Failed to delete version');
+                        }
+                      },
                     });
                   }}
                 />
@@ -272,6 +238,7 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
             ),
           },
         ]}
+        pagination={false}
       />
     </Modal>
   );
@@ -422,7 +389,210 @@ const AnalyticsCards = ({ metrics, isLoading, error }) => {
   );
 };
 
+// Update MetricsCards to accept props
+const MetricsCards = ({ documents, folders, documentTypes }) => {
+  return (
+    <div className="grid grid-cols-7 gap-4 mb-4">
+      <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+        <div className="flex items-center gap-2">
+          <FileTextOutlined className="text-blue-500" />
+          <div>
+            <div className="text-2xl font-semibold">{documents?.length || 0}</div>
+            <div className="text-sm text-gray-600">Total Documents</div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+        <div className="flex items-center gap-2">
+          <CloudDownloadOutlined className="text-green-500" />
+          <div>
+            <div className="text-2xl font-semibold">0</div>
+            <div className="text-sm text-gray-600">Downloads</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+        <div className="flex items-center gap-2">
+          <DatabaseOutlined className="text-purple-500" />
+          <div>
+            <div className="text-2xl font-semibold">0.0MB</div>
+            <div className="text-sm text-gray-600">Storage Used</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+        <div className="flex items-center gap-2">
+          <HistoryOutlined className="text-cyan-500" />
+          <div>
+            <div className="text-2xl font-semibold">2</div>
+            <div className="text-sm text-gray-600">Total Versions</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+        <div className="flex items-center gap-2">
+          <FolderOutlined className="text-amber-500" />
+          <div>
+            <div className="text-2xl font-semibold">{folders?.length || 0}</div>
+            <div className="text-sm text-gray-600">Active Folders</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+        <div className="flex items-center gap-2">
+          <ClockCircleOutlined className="text-indigo-500" />
+          <div>
+            <div className="text-2xl font-semibold">2</div>
+            <div className="text-sm text-gray-600">Recent Activity</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+        <div className="flex items-center gap-2">
+          <FileOutlined className="text-rose-500" />
+          <div>
+            <div className="text-2xl font-semibold">{documentTypes?.length || 0}</div>
+            <div className="text-sm text-gray-600">Doc Types</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DocumentManagement = () => {
+  // Define columns at the top of the component
+  const tableColumns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text, record) => (
+        <Space>
+          <FileOutlined />
+          <span>{text}</span>
+          <span className="text-gray-400 text-sm">
+            {record.latest_version?.file_size ? 
+              `(${(record.latest_version.file_size / (1024 * 1024)).toFixed(2)} MB)` : ''}
+          </span>
+        </Space>
+      ),
+    },
+    {
+      title: 'Version',
+      dataIndex: 'versions',
+      render: (_, record) => {
+        const versions = record.versions || [];
+        return (
+          <Space wrap>
+            {versions.length > 0 ? (
+              versions.map(version => (
+                <Tag 
+                  key={version.id}
+                  color="blue"
+                  style={{ 
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    marginBottom: '4px'
+                  }}
+                  onClick={() => handleVersionClick(record, version)}
+                >
+                  v{version.version_number}
+                </Tag>
+              ))
+            ) : (
+              <Tag>v1.0</Tag>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Status',
+      dataIndex: 'is_active',
+      key: 'status',
+      render: (isActive) => (
+        <Tag color={isActive ? 'success' : 'default'}>
+          {isActive ? 'ACTIVE' : 'INACTIVE'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Modified',
+      dataIndex: 'created_at',
+      key: 'modified',
+      render: (date, record) => (
+        <Space direction="vertical" size={0}>
+          <span>{new Date(date).toLocaleDateString()}</span>
+          <span className="text-gray-400 text-sm">
+            by {record.created_by_id}
+          </span>
+        </Space>
+      ),
+    },
+    {
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="View">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={() => handlePreview(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Download">
+            <Button
+              type="text"
+              icon={<DownloadOutlined />}
+              onClick={() => handleDownload(record)}
+            />
+          </Tooltip>
+          <Dropdown
+            overlay={
+              <Menu>
+                <Menu.Item 
+                  key="versions" 
+                  icon={<HistoryOutlined />}
+                  onClick={() => {
+                    if (record) {  // Add this check
+                      setSelectedVersionDoc(record);
+                      setVersionModalVisible(true);
+                    }
+                  }}
+                >
+                  Versions
+                </Menu.Item>
+                <Menu.Item 
+                  key="delete" 
+                  icon={<DeleteOutlined />}
+                  danger
+                  onClick={() => handleDelete(record)}
+                >
+                  Delete
+                </Menu.Item>
+              </Menu>
+            }
+          >
+            <Button type="text" icon={<MoreOutlined />} />
+          </Dropdown>
+        </Space>
+      ),
+    },
+  ];
+
   const [selectedFolder, setSelectedFolder] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [favorites, setFavorites] = useState(['DOC001']);
@@ -452,6 +622,8 @@ const DocumentManagement = () => {
     downloadDocumentVersion,
     fetchDocumentVersions,
     folders,
+    columns,
+    filteredDocuments,
     deleteFolder,
     fetchFolders,
     createFolder,
@@ -461,9 +633,19 @@ const DocumentManagement = () => {
     isLoadingMetrics,
     metricsError,
     fetchMetrics,
-    refreshMetrics
+    refreshMetrics,
+    totalDocuments,
+    getPreviewUrl,
+    searchByProductionOrder,
+    allOrders,
+    fetchAllOrders,
   } = useDocumentStore();
-  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, folder: null });
+  const [contextMenu, setContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    folder: null
+  });
   const [isNewFolderModalVisible, setIsNewFolderModalVisible] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState(null);
@@ -473,7 +655,7 @@ const DocumentManagement = () => {
   // Add new state for upload
   const [uploadForm] = Form.useForm();
   const [selectedFile, setSelectedFile] = useState(null);
-  const [searchType, setSearchType] = useState('text'); // 'text' or 'partNumber'
+  const [searchType, setSearchType] = useState('text'); // 'text' or 'partNumber' or 'productionOrder'
   const [selectedDocType, setSelectedDocType] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
 
@@ -503,28 +685,105 @@ const DocumentManagement = () => {
   // Add new state for view mode
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
 
+  const [expandedKeys, setExpandedKeys] = useState([]);
+  const [selectedFolderPath, setSelectedFolderPath] = useState([]);
+
+  // Add new state for selected part number details
+  const [selectedPartNumber, setSelectedPartNumber] = useState(null);
+  const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
+  const [filteredProductionOrders, setFilteredProductionOrders] = useState([]);
+
+  // Add this state to track the current folder context
+  const [currentFolderContext, setCurrentFolderContext] = useState({
+    folderId: null,
+    folderPath: [],
+    folderName: null
+  });
+
+  // Add states for folder operations
+  const [cutFolder, setCutFolder] = useState(null);
+  const [isRenameFolderModalVisible, setIsRenameFolderModalVisible] = useState(false);
+  const [renameFolderData, setRenameFolderData] = useState({ id: null, name: '' });
+
+  // Add this state for search input
+  const [searchInput, setSearchInput] = useState('');
+
+  // Update useEffect to use store's fetchAllOrders
   useEffect(() => {
-    if (selectedDocument?.document_name.toLowerCase().endsWith('.pdf')) {
+    fetchAllOrders();
+  }, []);
+
+  // Add back the handleCreateDocType function
+  const handleCreateDocType = async () => {
+    try {
+      await createDocType(newDocType);
+      message.success('Document type created successfully');
+      setIsCreateDocTypeModalVisible(false);
+      setNewDocType({
+        type_name: '',
+        description: '',
+        extensions: '',
+        is_active: true
+      });
+      // Refresh document types
+      const data = await fetchDocTypes();
+      setDocumentTypes(data);
+    } catch (error) {
+      message.error('Failed to create document type');
+    }
+  };
+
+  // Add back the context menu handler
+  useEffect(() => {
+    const handleClick = () => {
+      if (contextMenu.visible) {
+        setContextMenu({ visible: false });
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [contextMenu.visible]);
+
+  // Add back the onExpand function
+  const onExpand = async (expandedKeys, { expanded, node }) => {
+    setExpandedKeys(expandedKeys);
+    if (expanded) {
+      try {
+        await fetchFolders(node.key);
+      } catch (error) {
+        message.error('Failed to load subfolders');
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDocument?.name?.toLowerCase().endsWith('.pdf')) {
       const loadPdf = async () => {
-        const loadingTask = pdfjsLib.getDocument(selectedDocument.versionUrl);
-        const pdf = await loadingTask.promise;
-        const pages = [];
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 1.5 });
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
-          
-          await page.render({
-            canvasContext: context,
-            viewport: viewport
-          }).promise;
-          
-          pages.push(canvas.toDataURL());
+        try {
+          const loadingTask = pdfjsLib.getDocument(selectedDocument.versionUrl);
+          const pdf = await loadingTask.promise;
+          const pages = [];
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            await page.render({
+              canvasContext: context,
+              viewport: viewport
+            }).promise;
+            
+            pages.push(canvas.toDataURL());
+          }
+          setPdfPages(pages);
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          message.error('Failed to load PDF preview');
         }
-        setPdfPages(pages);
       };
       
       loadPdf();
@@ -545,140 +804,209 @@ const DocumentManagement = () => {
     fetchFolders();
   }, [fetchFolders]);
 
-  // Add click handler to close context menu
+  // Update the click outside handler
   useEffect(() => {
-    const handleClick = () => {
-      if (contextMenu.visible) {
-        setContextMenu({ visible: false });
+    const handleClickOutside = (event) => {
+      const folderTree = document.querySelector('.folder-tree-container');
+      const uploadBtn = document.querySelector('[data-testid="upload-button"]');
+      const newFolderBtn = document.querySelector('[data-testid="new-folder-button"]');
+      
+      // Check if click is outside folder tree and not on buttons
+      if (folderTree && 
+          !folderTree.contains(event.target) && 
+          !uploadBtn?.contains(event.target) && 
+          !newFolderBtn?.contains(event.target)) {
+        // Only reset folder context for general clicks, not for upload/new folder
+        if (!isUploadModalVisible && !isNewFolderModalVisible) {
+          setSelectedFolder(null);
+          setCurrentFolderContext({
+            folderId: null,
+            folderPath: [],
+            folderName: 'Root'
+          });
+          fetchFolderDocuments(null); // Fetch root level documents
+        }
       }
     };
 
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, [contextMenu.visible]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isUploadModalVisible, isNewFolderModalVisible]);
 
-  const handleCreateDocType = async () => {
-    try {
-      if (!newDocType.type_name || !newDocType.extensions) {
-        message.error('Type name and extensions are required');
-        return;
-      }
+  // Update the New Folder button click handler
+  const handleNewFolderClick = () => {
+    setIsNewFolderModalVisible(true);
+    // Current folder context is already maintained from selection
+  };
 
-      const docTypeData = {
-        type_name: newDocType.type_name,
-        description: newDocType.description,
-        extensions: newDocType.extensions.split(',').map(ext => ext.trim()).join(','),
-        is_active: newDocType.is_active
-      };
-
-      await createDocType(docTypeData);
-      setIsCreateDocTypeModalVisible(false);
-      setNewDocType({ type_name: '', description: '', extensions: '', is_active: true });
-      message.success('Document type created successfully');
-      // Fetch updated list after creation
-      fetchDocTypes();
-    } catch (error) {
-      message.error(error.message || 'Failed to create document type');
+  // Update the folder selection handler
+  const handleFolderSelect = async (selectedKeys, info) => {
+    if (!selectedKeys.length) {
+      // Handle deselection
+      setSelectedFolder(null);
+      setCurrentFolderContext({
+        folderId: null,
+        folderPath: [],
+        folderName: 'Root'
+      });
+      await fetchFolderDocuments(null);
+      return;
     }
-  };
 
-  // Update the convertFoldersToTree function
-  const convertFoldersToTree = (folders) => {
-    const folderMap = new Map();
-    const tree = [];
+    const folderId = selectedKeys[0];
+    setSelectedFolder(folderId);
 
-    // First pass: create all nodes
-    folders.forEach(folder => {
-      const node = {
-        title: (
-          <div className="flex items-center justify-between w-full py-1">
-            <div className="flex items-center space-x-2">
-              <FolderOutlined className="text-blue-500" />
-              <span className="font-medium">{folder.folder_name}</span>
-            </div>
-            {folder.document_count > 0 && (
-              <Tag className="ml-2" color="blue">
-                {folder.document_count}
-              </Tag>
-            )}
-          </div>
-        ),
-        key: folder.id.toString(),
-        parentId: folder.parent_folder_id,
-        children: []
-      };
-      folderMap.set(folder.id, node);
+    // Build folder path
+    let currentNode = info?.node;
+    const path = [];
+    while (currentNode) {
+      path.unshift({
+        key: currentNode.key,
+        title: currentNode.title,
+        id: currentNode.key
+      });
+      currentNode = folders.find(f => f.id === currentNode.parent_folder_id);
+    }
+
+    setCurrentFolderContext({
+      folderId: folderId,
+      folderPath: path,
+      folderName: info.node.title
     });
 
-    // Second pass: build tree structure
-    folders.forEach(folder => {
-      const node = folderMap.get(folder.id);
-      if (!folder.parent_folder_id) {
-        tree.push(node);
-      } else {
-        const parentNode = folderMap.get(folder.parent_folder_id);
-        if (parentNode) {
-          if (!parentNode.children) parentNode.children = [];
-          parentNode.children.push(node);
-        }
-      }
-    });
-
-    return tree;
+    await fetchFolderDocuments(folderId);
   };
 
-  const handleContextMenu = (event, folder) => {
+  // Update the folder tree rendering
+  const renderFolderTree = (folders) => {
+    return folders.map(folder => ({
+      key: folder.id.toString(),
+      title: folder.folder_name,
+      icon: <FolderOutlined />,
+      children: folder.children && folder.children.length > 0 
+        ? renderFolderTree(folder.children) 
+        : undefined,
+      isLeaf: false,
+      parent_folder_id: folder.parent_folder_id
+    }));
+  };
+
+  // Add this function before the renderLeftSidebar function
+  const handleRightClick = ({ event, node }) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!folder) return;
-    
-    console.log('Opening context menu for folder:', folder);
     setContextMenu({
       visible: true,
       x: event.clientX,
       y: event.clientY,
-      folder: folder
+      folder: {
+        id: node.key,
+        folder_name: node.title
+      }
     });
   };
 
-  const handleFolderSelect = (selectedKeys, info) => {
-    if (selectedKeys.length === 0) {
-      setSelectedFolder('all');
-      setSelectedParentId(null);
-    } else if (info.node) {
-      const folderId = info.node.key;
-      setSelectedFolder(folderId);
-      setSelectedParentId(folderId);
-      fetchFolderDocuments(folderId);
-    }
-  };
+  // Update the renderLeftSidebar function to include the right-click menu
+  const renderLeftSidebar = () => (
+    <div className="folder-tree-container" style={{ 
+      width: '300px',
+      height: 'calc(100vh - 120px)',
+      padding: '20px',
+      borderRight: '1px solid #e8e8e8',
+      backgroundColor: '#fff',
+      overflowY: 'auto',
+      marginRight: '24px'
+    }}>
+      <div className="folder-header mb-4">
+        {/* <div className="flex items-center justify-between mb-3">
+          <Text strong>Folders</Text>
+        </div> */}
+        <div className="flex items-center space-x-2 mb-4">
+        <Button
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              onClick={handleUploadClick}
+            >
+              Upload
+            </Button>
+            <Button
+              icon={<FolderOutlined />}
+              onClick={handleNewFolderClick}
+            >
+              New Folder
+            </Button>
+        </div>
+        {/* Show current path */}
+        {/* {selectedFolder && (
+          <div className="text-sm text-gray-500 mb-2">
+            Current Path: {getCurrentPath()}
+          </div>
+        )} */}
+      </div>
+      <Tree
+        showIcon
+        defaultExpandAll={false}
+        expandedKeys={expandedKeys}
+        onExpand={onExpand}
+        onSelect={handleFolderSelect}
+        onRightClick={handleRightClick}  // Keep the right-click handler
+        treeData={renderFolderTree(folders)}
+        className="custom-tree"
+        selectedKeys={[selectedFolder]}
+        icon={({ expanded }) => (
+          <FolderOutlined 
+            style={{ 
+              color: expanded ? '#1890ff' : '#8c8c8c',
+              fontSize: '16px'
+            }}
+          />
+        )}
+      />
+    </div>
+  );
 
+  // Update breadcrumb to show correct path
+  const renderBreadcrumb = () => (
+    <Breadcrumb className="mb-4">
+      <Breadcrumb.Item onClick={() => handleFolderSelect(['all'])}>
+        <HomeOutlined /> Home
+      </Breadcrumb.Item>
+      {currentFolderContext.folderPath.map((item) => (
+        <Breadcrumb.Item key={item.key}>
+          <span className="cursor-pointer" onClick={() => handleFolderSelect([item.key])}>
+            {item.title}
+          </span>
+        </Breadcrumb.Item>
+      ))}
+    </Breadcrumb>
+  );
+
+  // Update the create folder handler to handle root/child folder creation
   const handleCreateFolder = async () => {
     try {
       if (!newFolderName.trim()) {
         message.error('Please enter a folder name');
         return;
       }
-  
+
       const folderData = {
-        folder_name: newFolderName.trim(),
-        parent_folder_id: targetFolderId, // Use the locked-in folder ID
-        is_active: true
+        name: newFolderName.trim(), // Ensure this is set
+        parent_folder_id: currentFolderContext.folderId || null
       };
-  
+
       await createFolder(folderData);
       setIsNewFolderModalVisible(false);
       setNewFolderName('');
-      setTargetFolderId(null); // Reset target folder
-      await fetchFolders();
       message.success('Folder created successfully');
       
-      // Refresh the current folder's contents
-      if (targetFolderId) {
-        await fetchFolderDocuments(targetFolderId);
+      // Refresh folders based on context
+      if (currentFolderContext.folderId) {
+        await fetchFolders(currentFolderContext.folderId);
+      } else {
+        await fetchFolders();
       }
     } catch (error) {
-      message.error('Failed to create folder');
+      message.error('Failed to create folder: ' + error.message);
     }
   };
 
@@ -716,7 +1044,7 @@ const DocumentManagement = () => {
             // Reset selected folder if deleted folder was selected
             if (selectedFolder === folder.id) {
               setSelectedFolder('all');
-              setSelectedParentId(null);
+              setSelectedFolderPath([]);
             }
           } catch (error) {
             console.error('Error deleting folder:', error);
@@ -800,9 +1128,9 @@ const DocumentManagement = () => {
     }
   };
 
-  // Update the context menu render function
+  // Make sure the context menu rendering is still in place
   const renderContextMenu = () => {
-    if (!contextMenu.visible || !contextMenu.folder) return null;
+    if (!contextMenu.visible) return null;
 
     return ReactDOM.createPortal(
       <div
@@ -810,10 +1138,10 @@ const DocumentManagement = () => {
           position: 'fixed',
           top: contextMenu.y,
           left: contextMenu.x,
-          zIndex: 1000,
           backgroundColor: 'white',
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          borderRadius: '4px'
+          borderRadius: '4px',
+          zIndex: 1000
         }}
       >
         <Menu>
@@ -821,10 +1149,12 @@ const DocumentManagement = () => {
             key="rename" 
             icon={<EditOutlined />}
             onClick={() => {
-              if (contextMenu.folder) {
-                setRenameFolderModal({ visible: true, folder: contextMenu.folder });
-                setContextMenu({ visible: false, folder: null });
-              }
+              setRenameFolderData({
+                id: contextMenu.folder.id,
+                name: contextMenu.folder.folder_name
+              });
+              setIsRenameFolderModalVisible(true);
+              setContextMenu({ visible: false });
             }}
           >
             Rename
@@ -833,35 +1163,14 @@ const DocumentManagement = () => {
             key="cut" 
             icon={<ScissorOutlined />}
             onClick={() => {
-              if (contextMenu.folder) {
-                setClipboardItem({ 
-                  ...contextMenu.folder, 
-                  action: 'cut',
-                  folder_name: contextMenu.folder.folder_name
-                });
-                setContextMenu({ visible: false, folder: null });
-                message.info('Folder cut to clipboard');
-              }
+              setClipboardItem({
+                ...contextMenu.folder,
+                action: 'cut'
+              });
+              setContextMenu({ visible: false });
             }}
           >
             Cut
-          </Menu.Item>
-          <Menu.Item 
-            key="copy" 
-            icon={<CopyOutlined />}
-            onClick={() => {
-              if (contextMenu.folder) {
-                setClipboardItem({ 
-                  ...contextMenu.folder, 
-                  action: 'copy',
-                  folder_name: contextMenu.folder.folder_name
-                });
-                setContextMenu({ visible: false, folder: null });
-                message.info('Folder copied to clipboard');
-              }
-            }}
-          >
-            Copy
           </Menu.Item>
           {clipboardItem && (
             <Menu.Item 
@@ -869,22 +1178,19 @@ const DocumentManagement = () => {
               icon={<SnippetsOutlined />}
               onClick={() => {
                 handlePasteFolder(contextMenu.folder);
-                setContextMenu({ visible: false, folder: null });
+                setContextMenu({ visible: false });
               }}
             >
               Paste
-            </Menu.Item>
+          </Menu.Item>
           )}
-          <Menu.Divider />
           <Menu.Item 
             key="delete" 
-            icon={<DeleteOutlined />} 
+            icon={<DeleteOutlined />}
             danger
             onClick={() => {
-              if (contextMenu.folder) {
-                handleFolderDelete(contextMenu.folder);
-                setContextMenu({ visible: false, folder: null });
-              }
+              handleFolderDelete(contextMenu.folder);
+              setContextMenu({ visible: false });
             }}
           >
             Delete
@@ -895,367 +1201,723 @@ const DocumentManagement = () => {
     );
   };
 
-  // Update the New Folder Modal to show correct parent folder
-  const renderNewFolderModal = () => (
+  // Update the Upload button click handler
+  const handleUploadClick = () => {
+    if (!selectedFolder) {
+      message.warning('Please select a folder first');
+      return;
+    }
+    
+    setIsUploadModalVisible(true);
+  };
+
+  // Add handleUploadSuccess function
+  const handleUploadSuccess = async (response) => {
+    message.success('Document uploaded successfully');
+    setIsUploadModalVisible(false);
+    uploadForm.resetFields();
+    setSelectedFile(null);
+    setSelectedPartNumber(null);
+    
+    // Refresh documents in current folder
+    if (selectedFolder) {
+      await fetchFolderDocuments(selectedFolder);
+    }
+  };
+
+  // Update the upload form onFinish handler in renderUploadModal
+  const renderUploadModal = () => (
     <Modal
-      title="Create New Folder"
-      visible={isNewFolderModalVisible}
-      onOk={handleCreateFolder}
+      title="Upload Document"
+      visible={isUploadModalVisible}
       onCancel={() => {
-        setIsNewFolderModalVisible(false);
-        setNewFolderName('');
-        setTargetFolderId(null);
+        setIsUploadModalVisible(false);
+        uploadForm.resetFields();
+        setSelectedFile(null);
+        setSelectedPartNumber(null);
       }}
-      okButtonProps={{ disabled: !newFolderName.trim() }}
+      footer={null}
     >
-      <Form layout="vertical">
-        <Form.Item 
-          label="Folder Name" 
-          required
-          validateStatus={!newFolderName.trim() && 'error'}
-          help={!newFolderName.trim() && 'Please enter a folder name'}
-        >
+      <Form
+        form={uploadForm}
+        layout="vertical"
+        onFinish={handleUpload}
+      >
+        <Form.Item label="Selected Folder">
           <Input
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            placeholder="Enter folder name"
-            autoFocus
-            maxLength={50}
-          />
-        </Form.Item>
-        <Form.Item label="Parent Folder">
-          <Input 
-            value={
-              targetFolderId ? 
-                folders.find(f => f.id.toString() === targetFolderId?.toString())?.folder_name 
-                : 'Root'
-            }
+            value={currentFolderContext.folderName}
             disabled
+            prefix={<FolderOutlined />}
           />
+          {currentFolderContext.folderPath.length > 0 && (
+            <div className="text-sm text-gray-500 mt-1">
+              Path: {currentFolderContext.folderPath.join(' / ')}
+            </div>
+          )}
+        </Form.Item>
+
+        <Form.Item
+          label="Select File"
+          required
+          rules={[{ required: true, message: 'Please select a file' }]}
+        >
+          <Upload.Dragger
+            beforeUpload={(file) => {
+              setSelectedFile(file);
+              uploadForm.setFieldsValue({
+                document_name: file.name
+              });
+              return false;
+            }}
+            maxCount={1}
+            onRemove={() => {
+              setSelectedFile(null);
+              uploadForm.setFieldsValue({
+                document_name: ''
+              });
+            }}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined />
+            </p>
+            <p className="ant-upload-text">
+              Click or drag file to this area to upload
+            </p>
+          </Upload.Dragger>
+        </Form.Item>
+
+        <Form.Item
+          name="document_name"
+          label="Document Name"
+          rules={[{ required: true }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="description"
+          label="Description"
+        >
+          <Input.TextArea />
+        </Form.Item>
+
+        <Form.Item
+          name="doc_type_id"
+          label="Document Type"
+          rules={[{ required: true }]}
+        >
+          <Select>
+            {documentTypes.map(type => (
+              <Select.Option key={type.id} value={type.id}>
+                {type.name}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="part_number"
+          label="Part Number"
+        >
+          <Select
+            showSearch
+            placeholder="Select part number"
+            optionFilterProp="children"
+            allowClear
+            onChange={(value) => {
+              setSelectedPartNumber(value);
+              // Filter production orders when part number changes
+              if (value) {
+                const filteredOrders = allOrders.filter(order => order.part_number === value);
+                setFilteredProductionOrders(filteredOrders);
+              } else {
+                setFilteredProductionOrders([]);
+              }
+              // Clear production order selection
+              uploadForm.setFieldsValue({ production_order_id: undefined });
+            }}
+            filterOption={(input, option) =>
+              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+            }
+          >
+            {allOrders.map(order => (
+              <Select.Option key={order.part_number} value={order.part_number}>
+                {order.part_number} - {order.part_description}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        {selectedPartNumber && (
+          <Form.Item
+            name="production_order_id"
+            label="Production Order"
+          >
+            <Select
+              showSearch
+              placeholder="Select production order"
+              optionFilterProp="children"
+              allowClear
+              onChange={(value) => setSelectedProductionOrder(value)}
+              filterOption={(input, option) =>
+                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              }
+            >
+              {filteredProductionOrders.map(order => (
+                <Select.Option key={order.id} value={order.id}>
+                  {order.production_order} - {order.sale_order}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+        )}
+
+        <Form.Item>
+          <Button 
+            type="primary" 
+            htmlType="submit" 
+            block
+          >
+            Upload Document
+          </Button>
         </Form.Item>
       </Form>
     </Modal>
   );
 
-  // Update the handleUploadClick function
-  const handleUploadClick = () => {
-    if (!selectedFolder || selectedFolder === 'all') {
-      message.warning('Please select a folder before uploading');
-      return;
-    }
-    setIsUploadModalVisible(true);
-    setTargetFolderId(selectedFolder);
-  };
-
-  const handleUpload = async (file, values) => {
-    try {
-      if (!targetFolderId) {
-        message.error('Please select a folder before uploading.');
-        return;
-      }
-
-      // Check if document with same name exists in folder
-      const existingDoc = documents.find(
-        doc => doc.document_name === values.document_name && 
-               doc.folder_id.toString() === targetFolderId.toString()
-      );
-
-      const uploadData = {
-        file: file,
-        folder_id: targetFolderId,
-        document_name: values.document_name || file.name,
-        doc_type_id: values.doc_type_id,
-        part_number_id: values.part_number_id,
-        description: values.description || '',
-        version_number: existingDoc ? `1.${parseInt(existingDoc.version_number.split('.')[1] || '0') + 1}` : '1.0'
-      };
-
-      await uploadDocument(uploadData);
-      setIsUploadModalVisible(false);
-      uploadForm.resetFields();
-      setSelectedFile(null);
-      setTargetFolderId(null);
-      message.success('File uploaded successfully');
-      
-      if (selectedFolder && selectedFolder !== 'all') {
+  // Update the handleSearch function
+  const handleSearch = async (value) => {
+    if (!value || value.length < 2) {
+      // If search is cleared, show current folder documents
+      if (selectedFolder) {
         await fetchFolderDocuments(selectedFolder);
       }
-    } catch (error) {
-      console.error('Upload error:', error);
-      message.error(
-        error.message === '[object Object]' 
-          ? 'Failed to upload file. Please check all required fields are filled correctly.'
-          : `Upload failed: ${error.message}`
+      return;
+    }
+
+    if (searchType === 'partNumber') {
+      // Call the part number search function
+      await searchByPartNumber(
+        value,
+        selectedDocType?.id || null
+      );
+    } else {
+      // Call the text search function
+      await searchDocuments(
+        value,
+        selectedDocType?.id || null,
+        currentFolderContext.folderId
       );
     }
   };
 
-  // Handle delete
-  const handleDelete = (record) => {
+  // Update the search input in renderSearchSection
+  const renderSearchSection = () => (
+    <Row gutter={16} align="middle" justify="space-between">
+      <Col flex="auto">
+        <Input.Group compact>
+          <Select
+            defaultValue="text"
+            style={{ width: '130px' }}
+            onChange={(value) => {
+              setSearchType(value);
+              setSearchInput('');
+              if (selectedFolder) {
+                fetchFolderDocuments(selectedFolder);
+              }
+            }}
+          >
+            <Select.Option value="text">Search Text</Select.Option>
+            <Select.Option value="partNumber">Part Number</Select.Option>
+            <Select.Option value="productionOrder">Production Order</Select.Option>
+          </Select>
+          {searchType === 'text' ? (
+            // Text search with real-time updates
+            <Search
+              placeholder="Search documents (min. 3 characters)..."
+              allowClear
+              enterButton
+              value={searchInput}
+              style={{ width: 'calc(100% - 130px)' }}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchInput(value);
+                if (value.length >= 3 || value.length === 0) {
+                  searchDocuments(
+                    value,
+                    selectedDocType?.id || null,
+                    currentFolderContext.folderId
+                  );
+                }
+              }}
+              onSearch={(value) => {
+                if (value && value.length >= 3) {
+                  searchDocuments(
+                  value,
+                  selectedDocType?.id || null,
+                  currentFolderContext.folderId
+                );
+                }
+              }}
+            />
+          ) : searchType === 'partNumber' ? (
+              // Part number search
+              <Search
+                placeholder="Enter or select part number"
+                allowClear
+                enterButton
+                value={searchInput}
+                style={{ width: 'calc(100% - 130px)' }}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onSearch={(value) => {
+                  if (value && value.length >= 2) {
+                    searchByPartNumber(value, selectedDocType?.id || null);
+                  }
+                }}
+                addonBefore={
+                  <Select
+                    showSearch
+                    value={searchInput || undefined}
+                    placeholder="Select from list"
+                    style={{ width: 200 }}
+                    onChange={(value) => {
+                      setSearchInput(value);
+                      searchByPartNumber(value, selectedDocType?.id || null);
+                    }}
+                    filterOption={(input, option) =>
+                      option?.children?.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                    }
+                  >
+                    {partNumbers.map(part => (
+                      <Select.Option key={part.id} value={part.part_number}>
+                        {part.part_number} - {part.part_description}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                }
+              />
+            ) : (
+              // Production order search
+              <Search
+                placeholder="Enter or select production order"
+                allowClear
+                enterButton
+                value={searchInput}
+                style={{ width: 'calc(100% - 130px)' }}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onSearch={(value) => {
+                  if (value) {
+                    const order = allOrders.find(o => o.production_order === value);
+                    if (order) {
+                      searchByProductionOrder(order.id, selectedDocType?.id || null);
+                    }
+                  }
+                }}
+                addonBefore={
+                  <Select
+                    showSearch
+                    value={searchInput || undefined}
+                    placeholder="Select from list"
+                    style={{ width: 200 }}
+                    onChange={(value) => {
+                      const order = allOrders.find(o => o.production_order === value);
+                      setSearchInput(value);
+                      if (order) {
+                        searchByProductionOrder(order.id, selectedDocType?.id || null);
+                      }
+                    }}
+                    filterOption={(input, option) =>
+                      option?.children?.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                    }
+                    dropdownRender={menu => (
+                      <>
+                        <div style={{ padding: '8px', color: '#666' }}>
+                          <InfoCircleOutlined /> Select from list or type and search
+                        </div>
+                        {menu}
+                      </>
+                    )}
+                  >
+                    {allOrders.map(order => (
+                      <Select.Option key={order.id} value={order.production_order}>
+                        {order.production_order} - {order.part_description}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                }
+              />
+            )}
+        </Input.Group>
+      </Col>
+      <Col>
+        <Space>
+          <Radio.Group 
+            value={viewMode} 
+            onChange={e => setViewMode(e.target.value)}
+            buttonStyle="solid"
+          >
+            <Tooltip title="Table View">
+              <Radio.Button value="table"><BarsOutlined /></Radio.Button>
+            </Tooltip>
+            <Tooltip title="Grid View">
+              <Radio.Button value="grid"><AppstoreOutlined /></Radio.Button>
+            </Tooltip>
+          </Radio.Group>
+          {documentTypeButton}
+        </Space>
+      </Col>
+    </Row>
+  );
+
+  // Add these functions for handling downloads and previews
+  const handleFileDownload = (document, version = null) => {
     Modal.confirm({
-      title: 'Delete Document',
-      content: `Are you sure you want to delete "${record.name}"?`,
-      okText: 'Yes',
-      okType: 'danger',
-      cancelText: 'No',
-      onOk() {
-        setDocuments(prev => prev.filter(doc => doc.id !== record.id));
-        message.success('Document deleted successfully');
-      }
+      title: 'Download Confirmation',
+      content: (
+        <div>
+          <p>Are you sure you want to download:</p>
+          <p><strong>File:</strong> {document.name}</p>
+          {version && <p><strong>Version:</strong> v{version.version_number}</p>}
+          <p><strong>Size:</strong> {((version?.file_size || document.file_size) / (1024 * 1024)).toFixed(2)} MB</p>
+        </div>
+      ),
+      okText: 'Download',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          const blob = await downloadDocumentVersion(document.id, version?.id);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = version 
+            ? `${document.name}_${version.version_number}`
+            : document.name;
+          document.body.appendChild(a);
+          a.click();
+          URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          message.success('Download started successfully');
+        } catch (error) {
+          message.error('Failed to download file');
+          console.error('Download error:', error);
+        }
+      },
     });
   };
 
-  // Filter documents based on search and selected folder
-  const filteredDocuments = Array.isArray(documents) ? documents.filter(doc => {
-    const matchesSearch = doc.document_name?.toLowerCase().includes(searchText.toLowerCase());
-    const matchesFolder = selectedFolder === 'all' || doc.folder_id.toString() === selectedFolder.toString();
-    return matchesSearch && matchesFolder;
-  }) : [];
-
-  const getFileIcon = (fileName) => {
-    const extension = fileName.split('.').pop().toLowerCase();
-    const iconProps = { className: 'text-lg' };
-
-    switch (extension) {
-      case 'pdf':
-        return <FilePdfOutlined {...iconProps} className="text-red-500" />;
-      case 'doc':
-      case 'docx':
-        return <FileWordOutlined {...iconProps} className="text-blue-500" />;
-      case 'xls':
-      case 'xlsx':
-        return <FileExcelOutlined {...iconProps} className="text-green-500" />;
-      case 'txt':
-      case 'js':
-      case 'jsx':
-      case 'css':
-      case 'html':
-        return <FileTextOutlined {...iconProps} className="text-gray-500" />;
-      case 'stp':
-      case 'step':
-        return <FileImageOutlined {...iconProps} className="text-purple-500" />;
-      default:
-        return <FileOutlined {...iconProps} className="text-gray-400" />;
-    }
-  };
-
-  // Add download version selection modal
-  const renderDownloadVersionModal = () => (
-    <Modal
-      title={`Select Versions to Download - ${selectedDocument?.document_name}`}
-      visible={downloadModalVisible}
-      onCancel={handleDownloadModalClose}
-      onOk={async () => {
-        try {
-          // Download selected versions
-          for (const version of selectedVersions) {
-            const blob = await downloadDocumentVersion(selectedDocument.id, version.id);
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${selectedDocument.document_name}_v${version.version_number}`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-          }
-          message.success('Documents downloaded successfully');
-          setDownloadModalVisible(false);
-          setSelectedVersions([]);
-        } catch (error) {
-          message.error('Failed to download documents');
-        }
-      }}
-      okButtonProps={{ disabled: selectedVersions.length === 0 }}
-    >
-      <Checkbox.Group
-        value={selectedVersions.map(v => v.id)}
-        onChange={(values) => {
-          setSelectedVersions(
-            downloadVersions.filter(v => values.includes(v.id))
-          );
-        }}
-      >
-        <List
-          dataSource={downloadVersions}
-          renderItem={version => (
-            <List.Item>
-              <Checkbox value={version.id}>
-                Version {version.version_number} 
-                ({new Date(version.created_at).toLocaleDateString()})
-              </Checkbox>
-            </List.Item>
-          )}
-        />
-      </Checkbox.Group>
-    </Modal>
-  );
-
-  // Update the handleDownload function
-  const handleDownload = async (record) => {
+  // Update the preview handler
+  const handlePreview = async (record) => {
     try {
-      // Get all versions of the document
       const versions = await fetchDocumentVersions(record.id);
       
       if (versions.length > 1) {
-        // If multiple versions exist, show selection modal
         setSelectedDocument(record);
-        setDownloadVersions(versions);
-        setDownloadModalVisible(true);
+        setPreviewVersions(versions);
+        setPreviewModalVisible(true);
       } else {
-        // If only one version, download it directly
-        const blob = await downloadDocumentVersion(record.id, versions[0].id);
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = record.document_name;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        message.success('Document downloaded successfully');
+        try {
+          const url = await getPreviewUrl(record.id);
+          
+          if (record.name?.toLowerCase().endsWith('.pdf')) {
+            setSelectedDocument({
+              ...record,
+              versionUrl: url,
+              version_number: versions[0].version_number
+            });
+            setIsPreviewModalVisible(true);
+            
+            // Load PDF preview
+            const loadingTask = pdfjsLib.getDocument(url);
+            const pdf = await loadingTask.promise;
+            const pages = [];
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const viewport = page.getViewport({ scale: 1.5 });
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              
+              await page.render({
+                canvasContext: context,
+                viewport: viewport
+              }).promise;
+              
+              pages.push(canvas.toDataURL());
+            }
+            setPdfPages(pages);
+          } else {
+            Modal.confirm({
+              title: 'File Preview Not Available',
+              content: `This file type cannot be previewed. Would you like to download "${record.name}" instead?`,
+              okText: 'Download',
+              cancelText: 'Cancel',
+              onOk: () => handleFileDownload(record, versions[0])
+            });
+          }
+        } catch (error) {
+          message.error('Failed to load preview');
+          console.error('Preview error:', error);
+        }
       }
     } catch (error) {
-      message.error('Failed to download document');
+      message.error('Failed to load document versions');
+      console.error('Version fetch error:', error);
     }
   };
 
-  const handleShare = (record) => {
-    Modal.confirm({
-      title: 'Share Document',
-      content: (
-        <div>
-          <p>Share "{record.name}" with:</p>
-          <Input placeholder="Enter email addresses" />
-        </div>
-      ),
-      onOk() {
-        message.success('Document shared successfully');
-      }
-    });
-  };
-
-  const toggleFavorite = (docId) => {
-    setFavorites(prev => 
-      prev.includes(docId) 
-        ? prev.filter(id => id !== docId)
-        : [...prev, docId]
-    );
-    message.success('Favorites updated');
-  };
-
-  // Update the columns definition
-  const columns = [
-    {
-      title: 'Name',
-      dataIndex: 'document_name',
-      key: 'document_name',
-      render: (text, record) => (
-        <div className="flex items-center space-x-2">
-          {getFileIcon(record.document_name)}
-          <div>
-            <span className="font-medium">{text}</span>
-            <div className="text-xs text-gray-500">
-              {record.description || ''}
-              {record.latest_version?.file_size && 
-                ` • ${(record.latest_version.file_size / (1024 * 1024)).toFixed(2)} MB`}
-            </div>
+  // Add PDF preview modal component
+  const renderPdfPreviewModal = () => (
+    <Modal
+      title={`Preview - ${selectedDocument?.name} (${selectedDocument?.version_number})`}
+      visible={isPreviewModalVisible}
+      onCancel={handlePreviewModalClose}
+      width="60%"
+      footer={[
+        <Button key="close" onClick={handlePreviewModalClose}>
+          Close
+        </Button>,
+        <Button
+          key="download"
+          type="primary"
+          icon={<DownloadOutlined />}
+          onClick={() => handleFileDownload(selectedDocument)}
+        >
+          Download
+        </Button>
+      ]}
+    >
+      <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+        {pdfPages.map((pageUrl, index) => (
+          <div key={index} style={{ marginBottom: '20px' }}>
+            <img 
+              src={pageUrl} 
+              alt={`Page ${index + 1}`} 
+              style={{ width: '100%', height: 'auto' }}
+            />
           </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Version',
-      dataIndex: 'version_number',
-      key: 'version',
-      width: 200,
-      render: (version, record) => {
-        const versions = record.versions || [];
-        return (
-          <Space wrap>
-            {versions.map((ver) => (
-              <Tag
-                key={ver.id}
-                color={ver.status === 'active' ? 'blue' : 'default'}
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleVersionClick(record, ver)}
-              >
-                v{ver.version_number}
-              </Tag>
-            ))}
-            {versions.length === 0 && version && (
-              <Tag color="blue">
-                v{version}
-              </Tag>
-            )}
-          </Space>
-        );
-      }
-    },
-    {
-      title: 'Status',
-      dataIndex: ['latest_version', 'status'],
-      key: 'status',
-      width: 120,
-      render: (status) => (
-        <Tag color={
-          status === 'active' ? 'success' : 
-          status === 'under_review' ? 'processing' : 
-          'default'
-        }>
-          {status?.toUpperCase()}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Modified',
-      dataIndex: 'created_at',
-      key: 'modified',
-      width: 150,
-      render: (date, record) => (
-        <div>
-          <div>{new Date(date).toLocaleDateString()}</div>
-          <div className="text-xs text-gray-500">by {record.created_by}</div>
-        </div>
-      ),
-    },
-    {
-      title: 'Part Number',
-      dataIndex: 'part_number',
-      key: 'part_number',
-      width: 150,
-      render: (partNumber) => (
-        <div>
-          {partNumber || 'N/A'}
-        </div>
-      ),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 150,
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            onClick={() => handlePreview(record)}
-          />
-          <Button
-            type="text"
-            icon={<DownloadOutlined />}
-            onClick={() => handleDownload(record)}
-          />
-          <Dropdown 
-            overlay={renderQuickActions(record)} 
-            trigger={['click']}
+        ))}
+      </div>
+    </Modal>
+  );
+
+  // Update the version preview modal
+  const renderPreviewVersionModal = () => (
+    <Modal
+      title={`Select Version to Preview - ${selectedDocument?.name || ''}`}
+      visible={previewModalVisible}
+      onCancel={() => {
+        setPreviewModalVisible(false);
+        setSelectedPreviewVersion(null);
+      }}
+      footer={[
+        <Button key="cancel" onClick={() => {
+          setPreviewModalVisible(false);
+          setSelectedPreviewVersion(null);
+        }}>
+          Cancel
+        </Button>,
+        <Button
+          key="preview"
+          type="primary"
+          disabled={!selectedPreviewVersion}
+          onClick={async () => {
+            try {
+              const url = await getPreviewUrl(selectedDocument.id, selectedPreviewVersion.id);
+              
+              if (selectedDocument.name?.toLowerCase().endsWith('.pdf')) {
+                setSelectedDocument({
+                  ...selectedDocument,
+                  versionUrl: url,
+                  version_number: selectedPreviewVersion.version_number
+                });
+                setPreviewModalVisible(false);
+                setIsPreviewModalVisible(true);
+                
+                // Load PDF preview
+                const loadingTask = pdfjsLib.getDocument(url);
+                const pdf = await loadingTask.promise;
+                const pages = [];
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                  const page = await pdf.getPage(i);
+                  const viewport = page.getViewport({ scale: 1.5 });
+                  const canvas = document.createElement('canvas');
+                  const context = canvas.getContext('2d');
+                  canvas.height = viewport.height;
+                  canvas.width = viewport.width;
+                  
+                  await page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                  }).promise;
+                  
+                  pages.push(canvas.toDataURL());
+                }
+                setPdfPages(pages);
+              } else {
+                Modal.confirm({
+                  title: 'File Preview Not Available',
+                  content: `This file type cannot be previewed. Would you like to download "${selectedDocument.name}" (${selectedPreviewVersion.version_number}) instead?`,
+                  okText: 'Download',
+                  cancelText: 'Cancel',
+                  onOk: () => handleFileDownload(selectedDocument, selectedPreviewVersion)
+                });
+              }
+            } catch (error) {
+              message.error('Failed to load preview');
+              console.error('Preview error:', error);
+            }
+          }}
+        >
+          Preview
+        </Button>
+      ]}
+    >
+      <List
+        dataSource={previewVersions}
+        renderItem={version => (
+          <List.Item
+            className={`cursor-pointer p-3 rounded-lg ${
+              selectedPreviewVersion?.id === version.id ? 'bg-blue-50' : ''
+            }`}
+            onClick={() => setSelectedPreviewVersion(version)}
           >
-            <Button type="text" icon={<MoreOutlined />} />
-          </Dropdown>
-        </Space>
-      ),
-    },
-  ];
+            <Radio checked={selectedPreviewVersion?.id === version.id}>
+              <Space direction="vertical" size={1}>
+                <Text strong>Version {version.version_number}</Text>
+                <Text type="secondary" className="text-sm">
+                  Created: {new Date(version.created_at).toLocaleDateString()}
+                  <br />
+                  Size: {(version.file_size / (1024 * 1024)).toFixed(2)} MB
+                </Text>
+              </Space>
+            </Radio>
+          </List.Item>
+        )}
+      />
+    </Modal>
+  );
+
+  // Add this effect to refresh document versions when folder changes
+  useEffect(() => {
+    const refreshDocuments = async () => {
+      if (selectedFolder && selectedFolder !== 'all') {
+        await fetchFolderDocuments(selectedFolder);
+      }
+    };
+    refreshDocuments();
+  }, [selectedFolder]);
+
+  // Add this effect to refresh documents when needed
+  useEffect(() => {
+    const refreshDocuments = async () => {
+      if (selectedFolder && selectedFolder !== 'all') {
+        try {
+          await fetchFolderDocuments(selectedFolder);
+        } catch (error) {
+          console.error('Failed to refresh documents:', error);
+        }
+      }
+    };
+
+    refreshDocuments();
+  }, [selectedFolder, versionModalVisible]); // Add versionModalVisible to dependencies
+
+  // Update the handleUpload function
+  const handleUpload = async (values) => {
+    try {
+      if (!currentFolderContext.folderId) {
+        message.error('Please select a folder first');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', values.file.file);
+      formData.append('folder_id', currentFolderContext.folderId.toString());
+      formData.append('doc_type_id', values.doc_type_id.toString());
+      formData.append('document_name', values.document_name);
+      formData.append('description', values.description || '');
+      formData.append('version_number', 'v1');
+      formData.append('metadata', '{}');
+      
+      // Only append if selected
+      if (values.part_number) {
+        const partNumberOrder = allOrders.find(order => order.part_number === values.part_number);
+        if (partNumberOrder) {
+          formData.append('part_number_id', partNumberOrder.id.toString());
+        }
+      }
+      
+      // Only append if selected
+      if (values.production_order_id) {
+        formData.append('production_order_id', values.production_order_id.toString());
+      }
+
+      await uploadDocument(formData);
+      message.success('Document uploaded successfully');
+      setIsUploadModalVisible(false);
+      uploadForm.resetFields();
+      
+      // Refresh documents in current folder
+      if (currentFolderContext.folderId) {
+        await fetchFolderDocuments(currentFolderContext.folderId);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      message.error('Failed to upload document: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  // Add this effect to refresh document versions when folder changes
+  useEffect(() => {
+    const refreshDocuments = async () => {
+      if (selectedFolder && selectedFolder !== 'all') {
+        await fetchFolderDocuments(selectedFolder);
+      }
+    };
+    refreshDocuments();
+  }, [selectedFolder]);
+
+  // Add this effect to refresh documents when needed
+  useEffect(() => {
+    const refreshDocuments = async () => {
+      if (selectedFolder && selectedFolder !== 'all') {
+        try {
+          await fetchFolderDocuments(selectedFolder);
+        } catch (error) {
+          console.error('Failed to refresh documents:', error);
+        }
+      }
+    };
+
+    refreshDocuments();
+  }, [selectedFolder, versionModalVisible]); // Add versionModalVisible to dependencies
+
+  // Add this function to handle version modal close
+  const handleVersionModalClose = () => {
+    setVersionModalVisible(false);
+    setSelectedVersionDoc(null);
+    setSelectedVersions([]);
+  };
+
+  // Update the preview modal close handler
+  const handlePreviewModalClose = () => {
+    setIsPreviewModalVisible(false);
+    setPreviewModalVisible(false);
+    setSelectedPreviewVersion(null);
+    if (selectedDocument?.versionUrl) {
+      URL.revokeObjectURL(selectedDocument.versionUrl);
+    }
+    setSelectedDocument(null);
+  };
+
+  // Update the download modal close handler
+  const handleDownloadModalClose = () => {
+    setDownloadModalVisible(false);
+    setSelectedVersions([]);
+  };
 
   const documentTypeButton = (
     <Col>
@@ -1296,9 +1958,9 @@ const DocumentManagement = () => {
           columns={[
             {
               title: 'Type Name',
-              dataIndex: 'type_name',
-              key: 'type_name',
-              sorter: (a, b) => a.type_name.localeCompare(b.type_name)
+              dataIndex: 'name',
+              key: 'name',
+              sorter: (a, b) => a.name.localeCompare(b.name)
             },
             {
               title: 'Description',
@@ -1308,8 +1970,8 @@ const DocumentManagement = () => {
             },
             {
               title: 'Extensions',
-              dataIndex: 'file_extensions',
-              key: 'file_extensions',
+              dataIndex: 'allowed_extensions',
+              key: 'allowed_extensions',
               render: (extensions) => (
                 <Space wrap>
                   {extensions?.map(ext => (
@@ -1395,677 +2057,300 @@ const DocumentManagement = () => {
     </>
   );
 
-  // Update the left sidebar content
-  const renderLeftSidebar = () => {
-    return (
-      <Card className="h-full" bodyStyle={{ padding: '16px' }}>
-        <div className="flex items-center space-x-4 mb-6">
-          <Button
-            type="primary"
-            icon={<CloudUploadOutlined />}
-            onClick={handleUploadClick}
-            id="upload-button"
-            className="flex-1"
-          >
-            Upload
-          </Button>
-          <Button 
-            type="default" 
-            icon={<FolderOutlined />}
-            onClick={() => {
-              setIsNewFolderModalVisible(true);
-              setTargetFolderId(selectedParentId);
-            }}
-            id="new-folder-button"
-          >
-            New Folder
-          </Button>
-          {/* <Button 
-            type="default" 
-            icon={<StarOutlined />}
-          >
-            Favorites
-          </Button> */}
-        </div>
-        
-        <Divider className="my-4" />
-
-        <div className="folder-tree-container">
-          <Tree
-            className="custom-tree document-tree"
-            treeData={convertFoldersToTree(folders)}
-            selectedKeys={[selectedFolder].filter(Boolean)}
-            onSelect={handleFolderSelect}
-            onRightClick={({ event, node }) => {
-              event.preventDefault();
-              const folder = folders.find(f => f.id.toString() === node.key);
-              if (folder) {
-                handleContextMenu(event, folder);
-              }
-            }}
-            showIcon={false}
-            defaultExpandAll
-          />
-        </div>
-      </Card>
-    );
-  };
-
-  // Update the Upload Modal
-  const renderUploadModal = () => (
+  // Update the renderNewFolderModal function
+  const renderNewFolderModal = () => (
     <Modal
-      title="Upload Document"
-      visible={isUploadModalVisible}
+      title="Create New Folder"
+      visible={isNewFolderModalVisible}
+      onOk={handleCreateFolder}
       onCancel={() => {
-        setIsUploadModalVisible(false);
-        uploadForm.resetFields();
-        setSelectedFile(null);
-        setTargetFolderId(null);
+        setIsNewFolderModalVisible(false);
+        setNewFolderName('');
       }}
-      footer={null}
+      okText="Create"
+      cancelText="Cancel"
     >
-      <Form
-        form={uploadForm}
-        layout="vertical"
-        onFinish={async (values) => {
-          if (!selectedFile) {
-            message.error('Please select a file to upload');
-            return;
-          }
-          
-          // Use the selected folder ID
-          const folderId = targetFolderId || selectedFolder;
-          if (!folderId || folderId === 'all') {
-            message.error('Please select a folder for upload');
-            return;
-          }
-
-          await handleUpload(selectedFile, values);
-        }}
-      >
-        <Form.Item 
-          label="Selected Folder" 
+      <Form layout="vertical">
+        <Form.Item
+          label={<span>Folder Name <span style={{ color: '#ff4d4f' }}>*</span></span>}
           required
-          className="mb-4"
+          validateStatus={!newFolderName.trim() && 'error'}
+          help={!newFolderName.trim() && 'Please enter a folder name'}
         >
-          <Input 
-            value={folders.find(f => f.id.toString() === (targetFolderId || selectedFolder)?.toString())?.folder_name}
-            disabled
-            placeholder="Please select a folder first"
+          <Input
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            placeholder="Enter folder name"
+            maxLength={50}
           />
         </Form.Item>
 
-        <Form.Item
-          label="Select File"
-          required
-          rules={[{ required: true, message: 'Please select a file' }]}
-        >
-          <Upload.Dragger
-            beforeUpload={(file) => {
-              setSelectedFile(file);
-              // Set default document name from file name
-              uploadForm.setFieldsValue({
-                document_name: file.name
-              });
-              return false;
-            }}
-            maxCount={1}
-            onRemove={() => {
-              setSelectedFile(null);
-              uploadForm.setFieldsValue({
-                document_name: ''
-              });
-            }}
-          >
-            <p className="ant-upload-drag-icon">
-              <InboxOutlined />
-            </p>
-            <p className="ant-upload-text">
-              Click or drag file to this area to upload
-            </p>
-            <p className="ant-upload-hint">
-              Selected folder: {folders.find(f => f.id.toString() === (targetFolderId || selectedFolder)?.toString())?.folder_name}
-            </p>
-          </Upload.Dragger>
-        </Form.Item>
-
-        <Form.Item
-          name="document_name"
-          label="Document Name"
-          rules={[{ required: true }]}
-        >
-          <Input />
-        </Form.Item>
-  
-        <Form.Item
-          name="description"
-          label="Description"
-        >
-          <Input.TextArea />
-        </Form.Item>
-  
-        <Form.Item
-          name="doc_type_id"
-          label="Document Type"
-          rules={[{ required: true, message: 'Please select document type' }]}
-        >
-          <Select>
-            {documentTypes.map(type => (
-              <Select.Option key={type.id} value={type.id}>
-                {type.type_name}
-              </Select.Option>
-            ))}
-          </Select>
-        </Form.Item>
-  
-        <Form.Item
-          name="part_number_id"
-          label="Part Number"
-          rules={[{ required: true, message: 'Please select part number' }]}
-        >
-          <Select>
-            {partNumbers.map(part => (
-              <Select.Option key={part.id} value={part.id}>
-                {part.part_number}
-              </Select.Option>
-            ))}
-          </Select>
-        </Form.Item>
-  
-        <Form.Item>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
-            block
-            disabled={!selectedFile}
-          >
-            Upload Document
-          </Button>
+        <Form.Item label="Parent Folder">
+          <Input 
+            value={currentFolderContext.folderName || 'Root'}
+            disabled
+          />
+          {currentFolderContext.folderPath.length > 0 && (
+            <div className="text-sm text-gray-500 mt-1">
+              Path: {currentFolderContext.folderPath.map(f => f.title).join(' / ')}
+            </div>
+          )}
         </Form.Item>
       </Form>
     </Modal>
   );
 
-  // Add this function to handle search
-  const handleSearch = async (value) => {
-    if (!value) {
-      // If search is empty and a folder is selected, fetch folder documents
-      if (selectedFolder && selectedFolder !== 'all') {
-        await fetchFolderDocuments(selectedFolder);
-        return;
-      }
-    }
-
-    try {
-      if (searchType === 'text') {
-        await searchDocuments({
-          search_text: value,
-          folder_id: selectedFolder !== 'all' ? selectedFolder : undefined,
-          doc_type_id: selectedDocType
-        });
-      } else if (searchType === 'partNumber') {
-        // Update minimum character check to match your requirements
-        if (value.length >= 2) { // You can adjust this minimum length
-          // Get the token from auth store
-          const token = useAuthStore.getState().token;
-
-          if (!token) {
-            throw new Error('No authorization token available');
-          }
-
-          const response = await fetch(
-            `http://172.18.7.89:2222/api/v1/documents/search/by-partnumber/?part_number_query=${encodeURIComponent(value)}&skip=0&limit=100`,
-            {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              }
-            }
-          );
-
-          if (!response.ok) {
-            if (response.status === 401) {
-              message.error('Session expired. Please login again.');
-              // Optionally handle logout/redirect here
-              return;
-            }
-            throw new Error('Failed to fetch documents');
-          }
-
-          const data = await response.json();
-          
-          // Update the documents state with the search results
-          useDocumentStore.setState({
-            documents: data.documents,
-            totalDocuments: data.total
-          });
-          
-          if (data.documents.length === 0) {
-            message.info('No documents found for this part number');
-          }
-        } else {
-          message.warning('Please enter at least 2 characters for part number search');
-        }
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      message.error('Search failed: ' + error.message);
-    }
-  };
-
-  // Update the search section in your render method
-  // Replace the existing search input with this:
-  const renderSearchSection = () => (
-    <Row gutter={16} align="middle" justify="space-between">
-      <Col flex="auto">
-        <Input.Group compact>
-          <Select
-            defaultValue="text"
-            style={{ width: '130px' }}
-            onChange={(value) => {
-              setSearchType(value);
-              setSearchText(''); // Clear search text when switching search type
-            }}
-          >
-            <Select.Option value="text">Search Text</Select.Option>
-            <Select.Option value="partNumber">Part Number</Select.Option>
-          </Select>
-          <Search
-            placeholder={searchType === 'text' ? "Search documents..." : "Enter part number (min. 2 characters)..."}
-            allowClear
-            value={searchText}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              if (searchType === 'partNumber' && e.target.value.length < 2) {
-                // Clear results if less than 2 characters
-                if (selectedFolder && selectedFolder !== 'all') {
-                  fetchFolderDocuments(selectedFolder);
-                }
-              }
-            }}
-            onSearch={handleSearch}
-            style={{ width: 'calc(100% - 130px)' }}
-            enterButton
-          />
-        </Input.Group>
-      </Col>
-      <Col>
-        <Space>
-          <Radio.Group 
-            value={viewMode} 
-            onChange={e => setViewMode(e.target.value)}
-            buttonStyle="solid"
-          >
-            <Tooltip title="Table View">
-              <Radio.Button value="table"><BarsOutlined /></Radio.Button>
-            </Tooltip>
-            <Tooltip title="Grid View">
-              <Radio.Button value="grid"><AppstoreOutlined /></Radio.Button>
-            </Tooltip>
-          </Radio.Group>
-          {documentTypeButton}
-        </Space>
-      </Col>
-    </Row>
-  );
-
-  // Update the handleVersionClick function to show single version
-  const handleVersionClick = async (document, version) => {
-    try {
-      // Fetch the document blob
-      const blob = await downloadDocumentVersion(document.id, version.id);
-      
-      // Create a URL for the blob
-      const url = window.URL.createObjectURL(blob);
-      
-      // Check if it's a PDF
-      if (document.document_name.toLowerCase().endsWith('.pdf')) {
-        // Open PDF in new window with viewer
-        window.open(url, '_blank');
-      } else {
-        // For other file types, show preview in modal
-        setSelectedDocument({
-          ...document,
-          versionUrl: url,
-          versionNumber: version.version_number
-        });
-        setIsPreviewModalVisible(true);
-      }
-    } catch (error) {
-      message.error('Failed to load document');
-    }
-  };
-
-  // Update the handlePreview function
-  const handlePreview = async (record) => {
-    try {
-      // Get all versions of the document
-      const versions = await fetchDocumentVersions(record.id);
-      
-      if (versions.length > 1) {
-        // If multiple versions exist, show selection modal
-        setSelectedDocument(record);
-        setPreviewVersions(versions);
-        setPreviewModalVisible(true);
-      } else {
-        // If only one version, preview it directly
-        const blob = await downloadDocumentVersion(record.id, versions[0].id);
-        const url = window.URL.createObjectURL(blob);
-        setSelectedDocument({
-          ...record,
-          versionUrl: url,
-          version_number: versions[0].version_number
-        });
-        setIsPreviewModalVisible(true);
-      }
-    } catch (error) {
-      message.error('Failed to load document preview');
-    }
-  };
-
-  // Add new function for quick actions
-  const renderQuickActions = (record) => (
-    <Menu>
-      <Menu.Item 
-        key="preview" 
-        icon={<EyeOutlined />}
-        onClick={() => handlePreview(record)}
-      >
-        Preview
-      </Menu.Item>
-      <Menu.Item 
-        key="download" 
-        icon={<DownloadOutlined />}
-        onClick={() => handleDownload(record)}
-      >
-        Download
-      </Menu.Item>
-      <Menu.Item 
-        key="versions" 
-        icon={<HistoryOutlined />}
-        onClick={() => {
-          setSelectedVersionDoc(record);
-          setVersionModalVisible(true);
-        }}
-      >
-        Manage Versions
-      </Menu.Item>
-      <Menu.Divider />
-      {/* <Menu.SubMenu 
-        key="share" 
-        icon={<ShareAltOutlined />} 
-        title="Share"
-      >
-        <Menu.Item key="copy-link" icon={<LinkOutlined />}>
-          Copy Link
-        </Menu.Item>
-        <Menu.Item key="email" icon={<MailOutlined />}>
-          Share via Email
-        </Menu.Item>
-      </Menu.SubMenu> */}
-      <Menu.Item 
-        key="delete" 
-        icon={<DeleteOutlined />}
-        danger
-      >
-        Delete
-      </Menu.Item>
-    </Menu>
-  );
-
-  // Update the handleNewFolderClick function
-  const handleNewFolderClick = () => {
-    // Remove the folder selection check
-    setIsNewFolderModalVisible(true);
-    // Only set targetFolderId if a folder is selected
-    if (selectedFolder && selectedFolder !== 'all') {
-      setTargetFolderId(selectedFolder);
-    } else {
-      setTargetFolderId(null); // This will create folder at root
-    }
-  };
-
-  // Update click outside handler to ignore modal interactions completely
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Only handle clicks outside when no modal is open
-      if (isUploadModalVisible || isNewFolderModalVisible) {
-        return;
-      }
-
-      const tree = document.querySelector('.document-tree');
-      const uploadButton = document.querySelector('#upload-button');
-      const newFolderButton = document.querySelector('#new-folder-button');
-      
-      if (tree?.contains(event.target) || 
-          uploadButton?.contains(event.target) || 
-          newFolderButton?.contains(event.target)) {
-        return;
-      }
-      
-      setSelectedFolder('all');
-      setSelectedParentId(null);
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isUploadModalVisible, isNewFolderModalVisible]); // Add modal visibility to dependencies
-
-  // Add click handler to close context menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (contextMenu.visible && !event.target.closest('.ant-menu')) {
-        setContextMenu({ visible: false });
-      }
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [contextMenu.visible]);
-
-  // Add preview version selection modal
-  const renderPreviewVersionModal = () => (
+  // Update the download version modal
+  const renderDownloadVersionModal = () => (
     <Modal
-      title={`Select Version to Preview - ${selectedDocument?.document_name}`}
-      visible={previewModalVisible}
-      onCancel={handlePreviewModalClose}
-      onOk={async () => {
-        try {
-          if (selectedPreviewVersion) {
-            const blob = await downloadDocumentVersion(selectedDocument.id, selectedPreviewVersion.id);
-            const url = window.URL.createObjectURL(blob);
-            setSelectedDocument({
-              ...selectedDocument,
-              versionUrl: url,
-              version_number: selectedPreviewVersion.version_number
-            });
-            setPreviewModalVisible(false);
-            setIsPreviewModalVisible(true);
-          }
-        } catch (error) {
-          message.error('Failed to load document preview');
-        }
-      }}
-      okButtonProps={{ disabled: !selectedPreviewVersion }}
+      title={`Select Versions to Download - ${selectedDocument?.name || ''} ${selectedDocument?.version_number ? `(${selectedDocument.version_number})` : ''}`}
+      visible={downloadModalVisible}
+      onCancel={handleDownloadModalClose}
+      footer={[
+        <Button key="cancel" onClick={handleDownloadModalClose}>
+          Cancel
+        </Button>,
+        <Button
+          key="download"
+          type="primary"
+          icon={<DownloadOutlined />}
+          disabled={selectedVersions.length === 0}
+          onClick={async () => {
+            try {
+              for (const version of selectedVersions) {
+                const blob = await downloadDocumentVersion(
+                  selectedDocument.id,
+                  version.id
+                );
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${selectedDocument.name}_${version.version_number}`;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+              }
+              setDownloadModalVisible(false);
+              setSelectedVersions([]);
+              message.success('Download started');
+            } catch (error) {
+              message.error('Failed to download selected versions');
+            }
+          }}
+        >
+          Download Selected ({selectedVersions.length})
+        </Button>
+      ]}
     >
-      <Radio.Group
-        value={selectedPreviewVersion?.id}
-        onChange={(e) => {
-          setSelectedPreviewVersion(
-            previewVersions.find(v => v.id === e.target.value)
-          );
-        }}
-      >
-        <List
-          dataSource={previewVersions}
-          renderItem={version => (
-            <List.Item>
-              <Radio value={version.id}>
-                Version {version.version_number} 
-                ({new Date(version.created_at).toLocaleDateString()})
-              </Radio>
-            </List.Item>
-          )}
-        />
-      </Radio.Group>
+      <List
+        dataSource={downloadVersions}
+        renderItem={version => (
+          <List.Item
+            className={`cursor-pointer p-3 rounded-lg ${
+              selectedVersions.find(v => v.id === version.id) ? 'bg-blue-50' : ''
+            }`}
+            onClick={() => {
+              setSelectedVersions(prev => {
+                const exists = prev.find(v => v.id === version.id);
+                if (exists) {
+                  return prev.filter(v => v.id !== version.id);
+                }
+                return [...prev, version];
+              });
+            }}
+          >
+            <Checkbox
+              checked={selectedVersions.some(v => v.id === version.id)}
+            >
+              <Space direction="vertical" size={1}>
+                <Text strong>Version {version.version_number}</Text>
+                <Text type="secondary" className="text-sm">
+                  Created: {new Date(version.created_at).toLocaleDateString()}
+                  <br />
+                  Size: {(version.file_size / (1024 * 1024)).toFixed(2)} MB
+                </Text>
+              </Space>
+            </Checkbox>
+          </List.Item>
+        )}
+      />
     </Modal>
   );
 
-  // Add this effect to refresh document versions when folder changes
-  useEffect(() => {
-    const refreshDocuments = async () => {
-      if (selectedFolder && selectedFolder !== 'all') {
-        await fetchFolderDocuments(selectedFolder);
-      }
-    };
-    refreshDocuments();
-  }, [selectedFolder]);
-
-  // Add this effect to refresh documents when needed
-  useEffect(() => {
-    const refreshDocuments = async () => {
-      if (selectedFolder && selectedFolder !== 'all') {
-        try {
-          await fetchFolderDocuments(selectedFolder);
-        } catch (error) {
-          console.error('Failed to refresh documents:', error);
-        }
-      }
-    };
-
-    refreshDocuments();
-  }, [selectedFolder, versionModalVisible]); // Add versionModalVisible to dependencies
-
-  // Add this function to handle version modal close
-  const handleVersionModalClose = () => {
-    setVersionModalVisible(false);
-    setSelectedVersionDoc(null);
-    setSelectedVersions([]);
-  };
-
-  // Update the preview modal close handler
-  const handlePreviewModalClose = () => {
-    setIsPreviewModalVisible(false);
-    setPreviewModalVisible(false);
-    setSelectedPreviewVersion(null);
-    if (selectedDocument?.versionUrl) {
-      window.URL.revokeObjectURL(selectedDocument.versionUrl);
-    }
-    setSelectedDocument(null);
-  };
-
-  // Update the download modal close handler
-  const handleDownloadModalClose = () => {
-    setDownloadModalVisible(false);
-    setSelectedVersions([]);
-  };
-
-  // Add this function inside DocumentManagement component
-  const renderBreadcrumb = () => {
-    const getFolderPath = (folderId) => {
-      const path = [];
-      let currentFolder = folders.find(f => f.id.toString() === folderId?.toString());
-      
-      while (currentFolder) {
-        path.unshift(currentFolder);
-        currentFolder = folders.find(f => f.id === currentFolder.parent_folder_id);
-      }
-      
-      return path;
-    };
-
-    const folderPath = selectedFolder !== 'all' ? getFolderPath(selectedFolder) : [];
-
-    return (
-      <Breadcrumb className="mb-4">
-        <Breadcrumb.Item href="#" onClick={() => setSelectedFolder('all')}>
-          <HomeOutlined /> Home
-        </Breadcrumb.Item>
-        {folderPath.map(folder => (
-          <Breadcrumb.Item 
-            key={folder.id}
-            href="#"
-            onClick={() => setSelectedFolder(folder.id.toString())}
-          >
-            {folder.folder_name}
-          </Breadcrumb.Item>
-        ))}
-      </Breadcrumb>
-    );
-  };
-
-  // Add this function to render grid view
-  const renderGridView = () => (
-    <List
-      grid={{ gutter: 16, column: 4 }}
-      dataSource={filteredDocuments}
-      renderItem={document => (
-        <List.Item>
-          <Card
-            hoverable
-            className="document-card"
-            actions={[
-              <Tooltip title="Preview">
-                <EyeOutlined key="preview" onClick={() => handlePreview(document)} />
-              </Tooltip>,
-              <Tooltip title="Download">
-                <DownloadOutlined key="download" onClick={() => handleDownload(document)} />
-              </Tooltip>
-            ]}
-          >
-            <Card.Meta
-              avatar={getFileIcon(document.document_name)}
-              title={document.document_name}
-              description={
-                <Space direction="vertical" size="small">
-                  <Text type="secondary">{document.description}</Text>
-                  <Space>
-                    {document.versions?.map(ver => (
-                      <Tag 
-                        key={ver.id}
-                        color={ver.status === 'active' ? 'blue' : 'default'}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => handleVersionClick(document, ver)}
-                      >
-                        v{ver.version_number}
-                      </Tag>
-                    ))}
-                  </Space>
-                  <Text type="secondary">
-                    Modified: {new Date(document.created_at).toLocaleDateString()}
-                  </Text>
-                </Space>
-              }
-            />
-          </Card>
-        </List.Item>
-      )}
-    />
+  // Update the renderDocumentTable function
+  const renderDocumentTable = () => (
+    <div className="bg-white rounded-lg shadow">
+      <Table
+        columns={tableColumns}
+        dataSource={documents}
+        rowKey="id"
+        loading={isLoading}
+        pagination={{
+          total: totalDocuments,
+          pageSize: 5,
+          showSizeChanger: true,
+          showTotal: (total) => `Total ${total} items`,
+          onChange: (page, pageSize) => {
+            if (selectedFolder && selectedFolder !== 'all') {
+              fetchFolderDocuments(selectedFolder, page, pageSize);
+            }
+          }
+        }}
+        className="custom-table"
+      />
+    </div>
   );
 
-  // Update the metrics loading effect
-  useEffect(() => {
-    const loadMetrics = async () => {
-      try {
-        await fetchMetrics();
-      } catch (error) {
-        message.error('Failed to load analytics metrics');
+  // Add download handler with version selection
+  const handleDownload = async (record) => {
+    try {
+      const versions = await fetchDocumentVersions(record.id);
+      
+      if (versions.length > 1) {
+        setSelectedDocument(record);
+        setDownloadVersions(versions);
+        setDownloadModalVisible(true);
+      } else {
+        try {
+          const blob = await downloadDocumentVersion(record.id);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = record.name;
+          document.body.appendChild(a);
+          a.click();
+          URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          message.success('Download started');
+        } catch (error) {
+          message.error('Failed to download document');
+        }
       }
+    } catch (error) {
+      message.error('Failed to load document versions');
+    }
+  };
+
+  // Add table change handler
+  const handleTableChange = (pagination) => {
+    fetchFolderDocuments(selectedFolder, pagination.current);
+  };
+
+  // Add rename handler
+  const handleRenameFolder = (folder) => {
+    setRenameFolderData({ id: folder.id, name: folder.folder_name });
+    setIsRenameFolderModalVisible(true);
+  };
+
+  // Add rename modal
+  const renderRenameFolderModal = () => (
+    <Modal
+      title="Rename Folder"
+      visible={isRenameFolderModalVisible}
+      onOk={handleRenameFolderSubmit}
+      onCancel={() => setIsRenameFolderModalVisible(false)}
+    >
+      <Form layout="vertical">
+        <Form.Item
+          label="New Folder Name"
+          required
+          validateStatus={!renameFolderData.name.trim() && 'error'}
+          help={!renameFolderData.name.trim() && 'Please enter a folder name'}
+        >
+          <Input
+            value={renameFolderData.name}
+            onChange={(e) => setRenameFolderData({ ...renameFolderData, name: e.target.value })}
+            maxLength={50}
+          />
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+
+  // Add this function to get the current path
+  const getCurrentPath = () => {
+    if (!selectedFolder) return '';
+    
+    const findPath = (folders, targetId, path = []) => {
+      for (const folder of folders) {
+        if (folder.id === targetId) {
+          return [...path, folder.folder_name];
+        }
+        if (folder.children) {
+          const foundPath = findPath(folder.children, targetId, [...path, folder.folder_name]);
+          if (foundPath) return foundPath;
+        }
+      }
+      return null;
     };
-    loadMetrics();
 
-    // Set up periodic refresh every 30 seconds
-    const refreshInterval = setInterval(refreshMetrics, 30000);
+    const path = findPath(folders, selectedFolder);
+    return path ? path.join(' / ') : '';
+  };
 
-    return () => clearInterval(refreshInterval);
-  }, [fetchMetrics, refreshMetrics]);
+  // Add this effect to filter production orders when part number changes
+  useEffect(() => {
+    if (selectedPartNumber) {
+      const filteredOrders = allOrders.filter(order => order.part_number === selectedPartNumber);
+      console.log('Filtered orders:', filteredOrders); // Debug log
+      setFilteredProductionOrders(filteredOrders);
+    } else {
+      setFilteredProductionOrders([]);
+    }
+    // Reset production order when part number changes
+    setSelectedProductionOrder(null);
+  }, [selectedPartNumber, allOrders]);
+
+  // Add these styles to your existing styles
+  const styles = `
+    .custom-tree {
+      background: #fff;
+    }
+
+    .custom-tree .ant-tree-node-content-wrapper {
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin: 2px 0;
+      transition: all 0.3s;
+    }
+
+    .custom-tree .ant-tree-node-content-wrapper:hover {
+      background-color: #f5f5f5;
+    }
+
+    .custom-tree .ant-tree-node-selected {
+      background-color: #e6f7ff !important;
+    }
+
+    .custom-tree .ant-tree-switcher {
+      width: 24px;
+      height: 32px;
+      line-height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .custom-tree .ant-tree-title {
+      font-size: 14px;
+      color: #262626;
+    }
+
+    .folder-tree-container::-webkit-scrollbar {
+      width: 0px;
+      background: transparent;
+    }
+
+    .folder-tree-container {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+  `;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      {/* Compact Header with Metrics */}
       <div className="bg-white rounded-lg shadow-sm mb-4 p-4">
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-xl font-semibold text-gray-800">
               Document Management
@@ -2079,37 +2364,31 @@ const DocumentManagement = () => {
               type="primary"
               icon={<CloudUploadOutlined />}
               onClick={handleUploadClick}
-              className="flex items-center"
             >
               Upload
             </Button>
             <Button
               icon={<FolderOutlined />}
-              onClick={() => setIsNewFolderModalVisible(true)}
-              className="flex items-center"
+              onClick={handleNewFolderClick}
             >
               New Folder
             </Button>
           </div>
         </div>
-
-        {/* Compact Analytics */}
-        <AnalyticsCards 
-          metrics={metrics} 
-          isLoading={isLoadingMetrics}
-          error={metricsError}
+        
+        <MetricsCards 
+          documents={documents}
+          folders={folders}
+          documentTypes={documentTypes}
         />
       </div>
 
-      {/* Main Document Management Area */}
       <Card bordered={false} className="shadow-sm" bodyStyle={{ padding: '16px' }}>
         <Row gutter={[16, 16]}>
-          {/* Left Sidebar */}
           <Col flex="220px">
             {renderLeftSidebar()}
           </Col>
 
-          {/* Document Area */}
           <Col flex="auto">
             <div className="flex flex-col h-[calc(100vh-230px)]">
               {renderBreadcrumb()}
@@ -2117,30 +2396,7 @@ const DocumentManagement = () => {
                 {renderSearchSection()}
               </div>
 
-              <Card 
-                className="flex-1 overflow-hidden"
-                bodyStyle={{ 
-                  padding: viewMode === 'table' ? '0' : '16px',
-                  height: '100%',
-                  overflow: 'auto'
-                }}
-              >
-                {viewMode === 'table' ? (
-                  <Table
-                    columns={columns}
-                    dataSource={filteredDocuments}
-                    rowKey="id"
-                    pagination={{
-                      pageSize: 10,
-                      showSizeChanger: true,
-                      showQuickJumper: true
-                    }}
-                    className="custom-table"
-                  />
-                ) : (
-                  renderGridView()
-                )}
-              </Card>
+              {renderDocumentTable()}
             </div>
           </Col>
         </Row>
@@ -2151,53 +2407,8 @@ const DocumentManagement = () => {
 
       {renderUploadModal()}
 
-      {/* Document Preview Modal */}
-      <Modal
-        title={`Preview - ${selectedDocument?.document_name} (v${selectedDocument?.version_number})`}
-        visible={isPreviewModalVisible}
-        onCancel={handlePreviewModalClose}
-        width={800}
-        footer={[
-          <Button 
-            key="download" 
-            type="primary" 
-            icon={<DownloadOutlined />}
-            onClick={() => {
-              const a = document.createElement('a');
-              a.href = selectedDocument.versionUrl;
-              a.download = `${selectedDocument.document_name}_v${selectedDocument.version_number}`;
-              document.body.appendChild(a);
-              a.click();
-              window.URL.revokeObjectURL(selectedDocument.versionUrl);
-              document.body.removeChild(a);
-            }}
-          >
-            Download
-          </Button>,
-          <Button key="close" onClick={handlePreviewModalClose}>
-            Close
-          </Button>
-        ]}
-      >
-        {selectedDocument && (
-          <div className="preview-content">
-            {selectedDocument.document_name.toLowerCase().endsWith('.pdf') ? (
-              <iframe 
-                src={selectedDocument.versionUrl}
-                style={{ width: '100%', height: '600px' }}
-                title="PDF Preview"
-              />
-            ) : (
-              <div>
-                <p>Preview not available for this file type.</p>
-                <p>Please download the file to view it.</p>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
-
-      {documentTypeModals}
+      {renderPdfPreviewModal()}
+      {renderPreviewVersionModal()}
 
       <VersionManagementModal
         visible={versionModalVisible}
@@ -2206,197 +2417,10 @@ const DocumentManagement = () => {
       />
 
       {renderDownloadVersionModal()}
-      {renderPreviewVersionModal()}
+
+      {documentTypeModals}
     </div>
   );
 };
-
-// Add these styles
-const styles = `
-  .custom-tree .ant-tree-node-content-wrapper {
-    display: flex;
-    align-items: center;
-    padding: 8px;
-    border-radius: 6px;
-    transition: all 0.3s;
-    margin: 2px 0;
-  }
-
-  .custom-tree .ant-tree-node-content-wrapper:hover {
-    background-color: #f0f7ff;
-  }
-
-  .custom-tree .ant-tree-node-selected {
-    background-color: #e6f4ff !important;
-  }
-
-  .custom-tree .ant-tree-switcher {
-    align-self: center;
-    width: 24px;
-    height: 24px;
-    line-height: 24px;
-  }
-
-  .custom-tree .ant-tree-indent-unit {
-    width: 24px;
-  }
-
-  .folder-tree-container {
-    max-height: calc(100vh - 240px);
-    overflow-y: auto;
-    padding-right: 8px;
-  }
-
-  .folder-tree-container::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .folder-tree-container::-webkit-scrollbar-thumb {
-    background-color: #d9d9d9;
-    border-radius: 3px;
-  }
-
-  .folder-tree-container::-webkit-scrollbar-track {
-    background-color: #f5f5f5;
-    border-radius: 3px;
-  }
-
-  .document-card {
-    transition: all 0.3s;
-  }
-
-  .document-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  }
-
-  .ant-card-meta-title {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .ant-breadcrumb {
-    padding: 8px 0;
-  }
-
-  .ant-breadcrumb-link {
-    cursor: pointer;
-  }
-
-  .ant-breadcrumb-link:hover {
-    color: #1890ff;
-  }
-
-  .folder-tree-container .ant-tree-node-content-wrapper {
-    transition: all 0.3s;
-  }
-
-  .folder-tree-container .ant-tree-node-content-wrapper:hover {
-    background-color: #e6f7ff;
-  }
-
-  .document-table .ant-table-row {
-    cursor: pointer;
-    transition: all 0.3s;
-  }
-
-  .document-table .ant-table-row:hover {
-    background-color: #f0f7ff !important;
-  }
-
-  .document-management {
-    padding: 16px;
-    background: #f0f2f5;
-    min-height: 100vh;
-  }
-
-  .header-section {
-    background: white;
-    padding: 16px;
-    border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-  }
-
-  .analytics-card-compact {
-    border-radius: 8px;
-    height: 80px;
-    overflow: hidden;
-  }
-
-  .metric-content {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    height: 100%;
-    padding: 12px;
-  }
-
-  .metric-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .metric-value {
-    color: white;
-    font-size: 20px;
-    font-weight: 600;
-    line-height: 1;
-    margin-bottom: 4px;
-  }
-
-  .metric-label {
-    color: rgba(255,255,255,0.85);
-    font-size: 12px;
-  }
-
-  .bg-gradient-blue {
-    background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
-  }
-
-  .bg-gradient-green {
-    background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
-  }
-
-  .bg-gradient-purple {
-    background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);
-  }
-
-  .bg-gradient-orange {
-    background: linear-gradient(135deg, #fa8c16 0%, #d46b08 100%);
-  }
-
-  .document-content {
-    height: calc(100vh - 200px);
-    display: flex;
-    flex-direction: column;
-  }
-
-  .custom-table {
-    height: 100%;
-  }
-
-  .custom-table .ant-table-thead > tr > th {
-    background: #fafafa;
-    font-weight: 500;
-  }
-
-  .document-table .ant-card-body {
-    padding: 0;
-  }
-
-  .folder-tree-container {
-    height: calc(100vh - 240px);
-    overflow: auto;
-    padding: 12px;
-    background: #fafafa;
-    border-radius: 6px;
-  }
-`;
 
 export default DocumentManagement;

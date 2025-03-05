@@ -1,10 +1,38 @@
 import { create } from 'zustand';
 import moment from 'moment';
 import { throttle } from 'lodash';
+import axios from 'axios';
 
 const MAX_DATA_POINTS = 20; // Increase the number of points to show more history
 
-const BASE_URL = 'http://172.18.7.91:7777/api/v5';
+
+// Create axios instance with custom config
+const api = axios.create({
+    baseURL: 'http://172.18.7.91:7777',
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+});
+
+// Helper functions for localStorage
+const saveToLocalStorage = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error('Error saving to localStorage:', error);
+  }
+};
+
+const loadFromLocalStorage = (key, defaultValue = null) => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error('Error loading from localStorage:', error);
+    return defaultValue;
+  }
+};
 
 const useEnergyStore = create((set, get) => ({
   totalEnergy: 0,
@@ -26,7 +54,18 @@ const useEnergyStore = create((set, get) => ({
   energyData: [],
   lastUpdate: null,
   shiftLiveData: [],
-  selectedDate: null,
+  selectedDate: loadFromLocalStorage('selectedDate', moment().format('YYYY-MM-DD')),
+  showReport: false,
+  reportData: null,
+  weeklyEnergyData: [],
+  workshopProductionData: [],
+  totalEnergyCosts: {
+    weekly_cost: 0,
+    monthly_cost: 0
+  },
+  machineId: null,
+  defaultMachineId: 1,
+  graphData: loadFromLocalStorage('graphData', []),
 
   fetchEnergyData: async () => {
     set({ loading: true });
@@ -325,17 +364,17 @@ const useEnergyStore = create((set, get) => ({
 
   fetchShiftLiveData: async () => {
     try {
-      const response = await fetch(
-        `/api/v5/shift_live_data/`,
-        {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
+      const response = await fetch('/api/v5/shift_live_data/', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
         }
-      );
+      });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -348,7 +387,10 @@ const useEnergyStore = create((set, get) => ({
         machine_name: get().machines.find(m => Number(m.id) === Number(item.id))?.machine_name || `Machine ${item.id}`,
       }));
 
-      set({ shiftLiveData: enrichedData });
+      set({ 
+        shiftLiveData: enrichedData,
+        selectedDate: null // Clear selected date when fetching live data
+      });
       return enrichedData;
     } catch (error) {
       console.error('Error fetching shift live data:', error);
@@ -359,33 +401,38 @@ const useEnergyStore = create((set, get) => ({
 
   fetchShiftHistoricalData: async (date) => {
     try {
-      const response = await fetch(`${BASE_URL}/shift_live_history/?date=${date}`, {
+      const response = await fetch(`/api/v5/shift_live_history/?date=${date}`, {
         method: 'GET',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
+        }
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('Historical data received:', data); // Debug log
+      
+      // Use the machine_name directly from the API response
       const enrichedData = data.map(item => ({
         ...item,
         id: Number(item.id),
-        machine_name: get().machines.find(m => Number(m.id) === Number(item.id))?.machine_name || `Machine ${item.id}`,
+        // No need to look up machine name as it's already in the response
+        machine_name: item.machine_name // Use the machine_name from API response
       }));
 
       set({ 
         shiftLiveData: enrichedData,
         selectedDate: date
       });
-      console.log('Set date in fetchShiftHistoricalData:', date);
       return enrichedData;
     } catch (error) {
-      console.error('Error fetching historical data:', error);
+      console.error('Error fetching historical shift data:', error);
       set({ shiftLiveData: [] });
       throw error;
     }
@@ -400,6 +447,275 @@ const useEnergyStore = create((set, get) => ({
     console.log('Clearing date in store');
     set({ selectedDate: null });
   },
+
+  setShowReport: (show) => {
+    set({ showReport: show });
+  },
+
+  fetchReportData: async (date) => {
+    try {
+      // You can add actual report data fetching logic here if needed
+      set({ 
+        reportData: {
+          date: date,
+          // Add other report data as needed
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching report data:', error);
+      set({ reportData: null });
+    }
+  },
+
+  fetchDailyEnergyConsumption: async (date) => {
+    set({ loading: true });
+    try {
+      const formattedDate = moment(date).format('YYYY-MM-DD');
+      const response = await fetch(`/api/v5/daily_energy_consumption?date=${formattedDate}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Received data:', data);
+
+      set({ 
+        weeklyEnergyData: data.daily_energy_consumption || [],
+        loading: false,
+        error: null
+      });
+
+      return data.daily_energy_consumption;
+
+    } catch (error) {
+      console.error('Error in fetchDailyEnergyConsumption:', error);
+      set({ 
+        error: error.message, 
+        loading: false,
+        weeklyEnergyData: []
+      });
+      throw error;
+    }
+  },
+
+  fetchWorkshopProductionData: async (date) => {
+    set({ loading: true });
+    try {
+        const formattedDate = moment(date).format('YYYY-MM-DD');
+        const response = await fetch(`/api/v5/get_graph_data?date=${formattedDate}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Raw API response:', data);
+
+        // Check if data is in the expected format
+        if (!data || !data.dataPoints || !Array.isArray(data.dataPoints)) {
+            console.error('Invalid data format received:', data);
+            throw new Error('Invalid data format received from server');
+        }
+
+        const transformedData = data.dataPoints.map(point => ({
+            x: Number(point.value[0]),
+            x2: Number(point.value[1]),
+            y: parseInt(point.machine_id) - 1,
+            status: point.name,
+            color: point.name === 'PRODUCTION' ? '#006400' : 
+                   point.name === 'ON' ? '#FF8C00' : '#808080'
+        }));
+
+        console.log('Transformed data:', transformedData);
+
+        set({ 
+            workshopProductionData: transformedData,
+            loading: false,
+            error: null 
+        });
+        
+        return transformedData;
+    } catch (error) {
+        console.error('Error fetching workshop production data:', error);
+        set({ 
+            workshopProductionData: [],
+            loading: false,
+            error: error.message 
+        });
+        return [];
+    }
+},
+
+  fetchTotalEnergyCosts: async (date) => {
+    set({ loading: true });
+    
+    return new Promise((resolve, reject) => {
+        const formattedDate = moment(date).format('YYYY-MM-DD');
+        const xhr = new XMLHttpRequest();
+        
+        xhr.open('GET', `http://172.18.7.91:7777/api/v5/total_energy_costs?date=${formattedDate}`, true);
+        
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    console.log('Total energy costs data:', data);
+                    
+                    set({ 
+                        totalEnergyCosts: {
+                            weekly_cost: Number(data.total_weekly_cost) || 0,
+                            monthly_cost: Number(data.total_monthly_cost) || 0
+                        },
+                        loading: false,
+                        error: null
+                    });
+                    
+                    resolve(data);
+                } catch (error) {
+                    console.error('Error parsing response:', error);
+                    set({ 
+                        totalEnergyCosts: {
+                            weekly_cost: 0,
+                            monthly_cost: 0
+                        },
+                        loading: false,
+                        error: 'Error parsing response'
+                    });
+                    reject(error);
+                }
+            } else {
+                console.error('Server returned:', xhr.status, xhr.statusText);
+                set({ 
+                    totalEnergyCosts: {
+                        weekly_cost: 0,
+                        monthly_cost: 0
+                    },
+                    loading: false,
+                    error: `Server error: ${xhr.status}`
+                });
+                reject(new Error(`Server error: ${xhr.status}`));
+            }
+        };
+        
+        xhr.onerror = function() {
+            console.error('Request failed:', xhr.statusText);
+            set({ 
+                totalEnergyCosts: {
+                    weekly_cost: 0,
+                    monthly_cost: 0
+                },
+                loading: false,
+                error: 'Network error'
+            });
+            reject(new Error('Network error'));
+        };
+        
+        xhr.send();
+    });
+},
+
+  fetchMachineProductionData: async (machineId, date) => {
+    try {
+        const formattedDate = moment(date).format('YYYY-MM-DD');
+        const response = await fetch(`/api/v5/get_production_data?date=${formattedDate}&machine_id=${machineId}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Production data received:', data);
+        
+        return data; // Return the raw data structure with dataPoints
+    } catch (error) {
+        console.error('Error fetching machine production data:', error);
+        return { dataPoints: [] };
+    }
+},
+
+  fetchGraphData: async (date) => {
+    try {
+      set({ loading: true });
+      const formattedDate = moment(date).format('YYYY-MM-DD');
+      
+      const response = await fetch(`/api/v5/get_graph_data?date=${formattedDate}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const dataPoints = data.dataPoints || [];
+
+      const transformedData = dataPoints.map(point => ({
+        x: point.value[0],
+        x2: point.value[1],
+        y: point.machine_id - 1,
+        status: point.name,
+        color: point.name === 'PRODUCTION' ? '#006400' : 
+               point.name === 'ON' ? '#FF8C00' : '#808080'
+      }));
+
+      // Save to localStorage
+      saveToLocalStorage('graphData', transformedData);
+      saveToLocalStorage('selectedDate', formattedDate);
+
+      set({ 
+        graphData: transformedData,
+        selectedDate: formattedDate,
+        loading: false,
+        error: null
+      });
+
+      return transformedData;
+    } catch (error) {
+      console.error('Error fetching graph data:', error);
+      set({ 
+        graphData: [],
+        loading: false,
+        error: error.message
+      });
+      throw error;
+    }
+  },
+
+  // Add a method to clear the stored data if needed
+  clearStoredData: () => {
+    localStorage.removeItem('graphData');
+    localStorage.removeItem('selectedDate');
+    set({ 
+      graphData: [],
+      selectedDate: moment().format('YYYY-MM-DD')
+    });
+  }
 }));
 
 export default useEnergyStore; 

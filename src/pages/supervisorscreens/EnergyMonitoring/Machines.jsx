@@ -1,5 +1,3 @@
-
-
 import React, { Suspense, useEffect, useState, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PresentationControls, Html, Environment, Grid } from '@react-three/drei';

@@ -21,11 +21,22 @@ import JobDetails from './pages/operatorscreens/jobdetails';
 // import Inventory from './pages/operatorscreens/inventory/inventoryRequest';
 import Inventory from './pages/operatorscreens/inventory/InventoryViewData';
 import HelpAndSupport from './pages/operatorscreens/HelpAndSupport';
-import QualityManagementDashboard from './pages/supervisorscreens/QualityManagement';
+import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagement';
 import AlertScreens from './pages/operatorscreens/AlertScreens';
 import MaintenanceDashboard from './pages/operatorscreens/maintanance/MaintenanceDashboard';
-import InspectionResult from './pages/operatorscreens/InspectionResult';
+import InspectionResult from './pages/operatorscreens/Inspection/InspectionResult';
 import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
+import MachineDetails from './pages/supervisorscreens/EnergyMonitoring/MachineDetails';
+
+import Machines from './pages/supervisorscreens/EnergyMonitoring/Machines';
+
+import MachineOverlay from './pages/supervisorscreens/EnergyMonitoring/MachineOverlay';
+
+import Report from './pages/supervisorscreens/EnergyMonitoring/Report';
+
+import InspectionReport from './pages/supervisorscreens/QualityManagement/InspectionReport';
+
+import QualityInspectionDetails from './pages/supervisorscreens/QualityManagement/QualityInspectionDetails';
 
 const App = () => {
   return (
@@ -55,6 +66,10 @@ const App = () => {
             <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
             <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
             <Route path="energy-monitoring" element={<EnergyMonitoring />} />
+
+            <Route path="quality-management/inspection-details" element={<QualityInspectionDetails />} />
+
+            <Route path="quality-management/inspection-report" element={<InspectionReport />} />
           </Route>
 
           {/* Operator Routes */}
@@ -71,6 +86,10 @@ const App = () => {
             <Route path="help" element={<HelpAndSupport />} />
           </Route>
 
+          <Route path="/machine-details/:machineId" element={<MachineDetails />} />
+          <Route path="/machines" element={<Machines />} />
+          <Route path="/machine/:machineId" element={<MachineOverlay />} />
+          <Route path="/report" element={<Report />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>

@@ -625,22 +625,34 @@ const QualityManagementDashboard = () => {
   });
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Stats Overview */}
+    <div className="space-y-6 p-6 bg-gray-50">
+      {/* Header Section */}
+      <div className="flex justify-between items-center mb-6">
+        <Typography.Title level={3} className="mb-0">
+          Quality Management Dashboard
+        </Typography.Title>
+        <Space>
+          <Button type="primary" icon={<FileSearchOutlined />}>
+            Generate Report
+          </Button>
+        </Space>
+      </div>
+
+      {/* Stats Overview with improved styling */}
       <Row gutter={[16, 16]}>
         <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
             <Statistic 
-              title="Total Parts"
+              title={<span className="text-gray-600">Total Parts</span>}
               value={qualityStats.totalParts}
-              prefix={<PieChartOutlined />}
+              prefix={<PieChartOutlined className="text-blue-500" />}
             />
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
             <Statistic 
-              title="Good Parts"
+              title={<span className="text-gray-600">Good Parts</span>}
               value={qualityStats.goodParts}
               prefix={<CheckCircleOutlined />}
               valueStyle={{ color: '#52c41a' }}
@@ -648,9 +660,9 @@ const QualityManagementDashboard = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
             <Statistic 
-              title="Bad Parts"
+              title={<span className="text-gray-600">Bad Parts</span>}
               value={qualityStats.badParts}
               prefix={<CloseCircleOutlined />}
               valueStyle={{ color: '#ff4d4f' }}
@@ -658,9 +670,9 @@ const QualityManagementDashboard = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
             <Statistic 
-              title="Non Conformance"
+              title={<span className="text-gray-600">Non Conformance</span>}
               value={qualityStats.nonConformance}
               prefix={<WarningOutlined />}
               valueStyle={{ color: '#faad14' }}
@@ -668,9 +680,9 @@ const QualityManagementDashboard = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
             <Statistic 
-              title="Yield"
+              title={<span className="text-gray-600">Yield</span>}
               value={qualityStats.yield}
               suffix="%"
               prefix={<PieChartOutlined />}
@@ -679,9 +691,9 @@ const QualityManagementDashboard = () => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} className="hover:shadow-md transition-shadow">
+          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
             <Statistic 
-              title="Deviations"
+              title={<span className="text-gray-600">Deviations</span>}
               value={qualityStats.deviations}
               prefix={<WarningOutlined />}
               valueStyle={{ color: '#faad14' }}
@@ -690,13 +702,17 @@ const QualityManagementDashboard = () => {
         </Col>
       </Row>
 
-      {/* Part Selection */}
-      <Card className="shadow-sm">
+      {/* Part Selection with improved UI */}
+      <Card className="shadow-sm hover:shadow-md transition-all duration-300">
         <Row gutter={24} align="middle">
           <Col span={16}>
-            <Form.Item label="Select Part Number/Production Order" className="mb-0 flex-1">
+            <Form.Item 
+              label={<span className="font-medium">Select Part Number/Production Order</span>} 
+              className="mb-0 flex-1"
+            >
               <Select
                 showSearch
+                size="large"
                 placeholder="Search by Production Order or Part Number"
                 onChange={handlePartSelect}
                 optionFilterProp="children"
@@ -706,7 +722,17 @@ const QualityManagementDashboard = () => {
                 filterOption={(input, option) =>
                   option.label.toLowerCase().indexOf(input.toLowerCase()) >= 0
                 }
-                notFoundContent={loading ? 'Loading...' : (error ? 'Error loading data' : 'No data found')}
+                notFoundContent={
+                  loading ? (
+                    <div className="text-center py-2">
+                      <Spin size="small" /> Loading...
+                    </div>
+                  ) : error ? (
+                    <Alert type="error" message="Error loading data" showIcon />
+                  ) : (
+                    'No data found'
+                  )
+                }
               />
             </Form.Item>
           </Col>
@@ -721,6 +747,7 @@ const QualityManagementDashboard = () => {
           loading={loading}
           selectedOperation={selectedOperation}
           setSelectedOperation={setSelectedOperation}
+          openQMSSoftware={openQMSSoftware}
         />
       )}
 

@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { Typography, Card, Row, Col, Button, Space, Tabs } from 'antd';
 import { 
@@ -209,26 +207,26 @@ function MachineOverlay({ machineId, machineName, onBack }) {
       ),
       children: <RealtimeGraph machineId={machineId} />
     },
-    // {
-    //   key: 'detail',
-    //   label: (
-    //     <span>
-    //       <AreaChartOutlined />
-    //       Detail Graph
-    //     </span>
-    //   ),
-    //   children: <DetailGraph machineId={machineId} />
-    // },
-    // {
-    //   key: 'production-status',
-    //   label: (
-    //     <span>
-    //       <BarChartOutlined />
-    //       Production Status
-    //     </span>
-    //   ),
-    //   children: <ProductionStatus machineId={machineId} />
-    // },
+    {
+      key: 'detail',
+      label: (
+        <span>
+          <AreaChartOutlined />
+          Detail Graph
+        </span>
+      ),
+      children: <DetailGraph machineId={machineId} />
+    },
+    {
+      key: 'production-status',
+      label: (
+        <span>
+          <BarChartOutlined />
+          Production Status
+        </span>
+      ),
+      children: <ProductionStatus machineId={machineId} />
+    },
     {
       key: 'productivity',
       label: (

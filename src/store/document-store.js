@@ -14,6 +14,10 @@ const useDocumentStore = create((set, get) => ({
   metrics: null,
   isLoadingMetrics: false,
   metricsError: null,
+  totalDocuments: 0,
+  selectedFolder: null,
+  allOrders: [],
+  isLoadingOrders: false,
 
   // Fetch document types
   fetchDocTypes: async () => {
@@ -25,7 +29,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.88:7599/api/v1/documents/types/?include_inactive=true', {
+      const response = await fetch('http://172.18.7.89:4470/api/v1/document-management/document-types/', {
         headers: {
           'accept': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -39,7 +43,7 @@ const useDocumentStore = create((set, get) => ({
 
       const data = await response.json();
       set({ 
-        documentTypes: data,  // API returns array directly
+        documentTypes: data,
         isLoading: false 
       });
     } catch (error) {
@@ -48,50 +52,8 @@ const useDocumentStore = create((set, get) => ({
     }
   },
 
-  // Create new folder
-  createFolder: async (folderData) => {
-    try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      // Ensure parent_folder_id is a number or null
-      const requestData = {
-        folder_name: folderData.folder_name,
-        parent_folder_id: folderData.parent_folder_id ? Number(folderData.parent_folder_id) : null,
-        is_active: true
-      };
-
-      const response = await fetch('http://172.18.7.88:7599/api/v1/documents/folders/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create folder');
-      }
-
-      const data = await response.json();
-      set(state => ({
-        folders: [...state.folders, data]
-      }));
-      return data;
-    } catch (error) {
-      console.error('Create folder error:', error);
-      throw error;
-    }
-  },
-
-  // List folders
-  fetchFolders: async () => {
+  // List folders with proper tree structure
+  fetchFolders: async (parentId = null) => {
     set({ isLoading: true });
     try {
       const token = useAuthStore.getState().token;
@@ -100,7 +62,11 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.88:7599/api/v1/documents/folders/', {
+      const url = parentId 
+        ? `http://172.18.7.89:4470/api/v1/document-management/folders/?parent_id=${parentId}`
+        : 'http://172.18.7.89:4470/api/v1/document-management/folders/';
+
+      const response = await fetch(url, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -108,17 +74,51 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Authentication failed. Please login again.');
-        }
         throw new Error('Failed to fetch folders');
       }
 
       const data = await response.json();
-      set({ folders: data, isLoading: false });
+      
+      // Transform the response to match the expected format
+      const transformedFolders = data.map(folder => ({
+        id: folder.id,
+        folder_name: folder.name,
+        parent_folder_id: folder.parent_folder_id,
+        is_active: folder.is_active,
+        created_at: folder.created_at,
+        created_by_id: folder.created_by_id,
+        path: folder.path,
+        children: []
+      }));
+
+      set(state => {
+        if (!parentId) {
+          return { folders: transformedFolders, isLoading: false };
+        } else {
+          const updateFolderChildren = (folders) => {
+            return folders.map(folder => {
+              if (folder.id === Number(parentId)) {
+                return { ...folder, children: transformedFolders };
+              }
+              if (folder.children?.length > 0) {
+                return { ...folder, children: updateFolderChildren(folder.children) };
+              }
+              return folder;
+            });
+          };
+          
+          return { 
+            folders: updateFolderChildren(state.folders),
+            isLoading: false 
+          };
+        }
+      });
+
+      return transformedFolders;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       message.error(error.message);
+      return [];
     }
   },
 
@@ -131,7 +131,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.88:7599/api/v1/planning/all_orders', {
+      const response = await fetch('http://172.18.7.89:4470/planning/all_orders', {
         headers: {
           'accept': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -160,97 +160,87 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const uploadFormData = new FormData();
-      
-      // Append file with the correct field name
-      uploadFormData.append('file', formData.file);
-      uploadFormData.append('folder_id', formData.folder_id);
-      uploadFormData.append('document_name', formData.document_name);
-      uploadFormData.append('doc_type_id', formData.doc_type_id);
-      uploadFormData.append('part_number_id', formData.part_number_id);
-      uploadFormData.append('description', formData.description || '');
-      uploadFormData.append('version_number', '1.0');
-      uploadFormData.append('metadata', JSON.stringify({}));
+      // Log the FormData contents for debugging
+      for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + pair[1]);
+      }
 
-      console.log('Sending upload data:', {
-        folder_id: formData.folder_id,
-        document_name: formData.document_name,
-        doc_type_id: formData.doc_type_id,
-        part_number_id: formData.part_number_id,
-        description: formData.description
-      });
-
-      const response = await fetch('http://172.18.7.88:7599/api/v1/documents/upload/', {
+      const response = await fetch('http://172.18.7.89:4470/api/v1/document-management/documents/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         },
-        body: uploadFormData
+        body: formData
       });
 
-      const responseData = await response.json();
-
       if (!response.ok) {
-        console.log('Upload error response:', responseData);
-        if (responseData.detail && Array.isArray(responseData.detail)) {
-          throw new Error(responseData.detail[0]?.msg || 'Failed to upload document');
-        }
-        throw new Error(responseData.detail || 'Failed to upload document');
+        const errorData = await response.json();
+        console.error('Upload error response:', errorData); // Debug log
+        throw new Error(errorData.detail || 'Failed to upload document');
       }
 
-      return responseData;
+      const data = await response.json();
+      return data;
     } catch (error) {
-      console.error('Upload error details:', error);
+      console.error('Upload error:', error);
       throw error;
     }
   },
 
   // Fetch folder documents
-  fetchFolderDocuments: async (folderId) => {
+  fetchFolderDocuments: async (folderId, page = 1, pageSize = 10) => {
     try {
       const token = useAuthStore.getState().token;
       
       if (!token || !folderId) {
-        throw new Error('Invalid request parameters');
+        // Silently return empty data instead of throwing error
+        return { items: [], total: 0 };
       }
 
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/folder/${folderId}/documents?skip=0&limit=100`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json',
+      const response = await fetch(
+        `http://172.18.7.89:4470/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${pageSize}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
         }
-      });
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch documents');
+        // Don't show error popup, just return empty data
+        return { items: [], total: 0 };
       }
 
       const data = await response.json();
-      const documents = data.documents || [];
+      
+      // Format the documents data
+      const formattedDocuments = await Promise.all(data.items.map(async doc => {
+        // Fetch versions for each document
+        const versions = await get().fetchDocumentVersions(doc.id);
+        return {
+          ...doc,
+          key: doc.id,
+          versions,
+          file_size: doc.latest_version?.file_size 
+            ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+            : null,
+          created_at: new Date(doc.created_at).toISOString(),
+          version_number: doc.latest_version?.version_number || '1.0'
+        };
+      }));
 
-      // Fetch versions for each document
-      const documentsWithVersions = await Promise.all(
-        documents.map(async (doc) => {
-          try {
-            const versions = await get().fetchDocumentVersions(doc.id);
-            return { 
-              ...doc, 
-              versions: versions.sort((a, b) => 
-                parseInt(b.version_number) - parseInt(a.version_number)
-              ) 
-            };
-          } catch (error) {
-            console.error(`Failed to fetch versions for document ${doc.id}:`, error);
-            return doc;
-          }
-        })
-      );
+      set({ 
+        documents: formattedDocuments,
+        totalDocuments: data.total,
+        isLoading: false 
+      });
 
-      set({ documents: documentsWithVersions });
-      return documentsWithVersions;
+      return data;
     } catch (error) {
-      console.error('Fetch documents error:', error);
-      throw error;
+      set({ error: error.message, isLoading: false });
+      // Remove error popup
+      return { items: [], total: 0 };
     }
   },
 
@@ -312,7 +302,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/folders/${folderId}`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/folders/${folderId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -350,15 +340,13 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      // Format the request body according to API specification
       const requestBody = {
-        type_name: docTypeData.type_name,
+        name: docTypeData.type_name,
         description: docTypeData.description,
-        file_extensions: docTypeData.extensions.split(',').map(ext => ext.trim()),
-        is_active: docTypeData.is_active
+        allowed_extensions: docTypeData.extensions.split(',').map(ext => ext.trim())
       };
 
-      const response = await fetch('http://172.18.7.88:7599/api/v1/documents/types/', {
+      const response = await fetch('http://172.18.7.89:4470/api/v1/document-management/document-types/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -387,103 +375,110 @@ const useDocumentStore = create((set, get) => ({
   },
 
   // Search documents by text and other parameters
-  searchDocuments: async (searchParams) => {
+  searchDocuments: async (query, docTypeId = null, folderId = null) => {
     try {
       const token = useAuthStore.getState().token;
       
-      if (!token) {
-        throw new Error('No authentication token found');
+      if (!token || query.length < 3) {
+        return { items: [], total: 0 };
       }
 
-      const queryParams = new URLSearchParams({
-        skip: '0',
-        limit: '100',
-        ...(searchParams.search_text && { search_text: searchParams.search_text }),
-        ...(searchParams.doc_type_id && { doc_type_id: searchParams.doc_type_id }),
-        ...(searchParams.folder_id && { folder_id: searchParams.folder_id })
-      });
+      let url = `http://172.18.7.89:4470/api/v1/document-management/documents/search/?query=${encodeURIComponent(query)}`;
+      if (docTypeId) url += `&doc_type_id=${docTypeId}`;
+      if (folderId) url += `&folder_id=${folderId}`;
 
-      console.log('Search query params:', queryParams.toString()); // Debug log
-
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/search/?${queryParams}`, {
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'accept': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to search documents');
+        return { items: [], total: 0 };
       }
 
       const data = await response.json();
-      console.log('Search response:', data); // Debug log
       
-      // Update the documents in state
-      set({ documents: data.documents || [] });
-      return data;
+      // Format the documents data similar to fetchFolderDocuments
+      const formattedDocuments = await Promise.all(data.map(async doc => {
+        return {
+          ...doc,
+          key: doc.id,
+          file_size: doc.latest_version?.file_size 
+            ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+            : null,
+          created_at: new Date(doc.created_at).toISOString(),
+          version_number: doc.latest_version?.version_number || '1.0'
+        };
+      }));
+
+      set({ 
+        documents: formattedDocuments,
+        totalDocuments: formattedDocuments.length,
+        isLoading: false 
+      });
+
+      return { items: formattedDocuments, total: formattedDocuments.length };
     } catch (error) {
-      console.error('Search error:', error);
-      message.error(error.message);
-      throw error;
+      set({ error: error.message, isLoading: false });
+      return { items: [], total: 0 };
     }
   },
 
   // Search documents by part number
-  searchByPartNumber: async (partNumber, docTypeId) => {
+  searchByPartNumber: async (partNumber, docTypeId = null) => {
     try {
-      if (partNumber.length < 3) {
-        throw new Error('Please enter at least 3 characters for part number search');
-      }
-
       const token = useAuthStore.getState().token;
       
       if (!token) {
-        throw new Error('No authentication token found');
+        return { items: [], total: 0 };
       }
 
-      const queryParams = new URLSearchParams({
-        part_number: partNumber,
-        ...(docTypeId && { doc_type_id: docTypeId })
-      });
+      let url = `http://172.18.7.89:4470/api/v1/document-management/documents/by-part-number/${encodeURIComponent(partNumber)}`;
+      if (docTypeId) {
+        url += `?doc_type_id=${docTypeId}`;
+      }
 
-      console.log('Part number search params:', queryParams.toString()); // Debug log
-
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/by-part-number/?${queryParams}`, {
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'accept': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to search documents by part number');
+        return { items: [], total: 0 };
       }
 
       const data = await response.json();
-      console.log('Part number search response:', data); // Debug log
-
-      // Make sure we're setting the documents array correctly
-      if (data && data.documents) {
-        set({ documents: data.documents });
-      } else if (Array.isArray(data)) {
-        set({ documents: data });
-      } else {
-        set({ documents: [] });
-      }
       
-      return data;
+      // Format the documents data similar to other document responses
+      const formattedDocuments = data.map(doc => ({
+        ...doc,
+        key: doc.id,
+        file_size: doc.latest_version?.file_size 
+          ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+          : null,
+        created_at: new Date(doc.created_at).toISOString(),
+        version_number: doc.latest_version?.version_number || '1.0'
+      }));
+
+      set({ 
+        documents: formattedDocuments,
+        totalDocuments: formattedDocuments.length,
+        isLoading: false 
+      });
+
+      return { items: formattedDocuments, total: formattedDocuments.length };
     } catch (error) {
-      console.error('Part number search error:', error);
-      message.error(error.message);
-      throw error;
+      set({ error: error.message, isLoading: false });
+      return { items: [], total: 0 };
     }
   },
 
   // Download document version
-  downloadDocumentVersion: async (documentId, versionId) => {
+  downloadDocumentVersion: async (documentId, versionId = null) => {
     try {
       const token = useAuthStore.getState().token;
       
@@ -491,7 +486,12 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/${documentId}/download/${versionId}`, {
+      // Construct URL based on whether versionId is provided
+      const url = versionId 
+        ? `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download-latest`;
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -519,12 +519,15 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/${documentId}/versions`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
+      const response = await fetch(
+        `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/versions`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'accept': 'application/json'
+          }
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch document versions');
@@ -547,9 +550,9 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      console.log('Making DELETE request to:', `http://172.18.7.88:7599/api/v1/documents/folders/${folderId}`);
+      console.log('Making DELETE request to:', `http://172.18.7.85:6651/api/v1/documents/folders/${folderId}`);
       
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/folders/${folderId}`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/folders/${folderId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -589,7 +592,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/${copyData.document_id}/copy`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${copyData.document_id}/copy`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -618,31 +621,27 @@ const useDocumentStore = create((set, get) => ({
   uploadNewVersion: async (documentId, file) => {
     try {
       const token = useAuthStore.getState().token;
+      
+      // First get existing versions to determine next version number
+      const existingVersions = await get().fetchDocumentVersions(documentId);
+      const nextVersionNumber = `${existingVersions.length + 1}`;
+      
       const formData = new FormData();
-      
-      // Add required fields to formData
       formData.append('file', file);
-      
-      // Get the latest version number and increment it
-      const versions = await get().fetchDocumentVersions(documentId);
-      const latestVersion = versions.length > 0 
-        ? Math.max(...versions.map(v => parseInt(v.version_number))) 
-        : 0;
-      const newVersionNumber = (latestVersion + 1).toString();
-      
-      formData.append('version_number', newVersionNumber);
+      formData.append('version_number', nextVersionNumber);
       formData.append('metadata', '{}');
 
-      console.log('Making POST request to:', `http://172.18.7.88:7599/api/v1/documents/${documentId}/versions/`);
-      
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/${documentId}/versions/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
-        },
-        body: formData
-      });
+      const response = await fetch(
+        `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/versions`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'accept': 'application/json'
+          },
+          body: formData
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -650,7 +649,6 @@ const useDocumentStore = create((set, get) => ({
       }
 
       const data = await response.json();
-      console.log('Upload response:', data);
       return data;
     } catch (error) {
       console.error('Upload version error:', error);
@@ -658,25 +656,25 @@ const useDocumentStore = create((set, get) => ({
     }
   },
 
-  updateVersion: async (documentId, versionId, file, currentVersionNumber) => {
+  updateVersion: async (documentId, versionId, file, metadata = {}) => {
     try {
       const token = useAuthStore.getState().token;
       const formData = new FormData();
       
       formData.append('file', file);
-      formData.append('version_number', currentVersionNumber);
-      formData.append('metadata', '{}');
+      formData.append('metadata', JSON.stringify(metadata));
 
-      console.log('Making PUT request to:', `http://172.18.7.88:7599/api/v1/documents/${documentId}/versions/${versionId}/file`);
-
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/${documentId}/versions/${versionId}/file`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
-        },
-        body: formData
-      });
+      const response = await fetch(
+        `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/version/${versionId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'accept': 'application/json'
+          },
+          body: formData
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -684,25 +682,14 @@ const useDocumentStore = create((set, get) => ({
       }
 
       const data = await response.json();
-      console.log('Update version response:', data);
-
-      // Get the current folder ID from state
-      const currentFolderId = get().selectedFolder;
       
-      // Wait for both operations to complete
+      // Refresh document versions after successful update
+      await get().fetchDocumentVersions(documentId);
+      
+      // If we're in a folder, refresh the folder documents
+      const currentFolderId = get().selectedFolder;
       if (currentFolderId && currentFolderId !== 'all') {
-        // First fetch the latest document versions
-        const updatedVersions = await get().fetchDocumentVersions(documentId);
-        
-        // Then fetch and update the folder documents
-        const folderDocs = await get().fetchFolderDocuments(currentFolderId);
-        
-        // Update the specific document's versions in the state
-        set(state => ({
-          documents: state.documents.map(doc => 
-            doc.id === documentId ? { ...doc, versions: updatedVersions } : doc
-          )
-        }));
+        await get().fetchFolderDocuments(currentFolderId);
       }
 
       return data;
@@ -716,7 +703,7 @@ const useDocumentStore = create((set, get) => ({
     try {
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/${documentId}/versions/${versionId}`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/versions/${versionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -744,7 +731,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/${documentId}/download-count`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/download-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -790,7 +777,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.88:7599/api/v1/documents/${documentId}/view-count`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/view-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -816,19 +803,8 @@ const useDocumentStore = create((set, get) => ({
     }
   },
 
-  // Update handlePreview to track views
-  handlePreview: async (documentId) => {
-    try {
-      await get().incrementViewCount(documentId);
-      // Your existing preview logic...
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  // Add fetchMetrics function
-  fetchMetrics: async () => {
-    set({ isLoadingMetrics: true });
+  // Create new folder
+  createFolder: async (folderData) => {
     try {
       const token = useAuthStore.getState().token;
       
@@ -836,7 +812,51 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.88:7599/api/v1/documents/analytics/metrics', {
+      // Format the request body according to API requirements
+      const requestData = {
+        name: folderData.name,  // Make sure this is included
+        parent_folder_id: folderData.parent_folder_id || null
+      };
+
+      console.log('Creating folder with data:', requestData); // Debug log
+
+      const response = await fetch('http://172.18.7.89:4470/api/v1/document-management/folders/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail?.[0]?.msg || 'Failed to create folder');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Create folder error:', error);
+      throw error;
+    }
+  },
+
+  // Add a new function to get preview URL
+  getPreviewUrl: async (documentId, versionId = null) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const url = versionId 
+        ? `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download-latest`;
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -844,35 +864,89 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to fetch metrics');
+        throw new Error('Failed to get preview URL');
       }
 
-      const data = await response.json();
-      set({ 
-        metrics: data,
-        isLoadingMetrics: false,
-        metricsError: null
-      });
-      return data;
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
     } catch (error) {
-      console.error('Metrics fetch error:', error);
-      set({ 
-        metricsError: error.message,
-        isLoadingMetrics: false 
-      });
+      console.error('Preview error:', error);
       throw error;
     }
   },
 
-  // Add refresh metrics function
-  refreshMetrics: async () => {
+  // Add this new function for production order search
+  searchByProductionOrder: async (productionOrderId, docTypeId = null) => {
     try {
-      await get().fetchMetrics();
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        return { items: [], total: 0 };
+      }
+
+      let url = `http://172.18.7.89:4470/api/v1/document-management/documents/by-production-order/${productionOrderId}`;
+      if (docTypeId) {
+        url += `?doc_type_id=${docTypeId}`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        return { items: [], total: 0 };
+      }
+
+      const data = await response.json();
+      
+      const formattedDocuments = data.map(doc => ({
+        ...doc,
+        key: doc.id,
+        file_size: doc.latest_version?.file_size 
+          ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+          : null,
+        created_at: new Date(doc.created_at).toISOString(),
+        version_number: doc.latest_version?.version_number || '1.0'
+      }));
+
+      set({ 
+        documents: formattedDocuments,
+        totalDocuments: formattedDocuments.length,
+        isLoading: false 
+      });
+
+      return { items: formattedDocuments, total: formattedDocuments.length };
     } catch (error) {
-      message.error('Failed to refresh metrics');
+      set({ error: error.message, isLoading: false });
+      return { items: [], total: 0 };
     }
   },
+
+  // Add this function to fetch orders
+  fetchAllOrders: async () => {
+    try {
+      const token = useAuthStore.getState().token;
+      set({ isLoadingOrders: true });
+
+      const response = await fetch('http://172.18.7.89:4470/planning/all_orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        set({ allOrders: data, isLoadingOrders: false });
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      set({ isLoadingOrders: false });
+    }
+  }
 }));
 
 export default useDocumentStore;

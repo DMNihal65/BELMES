@@ -7,6 +7,8 @@ const useOrderStore = create((set, get) => ({
   isLoading: false,
   error: null,
   timelineData: [],
+  isLoadingTimeline: false,
+  timelineError: null,
 
   // Add workcenter-related state
   workcenters: [],
@@ -38,7 +40,7 @@ const useOrderStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:6661/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.88:6699/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -67,7 +69,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.85:6661/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:6699/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -191,7 +193,7 @@ const useOrderStore = create((set, get) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.85:6661/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.88:6699/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -234,52 +236,49 @@ const useOrderStore = create((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      // Transform the data to match API expectations
+      // Transform the data to match API expectations exactly
       const transformedData = {
-        "Project Name": orderData.projectName,
-        "Sale Order": orderData.salesOrderNumber,
-        "Part No": orderData.partNumber,
-        "Part Desc": orderData.materialDescription,
-        "Required Qty": orderData.targetQuantity.toString(),
-        "Plant": orderData.plant.toString(),
-        "WBS": orderData.wbsElement,
-        "Rtg Seq No": "0",
-        "Sequence No": "0",
-        "Launched Qty": orderData.launchedQuantity.toString(),
-        "Prod Order No": orderData.orderNumber,
-        "Operations": [],
-        "Document Verification": {},
-        "Raw Materials": []
+        data: {
+          "Project Name": orderData.projectName || "",
+          "Sale Order": orderData.salesOrderNumber || "",
+          "Part No": orderData.partNumber || "",
+          "Part Desc": orderData.materialDescription || "",
+          "Required Qty": orderData.targetQuantity ? orderData.targetQuantity.toString() : "0",
+          "Plant": orderData.plant ? orderData.plant.toString() : "",
+          "WBS": orderData.wbsElement || "",
+          "Rtg Seq No": orderData.totalOperations ? orderData.totalOperations.toString() : "0",
+          "Sequence No": "0",
+          "Launched Qty": orderData.launchedQuantity ? orderData.launchedQuantity.toString() : "0",
+          "Prod Order No": orderData.orderNumber || "",
+          "Operations": [],
+          "Document Verification": {},
+          "Raw Materials": []
+        }
       };
 
-      console.log('Transformed request data:', transformedData);
+      console.log('Sending request data:', JSON.stringify(transformedData, null, 2));
 
-      const response = await fetch('http://172.18.7.88:7529/api/v1/planning/save-to-db', {
+      const response = await fetch('http://172.18.7.88:6699/api/v1/planning/save-to-db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({ data: transformedData })
+        body: JSON.stringify(transformedData)
       });
 
+      const result = await response.json();
+      console.log('Server response:', JSON.stringify(result, null, 2));
+
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Server error response:', errorData);
-        throw new Error(errorData.detail || errorData.message || 'Failed to create order');
+        throw new Error(result.detail || result.message || 'Failed to create order');
       }
 
-      const result = await response.json();
-      console.log('Server response:', result);
-
+      // Return the raw response for now
       set({ isLoading: false });
       return result;
     } catch (error) {
-      console.error('Create order error:', {
-        message: error.message,
-        stack: error.stack,
-        error
-      });
+      console.error('Create order error:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -314,7 +313,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.85:6661/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.88:6699/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -421,9 +420,9 @@ const useOrderStore = create((set, get) => ({
   },
 
   fetchTimelineData: async () => {
-    set({ isLoading: true });
+    set({ isLoadingTimeline: true, timelineError: null });
     try {
-      const response = await fetch('http://172.18.7.88:7529/api/v1/scheduling/part-production-timeline/');
+      const response = await fetch('http://172.18.7.88:6699/api/v1/scheduling/part-production-timeline/');
       const data = await response.json();
       
       if (!response.ok) {
@@ -434,14 +433,18 @@ const useOrderStore = create((set, get) => ({
       const transformedData = data.items.map((item, index) => ({
         ...item,
         key: index,
-        first_start_time: new Date(item.first_start_time).toLocaleString(),
-        last_end_time: new Date(item.last_end_time).toLocaleString(),
       }));
 
-      set({ timelineData: transformedData, isLoading: false });
+      set({ 
+        timelineData: transformedData,
+        isLoadingTimeline: false 
+      });
       return transformedData;
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      set({ 
+        timelineError: error.message, 
+        isLoadingTimeline: false 
+      });
       throw error;
     }
   },
@@ -547,6 +550,62 @@ const useOrderStore = create((set, get) => ({
     documentError: null,
     isLoadingDocuments: false 
   }),
+
+  swapOrderPriority: async (order1Id, order2Id, order1Priority, order2Priority) => {
+    try {
+      set({ isLoading: true, error: null });
+
+      // Make the API call to swap priorities
+      const response = await fetch(
+        `http://172.18.7.88:6699/api/v1/planning/order/${order1Id}/priority`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            priority: order2Priority,  // Changed from new_priority to priority
+            order_id: order2Id        // Added order_id
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle different error formats
+        const errorMessage = data.detail 
+          ? typeof data.detail === 'object' 
+            ? JSON.stringify(data.detail) 
+            : data.detail
+          : 'Failed to swap order priorities';
+        throw new Error(errorMessage);
+      }
+
+      // After successful swap, update the local state
+      set(state => ({
+        orders: state.orders.map(order => {
+          if (order.id === order1Id) {
+            return { ...order, priority: order2Priority };
+          }
+          if (order.id === order2Id) {
+            return { ...order, priority: order1Priority };
+          }
+          return order;
+        }),
+        isLoading: false
+      }));
+
+      return true;
+    } catch (error) {
+      console.error('Swap priority error:', error);
+      set({ 
+        error: typeof error.message === 'string' ? error.message : 'Failed to swap priorities', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
 }));
 
 export default useOrderStore;

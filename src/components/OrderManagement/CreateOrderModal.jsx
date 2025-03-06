@@ -144,7 +144,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     try {
       form.setFields([{ name: 'submit', errors: [] }]);
       
-      // First handle document uploads if needed
+      // Handle document uploads first if needed
       if (!documents?.mpp_document && mppFile) {
         try {
           await uploadMppFile(
@@ -177,15 +177,16 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
 
       // Prepare order data
       const orderData = {
-        projectName: values.projectName,
-        salesOrderNumber: values.salesOrderNumber,
-        partNumber: values.partNumber,
-        materialDescription: values.materialDescription,
-        targetQuantity: values.targetQuantity,
-        launchedQuantity: values.launchedQuantity,
-        plant: values.plant,
-        wbsElement: values.wbsElement,
-        orderNumber: values.orderNumber
+        projectName: values.projectName || "",
+        salesOrderNumber: values.salesOrderNumber || "",
+        partNumber: values.partNumber || "",
+        materialDescription: values.materialDescription || "",
+        targetQuantity: values.targetQuantity || 0,
+        launchedQuantity: values.launchedQuantity || 0,
+        plant: values.plant || "",
+        wbsElement: values.wbsElement || "",
+        orderNumber: values.orderNumber || "",
+        totalOperations: values.totalOperations || 0
       };
 
       console.log('Submitting order data:', orderData);
@@ -194,13 +195,45 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       const response = await createOrder(orderData);
       console.log('Create order response:', response);
 
-      if (response.message === "Data saved successfully" && response.order_details) {
+      if (response && response.message === "Data saved successfully") {
         message.success('Order created successfully');
+        
+        const orderDetails = response.order_details;
+        
+        // Display detailed success message
+        const orderSummary = `
+          Order Details:
+          - Order Number: ${orderDetails.production_order}
+          - Sales Order: ${orderDetails.sale_order}
+          - Part Number: ${orderDetails.part_number}
+          - Description: ${orderDetails.part_description}
+          - Required Quantity: ${orderDetails.required_quantity}
+          
+          Project Details:
+          - Name: ${orderDetails.project.name}
+          - Priority: ${orderDetails.project.priority}
+          - Delivery Date: ${new Date(orderDetails.project.delivery_date).toLocaleDateString()}
+          
+          ${orderDetails.raw_material ? `
+          Raw Material:
+          - Part Number: ${orderDetails.raw_material.child_part_number}
+          - Description: ${orderDetails.raw_material.description}
+          - Quantity: ${orderDetails.raw_material.quantity} ${orderDetails.raw_material.unit.name}
+          - Status: ${orderDetails.raw_material.status.name}
+          ` : ''}
+        `;
+
+        message.info({
+          content: orderSummary,
+          duration: 10,
+          style: { whiteSpace: 'pre-wrap' }
+        });
+
         onCreate(response);
         form.resetFields();
         onCancel();
       } else {
-        throw new Error('Invalid response format from server');
+        throw new Error('Failed to create order: Invalid response from server');
       }
     } catch (error) {
       console.error('Order submission error:', error);
@@ -723,7 +756,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       };
 
       // Save to database
-      const response = await fetch('http://172.18.7.88:7599/api/v1/planning/save-to-db', {
+      const response = await fetch('http://172.18.7.88:6699/api/v1/planning/save-to-db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

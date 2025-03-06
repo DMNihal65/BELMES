@@ -64,18 +64,24 @@ const QualityInspectionDetails = ({
     }
   };
 
-  const handleLaunchQMS = async () => {
+  const handleLaunchQMS = () => {
     try {
-      // const success = await launchQMSApplication();
-      if (success) {
-        message.success('QMS application launched successfully');
-        setIsQmsModalVisible(false);
-      } else {
-        message.error('Failed to launch QMS. Please check if the application is installed correctly.');
-      }
+      // Using the registered protocol to launch QMS from the correct path
+      window.location.href = `myapp://launch-qms?path=D:\\BEL\\BELMES\\quality\\qms.exe`;
+      
+      message.info({
+        content: 'Launching QMS application...',
+        duration: 3
+      });
+
+      // Close the modal after launching
+      setIsQmsModalVisible(false);
     } catch (error) {
-      console.error('Failed to launch QMS application:', error);
-      message.error('Failed to launch QMS. Please ensure the application is properly installed.');
+      console.error('Failed to launch QMS:', error);
+      message.error({
+        content: 'Failed to launch QMS. Please ensure the application is properly installed.',
+        duration: 5
+      });
     }
   };
 
@@ -384,8 +390,16 @@ const QualityInspectionDetails = ({
         </Button>
       ]}
     >
-      <p>No measurement data is available for Operation {selectedOperation}.</p>
-      <p>Would you like to open the QMS software to view or add measurements?</p>
+      <div className="space-y-4">
+        <p>No measurement data is available for Operation {selectedOperation}.</p>
+        <p>Would you like to open the QMS software to view or add measurements?</p>
+        <Alert
+          message="Note"
+          description="This will launch the QMS application installed on your system."
+          type="info"
+          showIcon
+        />
+      </div>
     </Modal>
   );
 

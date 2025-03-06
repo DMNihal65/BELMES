@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Tag, Badge, Button, Space, Tooltip, Modal } from 'antd';
+import { Table, Tag, Badge, Button, Space, Tooltip, Modal, message } from 'antd';
 import { EyeOutlined, MenuOutlined, SwapOutlined } from '@ant-design/icons';
 import {
   DndContext,
@@ -16,45 +16,15 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-// Separate SortableRow component
-const SortableRow = ({ children, ...props }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ 
-    id: props['data-row-key']
-  });
-
-  const style = {
-    ...props.style,
-    transform: CSS.Transform.toString(transform),
-    transition,
-    ...(isDragging ? {
-      position: 'relative',
-      zIndex: 999,
-      background: '#fafafa',
-      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-    } : {}),
-    cursor: 'move',
-  };
-
-  return (
-    <tr {...props} ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {children}
-    </tr>
-  );
-};
+import useOrderStore from '../../store/order-store';
+import Row from './Row';
 
 const ReorderableTable = ({ orders, onOrdersReorder }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [pendingChanges, setPendingChanges] = useState(null);
   const [swapDetails, setSwapDetails] = useState(null);
   const [localOrders, setLocalOrders] = useState([]);
+  const { swapOrderPriority, fetchAllOrders } = useOrderStore();
 
   // Initialize and update local orders when props change
   useEffect(() => {
@@ -193,7 +163,7 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
     // }
   ];
 
-  const onDragEnd = ({ active, over }) => {
+  const onDragEnd = async ({ active, over }) => {
     if (active.id !== over?.id) {
       const activeIndex = localOrders.findIndex(i => i.id === active.id);
       const overIndex = localOrders.findIndex(i => i.id === over.id);
@@ -225,12 +195,27 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
     }
   };
 
-  const handleConfirmReorder = () => {
+  const handleConfirmReorder = async () => {
     if (pendingChanges) {
-      setLocalOrders(pendingChanges);
-      onOrdersReorder(pendingChanges);
-      setPendingChanges(null);
-      setSwapDetails(null);
+      try {
+        await swapOrderPriority(
+          pendingChanges[0].id,
+          pendingChanges[1].id,
+          pendingChanges[0].project?.priority,
+          pendingChanges[1].project?.priority
+        );
+        
+        // Refresh the orders list after successful swap
+        await fetchAllOrders();
+        
+        message.success('Orders swapped successfully');
+        setLocalOrders(pendingChanges);
+        onOrdersReorder(pendingChanges);
+        setPendingChanges(null);
+        setSwapDetails(null);
+      } catch (error) {
+        message.error('Failed to swap orders: ' + error.message);
+      }
     }
     setIsModalVisible(false);
   };
@@ -249,7 +234,7 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
           <Table
             components={{
               body: {
-                row: SortableRow,
+                row: Row,
               },
             }}
             columns={columns}

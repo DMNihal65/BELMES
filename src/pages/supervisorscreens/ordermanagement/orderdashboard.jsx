@@ -34,12 +34,7 @@ const OrderDashboard = () => {
 
   // Update timeline columns configuration
   const timelineColumns = [
-    { 
-      title: 'Part Number', 
-      dataIndex: 'part_number', 
-      key: 'part_number',
-      width: 150,
-    },
+    
     { 
       title: 'Production Order', 
       dataIndex: 'production_order', 
@@ -47,16 +42,17 @@ const OrderDashboard = () => {
       width: 150,
     },
     { 
-      title: 'First Start Time', 
-      dataIndex: 'first_start_time', 
-      key: 'first_start_time',
-      width: 180,
+      title: 'Part Number', 
+      dataIndex: 'part_number', 
+      key: 'part_number',
+      width: 150,
     },
+   
     { 
-      title: 'Last End Time', 
-      dataIndex: 'last_end_time', 
-      key: 'last_end_time',
-      width: 180,
+      title: 'Completed Quantity', 
+      dataIndex: 'completed_total_quantity', 
+      key: 'completed_total_quantity',
+      width: 150,
     },
     { 
       title: 'Operations Count', 

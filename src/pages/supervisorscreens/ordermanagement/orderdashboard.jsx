@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message } from 'antd';
+import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
@@ -12,23 +12,76 @@ import Workcenter from '../../../components/OrderManagement/Workcenter';
 const { TabPane } = Tabs;
 
 const OrderDashboard = () => {
-  const { orders, fetchAllOrders, isLoading, error } = useOrderStore();
+  const { orders, fetchAllOrders, fetchTimelineData, timelineData, isLoading, error } = useOrderStore();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [parent] = useAutoAnimate();
   
   const handleRefresh = useCallback(() => {
     fetchAllOrders();
-  }, [fetchAllOrders]);
+    fetchTimelineData();
+  }, [fetchAllOrders, fetchTimelineData]);
 
   useEffect(() => {
     fetchAllOrders();
-  }, [fetchAllOrders]);
+    fetchTimelineData();
+  }, [fetchAllOrders, fetchTimelineData]);
 
   const fadeIn = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
     transition: { duration: 0.5 }
   };
+
+  // Update timeline columns configuration
+  const timelineColumns = [
+    { 
+      title: 'Part Number', 
+      dataIndex: 'part_number', 
+      key: 'part_number',
+      width: 150,
+    },
+    { 
+      title: 'Production Order', 
+      dataIndex: 'production_order', 
+      key: 'production_order',
+      width: 150,
+    },
+    { 
+      title: 'First Start Time', 
+      dataIndex: 'first_start_time', 
+      key: 'first_start_time',
+      width: 180,
+    },
+    { 
+      title: 'Last End Time', 
+      dataIndex: 'last_end_time', 
+      key: 'last_end_time',
+      width: 180,
+    },
+    { 
+      title: 'Operations Count', 
+      dataIndex: 'operations_count', 
+      key: 'operations_count',
+      width: 140,
+    },
+    { 
+      title: 'Status', 
+      dataIndex: 'status', 
+      key: 'status',
+      fixed: 'right',
+      width: 120,
+      render: (status) => (
+        <span className={`
+          px-2 py-1 rounded-full text-sm
+          ${status === 'scheduled' ? 'bg-blue-100 text-blue-800' : ''}
+          ${status === 'completed' ? 'bg-green-100 text-green-800' : ''}
+          ${status === 'delayed' ? 'bg-red-100 text-red-800' : ''}
+        `}>
+          {status.charAt(0).toUpperCase() + status.slice(1)}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
@@ -61,7 +114,7 @@ const OrderDashboard = () => {
             <motion.div {...fadeIn}>
               <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
                 <Statistic
-                  title="In Progress"
+                  title="In  Progress"
                   value={orders.filter(o => o.status === 'in_progress').length}
                   prefix={<ArrowUpOutlined />}
                   valueStyle={{ color: '#1890ff' }}
@@ -130,17 +183,23 @@ const OrderDashboard = () => {
                   </TabPane>
                   <TabPane tab="In Progress" key="in_progress">
                     <div className="h-full overflow-auto">
-                      <OrderTable orders={orders.filter(order => order.status === 'in_progress')} onRefresh={handleRefresh} />
+                      <Table 
+                        columns={timelineColumns}
+                        dataSource={timelineData}
+                        loading={isLoading}
+                        scroll={{ x: 1800, y: 'calc(100vh - 300px)' }}
+                        pagination={{ 
+                          pageSize: 10,
+                          position: ['bottomCenter']
+                        }}
+                        size="middle"
+                        bordered
+                      />
                     </div>
                   </TabPane>
                   <TabPane tab="Completed" key="completed">
                     <div className="h-full overflow-auto">
                       <OrderTable orders={orders.filter(order => order.status === 'completed')} onRefresh={handleRefresh} />
-                    </div>
-                  </TabPane>
-                  <TabPane tab="Delayed" key="delayed">
-                    <div className="h-full overflow-auto">
-                      <OrderTable orders={orders.filter(order => order.status === 'delayed')} onRefresh={handleRefresh}/>
                     </div>
                   </TabPane>
                   <TabPane tab="Priority" key="reorder">
@@ -175,7 +234,7 @@ const OrderDashboard = () => {
           console.log('New order created:', newOrder);
           setIsModalVisible(false);
         }} 
-         onRefresh={handleRefresh} 
+        onRefresh={handleRefresh} 
       />
     </div>
   );

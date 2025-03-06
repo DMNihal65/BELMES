@@ -28,20 +28,20 @@ export default function MaintenanceDashboard() {
       label: 'Machine Maintenance',
       children: <MachineMaintenance />
     },
-    {
-      key: '2',
-      label: 'Components',
-      children: <Components />
-    },
-    {
-      key: '4',
-      label: (
-        <Badge count={operatorTotalPendingRequests} offset={[10, 0]}>
-          <span>Operator Requests</span>
-        </Badge>
-      ),
-      children: <OperatorRequests />
-    }
+    // {
+    //   key: '2',
+    //   label: 'Components',
+    //   children: <Components />
+    // },
+    // {
+    //   key: '4',
+    //   label: (
+    //     <Badge count={operatorTotalPendingRequests} offset={[10, 0]}>
+    //       <span>Operator Requests</span>
+    //     </Badge>
+    //   ),
+    //   children: <OperatorRequests />
+    // }
   ];
 
   return (

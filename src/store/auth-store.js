@@ -8,13 +8,14 @@ const useAuthStore = create(
       user: null,
       roles: [],
       machines: [],
+      currentMachine: null,
       isLoading: false,
       error: null,
 
       fetchRoles: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.89:4470/api/v1/auth/roles');
+          const response = await fetch('http://172.18.7.88:6699/api/v1/auth/roles');
           const data = await response.json();
           set({ roles: data, isLoading: false });
         } catch (error) {
@@ -25,7 +26,7 @@ const useAuthStore = create(
       fetchMachines: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.89:4470/api/v1/master-order/all-machines/');
+          const response = await fetch('http://172.18.7.88:6699/api/v1/master-order/all-machines/');
           const data = await response.json();
           // Extracting the "code" from each machine's work_center
           const machinesWithCode = data.map(machine => ({
@@ -41,50 +42,97 @@ const useAuthStore = create(
       login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-          const formData = new URLSearchParams({
-            grant_type: 'password',
-            username: credentials.username,
-            password: credentials.password,
-            scope: '',
-            client_id: 'string',
-            client_secret: 'string'
-          });
+          let response;
+          let data;
 
-          const response = await fetch('http://172.18.7.89:4470/api/v1/auth/login', {
-            method: 'POST',
-            headers: {
-              'accept': 'application/json',
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData.toString(),
-          });
-          
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.detail?.[0]?.msg || 'Authentication failed');
+          if (credentials.role === 'operator') {
+            // Use machine login endpoint for operators
+            response = await fetch('http://172.18.7.85:6661/api/v1/auth/machine-login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                machine_id: credentials.machineId,
+                machine_password: credentials.machinePassword,
+                username: credentials.username,
+                password: credentials.password
+              }),
+            });
+
+            data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.detail?.[0]?.msg || 'Authentication failed');
+            }
+
+            // Store machine details from the response
+            const userData = {
+              username: credentials.username,
+              role: data.role,
+              access: data.access_list,
+            };
+
+            set({ 
+              token: data.access_token,
+              user: userData,
+              currentMachine: data.machine, // Store the machine details
+              isLoading: false,
+              error: null
+            });
+
+            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('currentMachine', JSON.stringify(data.machine));
+
+            return { ...data, user: userData };
+          } else {
+            // Existing supervisor login logic
+            const formData = new URLSearchParams({
+              grant_type: 'password',
+              username: credentials.username,
+              password: credentials.password,
+              scope: '',
+              client_id: 'string',
+              client_secret: 'string'
+            });
+
+            response = await fetch('http://172.18.7.88:6699/api/v1/auth/login', {
+              method: 'POST',
+              headers: {
+                'accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: formData.toString(),
+            });
+            
+            data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.detail?.[0]?.msg || 'Authentication failed');
+            }
+            
+            const userData = {
+              username: credentials.username,
+              role: credentials.role || data.role,
+              access: data.access,
+            };
+
+            set({ 
+              token: data.access_token,
+              user: userData,
+              isLoading: false,
+              error: null
+            });
+
+            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(userData));
+
+            return { ...data, user: userData };
           }
-          
-          const userData = {
-            username: credentials.username,
-            role: credentials.role || data.role,
-            access: data.access,
-          };
-
-          set({ 
-            token: data.access_token,
-            user: userData,
-            isLoading: false,
-            error: null
-          });
-
-          localStorage.setItem('token', data.access_token);
-          localStorage.setItem('user', JSON.stringify(userData));
-
-          return { ...data, user: userData };
         } catch (error) {
-          set({ error: error.message, isLoading: false, token: null, user: null });
+          set({ error: error.message, isLoading: false, token: null, user: null, currentMachine: null });
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          localStorage.removeItem('currentMachine');
           throw error;
         }
       },
@@ -92,7 +140,7 @@ const useAuthStore = create(
       register: async (userData) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch('http://172.18.7.89:4470/api/v1/auth/register', {
+          const response = await fetch('http://172.18.7.88:6699/api/v1/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -118,9 +166,10 @@ const useAuthStore = create(
       },
 
       logout: () => {
-        set({ token: null, user: null });
+        set({ token: null, user: null, currentMachine: null });
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('currentMachine');
       },
 
       clearError: () => set({ error: null }),

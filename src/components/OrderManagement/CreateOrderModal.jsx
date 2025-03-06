@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Modal, Form, Input, DatePicker, Upload, Space, Select, 
-  Button, message, Divider, InputNumber, Steps, Row, Col, Alert 
+  Button, message, Divider, InputNumber, Steps, Row, Col, Alert, Card 
 } from 'antd';
 import { 
   InboxOutlined, FileTextOutlined, LoadingOutlined,
@@ -26,7 +26,12 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     error, 
     clearOrderDetails,
     uploadMppFile,
-    uploadEngineeringDrawing 
+    uploadEngineeringDrawing,
+    documents,
+    isLoadingDocuments,
+    documentError,
+    fetchDocumentsByPartNumber,
+    documentLoadingStates,
   } = useOrderStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [fileList, setFileList] = useState([]);
@@ -137,103 +142,73 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   // Handle form submission
   const handleSubmit = async (values) => {
     try {
-      // Validate document names if files are selected
-      if (mppFile && !mppDocName.trim()) {
-        message.error('Please enter MPP document name');
-        return;
-      }
-      if (drawingFile && !drawingDocName.trim()) {
-        message.error('Please enter Engineering Drawing document name');
-        return;
-      }
-
-      // Format the data according to the backend API requirements
-      const requestData = {
-        data: {
-          "Project Name": values.projectName,
-          "Sale Order": values.salesOrderNumber,
-          "Part No": values.partNumber,
-          "Part Desc": values.materialDescription,
-          "Required Qty": values.targetQuantity.toString(),
-          "Plant": values.plant.toString(),
-          "WBS": values.wbsElement,
-          "Rtg Seq No": "0",
-          "Sequence No": "0",
-          "Launched Qty": values.launchedQuantity.toString(),
-          "Prod Order No": values.orderNumber,
-          "Operations": orderDetails?.operations?.map(op => ({
-            "Oprn No": op.operation_number,
-            "Wc/Plant": op.workcenter,
-            "Plant Number": op.plant_number,
-            "Operation": op.operation_description,
-            "Setup Time": op.setup_time.toString(),
-            "Per Pc Time": op.per_piece_time.toString(),
-            "Jmp Qty": op.jump_quantity.toString(),
-            "Tot Qty": op.total_quantity.toString(),
-            "Allowed Time": op.allowed_time.toString(),
-            "Confirm No": op.confirmation_number,
-            "Long Text": op.long_text
-          })) || [],
-          "Document Verification": {},
-          "Raw Materials": orderDetails?.rawMaterials?.map(material => ({
-            "Sl.No": "0010",
-            "Child Part No": material.child_part_number,
-            "Description": material.description,
-            "Qty Per Set": material.quantity.toString(),
-            "UoM": material.unit.name,
-            "Total Qty": (material.quantity * values.targetQuantity).toString()
-          })) || []
-        }
-      };
-
-      // Save to database
-      const response = await fetch('http://172.18.7.88:7599/api/v1/planning/save-to-db', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save order');
-      }
-
-      const savedData = await response.json();
-
-      // Handle file uploads after successful order creation
-      try {
-        if (mppFile) {
+      form.setFields([{ name: 'submit', errors: [] }]);
+      
+      // First handle document uploads if needed
+      if (!documents?.mpp_document && mppFile) {
+        try {
           await uploadMppFile(
-            mppFile.originFileObj || mppFile, 
-            values.orderNumber,
+            mppFile,
+            values.partNumber,
             mppDocName.trim(),
-            mppDescription.trim(),
+            mppDescription.trim() || '',
             mppVersion.trim()
           );
+        } catch (error) {
+          message.error('Failed to upload MPP document');
+          throw error;
         }
-        
-        if (drawingFile) {
-          await uploadEngineeringDrawing(
-            drawingFile.originFileObj || drawingFile, 
-            values.orderNumber,
-            drawingDocName.trim(),
-            drawingDescription.trim(),
-            drawingVersion.trim()
-          );
-        }
-      } catch (fileError) {
-        console.error('File upload error:', fileError);
-        message.warning('Order was saved but there was an issue uploading some files: ' + fileError.message);
       }
 
-      message.success('Order saved successfully');
-      handleCancel();
+      if (!documents?.engineering_drawing_document && drawingFile) {
+        try {
+          await uploadEngineeringDrawing(
+            drawingFile,
+            values.partNumber,
+            drawingDocName.trim(),
+            drawingDescription.trim() || '',
+            drawingVersion.trim()
+          );
+        } catch (error) {
+          message.error('Failed to upload Engineering Drawing');
+          throw error;
+        }
+      }
+
+      // Prepare order data
+      const orderData = {
+        projectName: values.projectName,
+        salesOrderNumber: values.salesOrderNumber,
+        partNumber: values.partNumber,
+        materialDescription: values.materialDescription,
+        targetQuantity: values.targetQuantity,
+        launchedQuantity: values.launchedQuantity,
+        plant: values.plant,
+        wbsElement: values.wbsElement,
+        orderNumber: values.orderNumber
+      };
+
+      console.log('Submitting order data:', orderData);
+
+      // Create order
+      const response = await createOrder(orderData);
+      console.log('Create order response:', response);
+
+      if (response.message === "Data saved successfully" && response.order_details) {
+        message.success('Order created successfully');
+        onCreate(response);
+        form.resetFields();
+        onCancel();
+      } else {
+        throw new Error('Invalid response format from server');
+      }
     } catch (error) {
-      console.error('Submit Error:', error);
-      message.error(error.message || 'Failed to save order');
+      console.error('Order submission error:', error);
+      message.error(error.message || 'Failed to create order');
+      form.setFields([{
+        name: 'submit',
+        errors: [error.message || 'Failed to create order']
+      }]);
     }
   };
 
@@ -268,21 +243,31 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     }
   }, [visible, initialData, form]);
 
+  // Update the file change handlers to properly handle the file object
   const handleMppFileChange = (info) => {
-    if (info.file.status === 'uploading') {
-      return;
+    const file = info.fileList[info.fileList.length - 1]?.originFileObj;
+    if (file) {
+      setMppFile(file);
+      // Just store the file and metadata, don't upload yet
+      console.log('MPP file selected:', file);
     }
-    // Store the file for later upload
-    setMppFile(info.file);
   };
 
   const handleDrawingFileChange = (info) => {
-    if (info.file.status === 'uploading') {
-      return;
+    const file = info.file.originFileObj || info.file;
+    if (file) {
+      setDrawingFile(file);
+      // Just store the file and metadata, don't upload yet
+      console.log('Engineering Drawing file selected:', file);
     }
-    // Store the file for later upload
-    setDrawingFile(info.file);
   };
+
+  // Add useEffect to fetch documents when part number is available
+  useEffect(() => {
+    if (form.getFieldValue('partNumber')) {
+      fetchDocumentsByPartNumber(form.getFieldValue('partNumber'));
+    }
+  }, [form.getFieldValue('partNumber')]);
 
   const renderOrderForm = () => (
     <Form
@@ -528,6 +513,17 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
 
       {/* Optional File Uploads Section */}
       {renderFileUploadSection()}
+
+      {/* Add error display */}
+      {error && (
+        <Alert
+          message="Error"
+          description={error}
+          type="error"
+          showIcon
+          className="mb-4"
+        />
+      )}
 
       {/* Form Actions */}
       <Form.Item className="mb-0">
@@ -780,107 +776,175 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   // Update the file upload sections in renderOrderForm
   const renderFileUploadSection = () => (
     <>
-      <Divider>MPP and Drawing Files</Divider>
-      <Row gutter={16} className="mb-4">
+      <Divider>Document Information</Divider>
+      <Row gutter={16}>
         <Col span={12}>
-          <div className="border p-4 rounded">
-            <h4 className="mb-3">MPP File</h4>
-            <Form.Item
-              label="Document Name"
-              required
-            >
-              <Input 
-                value={mppDocName}
-                onChange={(e) => setMppDocName(e.target.value)}
-                placeholder="Enter document name"
-              />
-            </Form.Item>
-            <Form.Item
-              label="Description"
-            >
-              <Input.TextArea 
-                value={mppDescription}
-                onChange={(e) => setMppDescription(e.target.value)}
-                placeholder="Enter description"
-                rows={2}
-              />
-            </Form.Item>
-            <Form.Item
-              label="Version"
-              required
-            >
-              <Input 
-                value={mppVersion}
-                onChange={(e) => setMppVersion(e.target.value)}
-                placeholder="Enter version (e.g. v1)"
-              />
-            </Form.Item>
-            <Form.Item
-              name="mppFile"
-            >
-              <Upload
-                maxCount={1}
-                onChange={handleMppFileChange}
-                beforeUpload={() => false}
-                showUploadList={{ showRemoveIcon: true }}
-              >
-                <Button icon={<UploadOutlined />} className="w-full">
-                  {mppFile ? 'Change MPP File' : 'Upload MPP File'}
-                </Button>
-              </Upload>
-            </Form.Item>
-          </div>
+          <Card 
+            title="MPP File"
+            className="hover:shadow-sm transition-shadow duration-300"
+            bordered={true}
+            loading={documentLoadingStates.mpp}
+          >
+            {documents?.mpp_document ? (
+              <>
+                <Row gutter={16}>
+                  <Col span={24}>
+                    <Form.Item label="Document Name">
+                      <Input value={documents.mpp_document.name} disabled />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={16}>
+                  <Col span={24}>
+                    <Form.Item label="Description">
+                      <Input.TextArea 
+                        value={documents.mpp_document.description} 
+                        disabled 
+                        rows={2}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={16}>
+                  <Col span={24}>
+                    <Form.Item label="Version">
+                      <Input value={documents.mpp_document.latest_version.version_number} disabled />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </>
+            ) : (
+              <>
+                <Form.Item label="Document Name" required>
+                  <Input 
+                    value={mppDocName}
+                    onChange={(e) => setMppDocName(e.target.value)}
+                    placeholder="Enter document name"
+                  />
+                </Form.Item>
+                <Form.Item label="Description">
+                  <Input.TextArea 
+                    value={mppDescription}
+                    onChange={(e) => setMppDescription(e.target.value)}
+                    placeholder="Enter description"
+                    rows={2}
+                  />
+                </Form.Item>
+                <Form.Item label="Version" required>
+                  <Input 
+                    value={mppVersion}
+                    onChange={(e) => setMppVersion(e.target.value)}
+                    placeholder="Enter version (e.g. v1)"
+                  />
+                </Form.Item>
+                <Upload
+                  maxCount={1}
+                  onChange={handleMppFileChange}
+                  beforeUpload={() => false}
+                  accept=".pdf,.doc,.docx"
+                  showUploadList={{ showRemoveIcon: true }}
+                  fileList={mppFile ? [mppFile] : []}
+                >
+                  <Button 
+                    icon={<UploadOutlined />} 
+                    className="w-full"
+                    disabled={!mppDocName.trim() || !mppVersion.trim()}
+                  >
+                    {mppFile ? 'Change MPP File' : 'Select MPP File'}
+                  </Button>
+                </Upload>
+              </>
+            )}
+          </Card>
         </Col>
         <Col span={12}>
-          <div className="border p-4 rounded">
-            <h4 className="mb-3">Engineering Drawing</h4>
-            <Form.Item
-              label="Document Name"
-              required
-            >
-              <Input 
-                value={drawingDocName}
-                onChange={(e) => setDrawingDocName(e.target.value)}
-                placeholder="Enter document name"
-              />
-            </Form.Item>
-            <Form.Item
-              label="Description"
-            >
-              <Input.TextArea 
-                value={drawingDescription}
-                onChange={(e) => setDrawingDescription(e.target.value)}
-                placeholder="Enter description"
-                rows={2}
-              />
-            </Form.Item>
-            <Form.Item
-              label="Version"
-              required
-            >
-              <Input 
-                value={drawingVersion}
-                onChange={(e) => setDrawingVersion(e.target.value)}
-                placeholder="Enter version (e.g. v1)"
-              />
-            </Form.Item>
-            <Form.Item
-              name="drawingFile"
-            >
-              <Upload
-                maxCount={1}
-                onChange={handleDrawingFileChange}
-                beforeUpload={() => false}
-                showUploadList={{ showRemoveIcon: true }}
-              >
-                <Button icon={<UploadOutlined />} className="w-full">
-                  {drawingFile ? 'Change Drawing File' : 'Upload Drawing'}
-                </Button>
-              </Upload>
-            </Form.Item>
-          </div>
+          <Card 
+            title="Engineering Drawing"
+            className="hover:shadow-sm transition-shadow duration-300"
+            bordered={true}
+            loading={documentLoadingStates.engineering}
+          >
+            {documents?.engineering_drawing_document ? (
+              <>
+                <Row gutter={16}>
+                  <Col span={24}>
+                    <Form.Item label="Document Name">
+                      <Input value={documents.engineering_drawing_document.name} disabled />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={16}>
+                  <Col span={24}>
+                    <Form.Item label="Description">
+                      <Input.TextArea 
+                        value={documents.engineering_drawing_document.description} 
+                        disabled 
+                        rows={2}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={16}>
+                  <Col span={24}>
+                    <Form.Item label="Version">
+                      <Input value={documents.engineering_drawing_document.latest_version.version_number} disabled />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </>
+            ) : (
+              <>
+                <Form.Item label="Document Name" required>
+                  <Input 
+                    value={drawingDocName}
+                    onChange={(e) => setDrawingDocName(e.target.value)}
+                    placeholder="Enter document name"
+                  />
+                </Form.Item>
+                <Form.Item label="Description">
+                  <Input.TextArea 
+                    value={drawingDescription}
+                    onChange={(e) => setDrawingDescription(e.target.value)}
+                    placeholder="Enter description"
+                    rows={2}
+                  />
+                </Form.Item>
+                <Form.Item label="Version" required>
+                  <Input 
+                    value={drawingVersion}
+                    onChange={(e) => setDrawingVersion(e.target.value)}
+                    placeholder="Enter version (e.g. v1)"
+                  />
+                </Form.Item>
+                <Upload
+                  maxCount={1}
+                  onChange={handleDrawingFileChange}
+                  beforeUpload={() => false}
+                  accept=".pdf,.dwg,.dxf"  // Specify accepted file types
+                  showUploadList={{ showRemoveIcon: true }}
+                >
+                  <Button 
+                    icon={<UploadOutlined />} 
+                    className="w-full"
+                    disabled={!drawingDocName.trim()}
+                  >
+                    {drawingFile ? 'Change Drawing File' : 'Select Drawing File'}
+                  </Button>
+                </Upload>
+              </>
+            )}
+          </Card>
         </Col>
       </Row>
+      {documentError && (
+        <Alert
+          message="Error Loading Documents"
+          description={documentError}
+          type="error"
+          showIcon
+          className="mt-4"
+        />
+      )}
     </>
   );
 

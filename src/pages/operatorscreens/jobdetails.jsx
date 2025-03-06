@@ -22,6 +22,8 @@ import OperationDetails from '../operatorscreens/JobDetails/OperationDetails';
 import PokaYokeChecklist from '../operatorscreens/JobDetails/PokaYokeChecklist';
 import FeedbackModal from '../operatorscreens/FeedbackModal';
 import moment from 'moment';
+//
+import useAuthStore from '../../store/auth-store';
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
@@ -100,6 +102,9 @@ const JobDetails = () => {
   const [isFeedbackModalVisible, setIsFeedbackModalVisible] = useState(false);
   const [feedbackList, setFeedbackList] = useState([]);
   const [showFeedbackList, setShowFeedbackList] = useState(false);
+
+  // Add auth store
+  const { currentMachine } = useAuthStore();
 
   const handleUpdate = () => {
     const newCount = parseInt(inputValue);
@@ -189,8 +194,8 @@ const JobDetails = () => {
                     className="w-full bg-sky-100 h-36 object-fit rounded-lg mb-3"
                   />
                   <div className='bg-sky-100 p-1 px-2 rounded-lg'>
-                  <div className="text-lg font-bold ">{jobData.machine.name}</div>
-                  <div className="text-gray-500 text-sm">ID: {jobData.machine.id}</div>
+                  <div className="text-lg font-bold ">{currentMachine?.make || 'No Machine Selected'}</div>
+                  <div className="text-gray-500 text-sm">Workcenter Name: {currentMachine?.work_center_name || 'N/A'}</div>
                   </div>
                   
                 </div>

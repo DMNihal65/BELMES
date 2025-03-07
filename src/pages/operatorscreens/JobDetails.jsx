@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Card, Button, Input, Layout, Modal, Tabs,
   Row, Col, Statistic, Badge, Space, Progress, Avatar,
-  Tooltip, Divider, Alert, message, Tag
+  Tooltip, Divider, Alert, message, Tag, Table, Empty
 } from 'antd';
 import { 
   ClockCircleOutlined, UserOutlined, BellOutlined,
@@ -20,7 +20,8 @@ import { Link } from 'react-router-dom';
 import IPID from '../operatorscreens/JobDetails/IPID';
 import OperationDetails from '../operatorscreens/JobDetails/OperationDetails';
 import PokaYokeChecklist from '../operatorscreens/JobDetails/PokaYokeChecklist';
-
+import FeedbackModal from '../operatorscreens/FeedbackModal';
+import moment from 'moment';
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
@@ -70,6 +71,22 @@ const mockJobData = {
   }
 };
 
+const operators = [
+  { name: 'Ramesh', shift: 1 },
+  { name: 'Suresh', shift: 2 },
+  { name: 'Rajesh', shift: 3 },
+  { name: 'Dinesh', shift: 1 },
+  { name: 'Mahesh', shift: 2 },
+];
+
+const machines = [
+  'DMG DMU 60 eVo',
+  'Mazak VTC-300C',
+  'Haas VF-2',
+  'Okuma MB-46VAE',
+  'Doosan DNM 4500'
+];
+
 const JobDetails = () => {
   // State management
   const [jobData, setJobData] = useState(mockJobData);
@@ -80,7 +97,10 @@ const JobDetails = () => {
   const currentTime = new Date().toLocaleTimeString();
 
   const [inputValue, setInputValue] = useState('');
-  
+  const [isFeedbackModalVisible, setIsFeedbackModalVisible] = useState(false);
+  const [feedbackList, setFeedbackList] = useState([]);
+  const [showFeedbackList, setShowFeedbackList] = useState(false);
+
   const handleUpdate = () => {
     const newCount = parseInt(inputValue);
     if (isNaN(newCount) || newCount > jobData.batchSize) {
@@ -106,29 +126,40 @@ const JobDetails = () => {
     return colors[status] || 'gray';
   };
 
+  const handleFeedbackSubmit = (feedback) => {
+    const randomOperator = operators[Math.floor(Math.random() * operators.length)];
+    const randomMachine = machines[Math.floor(Math.random() * machines.length)];
+    
+    const newFeedback = {
+      operator: `${randomOperator.name} (Shift ${randomOperator.shift})`,
+      machine: randomMachine,
+      feedback: feedback,
+      timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
+    };
+    
+    setFeedbackList([...feedbackList, newFeedback]);
+    message.success('Feedback submitted successfully!');
+  };
+
   return (
     <Layout className="h-screen flex flex-col bg-gray-50">
       {/* Top Header Bar */}
       <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm border-b">
         <div className="flex items-center gap-4">
-          <Link to="/dashboard">
-            <Button icon={<ArrowLeftOutlined />} size="large">
-              Back to Dashboard
-            </Button>
-          </Link>
+         
           <div>
-            <h1 className="text-2xl font-bold mb-1">Job Details</h1>
-            <div className="flex items-center gap-2 text-gray-500">
+            <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
+            {/* <div className="flex items-center gap-2 text-gray-500">
               <Clock size={16} />
               <span>Last updated: 5 mins ago</span>
-            </div>
+            </div> */}
           </div>
         </div>
         
         <Space size="large">
-          <Button type="primary" icon={<BellOutlined />}>
+          {/* <Button type="primary" icon={<BellOutlined />}>
             Notifications
-          </Button>
+          </Button> */}
           
         </Space>
       </div>
@@ -353,6 +384,26 @@ const JobDetails = () => {
           >
             Poka Yoke Checklist
           </Button>
+          <div className="flex gap-2">
+            <Button 
+              type="default"
+              onClick={() => setIsFeedbackModalVisible(true)}
+              className="flex-1"
+            >
+              Operator Feedback
+            </Button>
+            <Tooltip title={`Last feedback: ${feedbackList.length > 0 ? moment(feedbackList[feedbackList.length - 1].timestamp).fromNow() : 'No feedback yet'}`}>
+              <Badge count={feedbackList.length} style={{ backgroundColor: '#52c41a' }}>
+                <Button 
+                  type="default"
+                  onClick={() => setShowFeedbackList(true)}
+                  icon={<Eye className="w-4 h-4" />}
+                >
+                  View Feedback
+                </Button>
+              </Badge>
+            </Tooltip>
+          </div>
           <div className="text-center text-xs text-gray-500">
             Last inspection: {jobData.quality.lastInspection}
           </div>
@@ -404,6 +455,13 @@ const JobDetails = () => {
           </div>
         </div>
       </Content>
+      {/* Feedback Modal */}
+      <FeedbackModal 
+            visible={isFeedbackModalVisible} 
+            onClose={() => setIsFeedbackModalVisible(false)} 
+            onSubmit={handleFeedbackSubmit}
+            feedbackList={feedbackList}
+          />
 
       {/* Poka-Yoke Modal */}
       <Modal
@@ -420,6 +478,86 @@ const JobDetails = () => {
         className="quality-modal"
       >
         <PokaYokeChecklist jobId={jobData.jobId} />
+      </Modal>
+
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <FileText className="text-blue-500" />
+            <span>Feedback History</span>
+          </div>
+        }
+        open={showFeedbackList}
+        onCancel={() => setShowFeedbackList(false)}
+        footer={null}
+        width={800}
+      >
+        {feedbackList.length > 0 ? (
+          <div className="space-y-4">
+            <Table
+              dataSource={feedbackList.map((item, index) => ({
+                key: index,
+                operator: item.operator,
+                machine: item.machine,
+                feedback: item.feedback,
+                timestamp: item.timestamp
+              }))}
+              columns={[
+                {
+                  title: 'Operator (Shift)',
+                  dataIndex: 'operator',
+                  key: 'operator',
+                  width: '20%',
+                  render: (text) => (
+                    <div className="flex items-center gap-2">
+                      <UserOutlined className="text-blue-500" />
+                      <span className="font-medium">{text}</span>
+                    </div>
+                  )
+                },
+                {
+                  title: 'Machine',
+                  dataIndex: 'machine',
+                  key: 'machine',
+                  width: '20%',
+                  render: (text) => (
+                    <div className="flex items-center gap-2">
+                      <ToolOutlined className="text-blue-500" />
+                      <span className="font-medium">{text}</span>
+                    </div>
+                  )
+                },
+                {
+                  title: 'Feedback',
+                  dataIndex: 'feedback',
+                  key: 'feedback',
+                  width: '40%',
+                  render: (text) => (
+                    <div className="bg-gray-50 p-3 rounded-lg shadow-sm">
+                      <p className="text-gray-700 whitespace-pre-wrap">{text}</p>
+                    </div>
+                  )
+                },
+                {
+                  title: 'Timestamp',
+                  dataIndex: 'timestamp',
+                  key: 'timestamp',
+                  width: '20%',
+                  render: (text) => (
+                    <div className="flex items-center gap-2">
+                      <ClockCircleOutlined className="text-blue-500" />
+                      <span className="text-gray-600">{moment(text).format('MMM DD, YYYY HH:mm')}</span>
+                    </div>
+                  )
+                }
+              ]}
+              pagination={false}
+              className="feedback-table"
+            />
+          </div>
+        ) : (
+          <Empty description="No feedback available" />
+        )}
       </Modal>
 
       <style jsx global>{`
@@ -608,6 +746,30 @@ const JobDetails = () => {
         .ant-modal-content,
         .ant-space {
           font-family: var(--font-family) !important;
+        }
+
+        .feedback-table .ant-table {
+          background: white;
+          border-radius: 8px;
+        }
+
+        .feedback-table .ant-table-thead > tr > th {
+          background: #f8fafc;
+          color: #475569;
+          font-weight: 600;
+        }
+
+        .feedback-table .ant-table-tbody > tr:hover > td {
+          background: #f1f5f9;
+        }
+
+        .feedback-table .ant-table-tbody > tr > td {
+          vertical-align: top;
+          padding: 16px;
+        }
+
+        .feedback-table .ant-table-tbody > tr {
+          border-bottom: 1px solid #e5e7eb;
         }
       `}</style>
     </Layout>

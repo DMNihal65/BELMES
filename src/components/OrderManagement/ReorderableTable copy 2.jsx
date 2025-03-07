@@ -55,6 +55,12 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
       ),
     },
     {
+      title: 'SI.No',
+      key: 'serialNumber',
+      width: 70,
+      render: (_, __, index) => index + 1,
+    },
+    {
       title: 'Production Order',
       dataIndex: 'production_order',
       key: 'production_order',
@@ -120,18 +126,11 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
       render: (_, record) => (
         <div>
           <div>{record.project?.name}</div>
-          <Tag color={getTagColor(record.project?.priority)}>
+          <Tag color={record.project?.priority === 1 ? 'red' : 'blue'}>
             Priority: {record.project?.priority}
           </Tag>
         </div>
       ),
-      sorter: (a, b) => {
-        // Sort by priority number
-        const priorityA = a.project?.priority || Infinity;
-        const priorityB = b.project?.priority || Infinity;
-        return priorityA - priorityB;
-      },
-      defaultSortOrder: 'ascend', // Start with ascending sort
     },
     // {
     //   title: 'Priority',
@@ -160,24 +159,6 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
     //   },
     // }
   ];
-
-  // Helper function to determine tag color based on priority
-  const getTagColor = (priority) => {
-    switch (priority) {
-      case 1:
-        return 'red';
-      case 2:
-        return 'orange';
-      case 3:
-        return 'yellow';
-      case 4:
-        return 'blue';
-      case 5:
-        return 'cyan';
-      default:
-        return 'default';
-    }
-  };
 
   const onDragEnd = async ({ active, over }) => {
     if (active.id !== over?.id) {
@@ -221,18 +202,12 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
                   ...order,
                   project: {
                     ...order.project,
-                    priority: updatedPriority.priority,
-                    name: updatedPriority.name // Make sure to update the name too
+                    priority: updatedPriority.priority
                   }
                 };
               }
               return order;
             });
-
-            // Sort the orders by priority
-            updatedOrders.sort((a, b) => 
-              (a.project?.priority || Infinity) - (b.project?.priority || Infinity)
-            );
 
             // Update both local and parent state
             setLocalOrders(updatedOrders);
@@ -269,21 +244,11 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
             dataSource={localOrders}
             rowKey="id"
             pagination={false}
-            rowClassName={(record) => {
-              const priority = record.project?.priority;
-              if (priority === 1) return 'bg-red-50';
-              if (priority === 2) return 'bg-orange-50';
-              if (priority === 3) return 'bg-yellow-50';
-              return '';
-            }}
+            rowClassName={(record) =>
+              record.project?.priority === 1 ? 'bg-red-50' : ''
+            }
             scroll={{ y: 480 }}
             size="middle"
-            onChange={(pagination, filters, sorter) => {
-              if (sorter.field === 'project') {
-                // Sort is handled automatically by Table component
-                console.log('Project column sorted:', sorter.order);
-              }
-            }}
           />
         </SortableContext>
       </DndContext>

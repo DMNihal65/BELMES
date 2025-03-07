@@ -21,9 +21,9 @@ import Row from './Row';
 
 const ReorderableTable = ({ orders, onOrdersReorder }) => {
   const [localOrders, setLocalOrders] = useState([]);
-  const { swapOrderPriority } = useOrderStore();
+  const { swapOrderPriority, fetchAllOrders } = useOrderStore();
 
-  // Only update localOrders when orders prop changes and there's no drag operation in progress
+  // Initialize and update local orders when props change
   useEffect(() => {
     const ordersWithIds = orders.map((order, index) => ({
       ...order,
@@ -53,6 +53,12 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
           style={{ cursor: 'move' }}
         />
       ),
+    },
+    {
+      title: 'SI.No',
+      key: 'serialNumber',
+      width: 70,
+      render: (_, __, index) => index + 1,
     },
     {
       title: 'Production Order',
@@ -120,18 +126,11 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
       render: (_, record) => (
         <div>
           <div>{record.project?.name}</div>
-          <Tag color={getTagColor(record.project?.priority)}>
+          <Tag color={record.project?.priority === 1 ? 'red' : 'blue'}>
             Priority: {record.project?.priority}
           </Tag>
         </div>
       ),
-      sorter: (a, b) => {
-        // Sort by priority number
-        const priorityA = a.project?.priority || Infinity;
-        const priorityB = b.project?.priority || Infinity;
-        return priorityA - priorityB;
-      },
-      defaultSortOrder: 'ascend', // Start with ascending sort
     },
     // {
     //   title: 'Priority',
@@ -161,24 +160,6 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
     // }
   ];
 
-  // Helper function to determine tag color based on priority
-  const getTagColor = (priority) => {
-    switch (priority) {
-      case 1:
-        return 'red';
-      case 2:
-        return 'orange';
-      case 3:
-        return 'yellow';
-      case 4:
-        return 'blue';
-      case 5:
-        return 'cyan';
-      default:
-        return 'default';
-    }
-  };
-
   const onDragEnd = async ({ active, over }) => {
     if (active.id !== over?.id) {
       const activeIndex = localOrders.findIndex(i => i.id === active.id);
@@ -189,59 +170,22 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
           const activeOrder = localOrders[activeIndex];
           const overOrder = localOrders[overIndex];
 
+          // Make sure we have the production orders
           if (!activeOrder.production_order || !overOrder.production_order) {
             throw new Error('Missing production order numbers');
           }
 
-          // Create new array with swapped items first
-          const newOrders = [...localOrders];
-          const temp = newOrders[activeIndex];
-          newOrders[activeIndex] = newOrders[overIndex];
-          newOrders[overIndex] = temp;
-
-          // Update local state immediately to prevent flickering
-          setLocalOrders(newOrders);
-
-          // Call API to update priorities
-          const result = await swapOrderPriority(
-            activeOrder.production_order,
-            overOrder.production_order,
-            activeIndex + 1,
-            overIndex + 1
+          await swapOrderPriority(
+            activeOrder.production_order,  // Use production_order
+            overOrder.production_order,    // Use production_order
+            activeIndex + 1,              // Position as priority
+            overIndex + 1                 // Position as priority
           );
 
-          if (result.updated_priorities) {
-            // Update priorities based on API response
-            const updatedOrders = newOrders.map(order => {
-              const updatedPriority = result.updated_priorities.find(
-                up => up.project_id === order.project?.id
-              );
-              if (updatedPriority) {
-                return {
-                  ...order,
-                  project: {
-                    ...order.project,
-                    priority: updatedPriority.priority,
-                    name: updatedPriority.name // Make sure to update the name too
-                  }
-                };
-              }
-              return order;
-            });
-
-            // Sort the orders by priority
-            updatedOrders.sort((a, b) => 
-              (a.project?.priority || Infinity) - (b.project?.priority || Infinity)
-            );
-
-            // Update both local and parent state
-            setLocalOrders(updatedOrders);
-            onOrdersReorder(updatedOrders);
-            message.success('Orders reordered successfully');
-          }
+          // Refresh orders after successful swap
+          await fetchAllOrders();
+          message.success('Orders reordered successfully');
         } catch (error) {
-          // Revert the local state if there's an error
-          setLocalOrders(localOrders);
           message.error('Failed to reorder: ' + error.message);
         }
       }
@@ -269,21 +213,11 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
             dataSource={localOrders}
             rowKey="id"
             pagination={false}
-            rowClassName={(record) => {
-              const priority = record.project?.priority;
-              if (priority === 1) return 'bg-red-50';
-              if (priority === 2) return 'bg-orange-50';
-              if (priority === 3) return 'bg-yellow-50';
-              return '';
-            }}
+            rowClassName={(record) =>
+              record.project?.priority === 1 ? 'bg-red-50' : ''
+            }
             scroll={{ y: 480 }}
             size="middle"
-            onChange={(pagination, filters, sorter) => {
-              if (sorter.field === 'project') {
-                // Sort is handled automatically by Table component
-                console.log('Project column sorted:', sorter.order);
-              }
-            }}
           />
         </SortableContext>
       </DndContext>

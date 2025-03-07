@@ -71,12 +71,40 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         return false;
       }
 
-      await uploadPDF(file);
-      setCurrentStep(1); // Move to order details after successful upload
-      return false;
-
+      // Upload OARC document
       const result = await uploadPDF(file);
-      setRawMaterials(result.raw_materials || []);
+      console.log('OARC Upload Response:', result);
+
+      // Store raw materials exactly as they come from the API
+      setRawMaterials(result['Raw Materials'] || []);
+
+      // Store operations data
+      const operations = result.Operations || [];
+
+      // Set form fields with the extracted data
+      const formData = {
+        production_order: result['Prod Order No'],
+        sale_order: result['Sale Order'],
+        project_name: result['Project Name'],
+        priority: 'normal',
+        wbs_element: result['WBS'],
+        part_number: result['Part No'],
+        part_description: result['Part Desc'],
+        total_operations: operations.length,
+        required_quantity: parseInt(result['Required Qty']) || 0,
+        launched_quantity: parseInt(result['Launched Qty']) || 0,
+        plant_id: result['Plant'],
+        operations: operations
+      };
+
+      console.log('Setting form data:', formData);
+      form.setFieldsValue(formData);
+
+      // Get documents for the part number
+      if (result['Part No']) {
+        await fetchDocumentsByPartNumber(result['Part No']);
+      }
+
       setCurrentStep(1);
       return false;
     } catch (error) {
@@ -149,13 +177,13 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         try {
           await uploadMppFile(
             mppFile,
-            values.partNumber,
+            values.part_number,
             mppDocName.trim(),
             mppDescription.trim() || '',
             mppVersion.trim()
           );
         } catch (error) {
-          message.error('Failed to upload MPP document');
+          message.error('Failed to upload MPP document: ' + error.message);
           throw error;
         }
       }
@@ -164,76 +192,70 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         try {
           await uploadEngineeringDrawing(
             drawingFile,
-            values.partNumber,
+            values.part_number,
             drawingDocName.trim(),
             drawingDescription.trim() || '',
             drawingVersion.trim()
           );
         } catch (error) {
-          message.error('Failed to upload Engineering Drawing');
+          message.error('Failed to upload Engineering Drawing: ' + error.message);
           throw error;
         }
       }
 
-      // Prepare order data
+      // Prepare data for save-to-db with all details from OARC
       const orderData = {
-        projectName: values.projectName || "",
-        salesOrderNumber: values.salesOrderNumber || "",
-        partNumber: values.partNumber || "",
-        materialDescription: values.materialDescription || "",
-        targetQuantity: values.targetQuantity || 0,
-        launchedQuantity: values.launchedQuantity || 0,
-        plant: values.plant || "",
-        wbsElement: values.wbsElement || "",
-        orderNumber: values.orderNumber || "",
-        totalOperations: values.totalOperations || 0
+        data: {
+          "Project Name": values.project_name,
+          "Sale Order": values.sale_order,
+          "Part No": values.part_number,
+          "Part Desc": values.part_description,
+          "Required Qty": String(values.required_quantity),
+          "Plant": values.plant_id,
+          "WBS": values.wbs_element,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Launched Qty": String(values.launched_quantity),
+          "Prod Order No": values.production_order,
+          "Operations": form.getFieldValue('operations') || [],
+          "Document Verification": documents || {},
+          "Raw Materials": rawMaterials.map(material => ({
+            "Sl.No": material.Sl.No,
+            "Child Part No": material["Child Part No"],
+            "Description": material.Description,
+            "Qty Per Set": material["Qty Per Set"],
+            "Total Qty": material["Total Qty"],
+            "UoM": material.UoM
+          }))
+        }
       };
 
-      console.log('Submitting order data:', orderData);
+      console.log('Sending to save-to-db:', orderData);
 
       // Create order
-      const response = await createOrder(orderData);
-      console.log('Create order response:', response);
+      const response = await fetch('http://172.18.7.85:4787/api/v1/planning/save-to-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(orderData)
+      });
 
-      if (response && response.message === "Data saved successfully") {
+      const result = await response.json();
+      console.log('Save to DB response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to create order');
+      }
+
+      if (result && result.message === "Data saved successfully") {
         message.success('Order created successfully');
-        
-        const orderDetails = response.order_details;
-        
-        // Display detailed success message
-        const orderSummary = `
-          Order Details:
-          - Order Number: ${orderDetails.production_order}
-          - Sales Order: ${orderDetails.sale_order}
-          - Part Number: ${orderDetails.part_number}
-          - Description: ${orderDetails.part_description}
-          - Required Quantity: ${orderDetails.required_quantity}
-          
-          Project Details:
-          - Name: ${orderDetails.project.name}
-          - Priority: ${orderDetails.project.priority}
-          - Delivery Date: ${new Date(orderDetails.project.delivery_date).toLocaleDateString()}
-          
-          ${orderDetails.raw_material ? `
-          Raw Material:
-          - Part Number: ${orderDetails.raw_material.child_part_number}
-          - Description: ${orderDetails.raw_material.description}
-          - Quantity: ${orderDetails.raw_material.quantity} ${orderDetails.raw_material.unit.name}
-          - Status: ${orderDetails.raw_material.status.name}
-          ` : ''}
-        `;
-
-        message.info({
-          content: orderSummary,
-          duration: 10,
-          style: { whiteSpace: 'pre-wrap' }
-        });
-
-        onCreate(response);
+        onCreate(result);
         form.resetFields();
         onCancel();
       } else {
-        throw new Error('Failed to create order: Invalid response from server');
+        throw new Error(result.message || 'Failed to create order');
       }
     } catch (error) {
       console.error('Order submission error:', error);
@@ -297,10 +319,10 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
 
   // Add useEffect to fetch documents when part number is available
   useEffect(() => {
-    if (form.getFieldValue('partNumber')) {
-      fetchDocumentsByPartNumber(form.getFieldValue('partNumber'));
+    if (form.getFieldValue('part_number')) {
+      fetchDocumentsByPartNumber(form.getFieldValue('part_number'));
     }
-  }, [form.getFieldValue('partNumber')]);
+  }, [form.getFieldValue('part_number')]);
 
   const renderOrderForm = () => (
     <Form
@@ -756,7 +778,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       };
 
       // Save to database
-      const response = await fetch('http://172.18.7.88:6699/api/v1/planning/save-to-db', {
+      const response = await fetch('http://172.18.7.85:9671/api/v1/planning/save-to-db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

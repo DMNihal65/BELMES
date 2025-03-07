@@ -15,9 +15,9 @@ const OrderDashboard = () => {
   const { orders, fetchAllOrders, fetchTimelineData, timelineData, isLoading, error } = useOrderStore();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [parent] = useAutoAnimate();
-  const [localOrders, setLocalOrders] = useState([]);
   
   const handleRefresh = useCallback(() => {
+    // Only fetch timeline data on refresh
     fetchTimelineData();
   }, [fetchTimelineData]);
 
@@ -26,16 +26,6 @@ const OrderDashboard = () => {
     fetchAllOrders();
     fetchTimelineData();
   }, []); // Empty dependency array means this runs once on mount
-
-  useEffect(() => {
-    setLocalOrders(orders);
-  }, [orders]);
-
-  const handleOrdersReorder = (newOrders) => {
-    setLocalOrders(newOrders); // Update the local state with the new order
-    // Update the orders in all tabs by updating the store
-    useOrderStore.setState({ orders: newOrders });
-  };
 
   const fadeIn = {
     initial: { opacity: 0, y: 20 },
@@ -185,10 +175,7 @@ const OrderDashboard = () => {
                 <Tabs defaultActiveKey="all" className="h-full">
                   <TabPane tab="All Orders" key="all">
                     <div className="h-full overflow-auto">
-                      <OrderTable 
-                        orders={localOrders}
-                        onRefresh={handleRefresh} 
-                      />
+                      <OrderTable orders={orders} onRefresh={handleRefresh} />
                     </div>
                   </TabPane>
                   <TabPane tab="In Progress" key="in_progress">
@@ -215,8 +202,14 @@ const OrderDashboard = () => {
                   <TabPane tab="Priority" key="reorder">
                     <div className="h-full overflow-auto">
                       <ReorderableTable 
-                        orders={localOrders}
-                        onOrdersReorder={handleOrdersReorder}
+                        orders={orders.map(order => ({
+                          ...order,
+                          id: order.key
+                        }))} 
+                        onOrdersReorder={(newOrders) => {
+                          console.log('Orders reordered:', newOrders);
+                          message.success('Order sequence updated successfully');
+                        }} 
                       />
                     </div>
                   </TabPane>

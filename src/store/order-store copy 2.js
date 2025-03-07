@@ -266,7 +266,27 @@ const useOrderStore = create((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      console.log('Sending order data:', orderData);
+      // Transform the data to match the expected API format
+      const transformedData = {
+        data: {
+          "Project Name": orderData.projectName,
+          "Sale Order": orderData.salesOrderNumber,
+          "Part No": orderData.partNumber,
+          "Part Desc": orderData.materialDescription,
+          "Required Qty": orderData.targetQuantity.toString(),
+          "Launched Qty": orderData.launchedQuantity.toString(),
+          "Plant": orderData.plant.toString(),
+          "WBS": orderData.wbsElement,
+          "Prod Order No": orderData.orderNumber,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Operations": [],
+          "Document Verification": {},
+          "Raw Materials": []
+        }
+      };
+
+      console.log('Sending transformed data:', JSON.stringify(transformedData, null, 2));
 
       const response = await fetch('http://172.18.7.85:4787/api/v1/planning/save-to-db', {
         method: 'POST',
@@ -274,27 +294,34 @@ const useOrderStore = create((set, get) => ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({
-          data: orderData
-        })
+        body: JSON.stringify(transformedData)
       });
 
       const result = await response.json();
       console.log('Server response:', result);
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to create order');
+        let errorMessage = 'Failed to create order';
+        if (result.detail) {
+          errorMessage = Array.isArray(result.detail)
+            ? result.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join('; ')
+            : result.detail;
+        } else if (result.message) {
+          errorMessage = result.message;
+        }
+        throw new Error(errorMessage);
       }
 
-      // Refresh orders list after successful creation
+      // Refresh the orders list after successful creation
       await get().fetchAllOrders();
 
       set({ isLoading: false });
       return result;
     } catch (error) {
       console.error('Create order error:', error);
-      set({ error: error.message, isLoading: false });
-      throw error;
+      const errorMessage = error.message || 'Failed to create order';
+      set({ error: errorMessage, isLoading: false });
+      throw new Error(errorMessage);
     }
   },
 

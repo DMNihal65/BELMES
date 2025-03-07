@@ -266,7 +266,27 @@ const useOrderStore = create((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      console.log('Sending order data:', orderData);
+      // Transform the data to match the expected API format
+      const transformedData = {
+        data: {
+          "Project Name": orderData.projectName,
+          "Sale Order": orderData.salesOrderNumber,
+          "Part No": orderData.partNumber,
+          "Part Desc": orderData.materialDescription,
+          "Required Qty": orderData.targetQuantity.toString(),
+          "Launched Qty": orderData.launchedQuantity.toString(),
+          "Plant": orderData.plant.toString(),
+          "WBS": orderData.wbsElement,
+          "Prod Order No": orderData.orderNumber,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Operations": [],
+          "Document Verification": {},
+          "Raw Materials": []
+        }
+      };
+
+      console.log('Sending transformed data:', JSON.stringify(transformedData, null, 2));
 
       const response = await fetch('http://172.18.7.85:4787/api/v1/planning/save-to-db', {
         method: 'POST',
@@ -274,27 +294,34 @@ const useOrderStore = create((set, get) => ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({
-          data: orderData
-        })
+        body: JSON.stringify(transformedData)
       });
 
       const result = await response.json();
       console.log('Server response:', result);
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to create order');
+        let errorMessage = 'Failed to create order';
+        if (result.detail) {
+          errorMessage = Array.isArray(result.detail)
+            ? result.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join('; ')
+            : result.detail;
+        } else if (result.message) {
+          errorMessage = result.message;
+        }
+        throw new Error(errorMessage);
       }
 
-      // Refresh orders list after successful creation
+      // Refresh the orders list after successful creation
       await get().fetchAllOrders();
 
       set({ isLoading: false });
       return result;
     } catch (error) {
       console.error('Create order error:', error);
-      set({ error: error.message, isLoading: false });
-      throw error;
+      const errorMessage = error.message || 'Failed to create order';
+      set({ error: errorMessage, isLoading: false });
+      throw new Error(errorMessage);
     }
   },
 
@@ -589,6 +616,11 @@ const useOrderStore = create((set, get) => ({
         throw new Error('Could not find order IDs for the selected orders');
       }
 
+      console.log('Found orders:', {
+        order1: { production_order: order1.production_order, id: order1.id },
+        order2: { production_order: order2.production_order, id: order2.id }
+      });
+
       // Make the priority update request using the order IDs from all_orders
       const response = await fetch(
         `http://172.18.7.85:4787/api/v1/planning/order/${order1.id}/priority`,
@@ -610,6 +642,20 @@ const useOrderStore = create((set, get) => ({
       if (!response.ok) {
         throw new Error(data.message || 'Failed to update priority');
       }
+
+      // Fetch updated orders list
+      const updatedOrdersResponse = await fetch('http://172.18.7.88:6699/api/v1/planning/all_orders');
+      const updatedOrdersData = await updatedOrdersResponse.json();
+
+      if (!updatedOrdersResponse.ok) {
+        throw new Error('Failed to fetch updated orders');
+      }
+
+      // Update state with fresh data
+      set({ 
+        orders: updatedOrdersData,
+        isLoading: false 
+      });
 
       return data;
     } catch (error) {

@@ -525,7 +525,7 @@ const InventoryAllData = () => {
 
           try {
             const response = await axios.post(
-              'http://172.18.7.88:6699/api/v1/api/inventory/items/bulk/',
+              'http://172.18.7.85:4787/api/v1/api/inventory/items/bulk/',
               {
                 created_by: 1,
                 subcategory_id: selectedCategory.id,

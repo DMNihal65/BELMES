@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Card, Button, Input, Layout, Modal, Tabs,
   Row, Col, Statistic, Badge, Space, Progress, Avatar,
-  Tooltip, Divider, Alert, message, Tag, Table, Empty
+  Tooltip, Divider, Alert, message, Tag, Table, Empty, DatePicker
 } from 'antd';
 import { 
   ClockCircleOutlined, UserOutlined, BellOutlined,
   ToolOutlined, CheckCircleOutlined, FileTextOutlined,
-  ArrowLeftOutlined
+  ArrowLeftOutlined, InfoCircleOutlined
 } from '@ant-design/icons';
 import {
   Timer, AlertTriangle, CheckCircle2, 
   FileText, Eye, Gauge, Settings, AlertOctagon,
   Clock, Activity, Power, ArrowUpCircle,
   AlertCircle, Ticket,
-  Wrench
+  Wrench, CalendarDays, Clock3
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import IPID from '../operatorscreens/JobDetails/IPID';
@@ -22,14 +22,31 @@ import OperationDetails from '../operatorscreens/JobDetails/OperationDetails';
 import PokaYokeChecklist from '../operatorscreens/JobDetails/PokaYokeChecklist';
 import FeedbackModal from '../operatorscreens/FeedbackModal';
 import moment from 'moment';
+import MachineIssueModal from './MachineIssueModal';
+import useAuthStore from '../../store/auth-store';
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
 // Mock data definition
 const mockJobData = {
   jobId: 'JOB-2024-001',
+  part_number: '211071570096',
+  production_order: '10581931',
+  sale_order: '07/3111202690/0010',
+  wbs_element: 'Sale order :07/3111202690/0010 Part Desc :CAVITY SPACER 4-BUTTON -3  (17.4) Tot.No of Oprns :5',
+  part_description: 'CAVITY SPACER 4-BUTTON -3',
+  total_operations: 5,
+  required_quantity: 2,
+  launched_quantity: 2,
+  plant_id: '1154',
+  project: {
+    id: 1,
+    name: 'MWT-TWT-BCCT 2000X',
+    priority: 1,
+    delivery_date: '2025-02-12T15:50:49.636790'
+  },
   partNumber: 'PA-0014',
-  partName: 'Aluminum Housing',
+  partName: 'HMC METAL TYPE',
   batchSize: 120,
   priority: 'High',
   jobDetails: {
@@ -39,8 +56,8 @@ const mockJobData = {
     orderQuantity: 120,
     completedQuantity: 75,
     remainingQuantity: 45,
-    partnumber: 'PA-001',
-    partname: 'Aluminum Housing',
+    partnumber: '62805080AA',
+    partname: 'HMC METAL TYPE',
     parameters: {
       orderNumber: 'ORD-2024-001',
       customer: 'ABC Manufacturing',
@@ -48,9 +65,9 @@ const mockJobData = {
     }
   },
   machine: {
-    id: 'OP10',
+    id: 'OP30',
     name: 'DMG DMU 60 eVo',
-    status: 'down',
+    status: 'IDLE',
     efficiency: 92,
     currentCycle: '02:45',
     nextMaintenance: '4hrs',
@@ -93,13 +110,57 @@ const JobDetails = () => {
   const [activeTab, setActiveTab] = useState('operations');
   const [showPokaYoke, setShowPokaYoke] = useState(false);
   const [partCount, setPartCount] = useState(jobData.machine.completedParts);
-  const currentShift = "Morning"; // This could be dynamic
-  const currentTime = new Date().toLocaleTimeString();
+  const [currentTime, setCurrentTime] = useState(moment().format('HH:mm:ss'));
+  const [currentShift, setCurrentShift] = useState('Shift 1'); // You can make this dynamic based on time
 
   const [inputValue, setInputValue] = useState('');
   const [isFeedbackModalVisible, setIsFeedbackModalVisible] = useState(false);
   const [feedbackList, setFeedbackList] = useState([]);
   const [showFeedbackList, setShowFeedbackList] = useState(false);
+
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [totalHours, setTotalHours] = useState(0);
+
+  const [showIssueModal, setShowIssueModal] = useState(false);
+
+  const [machineTimer, setMachineTimer] = useState(0);
+  const [timerInterval, setTimerInterval] = useState(null);
+
+  const [quickFeedback, setQuickFeedback] = useState('');
+
+  useEffect(() => {
+    if (jobData.machine.status === 'ON') {
+      const interval = setInterval(() => {
+        setMachineTimer(prev => prev + 1);
+      }, 1000);
+      setTimerInterval(interval);
+    } else {
+      clearInterval(timerInterval);
+      if (jobData.machine.status === 'PRODUCTION') {
+        setMachineTimer(0);
+      }
+    }
+    return () => clearInterval(timerInterval);
+  }, [jobData.machine.status]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(moment().format('HH:mm:ss'));
+      // You can also update shift here based on time
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+    // Add auth store
+    const { currentMachine } = useAuthStore();
 
   const handleUpdate = () => {
     const newCount = parseInt(inputValue);
@@ -117,13 +178,12 @@ const JobDetails = () => {
   };
 
   const getMachineStatusColor = (status) => {
-    const colors = {
-      running: 'green',
-      idle: 'orange',
-      down: 'red',
-      maintenance: 'blue'
+    const statusConfig = {
+      'OFF': { color: 'red', bgColor: 'bg-red-50', textColor: 'text-red-700' },
+      'ON': { color: 'orange', bgColor: 'bg-yellow-50', textColor: 'text-yellow-700' },
+      'PRODUCTION': { color: 'green', bgColor: 'bg-green-50', textColor: 'text-green-700' }
     };
-    return colors[status] || 'gray';
+    return statusConfig[status] || { color: 'default', bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
   };
 
   const handleFeedbackSubmit = (feedback) => {
@@ -141,81 +201,174 @@ const JobDetails = () => {
     message.success('Feedback submitted successfully!');
   };
 
+  const calculateHours = (start, end) => {
+    if (!start || !end) return;
+    const hours = moment(end).diff(moment(start), 'hours', true);
+    setTotalHours(parseFloat(hours.toFixed(2)));
+  };
+
+  const handleIssueSubmit = (issueData) => {
+    // Here you would send the issue data to your backend
+    console.log('Issue submitted:', issueData);
+    message.success('Maintenance ticket raised successfully');
+    setShowIssueModal(false);
+  };
+
   return (
     <Layout className="h-screen flex flex-col bg-gray-50">
       {/* Top Header Bar */}
       <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm border-b">
         <div className="flex items-center gap-4">
-         
           <div>
-            <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-            {/* <div className="flex items-center gap-2 text-gray-500">
-              <Clock size={16} />
-              <span>Last updated: 5 mins ago</span>
-            </div> */}
+            <h1 className="text-2xl font-bold mb-2">Dashboard</h1>
+            <div className="flex items-center gap-4 text-gray-600">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-500" />
+                <span className="font-medium">{currentTime}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <UserOutlined className="text-blue-500" />
+                <span className="font-medium">{currentShift}</span>
+              </div>
+            </div>
           </div>
         </div>
-        
-        <Space size="large">
-          {/* <Button type="primary" icon={<BellOutlined />}>
-            Notifications
-          </Button> */}
-          
-        </Space>
       </div>
 
       {/* Main Content Area */}
       <Content className="p-6 flex-1 overflow-hidden">
         <div className="h-full flex flex-col gap-6">
           {/* Status Cards Grid */}
-          <div className="grid grid-cols-4 gap-6 h-1/2">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6" style={{ minHeight: '55vh' }}>
             {/* Machine Status Card */}
             <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-gray-100">
-              <div className="px-4 py-3 border-b border-gray-100 flex bg-sky-200 justify-between items-center">
-                <div className="flex items-center gap-2 bg-sky-100 p-1 px-2 rounded-lg">
+              <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                <div className="flex items-center gap-2">
                   <Wrench className="text-blue-500" />
                   <span className="font-semibold">Machine Status</span>
                 </div>
-                <Badge 
-                  status={getMachineStatusColor(jobData.machine.status)}
-                  text={jobData.machine.status.toUpperCase()}
-                />
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${getMachineStatusColor(jobData.machine.status).bgColor}`}>
+                  <span className={`w-2 h-2 rounded-full bg-${getMachineStatusColor(jobData.machine.status).color}-500 animate-pulse`} />
+                  <span className={getMachineStatusColor(jobData.machine.status).textColor}>
+                    {jobData.machine.status}
+                  </span>
+                </div>
               </div>
-              <div className="p-4 ">
-                <div className="mb-4 ">
-                  <img 
-                    src="/dmg.png"
-                    alt="Machine" 
-                    className="w-full bg-sky-100 h-36 object-fit rounded-lg mb-3"
-                  />
-                  <div className='bg-sky-100 p-1 px-2 rounded-lg'>
-                  <div className="text-lg font-bold ">{jobData.machine.name}</div>
-                  <div className="text-gray-500 text-sm">ID: {jobData.machine.id}</div>
-                  </div>
-                  
-                </div>
-                <Divider className="my-2" />
-                <div className="grid grid-cols-2 gap-4 mb-2">
-                  <div>
-                    <div className="text-sm text-gray-500">Efficiency</div>
-                    <div className="text-xl font-semibold text-green-500">
-                      {jobData.machine.efficiency}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Cycle Time</div>
-                    <div className="text-xl font-semibold">
-                      {jobData.machine.currentCycle}
+              
+              <div className="p-4 space-y-3">
+                {/* Machine Image and Basic Info */}
+                <div className="bg-white rounded-lg overflow-hidden">
+                  <div className="relative h-32">
+                    <img 
+                      src="/dmg.png" 
+                      alt="Machine"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                    <div className="text-lg font-bold ">{currentMachine?.make || 'No Machine Selected'}</div>
+                      <div className="text-white/80 text-sm">ID: {jobData.machine.id}</div>
                     </div>
                   </div>
                 </div>
-                {jobData.machine.status !== 'running' && (
+
+                {/* Timer when machine is ON */}
+                {jobData.machine.status === 'ON' && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-yellow-600" />
+                        <span className="text-sm text-yellow-700">Idle Time</span>
+                      </div>
+                      <div className="text-lg font-mono font-bold text-yellow-600">
+                        {formatTime(machineTimer)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Current Operation Info */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Tooltip title="Current Order: OP30 - Milling">  
+                    <div className="bg-white p-2 rounded-lg">
+                      <div className="text-xs text-gray-500">Current Order</div>
+                      <div className="font-medium text-sm truncate">OP30 - Milling</div>
+                    </div>
+                  </Tooltip>
+                  <Tooltip title="Operation: Face Milling">
+                    <div className="bg-white p-2 rounded-lg">
+                      <div className="text-xs text-gray-500">Operation</div>
+                      <div className="font-medium text-sm truncate">Face Milling</div>
+                    </div>
+                  </Tooltip>
+                </div>
+
+                {/* Machine Parameters */}
+                {/* <div className="bg-white rounded-lg p-2">
+                  <div className="text-xs text-gray-500 mb-2">Machine Parameters</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <div className="text-xs text-gray-500">Speed</div>
+                      <div className="text-sm font-medium">1200 RPM</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Feed</div>
+                      <div className="text-sm font-medium">300 mm/min</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Temp</div>
+                      <div className="text-sm font-medium">28°C</div>
+                    </div>
+                  </div>
+                </div> */}
+
+                {/* Performance Metrics */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white p-2 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500">Efficiency</span>
+                      <span className={`text-xs ${jobData.machine.efficiency >= 80 ? 'text-green-600' : 'text-orange-600'}`}>
+                        {jobData.machine.efficiency}%
+                      </span>
+                    </div>
+                    <Progress 
+                      percent={jobData.machine.efficiency} 
+                      size="small" 
+                      strokeColor={{
+                        '0%': '#fbbf24',
+                        '100%': '#16a34a',
+                      }}
+                      showInfo={false}
+                    />
+                  </div>
+                  <div className="bg-white p-2 rounded-lg">
+                    <div className="text-xs text-gray-500">Uptime</div>
+                    <div className="text-sm font-semibold text-blue-600">
+                      {jobData.machine.currentCycle}hrs
+                    </div>
+                  </div>
+                </div>
+
+                {/* Start Time */}
+                <div className="bg-white p-2 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-gray-500" />
+                    <div>
+                      <div className="text-xs text-gray-500">Start Time</div>
+                      <div className="text-sm font-medium">
+                        {moment(jobData.machine.start_time).format('DD MMM YYYY, HH:mm')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                {jobData.machine.status !== 'PRODUCTION' && (
                   <Button 
                     type="primary" 
                     danger
-                    icon={<Ticket className="h-4 w-4" />}
-                    onClick={handleRaiseTicket}
-                    className="w-full"
+                    icon={<Ticket className="h-4 h-4" />}
+                    onClick={() => setShowIssueModal(true)}
+                    className="w-full flex items-center justify-center gap-2"
                   >
                     Raise Ticket
                   </Button>
@@ -225,191 +378,322 @@ const JobDetails = () => {
 
             {/* Current Job Details Card */}
             <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-sky-100">
-    <div className="px-4 py-3 border-b border-sky-100 flex items-center gap-2 bg-gradient-to-r from-sky-100 to-sky-50">
-      <FileText className="text-blue-600" />
-      <span className="font-semibold">Current Job</span>
-    </div>
-    <div className="p-4">
-      <div className="bg-sky-100/50 rounded-lg p-3 mb-4">
-        <div className="text-sm text-gray-600">Part Name</div>
-        <div className="text-xl font-bold text-blue-700">
-          {jobData.jobDetails.partname}
-        </div>
-        <div className="inline-block bg-sky-200 px-2 py-1 rounded mt-1 text-sm">
-          #{jobData.jobDetails.partnumber}
-        </div>
-      </div>
-      <div className="space-y-4">
-        <div className="flex items-center bg-sky-50 p-2 rounded">
-          <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center">
-            <UserOutlined className="text-blue-600" />
-          </div>
-          <div className="ml-3 flex-1 bg-white p-1 px-2 rounded-lg">
-            <div className="text-sm text-gray-500">Customer</div>
-            <div className="font-medium">{jobData.jobDetails.customer}</div>
-          </div>
-        </div>
-        <div className="flex items-center bg-sky-50 p-2 rounded">
-          <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center">
-            <FileTextOutlined className="text-blue-600" />
-          </div>
-          <div className="ml-3 flex-1 bg-white p-1 px-2 rounded-lg">
-            <div className="text-sm text-gray-500 ">Order #</div>
-            <div className="font-medium">{jobData.jobDetails.orderNumber}</div>
-          </div>
-        </div>
-        <div className="flex items-center bg-sky-50 p-2 rounded">
-          <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center">
-            <Clock className="w-4 h-4 text-blue-600" />
-          </div>
-          <div className="ml-3 flex-1">
-            <div className="text-sm text-gray-500">Due Date</div>
-            <Tag color="blue" className="mt-1">{jobData.jobDetails.dueDate}</Tag>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+              <div className="px-4 py-3 border-b border-sky-100 flex items-center justify-between bg-gradient-to-r from-sky-100 to-sky-50">
+                <div className="flex items-center gap-2">
+                  <FileText className="text-blue-600" />
+                  <span className="font-semibold">Current Job</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Tag color={jobData.project?.priority === 1 ? 'red' : 'blue'}>
+                    Priority {jobData.project?.priority || 'N/A'}
+                  </Tag>
+                </div>
+              </div>
 
-  <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-sky-100">
-      <div className="px-4 py-3 border-b border-sky-100 flex items-center gap-2 bg-gradient-to-r from-sky-100 to-sky-50">
-        <Activity className="text-blue-600" />
-        <span className="font-semibold">Production Progress</span>
-      </div>
-      <div className="p-2">
-        <div className="flex justify-center mb-4">
-          <Progress 
-            type="dashboard"
-            percent={Math.round((partCount / jobData.batchSize) * 100)}
-            strokeColor={{
-              '0%': '#38bdf8',
-              '100%': '#0ea5e9',
-            }}
-            width={160}
-          />
-        </div>
-        <div className="bg-sky-100/50 rounded-lg p-2 mb-2">
-          <div className="grid grid-cols-3 gap-4">
-            <Statistic 
-              title={<span className="text-gray-600">Total</span>}
-              value={jobData.batchSize}
-              className="text-center"
-            />
-            <Statistic 
-              title={<span className="text-gray-600">Completed</span>}
-              value={partCount}
-              className="text-center"
-              valueStyle={{ color: '#0ea5e9' }}
-            />
-            <Statistic 
-              title={<span className="text-gray-600">Remaining</span>}
-              value={jobData.batchSize - partCount}
-              className="text-center"
-              valueStyle={{ color: '#ef4444' }}
-            />
-          </div>
-        </div>
-        <div className="bg-white rounded-lg p-3">
-          <div className="text-sm font-medium mb-2">Update Part Count</div>
-          <Space.Compact className="w-full">
-            <Input 
-              placeholder="Enter count"
-              value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              type="number"
-              max={jobData.batchSize}
-            />
-            <Button 
-              type="primary"
-              onClick={handleUpdate}
-              className="bg-blue-500"
-            >
-              Update
-            </Button>
-          </Space.Compact>
-        </div>
-      </div>
-    </div>
+              <div className="p-4 space-y-3">
+                {/* Part Information */}
+                <div className="bg-white rounded-lg p-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">Part Number</div>
+                      <div className="text-sm font-semibold">{jobData.part_number}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Production Order</div>
+                      <div className="text-sm font-semibold">{jobData.production_order}</div>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Quality Status Card */}
+                {/* Material Description */}
+                <div className="bg-white rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Material Description</div>
+                  <Tooltip title={jobData.part_description}>
+                    <div className="text-sm font-medium truncate">
+                      {jobData.part_description || 'N/A'}
+                    </div>
+                  </Tooltip>
+                </div>
+
+                {/* Quantity Information */}
+                <div className="bg-white rounded-lg p-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">Required Qty</div>
+                      <div className="text-sm font-semibold text-blue-600">
+                        {jobData.required_quantity}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Launched Qty</div>
+                      <div className="text-sm font-semibold text-green-600">
+                        {jobData.launched_quantity}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <Progress 
+                      percent={Math.round((jobData.launched_quantity / jobData.required_quantity) * 100)}
+                      size="small"
+                      strokeColor={{
+                        '0%': '#60a5fa',
+                        '100%': '#2563eb',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Order Details */}
+                <div className="bg-white rounded-lg p-3">
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-xs text-gray-500">Sales Order</div>
+                      <div className="text-sm font-medium">{jobData.sale_order}</div>
+                    </div>
+                    <Divider className="my-2" />
+                    <div>
+                      <div className="text-xs text-gray-500">WBS Element</div>
+                      <Tooltip title={jobData.wbs_element}>
+                        <div className="text-sm font-medium truncate">
+                          {jobData.wbs_element}
+                        </div>
+                      </Tooltip>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Project Information */}
+                <div className="bg-white rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs text-gray-500">Project Details</div>
+                    <Tag color="blue">Total Ops: {jobData.total_operations}</Tag>
+                  </div>
+                  <div className="text-sm font-medium">{jobData.project?.name}</div>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                    <CalendarDays className="w-4 h-4" />
+                    <span>
+                      Delivery: {moment(jobData.project?.delivery_date).format('DD MMM YYYY')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Plant Information */}
+                <div className="flex items-center justify-between bg-blue-50 rounded-lg p-2">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm">Plant ID</span>
+                  </div>
+                  <Tag color="blue">{jobData.plant_id}</Tag>
+                </div>
+              </div>
+            </div>
+
+            {/* Production Progress Card */}
             <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-sky-100">
-      <div className="px-4 py-3 border-b border-sky-100 flex items-center justify-between bg-gradient-to-r from-sky-100 to-sky-50">
-        <div className="flex items-center gap-2">
-          <Eye className="text-blue-600" />
-          <span className="font-semibold">Quality Status and Poka Yoke</span>
-        </div>
-        <Tag color={jobData.quality.deviations === 0 ? 'success' : 'error'}>
-          {jobData.quality.deviations === 0 ? 'No Issues' : `${jobData.quality.deviations} Issues`}
-        </Tag>
-      </div>
-      <div className="p-4">
-        <div className="bg-sky-100/50 rounded-lg p-3 mb-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center bg-white p-2 rounded">
-              <Clock className="w-4 h-4 text-blue-600" />
-              <div className="ml-2">
-                <div className="text-xs text-gray-500">Current Time</div>
-                <div className="font-medium">{currentTime}</div>
+              <div className="px-4 py-3 border-b border-sky-100 flex items-center justify-between bg-gradient-to-r from-sky-100 to-sky-50">
+                <div className="flex items-center gap-2">
+                  <Activity className="text-blue-600" />
+                  <span className="font-semibold">Production Progress</span>
+                </div>
+                <Tag color="blue">
+                  {partCount} of {jobData.batchSize}
+                </Tag>
               </div>
-            </div>
-            <div className="flex items-center bg-white p-2 rounded">
-              <UserOutlined className="text-blue-600" />
-              <div className="ml-2">
-                <div className="text-xs text-gray-500">Shift</div>
-                <div className="font-medium">{currentShift}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-3 mb-4">
-          <div className="text-sm font-medium mb-2">Inspection Status</div>
-          <Progress 
-            percent={Math.round((jobData.quality.completedInspections / jobData.quality.inspectionPoints) * 100)}
-            status="active"
-            strokeColor="#0ea5e9"
-            className="mb-2"
-          />
-          <div className="text-xs text-gray-500">
-            {jobData.quality.completedInspections} of {jobData.quality.inspectionPoints} checks completed
-          </div>
-        </div>
 
-        <div className="space-y-3">
-          <Button 
-            type="primary"
-            icon={<FileTextOutlined />}
-            onClick={() => setShowPokaYoke(true)}
-            className="w-full bg-blue-500"
-          >
-            Poka Yoke Checklist
-          </Button>
-          <div className="flex gap-2">
-            <Button 
-              type="default"
-              onClick={() => setIsFeedbackModalVisible(true)}
-              className="flex-1"
-            >
-              Operator Feedback
-            </Button>
-            <Tooltip title={`Last feedback: ${feedbackList.length > 0 ? moment(feedbackList[feedbackList.length - 1].timestamp).fromNow() : 'No feedback yet'}`}>
-              <Badge count={feedbackList.length} style={{ backgroundColor: '#52c41a' }}>
+              <div className="p-4 space-y-4">
+                {/* Progress Circle */}
+                <div className="flex justify-center py-2">
+                  <Progress 
+                    type="dashboard"
+                    percent={Math.round((partCount / jobData.batchSize) * 100)}
+                    strokeColor={{
+                      '0%': '#60a5fa',
+                      '100%': '#2563eb',
+                    }}
+                    width={160}
+                  />
+                </div>
+
+                {/* Statistics Grid - Enlarged */}
+                <div className="bg-white rounded-lg p-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <Tooltip title="Total parts to be produced">
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <div className="text-sm text-blue-600 font-medium mb-1">Total</div>
+                        <div className="text-2xl font-bold text-blue-700">{jobData.batchSize}</div>
+                      </div>
+                    </Tooltip>
+                    <Tooltip title="Parts completed so far">
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <div className="text-sm text-green-600 font-medium mb-1">Completed</div>
+                        <div className="text-2xl font-bold text-green-700">{partCount}</div>
+                      </div>
+                    </Tooltip>
+                    <Tooltip title="Parts remaining">
+                      <div className="text-center p-3 bg-orange-50 rounded-lg">
+                        <div className="text-sm text-orange-600 font-medium mb-1">Remaining</div>
+                        <div className="text-2xl font-bold text-orange-700">
+                          {jobData.batchSize - partCount}
+                        </div>
+                      </div>
+                    </Tooltip>
+                  </div>
+                </div>
+
+                {/* Production Timeline */}
+                <div className="bg-white rounded-lg p-3">
+                  <div className="text-xs font-medium flex items-center gap-2 text-gray-500 mb-3">
+                    <CalendarDays className="w-4 h-4" />
+                    Production Timeline
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <DatePicker
+                      placeholder="Start Date"
+                      className="w-full"
+                      showTime
+                      value={startDate}
+                      onChange={(date) => {
+                        setStartDate(date);
+                        calculateHours(date, endDate);
+                      }}
+                    />
+                    <DatePicker
+                      placeholder="End Date"
+                      className="w-full"
+                      showTime
+                      value={endDate}
+                      onChange={(date) => {
+                        setEndDate(date);
+                        calculateHours(startDate, date);
+                      }}
+                    />
+                  </div>
+
+                  {totalHours > 0 && (
+                    <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-lg mt-2">
+                      <Clock className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm">
+                        Total Time: <strong>{totalHours} hours</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Part Count Update */}
+                <div className="bg-white rounded-lg p-3">
+                  <div className="text-xs text-gray-500 mb-2">Update Part Count</div>
+                  <Space.Compact className="w-full">
+                    <Input 
+                      placeholder="Enter count"
+                      value={inputValue}
+                      onChange={e => setInputValue(e.target.value)}
+                      type="number"
+                      max={jobData.batchSize}
+                      className="flex-1"
+                    />
+                    <Button 
+                      type="primary"
+                      onClick={handleUpdate}
+                      className="bg-blue-500"
+                    >
+                      Update
+                    </Button>
+                  </Space.Compact>
+                </div>
+              </div>
+            </div>
+
+            {/* Quality Status and Poka Yoke Card */}
+            <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-sky-100">
+              <div className="px-4 py-3 border-b border-sky-100 flex items-center justify-between bg-gradient-to-r from-sky-100 to-sky-50">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="text-blue-600" />
+                  <span className="font-semibold">Poka Yoke & Feedback</span>
+                </div>
+                {/* <Tag color="blue">
+                  {jobData.quality.completedInspections} / {jobData.quality.inspectionPoints} Checks
+                </Tag> */}
+              </div>
+
+              <div className="p-4 space-y-3">
+                {/* Poka Yoke Button */}
                 <Button 
-                  type="default"
-                  onClick={() => setShowFeedbackList(true)}
-                  icon={<Eye className="w-4 h-4" />}
-                >
-                  View Feedback
-                </Button>
-              </Badge>
-            </Tooltip>
-          </div>
-          <div className="text-center text-xs text-gray-500">
-            Last inspection: {jobData.quality.lastInspection}
-          </div>
-        </div>
-      </div>
-    </div>
+                    type="primary"
+                    onClick={() => setShowPokaYoke(true)}
+                    className="w-full bg-white hover:bg-blue-50 text-blue-600 border-blue-200 hover:border-blue-300 flex items-center justify-center gap-2 h-auto py-3"
+                  >
+                    <div className="flex flex-col items-center">
+                      <span className="font-medium">Open Poka Yoke Checklist</span>
+                      <span className="text-xs text-blue-400">Review and complete poka yoke checkpoints</span>
+                    </div>
+                  </Button>
+                  {/* Operator Feedback Section */}
+                  <div className="bg-white rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">Operator Feedback</span>
+                        <Badge count={feedbackList.length} style={{ backgroundColor: '#52c41a' }} />
+                      </div>
+                    </div>
+                    <Input.TextArea
+                      value={quickFeedback}
+                      onChange={(e) => setQuickFeedback(e.target.value)}
+                      placeholder="Share your feedback..."
+                      autoSize={{ minRows: 4, maxRows: 6 }}
+                      className="mb-3"
+                    />
+                    <Button 
+                      type="primary"
+                      className="w-full bg-blue-500"
+                      onClick={() => {
+                        if (quickFeedback.trim()) {
+                          handleFeedbackSubmit(quickFeedback);
+                          setQuickFeedback('');
+                        }
+                      }}
+                    >
+                      Submit Feedback
+                    </Button>
+                  </div>
+                
+
+                {/* Recent Feedback List with increased height */}
+                <div className="bg-white rounded-lg p-3 flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-500">Recent Feedback</span>
+                    <Button 
+                      type="link" 
+                      size="small"
+                      onClick={() => setShowFeedbackList(true)}
+                    >
+                      View All
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-[380px] overflow-auto">
+                    {feedbackList.slice(-3).reverse().map((feedback, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-2 text-sm">
+                        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                          <div className="flex items-center gap-1">
+                            <UserOutlined />
+                            {feedback.operator}
+                          </div>
+                          <span>{moment(feedback.timestamp).fromNow()}</span>
+                        </div>
+                        <div className="text-gray-700">{feedback.feedback}</div>
+                      </div>
+                    ))}
+                    {feedbackList.length === 0 && (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="No feedback yet"
+                        className="my-4"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Tabs Section */}
@@ -438,7 +722,7 @@ const JobDetails = () => {
                   <OperationDetails jobData={jobData} />
                 </div>
               </TabPane>
-              <TabPane 
+              {/* <TabPane 
                 tab={
                   <span className="flex items-center gap-2 px-2">
                     <AlertTriangle size={16} />
@@ -450,7 +734,7 @@ const JobDetails = () => {
                 <div className="p-4 overflow-auto" style={{ height: 'calc(100% - 46px)' }}>
                   <IPID jobData={jobData} />
                 </div>
-              </TabPane>
+              </TabPane> */}
             </Tabs>
           </div>
         </div>
@@ -468,7 +752,7 @@ const JobDetails = () => {
         title={
           <div className="flex items-center gap-2">
             <FileText className="text-blue-500" />
-            <span>Quality Checklist</span>
+            <span>Poka Yoke Checklist</span>
           </div>
         }
         open={showPokaYoke}
@@ -480,6 +764,7 @@ const JobDetails = () => {
         <PokaYokeChecklist jobId={jobData.jobId} />
       </Modal>
 
+      {/* Feedback History Modal */}
       <Modal
         title={
           <div className="flex items-center gap-2">
@@ -559,6 +844,14 @@ const JobDetails = () => {
           <Empty description="No feedback available" />
         )}
       </Modal>
+
+      {/* Machine Issue Modal */}
+      <MachineIssueModal
+        visible={showIssueModal}
+        onClose={() => setShowIssueModal(false)}
+        onSubmit={handleIssueSubmit}
+        machineData={jobData.machine}
+      />
 
       <style jsx global>{`
         .ant-tabs-content {
@@ -771,9 +1064,354 @@ const JobDetails = () => {
         .feedback-table .ant-table-tbody > tr {
           border-bottom: 1px solid #e5e7eb;
         }
+
+        /* Responsive adjustments for Production Progress card */
+        @media (max-width: 1400px) {
+          .grid-cols-4 {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .grid-cols-4 {
+            grid-template-columns: 1fr;
+          }
+          
+          .grid-cols-3 {
+            grid-template-columns: repeat(3, 1fr);
+          }
+          
+          .ant-progress {
+            width: 120px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .grid-cols-3 {
+            grid-template-columns: repeat(1, 1fr);
+          }
+          
+          .ant-space-compact {
+            flex-direction: column;
+          }
+          
+          .ant-space-compact .ant-input {
+            width: 100%;
+            margin-bottom: 8px;
+          }
+          
+          .ant-space-compact .ant-btn {
+            width: 100%;
+          }
+        }
+
+        /* Enhanced spacing and transitions */
+        .bg-sky-50 {
+          transition: all 0.3s ease;
+        }
+
+        .ant-progress-text {
+          font-size: 20px !important;
+          font-weight: 600;
+        }
+
+        .ant-picker {
+          transition: all 0.2s ease;
+        }
+
+        .ant-picker:hover {
+          border-color: #0ea5e9;
+        }
+
+        .ant-input:focus {
+          box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+        }
+
+        /* Card height adjustments */
+        .bg-sky-50.rounded-xl {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .bg-sky-50.rounded-xl > div:last-child {
+          flex: 1;
+          overflow-y: auto;
+        }
+
+        /* Custom scrollbar for cards */
+        .bg-sky-50.rounded-xl > div:last-child::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .bg-sky-50.rounded-xl > div:last-child::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 3px;
+        }
+
+        .bg-sky-50.rounded-xl > div:last-child::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 3px;
+        }
+
+        .bg-sky-50.rounded-xl > div:last-child::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+
+        /* Ensure content spacing */
+        .bg-sky-50.rounded-xl .p-4 {
+          padding: 1rem;
+        }
+
+        /* Responsive height adjustments */
+        @media (max-height: 900px) {
+          .grid.grid-cols-4 {
+            height: 70vh;
+          }
+        }
+
+        @media (max-height: 800px) {
+          .grid.grid-cols-4 {
+            height: 75vh;
+          }
+        }
+
+        /* Ensure Progress circle doesn't get too large */
+        .ant-progress.ant-progress-circle {
+          max-height: 140px;
+        }
+
+        /* Improve spacing in production progress card */
+        .space-y-4 > * {
+          margin-bottom: 1rem;
+        }
+
+        .space-y-4 > *:last-child {
+          margin-bottom: 0;
+        }
+
+        /* Responsive Layout Adjustments */
+        .h-screen {
+          min-height: 100vh;
+          height: auto;
+        }
+
+        /* Card Responsiveness */
+        .bg-sky-50.rounded-xl {
+          height: auto;
+          min-height: 500px;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* Improved Grid Layout */
+        @media (max-width: 1536px) {
+          .grid-cols-4 {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          
+          .bg-sky-50.rounded-xl {
+            min-height: 450px;
+          }
+        }
+
+        @media (max-width: 1280px) {
+          .grid-cols-4 {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          
+          .ant-progress.ant-progress-circle {
+            width: 120px !important;
+            height: 120px !important;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .grid-cols-4 {
+            grid-template-columns: 1fr;
+          }
+          
+          .bg-sky-50.rounded-xl {
+            min-height: auto;
+          }
+
+          .p-6 {
+            padding: 1rem;
+          }
+          
+          .gap-6 {
+            gap: 1rem;
+          }
+
+          /* Adjust statistics grid */
+          .grid-cols-3 {
+            grid-template-columns: repeat(3, 1fr);
+          }
+          
+          .text-lg {
+            font-size: 0.875rem;
+          }
+          
+          /* Compact date picker layout */
+          .grid-cols-2.gap-2 {
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+          }
+        }
+
+        /* Enhanced Mobile Experience */
+        @media (max-width: 480px) {
+          .text-2xl {
+            font-size: 1.5rem;
+          }
+          
+          .grid-cols-3 {
+            grid-template-columns: repeat(1, 1fr);
+            gap: 0.5rem;
+          }
+          
+          .bg-white.rounded-lg.p-3 {
+            padding: 0.75rem;
+          }
+          
+          .space-y-4 > * {
+            margin-bottom: 0.75rem;
+          }
+          
+          /* Stack buttons vertically */
+          .flex.gap-2 {
+            flex-direction: column;
+          }
+          
+          .flex.gap-2 > * {
+            width: 100%;
+          }
+          
+          /* Adjust modal width */
+          .ant-modal {
+            max-width: 90vw !important;
+            margin: 1rem auto !important;
+          }
+        }
+
+        /* Fluid Typography */
+        @media (max-width: 768px) {
+          html {
+            font-size: 14px;
+          }
+        }
+
+        /* Enhanced Scrolling */
+        .overflow-auto {
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+        }
+
+        /* Card Animations */
+        .bg-sky-50.rounded-xl {
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .bg-sky-50.rounded-xl:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                      0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Loading States */
+        .ant-spin-spinning {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        /* Better Touch Targets */
+        @media (max-width: 768px) {
+          .ant-btn {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          
+          .ant-input {
+            min-height: 44px;
+          }
+          
+          .ant-picker {
+            min-height: 44px;
+          }
+        }
+
+        /* Dark Mode Support */
+        @media (prefers-color-scheme: dark) {
+          .bg-sky-50 {
+            background-color: rgba(14, 165, 233, 0.05);
+          }
+          
+          .bg-white {
+            background-color: rgba(255, 255, 255, 0.05);
+          }
+        }
+
+        /* Print Styles */
+        @media print {
+          .bg-sky-50.rounded-xl {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+        }
+
+        /* Improved Focus States */
+        :focus {
+          outline: 2px solid #0ea5e9;
+          outline-offset: 2px;
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+          * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+          }
+        }
+
+        /* Container Query Support */
+        @container (min-width: 400px) {
+          .grid-cols-2 {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        /* Better Card Layout */
+        .card-content {
+          display: grid;
+          gap: 1rem;
+          height: 100%;
+        }
+
+        /* Improved Spacing */
+        .space-y-4 > * + * {
+          margin-top: 1rem;
+        }
+
+        /* Enhanced Accessibility */
+        .visually-hidden {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
       `}</style>
     </Layout>
   );
 };
 
-export default JobDetails;
+export default JobDetails; 

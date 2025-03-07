@@ -30,7 +30,7 @@ const useScheduleStore = create((set, get) => ({
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:7780/api/v1/operations/schedule-batch/');
+      const response = await fetch('http://172.18.7.85:6671/api/v1/operations/schedule-batch/');
       const data = await response.json();
 
       // Extract unique production orders
@@ -91,7 +91,7 @@ const useScheduleStore = create((set, get) => ({
   fetchLeadTimeData: async () => {
     set({ leadTimeLoading: true, leadTimeError: null });
     try {
-      const response = await axios.get('http://172.18.7.88:7780/api/v1/component_status/');
+      const response = await axios.get('http://172.18.7.85:6671/api/v1/component_status/');
       const formattedData = [
         ...response.data.early_complete,
         ...response.data.delayed_complete
@@ -145,7 +145,7 @@ const useScheduleStore = create((set, get) => ({
     // fetchScheduleData: async () => {
     //   set({ loading: true, error: null });
     //   try {
-    //     const response = await fetch('http://172.18.7.88:7780/api/v1/operations/unit_schedule/');
+    //     const response = await fetch('http://172.18.7.85:6671/api/v1/operations/unit_schedule/');
     //     const operations = await response.json();
         
     //     // Transform the array response into the expected format
@@ -415,7 +415,7 @@ const useScheduleStore = create((set, get) => ({
   fetchProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.88:7780/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.85:6671/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -435,7 +435,7 @@ const useScheduleStore = create((set, get) => ({
   fetchWeeklyProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.88:7780/api/v1/production/weekly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.85:6671/api/v1/production/weekly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -459,7 +459,7 @@ const useScheduleStore = create((set, get) => ({
   fetchMonthlyProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.88:7780/api/v1/production/monthly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.85:6671/api/v1/production/monthly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -498,7 +498,7 @@ const useScheduleStore = create((set, get) => ({
       const endEpoch = Math.floor(Date.now() / 1000);
       const startEpoch = endEpoch - (365 * 24 * 60 * 60); // 365 days ago
       
-      const response = await axios.get(`http://172.18.7.88:7780/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`);
+      const response = await axios.get(`http://172.18.7.85:6671/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`);
       const allPartNumbers = response.data.daily_production || [];
       
       // Get unique part numbers

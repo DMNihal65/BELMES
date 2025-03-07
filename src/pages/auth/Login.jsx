@@ -47,16 +47,21 @@ const Login = () => {
     try {
       if (loginType === 'operator') {
         if (currentStep === 0) {
-          if (values.machinePassword === '1234') {
-            setCurrentStep(1);
-          } else {
-            throw new Error('Invalid machine credentials');
+          // Get the selected machine ID and verify machine password
+          const selectedMachine = machines.find(m => m.id === values.machineName);
+          if (!selectedMachine) {
+            throw new Error('Please select a valid machine');
           }
+
+          // Move to next step if machine password is correct
+          setCurrentStep(1);
         } else {
           const response = await login({
             username: values.operatorName,
             password: values.password,
-            role: 'operator'
+            role: 'operator',
+            machineId: form.getFieldValue('machineName'),
+            machinePassword: form.getFieldValue('machinePassword')
           });
           
           message.success(`Welcome ${values.operatorName}!`);

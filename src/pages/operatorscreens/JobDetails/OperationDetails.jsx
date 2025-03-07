@@ -179,7 +179,7 @@ const OperationDetails = ({ jobData }) => {
     <div className="p-6 space-y-6">
       {/* Part & Document Information */}
       <div className="grid grid-cols-2 gap-6">
-        <Card 
+        {/* <Card 
           title={
             <Space>
               <FileTextOutlined className="text-blue-500" />
@@ -210,9 +210,9 @@ const OperationDetails = ({ jobData }) => {
               <div className="font-medium">{partInfo.dimensions}</div>
             </div>
           </div>
-        </Card>
+        </Card> */}
 
-        <Card 
+        {/* <Card 
           title={
             <Space>
               <FileTextOutlined className="text-blue-500" />
@@ -255,7 +255,7 @@ const OperationDetails = ({ jobData }) => {
               </div>
             </div>
           </div>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Operation Sequence Card */}
@@ -273,9 +273,9 @@ const OperationDetails = ({ jobData }) => {
                 showUploadList={false}
                 className="hover:scale-105 transition-transform"
               >
-                <Button icon={<UploadOutlined />}>
+                {/* <Button icon={<UploadOutlined />}>
                   Upload MPP
-                </Button>
+                </Button> */}
               </Upload>
             </Space>
           </div>

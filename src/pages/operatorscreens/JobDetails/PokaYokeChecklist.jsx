@@ -14,47 +14,81 @@ const PokaYokeChecklist = ({ jobId }) => {
   const [checklist, setChecklist] = useState([
     {
       id: 1,
-      category: 'Safety',
+      category: 'Documentation',
       items: [
         { 
-          id: 'safety-1', 
-          text: 'Safety guards in place and functional',
+          id: 'doc-1', 
+          text: 'IPID (In-process Inspection Document)',
           required: true,
           checked: false,
-          image: '/images/safety-guard.jpg',
-          notes: 'Check all safety interlocks'
+          docNumber: 'IPID-2024-001',
+          notes: 'Verify latest revision'
         },
         { 
-          id: 'safety-2', 
-          text: 'Emergency stop button accessible',
+          id: 'doc-2', 
+          text: 'MPP (Manufacturing Process Plan)',
           required: true,
           checked: false,
-          image: '/images/estop.jpg'
+          docNumber: 'MPP-2024-001',
+          notes: 'Check operation sequence'
+        },
+        { 
+          id: 'doc-3', 
+          text: 'Engineering Drawings',
+          required: true,
+          checked: false,
+          docNumber: 'DWG-2024-001',
+          notes: 'Verify revision level'
         }
       ]
     },
     {
       id: 2,
-      category: 'Setup',
+      category: 'Tools & Equipment',
       items: [
         { 
-          id: 'setup-1', 
-          text: 'Correct fixture installed',
+          id: 'tool-1', 
+          text: 'Required Tools Available',
           required: true,
           checked: false,
-          image: '/images/fixture.jpg',
-          notes: 'Fixture number: F-123'
+          notes: 'Check tool list in MPP'
         },
         { 
-          id: 'setup-2', 
-          text: 'Tool preset verified',
+          id: 'tool-2', 
+          text: 'Jigs & Fixtures Available',
           required: true,
           checked: false,
-          image: '/images/tool-preset.jpg'
+          notes: 'Verify fixture number and condition'
+        },
+        { 
+          id: 'tool-3', 
+          text: 'Measuring Instruments Calibrated',
+          required: true,
+          checked: false,
+          notes: 'Check calibration dates'
         }
       ]
     },
-    // Add more categories...
+    {
+      id: 3,
+      category: 'Machine Setup',
+      items: [
+        { 
+          id: 'setup-1', 
+          text: 'Machine Safety Guards in Place',
+          required: true,
+          checked: false,
+          notes: 'Check all interlocks'
+        },
+        { 
+          id: 'setup-2', 
+          text: 'Program Number Verified',
+          required: true,
+          checked: false,
+          notes: 'Match with MPP'
+        }
+      ]
+    }
   ]);
 
   const handleCheck = (categoryId, itemId) => {

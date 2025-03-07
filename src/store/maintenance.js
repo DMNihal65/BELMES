@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.88:7780/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.88:7780/api/v1/operator';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.88:7599/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.88:7599/api/v1/operator';
 
 const extractMachineId = (machineMake) => {
   // Extract numeric ID from machine make (e.g., "m1" -> 1)

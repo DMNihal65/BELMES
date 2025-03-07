@@ -325,6 +325,9 @@ const Planning = () => {
                     <Descriptions.Item label="Launched Quantity">
                       {selectedJob.launched_quantity}
                     </Descriptions.Item>
+                    <Descriptions.Item label="Delivery Date">
+                      {selectedJob.project?.delivery_date || 'N/A'}
+                    </Descriptions.Item>
                     <Descriptions.Item label="Total Operations">
                       {selectedJob.total_operations}
                     </Descriptions.Item>

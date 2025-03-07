@@ -26,7 +26,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.85:4787/api/v1/planning/all_orders',
+        'http://172.18.7.85:6797/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -48,7 +48,7 @@ class QualityStore {
   async fetchInspectionDetails(orderId) {
     try {
       const response = await axios.get(
-        `http://172.18.7.85:4787/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.85:6797/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       return response.data;

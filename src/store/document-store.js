@@ -302,7 +302,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:4787/api/v1/documents/folders/${folderId}`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/folders/${folderId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -550,9 +550,9 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      console.log('Making DELETE request to:', `http://172.18.7.85:4787/api/v1/documents/folders/${folderId}`);
+      console.log('Making DELETE request to:', `http://172.18.7.85:6651/api/v1/documents/folders/${folderId}`);
       
-      const response = await fetch(`http://172.18.7.85:4787/api/v1/documents/folders/${folderId}`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/folders/${folderId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -592,7 +592,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:4787/api/v1/documents/${copyData.document_id}/copy`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${copyData.document_id}/copy`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -703,7 +703,7 @@ const useDocumentStore = create((set, get) => ({
     try {
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`http://172.18.7.85:4787/api/v1/documents/${documentId}/versions/${versionId}`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/versions/${versionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -731,7 +731,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:4787/api/v1/documents/${documentId}/download-count`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/download-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -777,7 +777,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:4787/api/v1/documents/${documentId}/view-count`, {
+      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/view-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -950,3 +950,7 @@ const useDocumentStore = create((set, get) => ({
 }));
 
 export default useDocumentStore;
+
+
+
+

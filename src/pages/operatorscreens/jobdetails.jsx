@@ -24,6 +24,9 @@ import FeedbackModal from '../operatorscreens/FeedbackModal';
 import moment from 'moment';
 import MachineIssueModal from './MachineIssueModal';
 import useAuthStore from '../../store/auth-store';
+import useWebSocketStore from '../../store/websocket-store';
+import { formatDistanceToNow } from 'date-fns';
+import DocumentsList from '../operatorscreens/JobDetails/DocumentsList';
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
@@ -129,6 +132,51 @@ const JobDetails = () => {
 
   const [quickFeedback, setQuickFeedback] = useState('');
 
+  // Add WebSocket store
+  const { 
+    machineStatus, 
+    initializeWebSocket, 
+    closeWebSocket, 
+    isConnected,
+    getIdleTime 
+  } = useWebSocketStore();
+  const { currentMachine } = useAuthStore();
+
+  // Add this for idle timer display
+  const [idleTime, setIdleTime] = useState(0);
+
+  // Initialize WebSocket when component mounts
+  useEffect(() => {
+    if (currentMachine?.id) {
+      console.log('Initializing WebSocket with machine ID:', currentMachine.id);
+      initializeWebSocket(currentMachine.id);
+    }
+    
+    return () => {
+      console.log('Cleaning up WebSocket connection');
+      closeWebSocket();
+    };
+  }, [currentMachine?.id]);
+
+  // Update machine status from WebSocket
+  useEffect(() => {
+    if (machineStatus) {
+      console.log('Received machine status update:', machineStatus);
+      setJobData(prev => ({
+        ...prev,
+        machine: {
+          ...prev.machine,
+          status: machineStatus.status,
+          id: machineStatus.machine_id,
+          name: machineStatus.machine_name,
+          completedParts: machineStatus.part_count || 0,
+          current_order: machineStatus.production_order || 'N/A',
+          current_operation: machineStatus.operation_description || 'N/A'
+        }
+      }));
+    }
+  }, [machineStatus]);
+
   useEffect(() => {
     if (jobData.machine.status === 'ON') {
       const interval = setInterval(() => {
@@ -152,6 +200,19 @@ const JobDetails = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Update idle timer
+  useEffect(() => {
+    let timer;
+    if (machineStatus?.status === 'IDLE' || machineStatus?.status === 'ON') {
+      timer = setInterval(() => {
+        setIdleTime(getIdleTime());
+      }, 1000);
+    } else {
+      setIdleTime(0);
+    }
+    return () => clearInterval(timer);
+  }, [machineStatus?.status]);
+
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -159,8 +220,12 @@ const JobDetails = () => {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-    // Add auth store
-    const { currentMachine } = useAuthStore();
+  const formatIdleTime = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleUpdate = () => {
     const newCount = parseInt(inputValue);
@@ -230,6 +295,9 @@ const JobDetails = () => {
                 <UserOutlined className="text-blue-500" />
                 <span className="font-medium">{currentShift}</span>
               </div>
+              <Tooltip title={`WebSocket: ${isConnected ? 'Connected' : 'Disconnected'}${machineStatus?.error ? ` (${machineStatus.error})` : ''}`}>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -242,20 +310,21 @@ const JobDetails = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6" style={{ minHeight: '55vh' }}>
             {/* Machine Status Card */}
             <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-gray-100">
+              {/* Header */}
               <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <Wrench className="text-blue-500" />
                   <span className="font-semibold">Machine Status</span>
                 </div>
-                <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${getMachineStatusColor(jobData.machine.status).bgColor}`}>
-                  <span className={`w-2 h-2 rounded-full bg-${getMachineStatusColor(jobData.machine.status).color}-500 animate-pulse`} />
-                  <span className={getMachineStatusColor(jobData.machine.status).textColor}>
-                    {jobData.machine.status}
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${getMachineStatusColor(machineStatus?.status).bgColor}`}>
+                  <span className={`w-2 h-2 rounded-full bg-${getMachineStatusColor(machineStatus?.status).color}-500 animate-pulse`} />
+                  <span className={getMachineStatusColor(machineStatus?.status).textColor}>
+                    {machineStatus?.status || 'N/A'}
                   </span>
                 </div>
               </div>
               
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-4">
                 {/* Machine Image and Basic Info */}
                 <div className="bg-white rounded-lg overflow-hidden">
                   <div className="relative h-32">
@@ -265,114 +334,123 @@ const JobDetails = () => {
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                    <div className="text-lg font-bold ">{currentMachine?.make || 'No Machine Selected'}</div>
-                      <div className="text-white/80 text-sm">ID: {jobData.machine.id}</div>
+                      <div className="text-lg font-bold text-white">{machineStatus?.machine_name || 'No Machine Selected'}</div>
+                      <div className="text-white/80 text-sm">ID: {machineStatus?.machine_id}</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Timer when machine is ON */}
-                {jobData.machine.status === 'ON' && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                {/* Current Job Information */}
+                <div className="bg-white rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <span className="text-sm font-medium text-gray-600">Current Job</span>
+                    <Tag color={machineStatus?.job_status === 1 ? 'green' : 'orange'}>
+                      {machineStatus?.job_status === 1 ? 'Active' : 'Pending'}
+                    </Tag>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">Part Number</div>
+                      <div className="font-medium truncate" title={machineStatus?.part_number}>
+                        {machineStatus?.part_number || 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Production Order</div>
+                      <div className="font-medium truncate" title={machineStatus?.production_order}>
+                        {machineStatus?.production_order || 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">Operation</div>
+                      <div className="font-medium truncate" title={machineStatus?.operation_description}>
+                        {machineStatus?.operation_number} - {machineStatus?.operation_description || 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Part Description</div>
+                      <div className="font-medium truncate" title={machineStatus?.part_description}>
+                        {machineStatus?.part_description || 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Production Progress */}
+                <div className="bg-white rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Production Progress</span>
+                    <span className="text-xs text-gray-500">
+                      {machineStatus?.part_count || 0} of {machineStatus?.required_quantity || 0}
+                    </span>
+                  </div>
+                  <Progress 
+                    percent={Math.round((machineStatus?.part_count || 0) / (machineStatus?.required_quantity || 1) * 100)}
+                    strokeColor={{
+                      '0%': '#1890ff',
+                      '100%': '#52c41a',
+                    }}
+                    size="small"
+                  />
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
+                    <div>Launched: {machineStatus?.launched_quantity || 0}</div>
+                    <div>Required: {machineStatus?.required_quantity || 0}</div>
+                  </div>
+                </div>
+
+                {/* Program Information */}
+                <div className="bg-white rounded-lg p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">Active Program</div>
+                      <div className="font-medium">
+                        {machineStatus?.active_program !== 'x' ? machineStatus?.active_program : 'No Program'}
+                      </div>
+                    </div>
+                    {/* <div>
+                      <div className="text-xs text-gray-500">Selected Program</div>
+                      <div className="font-medium">
+                        {machineStatus?.selected_program || 'None'}
+                      </div>
+                    </div> */}
+                  </div>
+                </div>
+
+                {/* Last Updated */}
+                <div className="text-xs text-gray-500 flex items-center gap-2">
+                  <Clock3 className="w-4 h-4" />
+                  Last updated: {machineStatus?.last_updated ? formatDistanceToNow(new Date(machineStatus.last_updated), { addSuffix: true }) : 'N/A'}
+                </div>
+
+                {/* Idle Timer */}
+                {(machineStatus?.status === 'IDLE' || machineStatus?.status === 'ON') && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-yellow-600" />
                         <span className="text-sm text-yellow-700">Idle Time</span>
                       </div>
                       <div className="text-lg font-mono font-bold text-yellow-600">
-                        {formatTime(machineTimer)}
+                        {formatIdleTime(idleTime)}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Current Operation Info */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Tooltip title="Current Order: OP30 - Milling">  
-                    <div className="bg-white p-2 rounded-lg">
-                      <div className="text-xs text-gray-500">Current Order</div>
-                      <div className="font-medium text-sm truncate">OP30 - Milling</div>
-                    </div>
-                  </Tooltip>
-                  <Tooltip title="Operation: Face Milling">
-                    <div className="bg-white p-2 rounded-lg">
-                      <div className="text-xs text-gray-500">Operation</div>
-                      <div className="font-medium text-sm truncate">Face Milling</div>
-                    </div>
-                  </Tooltip>
-                </div>
-
-                {/* Machine Parameters */}
-                {/* <div className="bg-white rounded-lg p-2">
-                  <div className="text-xs text-gray-500 mb-2">Machine Parameters</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <div className="text-xs text-gray-500">Speed</div>
-                      <div className="text-sm font-medium">1200 RPM</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">Feed</div>
-                      <div className="text-sm font-medium">300 mm/min</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">Temp</div>
-                      <div className="text-sm font-medium">28°C</div>
-                    </div>
-                  </div>
-                </div> */}
-
-                {/* Performance Metrics */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-white p-2 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-500">Efficiency</span>
-                      <span className={`text-xs ${jobData.machine.efficiency >= 80 ? 'text-green-600' : 'text-orange-600'}`}>
-                        {jobData.machine.efficiency}%
-                      </span>
-                    </div>
-                    <Progress 
-                      percent={jobData.machine.efficiency} 
-                      size="small" 
-                      strokeColor={{
-                        '0%': '#fbbf24',
-                        '100%': '#16a34a',
-                      }}
-                      showInfo={false}
-                    />
-                  </div>
-                  <div className="bg-white p-2 rounded-lg">
-                    <div className="text-xs text-gray-500">Uptime</div>
-                    <div className="text-sm font-semibold text-blue-600">
-                      {jobData.machine.currentCycle}hrs
-                    </div>
-                  </div>
-                </div>
-
-                {/* Start Time */}
-                <div className="bg-white p-2 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <div className="text-xs text-gray-500">Start Time</div>
-                      <div className="text-sm font-medium">
-                        {moment(jobData.machine.start_time).format('DD MMM YYYY, HH:mm')}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action Button */}
-                {jobData.machine.status !== 'PRODUCTION' && (
-                  <Button 
-                    type="primary" 
-                    danger
-                    icon={<Ticket className="h-4 h-4" />}
-                    onClick={() => setShowIssueModal(true)}
-                    className="w-full flex items-center justify-center gap-2"
-                  >
-                    Raise Ticket
-                  </Button>
-                )}
+                {/* Raise Ticket Button */}
+                <Button
+                  type="primary"
+                  danger
+                  icon={<AlertTriangle className="w-4 h-4" />}
+                  onClick={() => setShowIssueModal(true)}
+                  className="w-full"
+                >
+                  Raise Ticket
+                </Button>
               </div>
             </div>
 
@@ -711,30 +789,28 @@ const JobDetails = () => {
             >
               <TabPane 
                 tab={
-                  <span className="flex items-center gap-2 px-2">
-                    <FileText size={16} />
-                    Operation Details
+                  <span className="flex items-center gap-2">
+                    <Settings size={16} />
+                    Operations
                   </span>
                 } 
                 key="operations"
               >
-                <div className="p-4 overflow-auto" style={{ height: 'calc(100% - 46px)' }}>
-                  <OperationDetails jobData={jobData} />
-                </div>
+                <OperationDetails jobData={jobData} />
               </TabPane>
-              {/* <TabPane 
+
+              {/* New Documents Tab */}
+              <TabPane
                 tab={
-                  <span className="flex items-center gap-2 px-2">
-                    <AlertTriangle size={16} />
-                    IPID
+                  <span className="flex items-center gap-2">
+                    <FileText size={16} />
+                    Documents
                   </span>
-                } 
-                key="ipid"
+                }
+                key="documents"
               >
-                <div className="p-4 overflow-auto" style={{ height: 'calc(100% - 46px)' }}>
-                  <IPID jobData={jobData} />
-                </div>
-              </TabPane> */}
+                <DocumentsList jobData={jobData} />
+              </TabPane>
             </Tabs>
           </div>
         </div>
@@ -852,6 +928,16 @@ const JobDetails = () => {
         onSubmit={handleIssueSubmit}
         machineData={jobData.machine}
       />
+
+      {/* Debugging Information */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 bg-black/80 text-white p-2 rounded text-xs">
+          <div>WebSocket: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
+          <div>Machine ID: {currentMachine?.id}</div>
+          <div>Last Status: {machineStatus?.status}</div>
+          {machineStatus?.error && <div className="text-red-400">Error: {machineStatus.error}</div>}
+        </div>
+      )}
 
       <style jsx global>{`
         .ant-tabs-content {

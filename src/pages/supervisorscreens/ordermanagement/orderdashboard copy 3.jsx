@@ -22,9 +22,10 @@ const OrderDashboard = () => {
   }, [fetchTimelineData]);
 
   useEffect(() => {
+    // Initial load only
     fetchAllOrders();
-    fetchTimelineData(); // Fetch timeline data on component mount
-  }, []);
+    fetchTimelineData();
+  }, []); // Empty dependency array means this runs once on mount
 
   const fadeIn = {
     initial: { opacity: 0, y: 20 },
@@ -75,7 +76,7 @@ const OrderDashboard = () => {
           px-2 py-1 rounded-full text-sm
           ${status === 'in_progress' ? 'bg-blue-100 text-blue-800' : ''}
           ${status === 'completed' ? 'bg-green-100 text-green-800' : ''}
-          ${status === 'scheduled' ? 'bg-yellow-100 text-yellow-800' : ''}
+          ${status === 'delayed' ? 'bg-red-100 text-red-800' : ''}
           ${!status ? 'bg-gray-100 text-gray-800' : ''}
         `}>
           {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'N/A'}
@@ -189,9 +190,9 @@ const OrderDashboard = () => {
                     <div className="h-full overflow-auto">
                       <Table 
                         columns={timelineColumns}
-                        dataSource={timelineData}
+                        dataSource={inProgressOrders}
                         loading={isLoading}
-                        rowKey="production_order"
+                        rowKey={record => record.id || record.production_order}
                         scroll={{ x: 1800, y: 'calc(100vh - 300px)' }}
                         pagination={{ 
                           pageSize: 10,

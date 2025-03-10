@@ -46,7 +46,7 @@ const useAuthStore = create(
           let data;
 
           if (credentials.role === 'operator') {
-            // Use machine login endpoint for operators
+            // Operator login endpoint
             response = await fetch('http://172.18.7.85:6797/api/v1/auth/machine-login', {
               method: 'POST',
               headers: {
@@ -65,28 +65,31 @@ const useAuthStore = create(
               throw new Error(data.detail?.[0]?.msg || 'Authentication failed');
             }
 
-            // Store machine details from the response
+            // Store user data including role from response
             const userData = {
               username: credentials.username,
-              role: data.role,
+              role: data.role, // Use role from response
               access: data.access_list,
             };
 
             set({ 
               token: data.access_token,
               user: userData,
-              currentMachine: data.machine, // Store the machine details
+              currentMachine: data.machine,
               isLoading: false,
               error: null
             });
 
+            // Store in localStorage
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', JSON.stringify(userData));
             localStorage.setItem('currentMachine', JSON.stringify(data.machine));
+            localStorage.setItem('userRole', data.role); // Store role separately
 
             return { ...data, user: userData };
+
           } else {
-            // Existing supervisor login logic
+            // Supervisor login endpoint
             const formData = new URLSearchParams({
               grant_type: 'password',
               username: credentials.username,
@@ -110,10 +113,11 @@ const useAuthStore = create(
               throw new Error(data.detail?.[0]?.msg || 'Authentication failed');
             }
             
+            // Store user data including role from response
             const userData = {
               username: credentials.username,
-              role: credentials.role || data.role,
-              access: data.access,
+              role: data.role, // Use role from response
+              access: data.access_list,
             };
 
             set({ 
@@ -123,8 +127,10 @@ const useAuthStore = create(
               error: null
             });
 
+            // Store in localStorage
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('userRole', data.role); // Store role separately
 
             return { ...data, user: userData };
           }
@@ -133,6 +139,7 @@ const useAuthStore = create(
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('currentMachine');
+          localStorage.removeItem('userRole');
           throw error;
         }
       },

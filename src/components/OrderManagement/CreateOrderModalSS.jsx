@@ -33,7 +33,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     fetchDocumentsByPartNumber,
     documentLoadingStates,
     fetchAllOrders,
-    createManualOrder,
   } = useOrderStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [fileList, setFileList] = useState([]);
@@ -207,34 +206,54 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
 
       // Use orderDetails directly since it contains the parsed PDF data
       const orderData = {
-        "Project Name": orderDetails['Project Name'],
-        "Sale Order": orderDetails['Sale Order'],
-        "Part No": orderDetails['Part No'],
-        "Part Desc": orderDetails['Part Desc'],
-        "Required Qty": orderDetails['Required Qty'],
-        "Plant": orderDetails['Plant'],
-        "WBS": orderDetails['WBS'],
-        "Rtg Seq No": orderDetails['Rtg Seq No'] || "0",
-        "Sequence No": orderDetails['Sequence No'] || "0",
-        "Launched Qty": orderDetails['Launched Qty'],
-        "Prod Order No": orderDetails['Prod Order No'],
-        "Operations": orderDetails['Operations'] || [],
-        "Document Verification": documents || {},
-        "Raw Materials": orderDetails['Raw Materials']?.map(material => ({
-          "Sl.No": material['Sl.No'],
-          "Child Part No": material['Child Part No'],
-          "Description": material['Description'],
-          "Qty Per Set": material['Qty Per Set'],
-          "UoM": material['UoM'],
-          "Total Qty": material['Total Qty']
-        })) || []
+        data: {
+          "Project Name": orderDetails['Project Name'],
+          "Sale Order": orderDetails['Sale Order'],
+          "Part No": orderDetails['Part No'],
+          "Part Desc": orderDetails['Part Desc'],
+          "Required Qty": orderDetails['Required Qty'],
+          "Plant": orderDetails['Plant'],
+          "WBS": orderDetails['WBS'],
+          "Rtg Seq No": orderDetails['Rtg Seq No'] || "0",
+          "Sequence No": orderDetails['Sequence No'] || "0",
+          "Launched Qty": orderDetails['Launched Qty'],
+          "Prod Order No": orderDetails['Prod Order No'],
+          "Operations": orderDetails['Operations'] || [],
+          "Document Verification": documents || {},
+          "Raw Materials": orderDetails['Raw Materials']?.map(material => ({
+            "Sl.No": material['Sl.No'],
+            "Child Part No": material['Child Part No'],
+            "Description": material['Description'],
+            "Qty Per Set": material['Qty Per Set'],
+            "UoM": material['UoM'],
+            "Total Qty": material['Total Qty']
+          })) || []
+        }
       };
 
-      // Create order using store function
-      const result = await createOrder(orderData);
+      console.log('Sending to save-to-db:', orderData);
+
+      // Create order
+      const response = await fetch('http://172.18.7.85:6797/api/v1/planning/save-to-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      const result = await response.json();
+      console.log('Save to DB response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.message || result.detail || 'Failed to create order');
+      }
 
       if (result && result.message === "Data saved successfully") {
         message.success('Order created successfully');
+        // Fetch updated orders list
+        await fetchAllOrders();
         onCreate(result);
         form.resetFields();
         onCancel();
@@ -251,7 +270,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     }
   };
 
-  // Update handleManualSubmit function to use store function
+  // Update handleManualSubmit function to refresh table
   const handleManualSubmit = async (values) => {
     try {
       // Validate document names if files are selected
@@ -278,8 +297,22 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         project_name: values.project_name
       };
 
-      // Create order using store function
-      const savedData = await createManualOrder(requestData);
+      // Create order using the create_order endpoint
+      const response = await fetch('http://172.18.7.85:6797/api/v1/planning/create_order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.detail || 'Failed to save order');
+      }
+
+      const savedData = await response.json();
 
       // Handle file uploads after successful order creation
       try {
@@ -308,6 +341,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       }
 
       message.success('Order saved successfully');
+      // Fetch updated orders list
+      await fetchAllOrders();
       handleCancel();
     } catch (error) {
       console.error('Submit Error:', error);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import OrderTable from '../../../components/OrderManagement/OrderTable';
@@ -12,23 +12,96 @@ import Workcenter from '../../../components/OrderManagement/Workcenter';
 const { TabPane } = Tabs;
 
 const OrderDashboard = () => {
-  const { orders, fetchAllOrders, isLoading, error } = useOrderStore();
+  const { orders, fetchAllOrders, fetchTimelineData, timelineData, isLoading, error } = useOrderStore();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [parent] = useAutoAnimate();
+  const [activeTab, setActiveTab] = useState('all');
   
-  const handleRefresh = useCallback(() => {
-    fetchAllOrders();
-  }, [fetchAllOrders]);
+  // Memoized refresh function
+  const handleRefresh = useCallback(async () => {
+    try {
+      await Promise.all([fetchAllOrders(), fetchTimelineData()]);
+      // message.success('Data refreshed successfully');
+    } catch (error) {
+      message.error('Failed to refresh data');
+    }
+  }, [fetchAllOrders, fetchTimelineData]);
 
+  // Initial data load
   useEffect(() => {
-    fetchAllOrders();
-  }, [fetchAllOrders]);
+    handleRefresh();
+  }, [handleRefresh]);
+
+  // Handle tab change
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+    handleRefresh();
+  };
+
+  // Handle order creation
+  const handleOrderCreate = async (newOrder) => {
+    try {
+      console.log('New order created:', newOrder);
+      await handleRefresh(); // Refresh data immediately
+      setIsModalVisible(false);
+      message.success('Order created successfully');
+    } catch (error) {
+      message.error('Failed to refresh data after order creation');
+    }
+  };
 
   const fadeIn = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
     transition: { duration: 0.5 }
   };
+
+  // Update timeline columns configuration
+  const timelineColumns = [
+    
+    { 
+      title: 'Production Order', 
+      dataIndex: 'production_order', 
+      key: 'production_order',
+      width: 150,
+    },
+    { 
+      title: 'Part Number', 
+      dataIndex: 'part_number', 
+      key: 'part_number',
+      width: 150,
+    },
+   
+    { 
+      title: 'Completed Quantity', 
+      dataIndex: 'completed_total_quantity', 
+      key: 'completed_total_quantity',
+      width: 150,
+    },
+    { 
+      title: 'Operations Count', 
+      dataIndex: 'operations_count', 
+      key: 'operations_count',
+      width: 140,
+    },
+    { 
+      title: 'Status', 
+      dataIndex: 'status', 
+      key: 'status',
+      fixed: 'right',
+      width: 120,
+      render: (status) => (
+        <span className={`
+          px-2 py-1 rounded-full text-sm
+          ${status === 'scheduled' ? 'bg-blue-100 text-blue-800' : ''}
+          ${status === 'completed' ? 'bg-green-100 text-green-800' : ''}
+          ${status === 'delayed' ? 'bg-red-100 text-red-800' : ''}
+        `}>
+          {status.charAt(0).toUpperCase() + status.slice(1)}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
@@ -61,7 +134,7 @@ const OrderDashboard = () => {
             <motion.div {...fadeIn}>
               <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
                 <Statistic
-                  title="In Progress"
+                  title="In  Progress"
                   value={orders.filter(o => o.status === 'in_progress').length}
                   prefix={<ArrowUpOutlined />}
                   valueStyle={{ color: '#1890ff' }}
@@ -105,12 +178,18 @@ const OrderDashboard = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-base font-semibold">Order Management</span>
                   <Space>
-                    <Button icon={<FilterOutlined />} size="small">Filter</Button>
+                    <Button
+                      icon={<SyncOutlined />}
+                      onClick={handleRefresh}
+                      loading={isLoading}
+                    >
+                      Refresh
+                    </Button>
                     <Button 
                       type="primary" 
-                      icon={<PlusOutlined />} 
-                      size="small"
+                      icon={<PlusOutlined />}
                       onClick={() => setIsModalVisible(true)}
+                      className="bg-blue-500"
                     >
                       New Order
                     </Button>
@@ -122,25 +201,39 @@ const OrderDashboard = () => {
               bodyStyle={{ padding: '12px', height: 'calc(100% - 48px)', overflow: 'hidden' }}
             >
               <div className="flex-1 overflow-hidden">
-                <Tabs defaultActiveKey="all" className="h-full">
+                <Tabs activeKey={activeTab} onChange={handleTabChange} className="h-full">
                   <TabPane tab="All Orders" key="all">
                     <div className="h-full overflow-auto">
-                      <OrderTable orders={orders} onRefresh={handleRefresh} />
+                      <OrderTable 
+                        orders={orders} 
+                        onRefresh={handleRefresh}
+                        loading={isLoading}
+                      />
                     </div>
                   </TabPane>
                   <TabPane tab="In Progress" key="in_progress">
                     <div className="h-full overflow-auto">
-                      <OrderTable orders={orders.filter(order => order.status === 'in_progress')} onRefresh={handleRefresh} />
+                      <Table 
+                        columns={timelineColumns}
+                        dataSource={timelineData}
+                        loading={isLoading}
+                        scroll={{ x: 1800, y: 'calc(100vh - 300px)' }}
+                        pagination={{ 
+                          pageSize: 10,
+                          position: ['bottomCenter']
+                        }}
+                        size="middle"
+                        bordered
+                      />
                     </div>
                   </TabPane>
                   <TabPane tab="Completed" key="completed">
                     <div className="h-full overflow-auto">
-                      <OrderTable orders={orders.filter(order => order.status === 'completed')} onRefresh={handleRefresh} />
-                    </div>
-                  </TabPane>
-                  <TabPane tab="Delayed" key="delayed">
-                    <div className="h-full overflow-auto">
-                      <OrderTable orders={orders.filter(order => order.status === 'delayed')} onRefresh={handleRefresh}/>
+                      <OrderTable 
+                        orders={orders.filter(order => order.status === 'completed')} 
+                        onRefresh={handleRefresh}
+                        loading={isLoading}
+                      />
                     </div>
                   </TabPane>
                   <TabPane tab="Priority" key="reorder">
@@ -150,10 +243,16 @@ const OrderDashboard = () => {
                           ...order,
                           id: order.key
                         }))} 
-                        onOrdersReorder={(newOrders) => {
-                          console.log('Orders reordered:', newOrders);
-                          message.success('Order sequence updated successfully');
+                        onOrdersReorder={async (newOrders) => {
+                          try {
+                            console.log('Orders reordered:', newOrders);
+                            await handleRefresh();
+                            message.success('Order sequence updated successfully');
+                          } catch (error) {
+                            message.error('Failed to update order sequence');
+                          }
                         }} 
+                        loading={isLoading}
                       />
                     </div>
                   </TabPane>
@@ -171,15 +270,10 @@ const OrderDashboard = () => {
       <CreateOrderModal 
         visible={isModalVisible} 
         onCancel={() => setIsModalVisible(false)} 
-        onCreate={(newOrder) => {
-          console.log('New order created:', newOrder);
-          setIsModalVisible(false);
-        }} 
-         onRefresh={handleRefresh} 
+        onCreate={handleOrderCreate}
       />
     </div>
   );
 };
 
 export default OrderDashboard;
-

@@ -4,24 +4,13 @@ import { EyeOutlined } from '@ant-design/icons';
 import { message } from 'antd';
 import dayjs from 'dayjs';
 
-const OrderTable = ({ orders, onRefresh }) => {
-
-    // Add useEffect for initial load and polling
-    React.useEffect(() => {
-      // Initial load
-      if (onRefresh) {
-        onRefresh();
-      }
-  
-      // Set up polling every 30 seconds
-      const intervalId = setInterval(() => {
-        if (onRefresh) {
-          onRefresh();
-        }
-      }, 10000);
-  
-      return () => clearInterval(intervalId);
-    }, [onRefresh]);
+const OrderTable = ({ orders, onRefresh, loading }) => {
+  // Remove automatic polling and only load data initially
+  React.useEffect(() => {
+    if (onRefresh) {
+      onRefresh();
+    }
+  }, [onRefresh]);
 
   // Handle view action
   const handleViewDetails = (record) => {
@@ -143,6 +132,7 @@ const OrderTable = ({ orders, onRefresh }) => {
       columns={columns}
       dataSource={orders}
       rowKey="id"
+      loading={loading}
       scroll={{ x: 1300, y: 'calc(100vh - 460px)' }}
       rowClassName={(record) =>
         record.project?.priority === 1 ? 'bg-red-50' : ''

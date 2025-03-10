@@ -298,38 +298,6 @@ const useOrderStore = create((set, get) => ({
     }
   },
 
-  createManualOrder: async (orderData) => {
-    try {
-      set({ isLoading: true, error: null });
-
-      const response = await fetch('http://172.18.7.85:6797/api/v1/planning/create_order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(orderData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.detail || 'Failed to save order');
-      }
-
-      const result = await response.json();
-
-      // Refresh orders list after successful creation
-      await get().fetchAllOrders();
-
-      set({ isLoading: false });
-      return result;
-    } catch (error) {
-      console.error('Manual order creation error:', error);
-      set({ error: error.message, isLoading: false });
-      throw error;
-    }
-  },
-
   clearOrderDetails: () => set({ orderDetails: null, error: null }),
 
   // Fetch all workcenters from the correct endpoint

@@ -332,6 +332,7 @@ const useDocumentStore = create((set, get) => ({
 
   // Create document type
   createDocType: async (docTypeData) => {
+    set({ isLoading: true });
     try {
       const token = useAuthStore.getState().token;
       
@@ -339,30 +340,36 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
+      const requestBody = {
+        name: docTypeData.type_name,
+        description: docTypeData.description,
+        allowed_extensions: docTypeData.extensions.split(',').map(ext => ext.trim())
+      };
+
       const response = await fetch('http://172.18.7.89:4470/api/v1/document-management/document-types/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          name: docTypeData.name,
-          description: docTypeData.description,
-          allowed_extensions: docTypeData.allowed_extensions,
-          is_active: docTypeData.is_active
-        })
+        body: JSON.stringify(requestBody)
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.detail || 'Failed to create document type');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create document type');
       }
 
-      // Return the created document type
+      const data = await response.json();
+      set(state => ({
+        documentTypes: [...state.documentTypes, data],
+        isLoading: false
+      }));
       return data;
     } catch (error) {
-      console.error('Create document type error:', error);
+      set({ error: error.message, isLoading: false });
+      message.error(error.message);
       throw error;
     }
   },

@@ -80,10 +80,8 @@ const OperationDetails = ({ jobData }) => {
       title: 'Operation',
       dataIndex: 'operation',
       key: 'operation',
-      render: (text, record) => (
-        <div className="flex items-center">
-          <div className="font-medium">{text}</div>
-        </div>
+      render: (text) => (
+        <div className="font-medium">{text}</div>
       ),
     },
     {
@@ -288,73 +286,44 @@ const OperationDetails = ({ jobData }) => {
         {selectedOperation && (
           <div className="space-y-6">
             {/* Fixture and IPID Information */}
-            <Card title="Fixture & IPID Details" className="shadow-sm">
-              <Descriptions column={1} bordered>
-                <Descriptions.Item label="Fixture No with Rev.">
-                  <Text strong>Fx-62805080AA-70.80-Rev.01</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="IPID No with Rev.">
-                  <Text strong>IPID-62805080AA-80-Rev.01</Text>
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
+            <Descriptions title="Fixture & IPID Details" column={1} bordered>
+              <Descriptions.Item label="Fixture No with Rev.">
+                <Text strong>Fx-62805080AA-70.80-Rev.01</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="IPID No with Rev.">
+                <Text strong>IPID-62805080AA-80-Rev.01</Text>
+              </Descriptions.Item>
+            </Descriptions>
 
             {/* Datum Information */}
-            <Card title="Datum Information" className="shadow-sm">
-              <Descriptions column={1} bordered>
-                <Descriptions.Item label="Datum X Axis">
-                  <Text strong>0 at the job center</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="Datum Y Axis">
-                  <Text strong>0 at the job center</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="Datum Z Axis">
-                  <Text strong>+0.25mm at top of the job</Text>
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
+            <Descriptions title="Datum Information" column={1} bordered>
+              <Descriptions.Item label="Datum X Axis">
+                <Text strong>0 at the job center</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Datum Y Axis">
+                <Text strong>0 at the job center</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Datum Z Axis">
+                <Text strong>+0.25mm at top of the job</Text>
+              </Descriptions.Item>
+            </Descriptions>
 
             {/* Work Holding Instructions */}
-            <Card title="Work Holding Instructions" className="shadow-sm">
-              <Collapse defaultActiveKey={['1']} ghost>
-                <Panel header="Fixture Setup" key="1">
-                  <List>
-                    <List.Item>
-                      <Text>Hold the fixture in vise with around 3 to 5 mm projection over jaws.</Text>
-                    </List.Item>
-                    <List.Item>
-                      <Text>Clamp the job on fixture with (14X) MS screws while ensuring longest edge to be parallel to X axis within +/-0.1 mm through dialing.</Text>
-                    </List.Item>
-                  </List>
-                </Panel>
-                <Panel header="Job Preparation" key="2">
-                  <List>
-                    <List.Item>
-                      <Text>Ensure that the job surface butting to the fixture is burr free.</Text>
-                    </List.Item>
-                    <List.Item>
-                      <Text>Ensure guide holes to be maintained to required tolerance as per program.</Text>
-                    </List.Item>
-                  </List>
-                </Panel>
-                <Panel header="Post-Machining Steps" key="3">
-                  <List>
-                    <List.Item>
-                      <Text>Blow off any chips, coolant, foreign materials with compressed air after completion of job.</Text>
-                    </List.Item>
-                    <List.Item>
-                      <Text>Perform necessary stage inspections as per IPID.</Text>
-                    </List.Item>
-                    <List.Item>
-                      <Text>Wrap the job in bubble sheet to prevent any damage and store it in a plastic cover.</Text>
-                    </List.Item>
-                    <List.Item>
-                      <Text>Attach the existing job card to the batch after completion of machining.</Text>
-                    </List.Item>
-                  </List>
-                </Panel>
-              </Collapse>
-            </Card>
+            <Collapse defaultActiveKey={['1']}>
+              <Panel header="Work Holding Instructions" key="1">
+                <List
+                  size="small"
+                  bordered
+                  dataSource={[
+                    "1. Clean the fixture and job before loading",
+                    "2. Ensure proper clamping pressure",
+                    "3. Check for any debris or chips",
+                    "4. Verify datum alignment"
+                  ]}
+                  renderItem={(item) => <List.Item>{item}</List.Item>}
+                />
+              </Panel>
+            </Collapse>
 
             {/* Reference Images */}
             <Card title="Reference Images" className="shadow-sm">

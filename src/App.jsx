@@ -26,6 +26,7 @@ import AlertScreens from './pages/operatorscreens/AlertScreens';
 import MaintenanceDashboard from './pages/operatorscreens/maintanance/MaintenanceDashboard';
 import InspectionResult from './pages/operatorscreens/InspectionResult';
 import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
+import LogsDashboard from './pages/supervisorscreens/Logs/LogsDashboard';
 
 const App = () => {
   return (
@@ -55,6 +56,7 @@ const App = () => {
             <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
             <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
             <Route path="energy-monitoring" element={<EnergyMonitoring />} />
+            <Route path="logs" element={<LogsDashboard />} />
           </Route>
 
           {/* Operator Routes */}

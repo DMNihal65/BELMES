@@ -13,7 +13,8 @@ import {
   CheckSquare,
   Archive,
   Files,
-  Box
+  Box,
+  Bell
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -159,6 +160,11 @@ function Sidebar() {
 
       icon: <Files size={20} />,
       label: 'Document Management',
+    },
+    {
+      key: '/supervisor/logs',
+      icon: <Bell size={20} />,
+      label: 'Logs',
     },
   ];
 

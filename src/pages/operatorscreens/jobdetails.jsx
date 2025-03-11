@@ -25,7 +25,7 @@ import moment from 'moment';
 import MachineIssueModal from './MachineIssueModal';
 import useAuthStore from '../../store/auth-store';
 import useWebSocketStore from '../../store/websocket-store';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, parseISO } from 'date-fns';
 import DocumentsList from '../operatorscreens/JobDetails/DocumentsList';
 const { Content } = Layout;
 const { TabPane } = Tabs;
@@ -132,13 +132,21 @@ const JobDetails = () => {
 
   const [quickFeedback, setQuickFeedback] = useState('');
 
+  const [ticketLoading, setTicketLoading] = useState(false);
+
+  const [jobOrderData, setJobOrderData] = useState(null);
+  const [isLoadingJobData, setIsLoadingJobData] = useState(false);
+
   // Add WebSocket store
   const { 
     machineStatus, 
     initializeWebSocket, 
     closeWebSocket, 
     isConnected,
-    getIdleTime 
+    getIdleTime,
+    error: wsError,
+    fetchMachineOperations,
+    maintenanceLoading
   } = useWebSocketStore();
   const { currentMachine } = useAuthStore();
 
@@ -202,16 +210,54 @@ const JobDetails = () => {
 
   // Update idle timer
   useEffect(() => {
-    let timer;
-    if (machineStatus?.status === 'IDLE' || machineStatus?.status === 'ON') {
-      timer = setInterval(() => {
+    let timerInterval;
+    
+    // Always create the interval, but only increment if IDLE/ON
+    timerInterval = setInterval(() => {
+      if (machineStatus?.status === 'IDLE' || machineStatus?.status === 'ON') {
         setIdleTime(getIdleTime());
-      }, 1000);
-    } else {
+      }
+    }, 1000);
+
+    // Reset timer when status changes to PRODUCTION
+    if (machineStatus?.status === 'PRODUCTION') {
       setIdleTime(0);
     }
-    return () => clearInterval(timer);
-  }, [machineStatus?.status]);
+
+    return () => {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+    };
+  }, [machineStatus?.status, getIdleTime]);
+
+  // Add new useEffect to fetch job data
+  useEffect(() => {
+    const fetchJobData = async () => {
+      if (currentMachine?.id) {
+        setIsLoadingJobData(true);
+        try {
+          const result = await fetchMachineOperations(currentMachine.id);
+          if (result.success && result.data.orders && result.data.orders.length > 0) {
+            // Get the first order from the response
+            setJobOrderData(result.data.orders[0]);
+            
+            // Update operations data if needed
+            if (result.data.operations) {
+              // You could set operations data here if needed
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching job data:', error);
+          message.error('Failed to load job data');
+        } finally {
+          setIsLoadingJobData(false);
+        }
+      }
+    };
+
+    fetchJobData();
+  }, [currentMachine?.id, fetchMachineOperations]);
 
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
@@ -221,10 +267,10 @@ const JobDetails = () => {
   };
 
   const formatIdleTime = (seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   const handleUpdate = () => {
@@ -246,6 +292,7 @@ const JobDetails = () => {
     const statusConfig = {
       'OFF': { color: 'red', bgColor: 'bg-red-50', textColor: 'text-red-700' },
       'ON': { color: 'orange', bgColor: 'bg-yellow-50', textColor: 'text-yellow-700' },
+      'IDLE': { color: 'orange', bgColor: 'bg-yellow-50', textColor: 'text-yellow-700' },
       'PRODUCTION': { color: 'green', bgColor: 'bg-green-50', textColor: 'text-green-700' }
     };
     return statusConfig[status] || { color: 'default', bgColor: 'bg-gray-50', textColor: 'text-gray-700' };
@@ -272,11 +319,48 @@ const JobDetails = () => {
     setTotalHours(parseFloat(hours.toFixed(2)));
   };
 
-  const handleIssueSubmit = (issueData) => {
-    // Here you would send the issue data to your backend
-    console.log('Issue submitted:', issueData);
-    message.success('Maintenance ticket raised successfully');
-    setShowIssueModal(false);
+  const handleIssueSubmit = async (data) => {
+    try {
+      setTicketLoading(true);
+      console.log('Ticket submitted:', data);
+      message.success('Ticket submitted successfully');
+    } catch (error) {
+      console.error('Error submitting ticket:', error);
+      message.error('Failed to submit ticket');
+    } finally {
+      setTicketLoading(false);
+      setShowIssueModal(false);
+    }
+  };
+
+  const getTimerStyles = (status) => {
+    switch (status) {
+      case 'IDLE':
+      case 'ON':
+        return {
+          containerClass: 'bg-yellow-50 border-yellow-200',
+          textClass: 'text-yellow-700',
+          iconClass: 'text-yellow-600'
+        };
+      case 'PRODUCTION':
+        return {
+          containerClass: 'bg-green-50 border-green-200',
+          textClass: 'text-green-700',
+          iconClass: 'text-green-600'
+        };
+      case 'OFF':
+        return {
+          containerClass: 'bg-red-50 border-red-200',
+          textClass: 'text-red-700',
+          iconClass: 'text-red-600'
+        };
+      default:
+        return {
+          containerClass: 'bg-gray-50 border-gray-200',
+          textClass: 'text-gray-700',
+          iconClass: 'text-gray-600'
+        };
+    }
   };
 
   return (
@@ -310,17 +394,21 @@ const JobDetails = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6" style={{ minHeight: '55vh' }}>
             {/* Machine Status Card */}
             <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-gray-100">
-              {/* Header */}
               <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <Wrench className="text-blue-500" />
                   <span className="font-semibold">Machine Status</span>
                 </div>
-                <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${getMachineStatusColor(machineStatus?.status).bgColor}`}>
-                  <span className={`w-2 h-2 rounded-full bg-${getMachineStatusColor(machineStatus?.status).color}-500 animate-pulse`} />
-                  <span className={getMachineStatusColor(machineStatus?.status).textColor}>
-                    {machineStatus?.status || 'N/A'}
-                  </span>
+                <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${getMachineStatusColor(machineStatus?.status).bgColor}`}>
+                    <span className={`w-2 h-2 rounded-full bg-${getMachineStatusColor(machineStatus?.status).color}-500 animate-pulse`} />
+                    <span className={getMachineStatusColor(machineStatus?.status).textColor}>
+                      {machineStatus?.status || 'N/A'}
+                    </span>
+                  </div>
+                  <Tooltip title={isConnected ? 'WebSocket Connected' : 'WebSocket Disconnected'}>
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
+                  </Tooltip>
                 </div>
               </div>
               
@@ -340,10 +428,10 @@ const JobDetails = () => {
                   </div>
                 </div>
 
-                {/* Current Job Information */}
+                {/* Machine Details */}
                 <div className="bg-white rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <span className="text-sm font-medium text-gray-600">Current Job</span>
+                    <span className="text-sm font-medium text-gray-600">Machine Details</span>
                     <Tag color={machineStatus?.job_status === 1 ? 'green' : 'orange'}>
                       {machineStatus?.job_status === 1 ? 'Active' : 'Pending'}
                     </Tag>
@@ -351,95 +439,59 @@ const JobDetails = () => {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <div className="text-xs text-gray-500">Part Number</div>
-                      <div className="font-medium truncate" title={machineStatus?.part_number}>
-                        {machineStatus?.part_number || 'N/A'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">Production Order</div>
-                      <div className="font-medium truncate" title={machineStatus?.production_order}>
-                        {machineStatus?.production_order || 'N/A'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="text-xs text-gray-500">Operation</div>
-                      <div className="font-medium truncate" title={machineStatus?.operation_description}>
-                        {machineStatus?.operation_number} - {machineStatus?.operation_description || 'N/A'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">Part Description</div>
-                      <div className="font-medium truncate" title={machineStatus?.part_description}>
-                        {machineStatus?.part_description || 'N/A'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Production Progress */}
-                <div className="bg-white rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Production Progress</span>
-                    <span className="text-xs text-gray-500">
-                      {machineStatus?.part_count || 0} of {machineStatus?.required_quantity || 0}
-                    </span>
-                  </div>
-                  <Progress 
-                    percent={Math.round((machineStatus?.part_count || 0) / (machineStatus?.required_quantity || 1) * 100)}
-                    strokeColor={{
-                      '0%': '#1890ff',
-                      '100%': '#52c41a',
-                    }}
-                    size="small"
-                  />
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
-                    <div>Launched: {machineStatus?.launched_quantity || 0}</div>
-                    <div>Required: {machineStatus?.required_quantity || 0}</div>
-                  </div>
-                </div>
-
-                {/* Program Information */}
-                <div className="bg-white rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
                       <div className="text-xs text-gray-500">Active Program</div>
-                      <div className="font-medium">
+                      <div className="font-medium truncate">
                         {machineStatus?.active_program !== 'x' ? machineStatus?.active_program : 'No Program'}
                       </div>
                     </div>
-                    {/* <div>
-                      <div className="text-xs text-gray-500">Selected Program</div>
-                      <div className="font-medium">
-                        {machineStatus?.selected_program || 'None'}
-                      </div>
-                    </div> */}
-                  </div>
-                </div>
-
-                {/* Last Updated */}
-                <div className="text-xs text-gray-500 flex items-center gap-2">
-                  <Clock3 className="w-4 h-4" />
-                  Last updated: {machineStatus?.last_updated ? formatDistanceToNow(new Date(machineStatus.last_updated), { addSuffix: true }) : 'N/A'}
-                </div>
-
-                {/* Idle Timer */}
-                {(machineStatus?.status === 'IDLE' || machineStatus?.status === 'ON') && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-yellow-600" />
-                        <span className="text-sm text-yellow-700">Idle Time</span>
-                      </div>
-                      <div className="text-lg font-mono font-bold text-yellow-600">
-                        {formatIdleTime(idleTime)}
+                    <div>
+                      <div className="text-xs text-gray-500">Job in Progress</div>
+                      <div className="font-medium truncate">
+                        {machineStatus?.job_in_progress || 'None'}
                       </div>
                     </div>
                   </div>
-                )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">Launched Quantity</div>
+                      <div className="font-medium">
+                        {machineStatus?.launched_quantity || '0'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Last Updated</div>
+                      <div className="font-medium text-xs">
+                        {machineStatus?.last_updated ? 
+                          formatDistanceToNow(parseISO(machineStatus.last_updated), { addSuffix: true }) : 
+                          'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timer Display - Always Visible */}
+                <div className={`border rounded-lg p-3 ${getTimerStyles(machineStatus?.status).containerClass}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className={`w-4 h-4 ${getTimerStyles(machineStatus?.status).iconClass}`} />
+                      <span className={`text-sm ${getTimerStyles(machineStatus?.status).textClass}`}>
+                        {machineStatus?.status === 'IDLE' || machineStatus?.status === 'ON' 
+                          ? 'Idle Time'
+                          : machineStatus?.status === 'PRODUCTION'
+                          ? 'Production Time'
+                          : 'IDLE Time'}
+                      </span>
+                    </div>
+                    <div className={`text-lg font-mono font-bold ${getTimerStyles(machineStatus?.status).textClass}`}>
+                      {formatIdleTime(idleTime)}
+                    </div>
+                  </div>
+                  {/* Status Indicator */}
+                  <div className={`text-xs mt-1 ${getTimerStyles(machineStatus?.status).textClass}`}>
+                    Status: {machineStatus?.status || 'N/A'}
+                  </div>
+                </div>
 
                 {/* Raise Ticket Button */}
                 <Button
@@ -451,6 +503,13 @@ const JobDetails = () => {
                 >
                   Raise Ticket
                 </Button>
+
+                {/* WebSocket Error Display */}
+                {wsError && (
+                  <div className="text-xs text-red-500 mt-2">
+                    Connection Error: {wsError}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -462,107 +521,123 @@ const JobDetails = () => {
                   <span className="font-semibold">Current Job</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Tag color={jobData.project?.priority === 1 ? 'red' : 'blue'}>
-                    Priority {jobData.project?.priority || 'N/A'}
-                  </Tag>
+                  {isLoadingJobData ? (
+                    <Tag color="blue">Loading...</Tag>
+                  ) : jobOrderData ? (
+                    <Tag color={jobOrderData.priority === 1 ? 'red' : 'blue'}>
+                      Priority {jobOrderData.priority || 'N/A'}
+                    </Tag>
+                  ) : (
+                    <Tag color="blue">No Data</Tag>
+                  )}
                 </div>
               </div>
 
               <div className="p-4 space-y-3">
-                {/* Part Information */}
-                <div className="bg-white rounded-lg p-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="text-xs text-gray-500">Part Number</div>
-                      <div className="text-sm font-semibold">{jobData.part_number}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">Production Order</div>
-                      <div className="text-sm font-semibold">{jobData.production_order}</div>
+                {isLoadingJobData ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-pulse space-y-4 w-full">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                      <div className="h-4 bg-gray-200 rounded w-full"></div>
+                      <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                      <div className="h-4 bg-gray-200 rounded w-2/3"></div>
                     </div>
                   </div>
-                </div>
-
-                {/* Material Description */}
-                <div className="bg-white rounded-lg p-3">
-                  <div className="text-xs text-gray-500">Material Description</div>
-                  <Tooltip title={jobData.part_description}>
-                    <div className="text-sm font-medium truncate">
-                      {jobData.part_description || 'N/A'}
-                    </div>
-                  </Tooltip>
-                </div>
-
-                {/* Quantity Information */}
-                <div className="bg-white rounded-lg p-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="text-xs text-gray-500">Required Qty</div>
-                      <div className="text-sm font-semibold text-blue-600">
-                        {jobData.required_quantity}
+                ) : jobOrderData ? (
+                  <>
+                    {/* Part Information */}
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-gray-500">Part Number</div>
+                          <div className="text-sm font-semibold">{jobOrderData.part_number}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Production Order</div>
+                          <div className="text-sm font-semibold">{jobOrderData.production_order}</div>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <div className="text-xs text-gray-500">Launched Qty</div>
-                      <div className="text-sm font-semibold text-green-600">
-                        {jobData.launched_quantity}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-2">
-                    <Progress 
-                      percent={Math.round((jobData.launched_quantity / jobData.required_quantity) * 100)}
-                      size="small"
-                      strokeColor={{
-                        '0%': '#60a5fa',
-                        '100%': '#2563eb',
-                      }}
-                    />
-                  </div>
-                </div>
 
-                {/* Order Details */}
-                <div className="bg-white rounded-lg p-3">
-                  <div className="space-y-2">
-                    <div>
-                      <div className="text-xs text-gray-500">Sales Order</div>
-                      <div className="text-sm font-medium">{jobData.sale_order}</div>
-                    </div>
-                    <Divider className="my-2" />
-                    <div>
-                      <div className="text-xs text-gray-500">WBS Element</div>
-                      <Tooltip title={jobData.wbs_element}>
+                    {/* Material Description */}
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="text-xs text-gray-500">Material Description</div>
+                      <Tooltip title={jobOrderData.material_description}>
                         <div className="text-sm font-medium truncate">
-                          {jobData.wbs_element}
+                          {jobOrderData.material_description || 'N/A'}
                         </div>
                       </Tooltip>
                     </div>
-                  </div>
-                </div>
 
-                {/* Project Information */}
-                <div className="bg-white rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs text-gray-500">Project Details</div>
-                    <Tag color="blue">Total Ops: {jobData.total_operations}</Tag>
-                  </div>
-                  <div className="text-sm font-medium">{jobData.project?.name}</div>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                    <CalendarDays className="w-4 h-4" />
-                    <span>
-                      Delivery: {moment(jobData.project?.delivery_date).format('DD MMM YYYY')}
-                    </span>
-                  </div>
-                </div>
+                    {/* Quantity Information */}
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-gray-500">Required Qty</div>
+                          <div className="text-sm font-semibold text-blue-600">
+                            {jobOrderData.required_qty}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Launched Qty</div>
+                          <div className="text-sm font-semibold text-green-600">
+                            {jobOrderData.launched_qty}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <Progress 
+                          percent={Math.round((jobOrderData.launched_qty / jobOrderData.required_qty) * 100)}
+                          size="small"
+                          strokeColor={{
+                            '0%': '#60a5fa',
+                            '100%': '#2563eb',
+                          }}
+                        />
+                      </div>
+                    </div>
 
-                {/* Plant Information */}
-                <div className="flex items-center justify-between bg-blue-50 rounded-lg p-2">
-                  <div className="flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm">Plant ID</span>
+                    {/* Order Details */}
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="space-y-2">
+                        <div>
+                          <div className="text-xs text-gray-500">Sales Order</div>
+                          <div className="text-sm font-medium">{jobOrderData.sales_order}</div>
+                        </div>
+                        <Divider className="my-2" />
+                        <div>
+                          <div className="text-xs text-gray-500">WBS Element</div>
+                          <Tooltip title={jobOrderData.wbs_element}>
+                            <div className="text-sm font-medium truncate">
+                              {jobOrderData.wbs_element}
+                            </div>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Project Information */}
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs text-gray-500">Project Details</div>
+                        <Tag color="blue">Total Ops: {jobOrderData.project_details?.total_operations || 'N/A'}</Tag>
+                      </div>
+                      <div className="text-sm font-medium">{jobOrderData.project_details?.project_name || 'N/A'}</div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <Empty description="No job data available" />
+                    <Button 
+                      type="primary" 
+                      className="mt-4"
+                      onClick={() => fetchMachineOperations(currentMachine?.id)}
+                      loading={isLoadingJobData}
+                    >
+                      Refresh Data
+                    </Button>
                   </div>
-                  <Tag color="blue">{jobData.plant_id}</Tag>
-                </div>
+                )}
               </div>
             </div>
 
@@ -925,8 +1000,8 @@ const JobDetails = () => {
       <MachineIssueModal
         visible={showIssueModal}
         onClose={() => setShowIssueModal(false)}
-        onSubmit={handleIssueSubmit}
-        machineData={jobData.machine}
+        machineId={currentMachine?.id}
+        partNumber={jobData?.part_number}
       />
 
       {/* Debugging Information */}

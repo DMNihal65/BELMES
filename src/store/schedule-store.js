@@ -42,6 +42,7 @@ const useScheduleStore = create((set, get) => ({
       // Store work centers data
       const workCenters = data.work_centers || [];
       
+      
       // Create a mapping of machines to their work centers
       const machineToWorkCenter = {};
       workCenters.forEach(wc => {

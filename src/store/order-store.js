@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.85:6768',
+  BASE_URL: 'http://localhost:8000',
   QUALITY_URL: 'http://172.18.7.93:9999',
   PLANNING_URL: 'http://172.18.7.85:9671',
   endpoints: {
@@ -65,7 +65,7 @@ const useOrderStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:6768/api/v1/planning/all_orders');
+      const response = await fetch('http://localhost:8000/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -124,7 +124,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.85:6768/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://localhost:8000/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -209,7 +209,7 @@ const useOrderStore = create((set, get) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://localhost:8000/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -444,7 +444,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.85:6768/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://localhost:8000/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -550,7 +550,7 @@ const useOrderStore = create((set, get) => ({
     set({ isLoadingTimeline: true, timelineError: null });
     try {
       const response = await fetch(
-        'http://172.18.7.85:6768/api/v1/scheduling/part-production-timeline/',
+        'http://localhost:8000/api/v1/scheduling/part-production-timeline/',
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -702,7 +702,7 @@ const useOrderStore = create((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      const allOrdersResponse = await fetch('http://172.18.7.85:6768/api/v1/planning/all_orders');
+      const allOrdersResponse = await fetch('http://localhost:8000/api/v1/planning/all_orders');
       const allOrdersData = await allOrdersResponse.json();
 
       if (!allOrdersResponse.ok) {
@@ -722,7 +722,7 @@ const useOrderStore = create((set, get) => ({
 
       // Make the priority update request
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/planning/order/${order1.id}/priority`,
+        `http://localhost:8000/api/v1/planning/order/${order1.id}/priority`,
         {
           method: 'PUT',
           headers: {
@@ -802,7 +802,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.85:6768/api/v1/planning/projects/priority', {
+      const response = await fetch('http://localhost:8000/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -899,7 +899,7 @@ const useOrderStore = create((set, get) => ({
           });
 
           const mppResponse = await fetch(
-            'http://172.18.7.85:6768/api/v1/document-management/documents/upload-by-type',
+            'http://localhost:8000/api/v1/document-management/documents/upload-by-type',
             {
               method: 'POST',
               headers: {
@@ -943,7 +943,7 @@ const useOrderStore = create((set, get) => ({
           });
 
           const drawingResponse = await fetch(
-            'http://172.18.7.85:6768/api/v1/document-management/documents/upload-by-type',
+            'http://localhost:8000/api/v1/document-management/documents/upload-by-type',
             {
               method: 'POST',
               headers: {

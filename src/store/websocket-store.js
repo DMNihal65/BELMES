@@ -145,7 +145,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Fetching operations for machine ID: ${machineId}`);
       
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/operator/machines/${machineId}/operations`
+        `http://localhost:8000/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -272,7 +272,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting machine issue for machine ID: ${machineId}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://localhost:8000/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -325,7 +325,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting component issue for part number: ${partNumber}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://localhost:8000/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {

@@ -1,8 +1,18 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.85:6797/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.85:6797/api/v1/operator';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.85:6768/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.85:6768/api/v1/operator';
+
+// Helper function to sort notifications by date
+const sortNotifications = (notifications) => {
+  return [...notifications].sort((a, b) => {
+    const dateA = new Date(a.updated_at).getTime();
+    const dateB = new Date(b.updated_at).getTime();
+    return dateB - dateA; // Newest first
+  });
+};
 
 const extractMachineId = (machineMake) => {
   // Extract numeric ID from machine make (e.g., "m1" -> 1)
@@ -20,7 +30,13 @@ const useMachineMaintenanceStore = create((set, get) => ({
   totalPendingRequests: 0,
   operatorPendingRequests: [],
   operatorTotalPendingRequests: 0,
-  notifications: [],
+  
+  // New state for notifications
+  machineNotifications: [],
+  componentNotifications: [],
+  totalMachineNotifications: 0,
+  totalComponentNotifications: 0,
+  notificationsLimit: 10,
 
   // Operator: Fetch all machine statuses
   fetchOperatorMachineStatuses: async () => {
@@ -211,16 +227,27 @@ const useMachineMaintenanceStore = create((set, get) => ({
     }
   },
 
-  // Fetch machine status notifications
-  fetchNotifications: async () => {
+  // Fetch machine notifications
+  fetchMachineNotifications: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.get(`${OPERATOR_BASE_URL}/Machine-status-Notification`);
+      const { notificationsLimit } = get();
+      // Only add limit parameter if not -1 (All)
+      const limitQuery = notificationsLimit === -1 ? '' : `?limit=${notificationsLimit}`;
+      
+      const response = await axios.get(
+        `${SUPERVISOR_BASE_URL}/supervisor/machine-notifications/${limitQuery}`
+      );
+      
+      const sortedNotifications = sortNotifications(response.data.notifications || []);
+      
       set({
-        notifications: response.data.messages || [],
+        machineNotifications: sortedNotifications,
+        totalMachineNotifications: response.data.total_notifications || sortedNotifications.length,
         loading: false
       });
     } catch (error) {
+      console.error('Error fetching machine notifications:', error);
       set({ 
         error: error.response?.data?.detail || error.message, 
         loading: false 
@@ -228,41 +255,41 @@ const useMachineMaintenanceStore = create((set, get) => ({
     }
   },
 
-  // Update notification status
-  updateNotificationStatus: async (machineId, timestamp, read, retain) => {
+  // Fetch component notifications
+  fetchComponentNotifications: async () => {
     set({ loading: true, error: null });
     try {
-      // Ensure timestamp is properly encoded for URL
-      const encodedTimestamp = encodeURIComponent(timestamp);
+      const { notificationsLimit } = get();
+      // Only add limit parameter if not -1 (All)
+      const limitQuery = notificationsLimit === -1 ? '' : `?limit=${notificationsLimit}`;
       
-      // Make PUT request with path parameters and query parameters
-      const response = await axios.put(
-        `${OPERATOR_BASE_URL}/Machine-status-Notification/${machineId}/${encodedTimestamp}`,
-        null,  // no body needed
-        {
-          params: {
-            read: read,
-            retain: retain
-          }
-        }
+      const response = await axios.get(
+        `${SUPERVISOR_BASE_URL}/supervisor/raw-material-notifications/${limitQuery}`
       );
-
-      if (response.data.message === "Message status updated successfully") {
-        // Refresh notifications after successful update
-        await get().fetchNotifications();
-      }
-
-      return response.data;
+      
+      const sortedNotifications = sortNotifications(response.data.notifications || []);
+      
+      set({
+        componentNotifications: sortedNotifications,
+        totalComponentNotifications: response.data.total_notifications || sortedNotifications.length,
+        loading: false
+      });
     } catch (error) {
-      console.error('Error updating notification status:', error);
+      console.error('Error fetching component notifications:', error);
       set({ 
         error: error.response?.data?.detail || error.message, 
         loading: false 
       });
-      throw error;
-    } finally {
-      set({ loading: false });
     }
+  },
+
+  // Set notifications limit
+  setNotificationsLimit: (limit) => {
+    set({ notificationsLimit: limit });
+    const { fetchMachineNotifications, fetchComponentNotifications } = get();
+    // Refetch data with new limit
+    fetchMachineNotifications();
+    fetchComponentNotifications();
   },
 }));
 

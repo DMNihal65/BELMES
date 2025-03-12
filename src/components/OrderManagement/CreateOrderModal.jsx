@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Modal, Form, Input, DatePicker, Upload, Space, Select, 
-  Button, message, Divider, InputNumber, Steps, Row, Col, Alert, Card 
+  Button, message, Divider, InputNumber, Steps, Row, Col, Alert, Card, Table 
 } from 'antd';
 import { 
   InboxOutlined, FileTextOutlined, LoadingOutlined,
@@ -32,8 +32,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     documentError,
     fetchDocumentsByPartNumber,
     documentLoadingStates,
-    fetchAllOrders,
-    createManualOrder,
   } = useOrderStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [fileList, setFileList] = useState([]);
@@ -47,6 +45,9 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
   const [drawingVersion, setDrawingVersion] = useState('v1');
   const [mppDescription, setMppDescription] = useState('');
   const [drawingDescription, setDrawingDescription] = useState('');
+  const [oarcData, setOarcData] = useState(null);
+  const [operations, setOperations] = useState([]);
+  const [orderData, setOrderData] = useState(null);
 
   const steps = [
     {
@@ -73,39 +74,49 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         return false;
       }
 
-      // Upload OARC document
       const result = await uploadPDF(file);
       console.log('OARC Upload Response:', result);
 
-      // Store raw materials exactly as they come from the API
-      setRawMaterials(result['Raw Materials'] || []);
-
-      // Store operations data
-      const operations = result.Operations || [];
-
-      // Set form fields with the extracted data
-      const formData = {
-        production_order: result['Prod Order No'],
-        sale_order: result['Sale Order'],
-        project_name: result['Project Name'],
-        priority: 'normal',
-        wbs_element: result['WBS'],
-        part_number: result['Part No'],
-        part_description: result['Part Desc'],
-        total_operations: operations.length,
-        required_quantity: parseInt(result['Required Qty']) || 0,
-        launched_quantity: parseInt(result['Launched Qty']) || 0,
-        plant_id: result['Plant'],
-        operations: operations
+      const completeData = {
+        "Project Name": result["Project Name"],
+        "Sale Order": result["Sale Order"],
+        "Part No": result["Part No"],
+        "Part Desc": result["Part Desc"],
+        "Required Qty": result["Required Qty"],
+        "Plant": result["Plant"],
+        "WBS": result["WBS"],
+        "Rtg Seq No": result["Rtg Seq No"],
+        "Sequence No": result["Sequence No"],
+        "Launched Qty": result["Launched Qty"],
+        "Prod Order No": result["Prod Order No"],
+        "Operations": result.Operations,
+        "Raw Materials": result["Raw Materials"],
+        "Document Verification": {}
       };
 
-      console.log('Setting form data:', formData);
-      form.setFieldsValue(formData);
+      const storageKey = `oarcData_${result["Prod Order No"]}`;
+      localStorage.setItem('currentProductionOrder', result["Prod Order No"]);
+      localStorage.setItem(storageKey, JSON.stringify(completeData));
 
-      // Get documents for the part number
-      if (result['Part No']) {
-        await fetchDocumentsByPartNumber(result['Part No']);
-      }
+      setOrderData(completeData);
+      setOperations(result.Operations);
+      setRawMaterials(result["Raw Materials"]);
+
+      console.log('Stored complete data:', completeData);
+
+      form.setFieldsValue({
+        production_order: result["Prod Order No"],
+        sale_order: result["Sale Order"],
+        project_name: result["Project Name"],
+        priority: 'normal',
+        wbs_element: result["WBS"],
+        part_number: result["Part No"],
+        part_description: result["Part Desc"],
+        total_operations: result.Operations?.length || 0,
+        required_quantity: result["Required Qty"],
+        launched_quantity: result["Launched Qty"],
+        plant_id: result["Plant"]
+      });
 
       setCurrentStep(1);
       return false;
@@ -115,34 +126,96 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     }
   };
 
-  const renderRawMaterials = () => (
+  const renderOperations = () => (
     <div className="mb-4">
-      <Divider>Raw Materials</Divider>
-      {rawMaterials.map((material, index) => (
-        <div key={index} className="p-2 bg-gray-50 rounded mb-2">
-          <Row gutter={16}>
-            <Col span={8}>
-              <strong>Part Number:</strong> {material.child_part_number}
-            </Col>
-            <Col span={8}>
-              <strong>Description:</strong> {material.description}
-            </Col>
-            <Col span={4}>
-              <strong>Quantity:</strong> {material.quantity} {material.unit.name}
-            </Col>
-            <Col span={4}>
-              <strong>Status:</strong> {material.status.name}
-            </Col>
-          </Row>
-        </div>
-      ))}
+      <Divider>Operations</Divider>
+      <Table
+        dataSource={operations?.map(op => ({
+          key: op["Oprn No"],
+          operation_number: op["Oprn No"],
+          workcenter: op["Wc/Plant"],
+          operation_description: op["Operation"],
+          setup_time: op["Setup Time"],
+          per_piece_time: op["Per Pc Time"]
+        })) || []}
+        size="small"
+        pagination={false}
+        scroll={{ y: 200 }}
+        columns={[
+          {
+            title: 'Operation No',
+            dataIndex: 'operation_number',
+            key: 'operation_number',
+          },
+          {
+            title: 'Workcenter',
+            dataIndex: 'workcenter',
+            key: 'workcenter',
+          },
+          {
+            title: 'Operation',
+            dataIndex: 'operation_description',
+            key: 'operation_description',
+          },
+          {
+            title: 'Setup Time',
+            dataIndex: 'setup_time',
+            key: 'setup_time',
+          },
+          {
+            title: 'Per Piece Time',
+            dataIndex: 'per_piece_time',
+            key: 'per_piece_time',
+          }
+        ]}
+      />
     </div>
   );
 
+  const renderRawMaterials = () => (
+    <div className="mb-4">
+      <Divider>Raw Materials</Divider>
+      <Table
+        dataSource={rawMaterials?.map(material => ({
+          key: material["Sl.No"],
+          child_part_number: material["Child Part No"],
+          description: material["Description"],
+          quantity_per_set: material["Qty Per Set"],
+          unit_of_measure: material["UoM"],
+          total_quantity: material["Total Qty"]
+        })) || []}
+        size="small"
+        pagination={false}
+        scroll={{ y: 200 }}
+        columns={[
+          {
+            title: 'Part Number',
+            dataIndex: 'child_part_number',
+            key: 'child_part_number',
+          },
+          {
+            title: 'Description',
+            dataIndex: 'description',
+            key: 'description',
+          },
+          {
+            title: 'Quantity',
+            dataIndex: 'quantity_per_set',
+            key: 'quantity_per_set',
+            render: (text, record) => `${text} ${record.unit_of_measure}`,
+          },
+          {
+            title: 'Total Quantity',
+            dataIndex: 'total_quantity',
+            key: 'total_quantity',
+          }
+        ]}
+      />
+    </div>
+  );
 
   const handleBack = () => {
     if (isManualCreate) {
-      // If in manual create mode, go back to upload option
       setIsManualCreate(false);
       form.resetFields();
     } else if (currentStep > 0) {
@@ -151,7 +224,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       handleCancel();
     }
   };
-
 
   const handleCancel = () => {
     form.resetFields();
@@ -169,71 +241,86 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     onCancel();
   };
 
-  // Handle form submission for OARC upload
   const handleSubmit = async (values) => {
     try {
       form.setFields([{ name: 'submit', errors: [] }]);
       
-      // Handle document uploads first if needed
-      if (!documents?.mpp_document && mppFile) {
-        try {
-          await uploadMppFile(
-            mppFile,
-            orderDetails['Part No'],
-            mppDocName.trim(),
-            mppDescription.trim() || '',
-            mppVersion.trim()
-          );
-        } catch (error) {
-          message.error('Failed to upload MPP document: ' + error.message);
-          throw error;
-        }
+      const productionOrder = localStorage.getItem('currentProductionOrder');
+      if (!productionOrder) {
+        throw new Error('No production order found');
       }
 
-      if (!documents?.engineering_drawing_document && drawingFile) {
-        try {
-          await uploadEngineeringDrawing(
-            drawingFile,
-            orderDetails['Part No'],
-            drawingDocName.trim(),
-            drawingDescription.trim() || '',
-            drawingVersion.trim()
-          );
-        } catch (error) {
-          message.error('Failed to upload Engineering Drawing: ' + error.message);
-          throw error;
-        }
+      const storageKey = `oarcData_${productionOrder}`;
+      const storedData = JSON.parse(localStorage.getItem(storageKey));
+      
+      console.log('Retrieved stored data:', storedData);
+
+      if (!storedData) {
+        throw new Error('No stored data found');
       }
 
-      // Use orderDetails directly since it contains the parsed PDF data
-      const orderData = {
-        "Project Name": orderDetails['Project Name'],
-        "Sale Order": orderDetails['Sale Order'],
-        "Part No": orderDetails['Part No'],
-        "Part Desc": orderDetails['Part Desc'],
-        "Required Qty": orderDetails['Required Qty'],
-        "Plant": orderDetails['Plant'],
-        "WBS": orderDetails['WBS'],
-        "Rtg Seq No": orderDetails['Rtg Seq No'] || "0",
-        "Sequence No": orderDetails['Sequence No'] || "0",
-        "Launched Qty": orderDetails['Launched Qty'],
-        "Prod Order No": orderDetails['Prod Order No'],
-        "Operations": orderDetails['Operations'] || [],
-        "Document Verification": documents || {},
-        "Raw Materials": orderDetails['Raw Materials']?.map(material => ({
-          "Sl.No": material['Sl.No'],
-          "Child Part No": material['Child Part No'],
-          "Description": material['Description'],
-          "Qty Per Set": material['Qty Per Set'],
-          "UoM": material['UoM'],
-          "Total Qty": material['Total Qty']
-        })) || []
+      const submitData = {
+        data: {
+          "Project Name": storedData["Project Name"],
+          "Sale Order": storedData["Sale Order"],
+          "Part No": storedData["Part No"],
+          "Part Desc": storedData["Part Desc"],
+          "Required Qty": storedData["Required Qty"],
+          "Plant": storedData["Plant"],
+          "WBS": storedData["WBS"],
+          "Rtg Seq No": storedData["Rtg Seq No"],
+          "Sequence No": storedData["Sequence No"],
+          "Launched Qty": storedData["Launched Qty"],
+          "Prod Order No": storedData["Prod Order No"],
+          "Operations": storedData["Operations"],
+          "Raw Materials": storedData["Raw Materials"],
+          "Document Verification": {}
+        }
       };
 
-      // Create order using store function
-      const result = await createOrder(orderData);
+      console.log('Sending order data:', submitData);
+
+      const maxRetries = 3;
+      let retryCount = 0;
+      let response;
+
+      while (retryCount < maxRetries) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+          response = await fetch('http://172.18.7.85:6768/api/v1/planning/save-to-db', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(submitData),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            break;
+          }
+
+          throw new Error(`Server responded with ${response.status}`);
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw new Error(`Failed after ${maxRetries} attempts: ${error.message}`);
+          }
+          console.log(`Attempt ${retryCount} failed, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+        }
+      }
+
+      const result = await response.json();
+      console.log('Save to DB Response:', result);
 
       if (result && result.message === "Data saved successfully") {
+        localStorage.removeItem(storageKey);
+        localStorage.removeItem('currentProductionOrder');
         message.success('Order created successfully');
         onCreate(result);
         form.resetFields();
@@ -251,72 +338,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     }
   };
 
-  // Update handleManualSubmit function to use store function
-  const handleManualSubmit = async (values) => {
-    try {
-      // Validate document names if files are selected
-      if (mppFile && !mppDocName.trim()) {
-        message.error('Please enter MPP document name');
-        return;
-      }
-      if (drawingFile && !drawingDocName.trim()) {
-        message.error('Please enter Engineering Drawing document name');
-        return;
-      }
-
-      // Format the data according to the create_order endpoint requirements
-      const requestData = {
-        production_order: values.production_order,
-        sale_order: values.sale_order,
-        wbs_element: values.wbs_element,
-        part_number: values.part_number,
-        part_description: values.part_description,
-        total_operations: values.total_operations,
-        required_quantity: values.required_quantity,
-        launched_quantity: values.launched_quantity,
-        plant_id: values.plant_id,
-        project_name: values.project_name
-      };
-
-      // Create order using store function
-      const savedData = await createManualOrder(requestData);
-
-      // Handle file uploads after successful order creation
-      try {
-        if (mppFile) {
-          await uploadMppFile(
-            mppFile.originFileObj || mppFile, 
-            values.part_number,
-            mppDocName.trim(),
-            mppDescription.trim(),
-            mppVersion.trim()
-          );
-        }
-        
-        if (drawingFile) {
-          await uploadEngineeringDrawing(
-            drawingFile.originFileObj || drawingFile, 
-            values.part_number,
-            drawingDocName.trim(),
-            drawingDescription.trim(),
-            drawingVersion.trim()
-          );
-        }
-      } catch (fileError) {
-        console.error('File upload error:', fileError);
-        message.warning('Order was saved but there was an issue uploading some files: ' + fileError.message);
-      }
-
-      message.success('Order saved successfully');
-      handleCancel();
-    } catch (error) {
-      console.error('Submit Error:', error);
-      message.error(error.message || 'Failed to save order');
-    }
-  };
-
-  // Set initial form values when editing
- useEffect(() => {
+  useEffect(() => {
     if (visible && initialData) {
       form.setFieldsValue({
         ...initialData,
@@ -326,18 +348,15 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     }
   }, [visible, initialData, form]);
 
-
   useEffect(() => {
     if (!visible) {
-      // When modal is closed, reset everything
       form.resetFields();
       clearOrderDetails();
       setCurrentStep(0);
       setFileList([]);
       setRawMaterials([]);
-      setIsManualCreate(false); // Reset manual create mode
+      setIsManualCreate(false);
     } else if (initialData) {
-      // Only set initial data when modal is opened with data
       form.setFieldsValue({
         ...initialData,
         deliveryDate: initialData.deliveryDate ? dayjs(initialData.deliveryDate) : undefined,
@@ -346,12 +365,24 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     }
   }, [visible, initialData, form]);
 
-  // Update the file change handlers to properly handle the file object
+  useEffect(() => {
+    if (visible) {
+      const productionOrder = localStorage.getItem('currentProductionOrder');
+      if (productionOrder) {
+        const storageKey = `oarcData_${productionOrder}`;
+        const storedData = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        if (storedData) {
+          setOperations(storedData.Operations || []);
+          setRawMaterials(storedData["Raw Materials"] || []);
+        }
+      }
+    }
+  }, [visible]);
+
   const handleMppFileChange = (info) => {
     const file = info.fileList[info.fileList.length - 1]?.originFileObj;
     if (file) {
       setMppFile(file);
-      // Just store the file and metadata, don't upload yet
       console.log('MPP file selected:', file);
     }
   };
@@ -360,12 +391,10 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     const file = info.file.originFileObj || info.file;
     if (file) {
       setDrawingFile(file);
-      // Just store the file and metadata, don't upload yet
       console.log('Engineering Drawing file selected:', file);
     }
   };
 
-  // Add useEffect to fetch documents when part number is available
   useEffect(() => {
     if (form.getFieldValue('part_number')) {
       fetchDocumentsByPartNumber(form.getFieldValue('part_number'));
@@ -380,7 +409,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       initialValues={orderDetails || initialData}
       className="p-4"
     >
-      {/* Order Information Section */}
       <Divider>Order Information</Divider>
       
       <Row gutter={16}>
@@ -402,7 +430,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         </Col>
       </Row>
 
-      {/* Project Information */}
       <Divider>Project Information</Divider>
       <Row gutter={16}>
         <Col span={12}>
@@ -423,110 +450,11 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         </Col>
       </Row>
 
-      {/* Raw Materials Section */}
-      {/* {orderDetails?.rawMaterials && orderDetails.rawMaterials.length > 0 && (
-        <>
-          <Divider>Raw Materials</Divider>
-          {orderDetails.rawMaterials.map((material, index) => (
-            <div key={index}>
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    label="Part Number"
-                  >
-                    <Input value={material.child_part_number} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="Description"
-                  >
-                    <Input value={material.description} disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    label="Quantity"
-                  >
-                    <Input value={`${material.quantity} ${material.unit.name}`} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="Status"
-                  >
-                    <Input value={material.status.name} disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-              {index < orderDetails.rawMaterials.length - 1 && <Divider dashed />}
-            </div>
-          ))}
-        </>
-      )} */}
+      {Array.isArray(rawMaterials) && rawMaterials.length > 0 && renderRawMaterials()}
 
-      {/* Operations Section */}
-      {/* {orderDetails?.operations && orderDetails.operations.length > 0 && (
-        <>
-          <Divider>Operations</Divider>
-          {orderDetails.operations.map((operation, index) => (
-            <div key={index}>
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item label="Operation Number">
-                    <Input value={operation.operation_number} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="Workcenter">
-                    <Input value={operation.workcenter} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="Plant Number">
-                    <Input value={operation.plant_number} disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={16}>
-                <Col span={24}>
-                  <Form.Item label="Operation Description">
-                    <Input value={operation.operation_description} disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={16}>
-                <Col span={6}>
-                  <Form.Item label="Setup Time">
-                    <Input value={`${operation.setup_time} hrs`} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={6}>
-                  <Form.Item label="Per Piece Time">
-                    <Input value={`${operation.per_piece_time} hrs`} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={6}>
-                  <Form.Item label="Jump Quantity">
-                    <Input value={operation.jump_quantity} disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={6}>
-                  <Form.Item label="Total Quantity">
-                    <Input value={operation.total_quantity} disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-              {index < orderDetails.operations.length - 1 && <Divider dashed />}
-            </div>
-          ))}
-        </>
-      )} */}
+      {Array.isArray(operations) && operations.length > 0 && renderOperations()}
 
       <Divider/>
-      {/* Editable fields */}
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
@@ -614,10 +542,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         </Col>
       </Row>
 
-      {/* Optional File Uploads Section */}
       {renderFileUploadSection()}
 
-      {/* Add error display */}
       {error && (
         <Alert
           message="Error"
@@ -628,7 +554,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
         />
       )}
 
-      {/* Form Actions */}
       <Form.Item className="mb-0">
         <Space className="w-full justify-end">
           <Button onClick={handleCancel}>Cancel</Button>
@@ -645,7 +570,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     </Form>
   );
 
-  // Manual Create Form
   const renderManualCreateForm = () => (
     <Form
       form={form}
@@ -654,8 +578,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       initialValues={{
         total_operations: 1,
         required_quantity: 1,
-        launched_quantity: 0,
-        plant_id: 1154
+        launched_quantity: 0
       }}
       className="p-4"
     >
@@ -759,11 +682,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
               label="Plant ID"
               rules={[{ required: true, message: 'Please enter Plant ID' }]}
             >
-              <InputNumber 
-                style={{ width: '100%' }} 
-                min={1}
-                placeholder="Enter plant ID"
-              />
+              <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -777,7 +696,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
           </Col>
         </Row>
 
-        {/* Add the same file upload section */}
         {renderFileUploadSection()}
 
         <Form.Item className="mb-0 mt-6">
@@ -797,7 +715,85 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
     </Form>
   );
 
-  // Update the file upload sections in renderOrderForm
+  const handleManualSubmit = async (values) => {
+    try {
+      if (mppFile && !mppDocName.trim()) {
+        message.error('Please enter MPP document name');
+        return;
+      }
+      if (drawingFile && !drawingDocName.trim()) {
+        message.error('Please enter Engineering Drawing document name');
+        return;
+      }
+
+      const requestData = {
+        data: {
+          "Project Name": values.project_name,
+          "Sale Order": values.sale_order,
+          "Part No": values.part_number,
+          "Part Desc": values.part_description,
+          "Required Qty": values.required_quantity.toString(),
+          "Plant": values.plant_id.toString(),
+          "WBS": values.wbs_element,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Launched Qty": values.launched_quantity.toString(),
+          "Prod Order No": values.production_order,
+          "Operations": [],
+          "Document Verification": {},
+          "Raw Materials": []
+        }
+      };
+
+      const response = await fetch('http://172.18.7.85:9671/api/v1/planning/save-to-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save order');
+      }
+
+      const savedData = await response.json();
+
+      try {
+        if (mppFile) {
+          await uploadMppFile(
+            mppFile.originFileObj || mppFile, 
+            values.production_order,
+            mppDocName.trim(),
+            mppDescription.trim(),
+            mppVersion.trim()
+          );
+        }
+        
+        if (drawingFile) {
+          await uploadEngineeringDrawing(
+            drawingFile.originFileObj || drawingFile, 
+            values.production_order,
+            drawingDocName.trim(),
+            drawingDescription.trim(),
+            drawingVersion.trim()
+          );
+        }
+      } catch (fileError) {
+        console.error('File upload error:', fileError);
+        message.warning('Order was saved but there was an issue uploading some files: ' + fileError.message);
+      }
+
+      message.success('Order saved successfully');
+      handleCancel();
+    } catch (error) {
+      console.error('Submit Error:', error);
+      message.error(error.message || 'Failed to save order');
+    }
+  };
+  
   const renderFileUploadSection = () => (
     <>
       <Divider>Document Information</Divider>
@@ -832,7 +828,10 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
                 <Row gutter={16}>
                   <Col span={24}>
                     <Form.Item label="Version">
-                      <Input value={documents.mpp_document.latest_version.version_number} disabled />
+                      <Input 
+                        value={documents.mpp_document.latest_version?.version_number || 'N/A'} 
+                        disabled 
+                      />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -944,7 +943,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
                   maxCount={1}
                   onChange={handleDrawingFileChange}
                   beforeUpload={() => false}
-                  accept=".pdf,.dwg,.dxf"  // Specify accepted file types
+                  accept=".pdf,.dwg,.dxf"
                   showUploadList={{ showRemoveIcon: true }}
                 >
                   <Button 

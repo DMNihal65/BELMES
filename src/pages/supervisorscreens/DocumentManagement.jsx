@@ -557,7 +557,7 @@ const DocumentManagement = () => {
             <Button
               type="text"
               icon={<DownloadOutlined />}
-              onClick={() => handleDownload(record)}
+              onClick={() => handleDownload(record.id)}
             />
           </Tooltip>
           <Dropdown
@@ -713,22 +713,34 @@ const DocumentManagement = () => {
     fetchAllOrders();
   }, []);
 
-  // Add back the handleCreateDocType function
+  // Update the handleCreateDocType function
   const handleCreateDocType = async () => {
     try {
-      await createDocType(newDocType);
-      message.success('Document type created successfully');
-      setIsCreateDocTypeModalVisible(false);
-      setNewDocType({
-        type_name: '',
-        description: '',
-        extensions: '',
-        is_active: true
-      });
-      // Refresh document types
-      const data = await fetchDocTypes();
-      setDocumentTypes(data);
+      // Format the data properly before sending
+      const docTypeData = {
+        name: newDocType.type_name,
+        description: newDocType.description || '',
+        allowed_extensions: newDocType.extensions.split(',').map(ext => ext.trim()),
+        is_active: newDocType.is_active
+      };
+
+      const result = await createDocType(docTypeData);
+      
+      if (result) {
+        message.success('Document type created successfully');
+        setIsCreateDocTypeModalVisible(false);
+        // Reset form
+        setNewDocType({
+          type_name: '',
+          description: '',
+          extensions: '',
+          is_active: true
+        });
+        // Refresh document types list
+        await fetchDocTypes();
+      }
     } catch (error) {
+      console.error('Create document type error:', error);
       message.error('Failed to create document type');
     }
   };
@@ -1211,21 +1223,64 @@ const DocumentManagement = () => {
     setIsUploadModalVisible(true);
   };
 
-  // Add handleUploadSuccess function
-  const handleUploadSuccess = async (response) => {
-    message.success('Document uploaded successfully');
-    setIsUploadModalVisible(false);
-    uploadForm.resetFields();
-    setSelectedFile(null);
-    setSelectedPartNumber(null);
-    
-    // Refresh documents in current folder
-    if (selectedFolder) {
-      await fetchFolderDocuments(selectedFolder);
+  // Update the handleUpload function to correctly handle part number
+  const handleUpload = async (values) => {
+    try {
+      if (!currentFolderContext.folderId) {
+        message.error('Please select a folder first');
+        return;
+      }
+
+      if (!selectedFile) {
+        message.error('Please select a file to upload');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('folder_id', currentFolderContext.folderId.toString());
+      formData.append('doc_type_id', values.doc_type_id.toString());
+      formData.append('name', values.document_name);
+      formData.append('document_name', values.document_name);
+      formData.append('description', values.description || '');
+      formData.append('version_number', 'v1');
+      formData.append('metadata', JSON.stringify({
+        uploadedBy: 'user',
+        uploadDate: new Date().toISOString(),
+        fileName: selectedFile.name
+      }));
+      
+      // Update part number handling
+      if (values.part_number) {
+        formData.append('part_number', values.part_number);
+      }
+      
+      if (values.production_order_id) {
+        formData.append('production_order_id', values.production_order_id.toString());
+      }
+
+      // Log the FormData contents for debugging
+      for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + pair[1]);
+      }
+
+      await uploadDocument(formData);
+      message.success('Document uploaded successfully');
+      setIsUploadModalVisible(false);
+      uploadForm.resetFields();
+      setSelectedFile(null);
+      setSelectedPartNumber(null);
+      
+      if (currentFolderContext.folderId) {
+        await fetchFolderDocuments(currentFolderContext.folderId);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      message.error('Failed to upload document: ' + (error.message || 'Unknown error'));
     }
   };
 
-  // Update the upload form onFinish handler in renderUploadModal
+  // Update the Upload component in the modal
   const renderUploadModal = () => (
     <Modal
       title="Upload Document"
@@ -1242,6 +1297,9 @@ const DocumentManagement = () => {
         form={uploadForm}
         layout="vertical"
         onFinish={handleUpload}
+        initialValues={{
+          version_number: 'v1'
+        }}
       >
         <Form.Item label="Selected Folder">
           <Input
@@ -1249,22 +1307,18 @@ const DocumentManagement = () => {
             disabled
             prefix={<FolderOutlined />}
           />
-          {currentFolderContext.folderPath.length > 0 && (
-            <div className="text-sm text-gray-500 mt-1">
-              Path: {currentFolderContext.folderPath.join(' / ')}
-            </div>
-          )}
         </Form.Item>
 
         <Form.Item
+          name="file"
           label="Select File"
-          required
           rules={[{ required: true, message: 'Please select a file' }]}
         >
           <Upload.Dragger
             beforeUpload={(file) => {
               setSelectedFile(file);
               uploadForm.setFieldsValue({
+                name: file.name,
                 document_name: file.name
               });
               return false;
@@ -1273,6 +1327,7 @@ const DocumentManagement = () => {
             onRemove={() => {
               setSelectedFile(null);
               uploadForm.setFieldsValue({
+                name: '',
                 document_name: ''
               });
             }}
@@ -1289,22 +1344,17 @@ const DocumentManagement = () => {
         <Form.Item
           name="document_name"
           label="Document Name"
-          rules={[{ required: true }]}
+          rules={[{ required: true, message: 'Please enter document name' }]}
         >
-          <Input />
-        </Form.Item>
-
-        <Form.Item
-          name="description"
-          label="Description"
-        >
-          <Input.TextArea />
+          <Input onChange={(e) => {
+            uploadForm.setFieldsValue({ name: e.target.value });
+          }} />
         </Form.Item>
 
         <Form.Item
           name="doc_type_id"
           label="Document Type"
-          rules={[{ required: true }]}
+          rules={[{ required: true, message: 'Please select document type' }]}
         >
           <Select>
             {documentTypes.map(type => (
@@ -1313,6 +1363,13 @@ const DocumentManagement = () => {
               </Select.Option>
             ))}
           </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="description"
+          label="Description"
+        >
+          <Input.TextArea />
         </Form.Item>
 
         <Form.Item
@@ -1326,14 +1383,12 @@ const DocumentManagement = () => {
             allowClear
             onChange={(value) => {
               setSelectedPartNumber(value);
-              // Filter production orders when part number changes
               if (value) {
                 const filteredOrders = allOrders.filter(order => order.part_number === value);
                 setFilteredProductionOrders(filteredOrders);
               } else {
                 setFilteredProductionOrders([]);
               }
-              // Clear production order selection
               uploadForm.setFieldsValue({ production_order_id: undefined });
             }}
             filterOption={(input, option) =>
@@ -1373,11 +1428,7 @@ const DocumentManagement = () => {
         )}
 
         <Form.Item>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
-            block
-          >
+          <Button type="primary" htmlType="submit" block>
             Upload Document
           </Button>
         </Form.Item>
@@ -1556,12 +1607,12 @@ const DocumentManagement = () => {
             onChange={e => setViewMode(e.target.value)}
             buttonStyle="solid"
           >
-            <Tooltip title="Table View">
+            {/* <Tooltip title="Table View">
               <Radio.Button value="table"><BarsOutlined /></Radio.Button>
             </Tooltip>
             <Tooltip title="Grid View">
               <Radio.Button value="grid"><AppstoreOutlined /></Radio.Button>
-            </Tooltip>
+            </Tooltip> */}
           </Radio.Group>
           {documentTypeButton}
         </Space>
@@ -1570,39 +1621,41 @@ const DocumentManagement = () => {
   );
 
   // Add these functions for handling downloads and previews
-  const handleFileDownload = (document, version = null) => {
-    Modal.confirm({
-      title: 'Download Confirmation',
-      content: (
-        <div>
-          <p>Are you sure you want to download:</p>
-          <p><strong>File:</strong> {document.name}</p>
-          {version && <p><strong>Version:</strong> v{version.version_number}</p>}
-          <p><strong>Size:</strong> {((version?.file_size || document.file_size) / (1024 * 1024)).toFixed(2)} MB</p>
-        </div>
-      ),
-      okText: 'Download',
-      cancelText: 'Cancel',
-      onOk: async () => {
-        try {
-          const blob = await downloadDocumentVersion(document.id, version?.id);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = version 
-            ? `${document.name}_${version.version_number}`
-            : document.name;
-          document.body.appendChild(a);
-          a.click();
-          URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-          message.success('Download started successfully');
-        } catch (error) {
-          message.error('Failed to download file');
-          console.error('Download error:', error);
+  const handleDownload = async (documentId) => {
+    try {
+      const token = useAuthStore.getState().token;
+      const response = await fetch(
+        `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download-latest`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          }
         }
-      },
-    });
+      );
+
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Get filename from Content-Disposition header or use a default name
+      const contentDisposition = response.headers.get('content-disposition');
+      const fileName = contentDisposition
+        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+        : 'document';
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      message.success('Document downloaded successfully');
+    } catch (error) {
+      console.error('Download error:', error);
+      message.error('Failed to download document');
+    }
   };
 
   // Update the preview handler
@@ -1653,7 +1706,7 @@ const DocumentManagement = () => {
               content: `This file type cannot be previewed. Would you like to download "${record.name}" instead?`,
               okText: 'Download',
               cancelText: 'Cancel',
-              onOk: () => handleFileDownload(record, versions[0])
+              onOk: () => handleDownload(record.id)
             });
           }
         } catch (error) {
@@ -1682,7 +1735,7 @@ const DocumentManagement = () => {
           key="download"
           type="primary"
           icon={<DownloadOutlined />}
-          onClick={() => handleFileDownload(selectedDocument)}
+          onClick={() => handleDownload(selectedDocument.id)}
         >
           Download
         </Button>
@@ -1762,7 +1815,7 @@ const DocumentManagement = () => {
                   content: `This file type cannot be previewed. Would you like to download "${selectedDocument.name}" (${selectedPreviewVersion.version_number}) instead?`,
                   okText: 'Download',
                   cancelText: 'Cancel',
-                  onOk: () => handleFileDownload(selectedDocument, selectedPreviewVersion)
+                  onOk: () => handleDownload(selectedDocument.id)
                 });
               }
             } catch (error) {
@@ -1825,76 +1878,6 @@ const DocumentManagement = () => {
     refreshDocuments();
   }, [selectedFolder, versionModalVisible]); // Add versionModalVisible to dependencies
 
-  // Update the handleUpload function
-  const handleUpload = async (values) => {
-    try {
-      if (!currentFolderContext.folderId) {
-        message.error('Please select a folder first');
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('file', values.file.file);
-      formData.append('folder_id', currentFolderContext.folderId.toString());
-      formData.append('doc_type_id', values.doc_type_id.toString());
-      formData.append('document_name', values.document_name);
-      formData.append('description', values.description || '');
-      formData.append('version_number', 'v1');
-      formData.append('metadata', '{}');
-      
-      // Only append if selected
-      if (values.part_number) {
-        const partNumberOrder = allOrders.find(order => order.part_number === values.part_number);
-        if (partNumberOrder) {
-          formData.append('part_number_id', partNumberOrder.id.toString());
-        }
-      }
-      
-      // Only append if selected
-      if (values.production_order_id) {
-        formData.append('production_order_id', values.production_order_id.toString());
-      }
-
-      await uploadDocument(formData);
-      message.success('Document uploaded successfully');
-      setIsUploadModalVisible(false);
-      uploadForm.resetFields();
-      
-      // Refresh documents in current folder
-      if (currentFolderContext.folderId) {
-        await fetchFolderDocuments(currentFolderContext.folderId);
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      message.error('Failed to upload document: ' + (error.message || 'Unknown error'));
-    }
-  };
-
-  // Add this effect to refresh document versions when folder changes
-  useEffect(() => {
-    const refreshDocuments = async () => {
-      if (selectedFolder && selectedFolder !== 'all') {
-        await fetchFolderDocuments(selectedFolder);
-      }
-    };
-    refreshDocuments();
-  }, [selectedFolder]);
-
-  // Add this effect to refresh documents when needed
-  useEffect(() => {
-    const refreshDocuments = async () => {
-      if (selectedFolder && selectedFolder !== 'all') {
-        try {
-          await fetchFolderDocuments(selectedFolder);
-        } catch (error) {
-          console.error('Failed to refresh documents:', error);
-        }
-      }
-    };
-
-    refreshDocuments();
-  }, [selectedFolder, versionModalVisible]); // Add versionModalVisible to dependencies
-
   // Add this function to handle version modal close
   const handleVersionModalClose = () => {
     setVersionModalVisible(false);
@@ -1908,7 +1891,7 @@ const DocumentManagement = () => {
     setPreviewModalVisible(false);
     setSelectedPreviewVersion(null);
     if (selectedDocument?.versionUrl) {
-      URL.revokeObjectURL(selectedDocument.versionUrl);
+      window.URL.revokeObjectURL(selectedDocument.versionUrl);
     }
     setSelectedDocument(null);
   };
@@ -2026,6 +2009,7 @@ const DocumentManagement = () => {
               placeholder="Enter type name"
             />
           </Form.Item>
+
           <Form.Item label="Description">
             <Input.TextArea
               value={newDocType.description}
@@ -2033,6 +2017,7 @@ const DocumentManagement = () => {
               placeholder="Enter description"
             />
           </Form.Item>
+
           <Form.Item 
             label="File Extensions" 
             required
@@ -2044,6 +2029,7 @@ const DocumentManagement = () => {
               placeholder=".pdf, .doc, etc."
             />
           </Form.Item>
+
           <Form.Item>
             <Checkbox
               checked={newDocType.is_active}
@@ -2118,17 +2104,7 @@ const DocumentManagement = () => {
           onClick={async () => {
             try {
               for (const version of selectedVersions) {
-                const blob = await downloadDocumentVersion(
-                  selectedDocument.id,
-                  version.id
-                );
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${selectedDocument.name}_${version.version_number}`;
-                document.body.appendChild(a);
-                a.click();
-                URL.revokeObjectURL(url);
+                await handleDownload(selectedDocument.id, version);
               }
               setDownloadModalVisible(false);
               setSelectedVersions([]);
@@ -2201,41 +2177,6 @@ const DocumentManagement = () => {
     </div>
   );
 
-  // Add download handler with version selection
-  const handleDownload = async (record) => {
-    try {
-      const versions = await fetchDocumentVersions(record.id);
-      
-      if (versions.length > 1) {
-        setSelectedDocument(record);
-        setDownloadVersions(versions);
-        setDownloadModalVisible(true);
-      } else {
-        try {
-          const blob = await downloadDocumentVersion(record.id);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = record.name;
-          document.body.appendChild(a);
-          a.click();
-          URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-          message.success('Download started');
-        } catch (error) {
-          message.error('Failed to download document');
-        }
-      }
-    } catch (error) {
-      message.error('Failed to load document versions');
-    }
-  };
-
-  // Add table change handler
-  const handleTableChange = (pagination) => {
-    fetchFolderDocuments(selectedFolder, pagination.current);
-  };
-
   // Add rename handler
   const handleRenameFolder = (folder) => {
     setRenameFolderData({ id: folder.id, name: folder.folder_name });
@@ -2292,7 +2233,6 @@ const DocumentManagement = () => {
   useEffect(() => {
     if (selectedPartNumber) {
       const filteredOrders = allOrders.filter(order => order.part_number === selectedPartNumber);
-      console.log('Filtered orders:', filteredOrders); // Debug log
       setFilteredProductionOrders(filteredOrders);
     } else {
       setFilteredProductionOrders([]);
@@ -2359,7 +2299,7 @@ const DocumentManagement = () => {
               Manage and organize your documents
             </p>
           </div>
-          <div className="flex gap-2">
+          {/* <div className="flex gap-2">
             <Button
               type="primary"
               icon={<CloudUploadOutlined />}
@@ -2373,7 +2313,7 @@ const DocumentManagement = () => {
             >
               New Folder
             </Button>
-          </div>
+          </div> */}
         </div>
         
         <MetricsCards 

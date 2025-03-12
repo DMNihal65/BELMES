@@ -13,7 +13,8 @@ import {
   CheckSquare,
   Archive,
   Files,
-  Box
+  Box,
+  Bell
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -102,9 +103,36 @@ function Sidebar() {
     },
     {
       key: '/supervisor/production-monitoring',
-      icon: <Activity size={20} />,
+      icon: <Calendar size={20} />,
       label: 'Production Monitoring',
+      children: [
+        {
+          key: '/supervisor/production-monitoring/dashboard',
+          label: 'Live Monitoring',
+        },
+        {
+          key: '/supervisor/production-monitoring/production-vs-actual',
+          label: 'Production vs Actual',
+        },
+        {
+          key: '/supervisor/production-monitoring/order-analysis',
+          label: 'Order Analysis',
+        },
+        {
+          key: '/supervisor/production-monitoring/oee-overview',
+          label: 'OEE Overview',
+        },
+        {
+          key: '/supervisor/production-monitoring/analytics',
+          label: 'Analytics',
+        },
+      ],
     },
+    // {
+    //   key: '/supervisor/production-monitoring',
+    //   icon: <Activity size={20} />,
+    //   label: 'Production Monitoring',
+    // },
     {
       key: '/supervisor/quality-management',
       icon: <CheckSquare size={20} />,
@@ -159,6 +187,11 @@ function Sidebar() {
 
       icon: <Files size={20} />,
       label: 'Document Management',
+    },
+    {
+      key: '/supervisor/logs',
+      icon: <Bell size={20} />,
+      label: 'Logs',
     },
   ];
 

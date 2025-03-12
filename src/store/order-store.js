@@ -1,6 +1,21 @@
 import { create } from 'zustand';
 import dayjs from 'dayjs';
 
+// API endpoints configuration
+const API_CONFIG = {
+  BASE_URL: 'http://172.18.7.85:6768',
+  QUALITY_URL: 'http://172.18.7.93:9999',
+  PLANNING_URL: 'http://172.18.7.85:9671',
+  endpoints: {
+    allOrders: '/api/v1/planning/all_orders',
+    saveOrder: '/api/v1/planning/save-to-db',
+    uploadPdf: '/api/v1/planning/upload-pdf',
+    updatePriority: (orderId) => `/api/v1/planning/order/${orderId}/priority`,
+    uploadMpp: '/api/v1/documents/mpp',
+    uploadDrawing: '/api/v1/documents/drawing',
+    documents: (productionOrder) => `/api/v1/documents/${productionOrder}`,
+  }
+};
 
 const useOrderStore = create((set, get) => ({
   orders: [],
@@ -31,6 +46,8 @@ const useOrderStore = create((set, get) => ({
     engineering: false
   },
 
+  timelinePollingInterval: null,  // Add this to track the interval
+
   clearOrderDetails: () => set({ 
     orderDetails: null, 
     error: null,
@@ -40,7 +57,7 @@ const useOrderStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:6797/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.85:6768/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -54,35 +71,35 @@ const useOrderStore = create((set, get) => ({
       // Get saved sequence from localStorage
       const savedSequence = localStorage.getItem('orderSequence');
       if (savedSequence) {
-        const { orders: savedOrders, timestamp } = JSON.parse(savedSequence);
+        const { orders: savedOrders } = JSON.parse(savedSequence);
         
-        // Only use saved sequence if it's less than 24 hours old
-        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
-          const orderedItems = [];
-          
-          // Reconstruct the order based on saved sequence
-          savedOrders.forEach(savedOrder => {
-            const item = transformedOrders.find(
-              order => order.id === savedOrder.id || 
-                       order.project?.id === savedOrder.project_id
-            );
-            if (item) {
-              if (item.project) {
-                item.project.priority = savedOrder.priority;
-              }
-              orderedItems.push(item);
-            }
-          });
-          
-          // Add any new items at the end
-          transformedOrders.forEach(order => {
-            if (!orderedItems.find(item => item.id === order.id)) {
-              orderedItems.push(order);
-            }
-          });
+        // Sort orders based on priority
+        transformedOrders.sort((a, b) => {
+          const savedOrderA = savedOrders.find(
+            so => so.id === a.id || so.project_id === a.project?.id
+          );
+          const savedOrderB = savedOrders.find(
+            so => so.id === b.id || so.project_id === b.project?.id
+          );
 
-          transformedOrders = orderedItems;
-        }
+          // Get priorities (default to highest number if not found)
+          const priorityA = savedOrderA?.priority ?? 999;
+          const priorityB = savedOrderB?.priority ?? 999;
+
+          // Sort by priority (lower number comes first)
+          return priorityA - priorityB;
+        });
+
+        // Update priorities in the transformed orders
+        transformedOrders = transformedOrders.map(order => {
+          const savedOrder = savedOrders.find(
+            so => so.id === order.id || so.project_id === order.project?.id
+          );
+          if (savedOrder && order.project) {
+            order.project.priority = savedOrder.priority;
+          }
+          return order;
+        });
       }
 
       set({ orders: transformedOrders, isLoading: false });
@@ -99,7 +116,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.85:6797/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.85:6768/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -147,51 +164,12 @@ const useOrderStore = create((set, get) => ({
         })) || []
       };
 
-      // Immediately fetch documents after successful PDF upload
-      try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          const documentsResponse = await fetch(
-            `http://172.18.7.85:6797/api/v1/document-management/documents/by-part-number-all/${transformedData.partNumber}`,
-            {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-
-          if (documentsResponse.ok) {
-            const documentsData = await documentsResponse.json();
-            set({
-              documents: {
-                mpp_document: documentsData.mpp_document || null,
-                engineering_drawing_document: documentsData.engineering_drawing_document || null,
-                oarc_document: documentsData.oarc_document || null,
-                ipid_document: documentsData.ipid_document || null,
-                all_documents: documentsData.all_documents || []
-              },
-              documentLoadingStates: {
-                mpp: false,
-                engineering: false
-              },
-              isLoadingDocuments: false
-            });
-          }
-        }
-      } catch (docError) {
-        console.error('Error fetching documents:', docError);
-        // Don't throw this error as it's not critical to the PDF upload
-      }
-
       set({ 
         orderDetails: transformedData, 
         isLoading: false 
       });
       
-      return transformedData;
+      return data;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       throw error;
@@ -223,7 +201,7 @@ const useOrderStore = create((set, get) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.85:6797/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.85:6768/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -262,69 +240,46 @@ const useOrderStore = create((set, get) => ({
   },
 
   // Add createOrder function to the store
-  createOrder: async (orderData) => {
+  createOrder: async (payload) => {
+    set({ isLoading: true, error: null });
     try {
-      set({ isLoading: true, error: null });
+      const submitData = {
+        data: {
+          "Project Name": payload.project_name,
+          "Sale Order": payload.sale_order,
+          "Part No": payload.part_number,
+          "Part Desc": payload.part_description,
+          "Required Qty": payload.required_quantity.toString(),
+          "Plant": payload.plant_id.toString(),
+          "WBS": payload.wbs_element,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Launched Qty": payload.launched_quantity.toString(),
+          "Prod Order No": payload.production_order,
+          "Operations": [],
+          "Document Verification": {},
+          "Raw Materials": []
+        }
+      };
 
-      console.log('Sending order data:', orderData);
-
-      const response = await fetch('http://172.18.7.85:6797/api/v1/planning/save-to-db', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          data: orderData
-        })
-      });
-
-      const result = await response.json();
-      console.log('Server response:', result);
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to create order');
-      }
-
-      // Refresh orders list after successful creation
-      await get().fetchAllOrders();
-
-      set({ isLoading: false });
-      return result;
-    } catch (error) {
-      console.error('Create order error:', error);
-      set({ error: error.message, isLoading: false });
-      throw error;
-    }
-  },
-
-  createManualOrder: async (orderData) => {
-    try {
-      set({ isLoading: true, error: null });
-
-      const response = await fetch('http://172.18.7.85:6797/api/v1/planning/create_order', {
+      const response = await fetch(`${API_CONFIG.PLANNING_URL}${API_CONFIG.endpoints.saveOrder}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify(submitData)
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || errorData.detail || 'Failed to save order');
+        throw new Error(errorData.message || 'Failed to create order');
       }
 
-      const result = await response.json();
-
-      // Refresh orders list after successful creation
-      await get().fetchAllOrders();
-
+      const data = await response.json();
       set({ isLoading: false });
-      return result;
+      return data;
     } catch (error) {
-      console.error('Manual order creation error:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -359,7 +314,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.85:6797/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.85:6768/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -403,95 +358,140 @@ const useOrderStore = create((set, get) => ({
     });
   },
 
-  uploadMppFile: async (file, partNumber, documentName, description, version) => {
+  uploadMppFile: async (file, productionOrder, documentName, description, version) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('part_number', partNumber);
-      formData.append('name', documentName);
+      formData.append('production_order', productionOrder);
+      formData.append('document_name', documentName);
       formData.append('description', description || '');
       formData.append('version', version);
-      formData.append('doc_type', 'MPP');
-      formData.append('metadata', JSON.stringify({}));
 
-      const response = await fetch('http://172.18.7.85:6797/api/v1/document-management/documents/upload-by-type', {
+      const response = await fetch(`${API_CONFIG.PLANNING_URL}${API_CONFIG.endpoints.uploadMpp}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: formData,
+        body: formData
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload MPP document');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload MPP file');
       }
 
-      const data = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('MPP Upload Error:', error);
+      console.error('Upload MPP file error:', error);
       throw error;
     }
   },
 
-  uploadEngineeringDrawing: async (file, partNumber, documentName, description, version) => {
+  uploadEngineeringDrawing: async (file, productionOrder, documentName, description, version) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('part_number', partNumber);
-      formData.append('name', documentName);
+      formData.append('production_order', productionOrder);
+      formData.append('document_name', documentName);
       formData.append('description', description || '');
       formData.append('version', version);
-      formData.append('doc_type', 'ENGINEERING_DRAWING');
-      formData.append('metadata', JSON.stringify({}));
 
-      const response = await fetch('http://172.18.7.85:6797/api/v1/document-management/documents/upload-by-type', {
+      const response = await fetch(`${API_CONFIG.PLANNING_URL}${API_CONFIG.endpoints.uploadDrawing}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: formData,
+        body: formData
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload Engineering Drawing');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload Engineering Drawing');
       }
 
-      const data = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('Engineering Drawing Upload Error:', error);
+      console.error('Upload Engineering Drawing error:', error);
       throw error;
     }
   },
 
   fetchTimelineData: async () => {
-    set({ isLoadingTimeline: true, timelineError: null });
     try {
-      const response = await fetch('http://172.18.7.85:6797/api/v1/scheduling/part-production-timeline/');
-      const data = await response.json();
+      set({ isLoadingTimeline: true, timelineError: null });
+      
+      const response = await fetch('http://172.18.7.85:6768/api/v1/scheduling/part-production-timeline/');
       
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch timeline data');
+        throw new Error('Failed to fetch timeline data');
       }
 
-      // Transform the data to include a key property for the table
-      const transformedData = data.items.map((item, index) => ({
-        ...item,
-        key: index,
+      const data = await response.json();
+      
+      // Ensure we're working with an array
+      const items = data?.items || [];
+      
+      // Transform the data and ensure it's an array
+      const transformedData = items.map(item => ({
+        key: item.production_order,
+        part_number: item.part_number || '',
+        production_order: item.production_order || '',
+        completed_total_quantity: item.completed_total_quantity || 0,
+        operations_count: item.operations_count || 0,
+        status: item.status || 'scheduled',
+        part_description: item.part_description || ''
       }));
 
       set({ 
         timelineData: transformedData,
         isLoadingTimeline: false 
       });
+
       return transformedData;
+
     } catch (error) {
+      console.error('Timeline fetch error:', error);
       set({ 
-        timelineError: error.message, 
+        timelineError: error.message,
+        timelineData: [], // Always set an empty array if there's an error
         isLoadingTimeline: false 
       });
       throw error;
+    }
+  },
+
+  // Start polling when component mounts
+  startTimelinePolling: () => {
+    // Clear any existing interval first
+    const { timelinePollingInterval } = get();
+    if (timelinePollingInterval) {
+      console.log('Clearing existing polling interval');
+      clearInterval(timelinePollingInterval);
+      set({ timelinePollingInterval: null });
+    }
+
+    // Set new interval for 1 hour
+    const ONE_HOUR = 3600000; // 1 hour in milliseconds
+    console.log('Starting new polling interval with delay:', ONE_HOUR, 'ms');
+    
+    const intervalId = setInterval(() => {
+      console.log('Polling timeline data at:', new Date().toLocaleTimeString());
+      get().fetchTimelineData();
+    }, ONE_HOUR);
+
+    // Store the interval ID
+    set({ timelinePollingInterval: intervalId });
+    console.log('Timeline polling started - updating every hour');
+    console.log('Next update at:', new Date(Date.now() + ONE_HOUR).toLocaleTimeString());
+  },
+
+  // Stop polling when component unmounts
+  stopTimelinePolling: () => {
+    const { timelinePollingInterval } = get();
+    if (timelinePollingInterval) {
+      console.log('Stopping timeline polling');
+      clearInterval(timelinePollingInterval);
+      set({ timelinePollingInterval: null });
     }
   },
 
@@ -516,7 +516,7 @@ const useOrderStore = create((set, get) => ({
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(
-        `http://172.18.7.85:6797/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.85:6768/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           method: 'GET',
           headers: {
@@ -601,15 +601,13 @@ const useOrderStore = create((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      // First, fetch all orders to get the correct order_ids
-      const allOrdersResponse = await fetch('http://172.18.7.85:6797/api/v1/planning/all_orders');
+      const allOrdersResponse = await fetch('http://172.18.7.85:6768/api/v1/planning/all_orders');
       const allOrdersData = await allOrdersResponse.json();
 
       if (!allOrdersResponse.ok) {
         throw new Error('Failed to fetch orders data');
       }
 
-      // Find the orders by their production order numbers to get their order_ids
       const order1 = allOrdersData.find(order => 
         String(order.production_order) === String(order1ProductionOrder)
       );
@@ -621,13 +619,14 @@ const useOrderStore = create((set, get) => ({
         throw new Error('Could not find order IDs for the selected orders');
       }
 
-      // Make the priority update request using the order IDs from all_orders
+      // Make the priority update request
       const response = await fetch(
-        `http://172.18.7.85:6797/api/v1/planning/order/${order1.id}/priority`,
+        `http://172.18.7.85:6768/api/v1/planning/order/${order1.id}/priority`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
           body: JSON.stringify({
             priority: order2Priority,
@@ -637,19 +636,44 @@ const useOrderStore = create((set, get) => ({
       );
 
       const data = await response.json();
-      console.log('Priority update response:', data);
 
       if (!response.ok) {
         throw new Error(data.message || 'Failed to update priority');
       }
 
+      // Update the orders in memory and localStorage
+      const currentOrders = get().orders;
+      const updatedOrders = currentOrders.map(order => {
+        if (order.id === order1.id && order.project) {
+          order.project.priority = order2Priority;
+        } else if (order.id === order2.id && order.project) {
+          order.project.priority = order1Priority;
+        }
+        return order;
+      });
+
+      // Sort orders by priority
+      updatedOrders.sort((a, b) => 
+        (a.project?.priority ?? 999) - (b.project?.priority ?? 999)
+      );
+
+      // Save the sorted sequence to localStorage
+      localStorage.setItem('orderSequence', JSON.stringify({
+        orders: updatedOrders.map(order => ({
+          id: order.id,
+          project_id: order.project?.id,
+          priority: order.project?.priority
+        })),
+        timestamp: Date.now()
+      }));
+
+      // Update state with sorted orders
+      set({ orders: updatedOrders, isLoading: false });
+
       return data;
     } catch (error) {
       console.error('Swap priority error:', error);
-      set({ 
-        error: error.message || 'Failed to swap priorities', 
-        isLoading: false 
-      });
+      set({ error: error.message || 'Failed to swap priorities', isLoading: false });
       throw error;
     }
   },

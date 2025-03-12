@@ -37,6 +37,7 @@ import Report from './pages/supervisorscreens/EnergyMonitoring/Report';
 import InspectionReport from './pages/supervisorscreens/QualityManagement/InspectionReport';
 
 import QualityInspectionDetails from './pages/supervisorscreens/QualityManagement/QualityInspectionDetails';
+import LogsDashboard from './pages/supervisorscreens/Logs/LogsDashboard';
 
 const App = () => {
   return (
@@ -57,7 +58,13 @@ const App = () => {
             <Route path="maintenance" element={<Maintenance />} />
             <Route path="production-planning/planning" element={<Planning />} />
             <Route path="production-planning/scheduling" element={<Scheduling />} />
-            <Route path="production-monitoring" element={<ProductionMonitoring />} />
+
+            <Route path="production-monitoring/dashboard" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/production-vs-actual" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-analysis" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/oee-overview" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/analytics" element={<ProductionMonitoring />} />
+            
             <Route path="documents" element={<DocumentManagement />} />
             <Route path="quality-management" element={<QualityManagementDashboard />} />
             <Route path="inventory_master/inventory_usage_and_analytics" element={<InventoryUsageAndAnalytics />} />
@@ -70,6 +77,7 @@ const App = () => {
             <Route path="quality-management/inspection-details" element={<QualityInspectionDetails />} />
 
             <Route path="quality-management/inspection-report" element={<InspectionReport />} />
+            <Route path="logs" element={<LogsDashboard />} />
           </Route>
 
           {/* Operator Routes */}

@@ -23,18 +23,18 @@ function MaintenanceDashboard() {
           onChange={setActiveTab}
           className="px-6 pt-4"
           items={[
+            // {
+            //   key: '1',
+            //   label: (
+            //     <span>
+            //       <ToolOutlined />
+            //      Machine Maintenance
+            //     </span>
+            //   ),
+            //   children: <MachineMaintenance />
+            // },
             {
               key: '1',
-              label: (
-                <span>
-                  <ToolOutlined />
-                 Machine Maintenance
-                </span>
-              ),
-              children: <MachineMaintenance />
-            },
-            {
-              key: '2',
               label: (
                 <span>
                   <FileTextOutlined />

@@ -608,18 +608,18 @@ function MaintenanceScreen() {
               ),
               children: <MaintenanceTasksTab />
             },
+            // {
+            //   key: '2',
+            //   label: (
+            //     <span>
+            //       <FileExcelOutlined />
+            //       Documentation
+            //     </span>
+            //   ),
+            //   children: <DocumentationTab />
+            // },
             {
               key: '2',
-              label: (
-                <span>
-                  <FileExcelOutlined />
-                  Documentation
-                </span>
-              ),
-              children: <DocumentationTab />
-            },
-            {
-              key: '3',
               label: (
                 <span>
                   <HistoryOutlined />
@@ -628,16 +628,16 @@ function MaintenanceScreen() {
               ),
               children: <MaintenanceHistoryTab />
             },
-            {
-              key: '4',
-              label: (
-                <span>
-                  <WarningOutlined />
-                  Troubleshooting
-                </span>
-              ),
-              children: <TroubleshootingTab />
-            }
+            // {
+            //   key: '4',
+            //   label: (
+            //     <span>
+            //       <WarningOutlined />
+            //       Troubleshooting
+            //     </span>
+            //   ),
+            //   children: <TroubleshootingTab />
+            // }
           ]}
         />
       </div>

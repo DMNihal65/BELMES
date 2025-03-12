@@ -182,7 +182,7 @@ const OrderDashboard = () => {
                 className="h-full flex flex-col"
                 style={{ flex: 1 }}
               >
-                <TabPane tab="All Orders" key="all">
+                <TabPane tab="All Order" key="all">
                   <div className="h-[calc(100vh-320px)] overflow-auto">
                     <OrderTable orders={orders} onRefresh={handleRefresh} />
                   </div>

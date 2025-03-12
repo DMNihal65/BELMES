@@ -26,7 +26,7 @@ import AlertScreens from './pages/operatorscreens/AlertScreens';
 import MaintenanceDashboard from './pages/operatorscreens/maintanance/MaintenanceDashboard';
 import InspectionResult from './pages/operatorscreens/InspectionResult';
 import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
-import LogsDashboard from './pages/supervisorscreens/Logs/LogsDashboard';
+import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
 
 const App = () => {
   return (

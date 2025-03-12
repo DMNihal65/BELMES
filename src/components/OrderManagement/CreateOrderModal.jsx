@@ -387,45 +387,71 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     try {
       form.setFields([{ name: 'submit', errors: [] }]);
       
-      const productionOrder = localStorage.getItem('currentProductionOrder');
-      if (!productionOrder) {
-        throw new Error('No production order found');
-      }
+      if (!isManualCreate) {
+        // Handle OARC upload case
+        const productionOrder = localStorage.getItem('currentProductionOrder');
+        if (!productionOrder) {
+          throw new Error('No production order found');
+        }
 
-      const storageKey = `oarcData_${productionOrder}`;
-      const storedData = JSON.parse(localStorage.getItem(storageKey));
-      
-      if (!storedData) {
-        throw new Error('No stored data found');
-      }
+        const storageKey = `oarcData_${productionOrder}`;
+        const storedData = JSON.parse(localStorage.getItem(storageKey));
+        
+        if (!storedData) {
+          throw new Error('No stored data found');
+        }
 
-      // Save OARC data and upload documents
-      const result = await saveOarcDataToDb(
-        storedData,
-        mppFile,
-        drawingFile,
-        mppDocName,
-        mppDescription,
-        mppVersion,
-        drawingDocName,
-        drawingDescription,
-        drawingVersion
-      );
+        // Save OARC data
+        const result = await saveOarcDataToDb(
+          storedData,
+          mppFile,
+          drawingFile,
+          mppDocName,
+          mppDescription,
+          mppVersion,
+          drawingDocName,
+          drawingDescription,
+          drawingVersion
+        );
 
-      // Handle file upload results
-      if (result.fileUploadError) {
-        message.warning('Order was saved but there was an issue uploading some files: ' + result.fileUploadError);
+        // Clean up localStorage
+        localStorage.removeItem(storageKey);
+        localStorage.removeItem('currentProductionOrder');
+
+        if (result.fileUploadError) {
+          message.warning('Order was saved but there was an issue uploading some files: ' + result.fileUploadError);
+        } else {
+          message.success('Order and documents saved successfully');
+        }
+
+        await onCreate(result);
       } else {
-        message.success('Order and documents saved successfully');
+        // Handle manual creation case
+        const result = await createManualOrder({
+          ...values,
+          mppFile,
+          drawingFile,
+          mppDocName,
+          mppDescription,
+          mppVersion,
+          drawingDocName,
+          drawingDescription,
+          drawingVersion
+        });
+
+        if (result.fileUploadError) {
+          message.warning('Order was created but there was an issue uploading some files: ' + result.fileUploadError);
+        } else {
+          message.success('Order and documents created successfully');
+        }
+
+        await onCreate(result);
       }
 
-      // Clean up localStorage
-      localStorage.removeItem(storageKey);
-      localStorage.removeItem('currentProductionOrder');
-
-      // Call onCreate and close modal
-      await onCreate(result);
-      handleCancel();
+      // Clear form and close modal
+      form.resetFields();
+      clearDocuments();
+      onCancel();
 
     } catch (error) {
       console.error('Order submission error:', error);

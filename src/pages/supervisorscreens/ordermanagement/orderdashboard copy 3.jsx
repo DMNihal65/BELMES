@@ -17,14 +17,15 @@ const OrderDashboard = () => {
   const [parent] = useAutoAnimate();
   
   const handleRefresh = useCallback(() => {
+    // Only fetch timeline data on refresh
     fetchTimelineData();
-    fetchAllOrders();
-  }, [fetchTimelineData, fetchAllOrders]);
+  }, [fetchTimelineData]);
 
   useEffect(() => {
+    // Initial load only
     fetchAllOrders();
-    fetchTimelineData(); // Fetch timeline data on component mount
-  }, []);
+    fetchTimelineData();
+  }, []); // Empty dependency array means this runs once on mount
 
   const fadeIn = {
     initial: { opacity: 0, y: 20 },
@@ -45,6 +46,12 @@ const OrderDashboard = () => {
       dataIndex: 'part_number', 
       key: 'part_number',
       width: 150,
+    },
+    { 
+      title: 'Material Description',
+      dataIndex: 'part_description',
+      key: 'part_description',
+      width: 200,
     },
     { 
       title: 'Completed Quantity', 
@@ -69,7 +76,7 @@ const OrderDashboard = () => {
           px-2 py-1 rounded-full text-sm
           ${status === 'in_progress' ? 'bg-blue-100 text-blue-800' : ''}
           ${status === 'completed' ? 'bg-green-100 text-green-800' : ''}
-          ${status === 'scheduled' ? 'bg-yellow-100 text-yellow-800' : ''}
+          ${status === 'delayed' ? 'bg-red-100 text-red-800' : ''}
           ${!status ? 'bg-gray-100 text-gray-800' : ''}
         `}>
           {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'N/A'}
@@ -93,7 +100,7 @@ const OrderDashboard = () => {
         />
       )}
       
-      <div className="flex-1 p-4 overflow-hidden flex flex-col">
+      <div className="flex-1 p-4 overflow-hidden">
         {/* Quick Stats Row */}
         <Row gutter={[16, 16]} className="mb-6" ref={parent}>
           <Col xs={24} sm={12} lg={6}>
@@ -149,7 +156,7 @@ const OrderDashboard = () => {
         </Row>
 
         {/* Main Content Area - Full Width Order Management */}
-        <Row className="flex-1">
+        <Row className="h-[calc(100vh-20px)]">
           <Col span={24} className="h-full">
             <Card
               title={
@@ -169,69 +176,62 @@ const OrderDashboard = () => {
                 </div>
               }
               bordered={false}
-              className="h-full"
-              bodyStyle={{ 
-                padding: '12px', 
-                height: 'calc(100% - 56px)',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
+              className="hover:shadow-lg transition-shadow duration-300 h-full"
+              bodyStyle={{ padding: '12px', height: 'calc(100% - 48px)', overflow: 'hidden' }}
             >
-              <Tabs 
-                defaultActiveKey="all" 
-                className="h-full flex flex-col"
-                style={{ flex: 1 }}
-              >
-                <TabPane tab="All Orders" key="all">
-                  <div className="h-[calc(100vh-320px)] overflow-auto">
-                    <OrderTable orders={orders} onRefresh={handleRefresh} />
-                  </div>
-                </TabPane>
-                <TabPane tab="In Progress" key="in_progress">
-                  <div className="h-full overflow-auto">
-                    <Table 
-                      columns={timelineColumns}
-                      dataSource={timelineData}
-                      loading={isLoading}
-                      rowKey="production_order"
-                      scroll={{ x: 1800, y: 'calc(100vh - 300px)' }}
-                      pagination={{ 
-                        pageSize: 10,
-                        position: ['bottomCenter'],
-                        showSizeChanger: true,
-                        showTotal: (total) => `Total ${total} items`
-                      }}
-                      size="middle"
-                      bordered
-                    />
-                  </div>
-                </TabPane>
-                <TabPane tab="Completed" key="completed">
-                  <div className="h-full overflow-auto">
-                    <OrderTable orders={orders.filter(order => order.status === 'completed')} onRefresh={handleRefresh} />
-                  </div>
-                </TabPane>
-                <TabPane tab="Priority" key="reorder">
-                  <div className="h-full overflow-auto">
-                    <ReorderableTable 
-                      orders={Array.isArray(orders) ? orders.map(order => ({
-                        ...order,
-                        key: order.id || order.production_order,
-                        id: order.id || order.production_order
-                      })) : []} 
-                      onOrdersReorder={(newOrders) => {
-                        console.log('Orders reordered:', newOrders);
-                        message.success('Order sequence updated successfully');
-                      }} 
-                    />
-                  </div>
-                </TabPane>
-                {/* <TabPane tab="Workcenter" key="workcenter">
-                  <div className="h-full overflow-auto">
-                    <Workcenter />
-                  </div>
-                </TabPane> */}
-              </Tabs>
+              <div className="flex-1 overflow-hidden">
+                <Tabs defaultActiveKey="all" className="h-full">
+                  <TabPane tab="All Orders" key="all">
+                    <div className="h-full overflow-auto">
+                      <OrderTable orders={orders} onRefresh={handleRefresh} />
+                    </div>
+                  </TabPane>
+                  <TabPane tab="In Progress" key="in_progress">
+                    <div className="h-full overflow-auto">
+                      <Table 
+                        columns={timelineColumns}
+                        dataSource={inProgressOrders}
+                        loading={isLoading}
+                        rowKey={record => record.id || record.production_order}
+                        scroll={{ x: 1800, y: 'calc(100vh - 300px)' }}
+                        pagination={{ 
+                          pageSize: 10,
+                          position: ['bottomCenter'],
+                          showSizeChanger: true,
+                          showTotal: (total) => `Total ${total} items`
+                        }}
+                        size="middle"
+                        bordered
+                      />
+                    </div>
+                  </TabPane>
+                  <TabPane tab="Completed" key="completed">
+                    <div className="h-full overflow-auto">
+                      <OrderTable orders={orders.filter(order => order.status === 'completed')} onRefresh={handleRefresh} />
+                    </div>
+                  </TabPane>
+                  <TabPane tab="Priority" key="reorder">
+                    <div className="h-full overflow-auto">
+                      <ReorderableTable 
+                        orders={Array.isArray(orders) ? orders.map(order => ({
+                          ...order,
+                          key: order.id || order.production_order,
+                          id: order.id || order.production_order
+                        })) : []} 
+                        onOrdersReorder={(newOrders) => {
+                          console.log('Orders reordered:', newOrders);
+                          message.success('Order sequence updated successfully');
+                        }} 
+                      />
+                    </div>
+                  </TabPane>
+                  {/* <TabPane tab="Workcenter" key="workcenter">
+                    <div className="h-full overflow-auto">
+                      <Workcenter />
+                    </div>
+                  </TabPane> */}
+                </Tabs>
+              </div>
             </Card>
           </Col>
         </Row>
@@ -239,11 +239,9 @@ const OrderDashboard = () => {
       <CreateOrderModal 
         visible={isModalVisible} 
         onCancel={() => setIsModalVisible(false)} 
-        onCreate={async (newOrder) => {
+        onCreate={(newOrder) => {
           console.log('New order created:', newOrder);
-          await handleRefresh();
           setIsModalVisible(false);
-          message.success('Order created successfully');
         }} 
         onRefresh={handleRefresh} 
       />

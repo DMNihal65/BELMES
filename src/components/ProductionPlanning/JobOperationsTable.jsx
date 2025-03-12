@@ -305,17 +305,12 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   // Define Columns for the Table
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      width: 80,
-      fixed: 'left',
-      editable: false,
-    },
-    {
       title: 'Operation Number',
       dataIndex: 'operation_number',
       width: 150,
       editable: false,
+      sorter: (a, b) => a.operation_number - b.operation_number,
+      defaultSortOrder: 'ascend',
     },
     {
       title: 'Operation Description',
@@ -526,6 +521,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           }}
           size="middle"
           rowKey="id"
+          defaultSortOrder={['operation_number', 'ascend']}
         />
       </div>
 

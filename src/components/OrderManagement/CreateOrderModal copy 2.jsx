@@ -15,7 +15,7 @@ const { Dragger } = Upload;
 const { TextArea } = Input;
 const { Step } = Steps;
 
-const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData = null }) => {
+const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) => {
   const [form] = Form.useForm();
   const { 
     uploadPDF, 
@@ -243,57 +243,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     onCancel();
   };
 
-  const handleManualSubmit = async (values) => {
-    try {
-      // Validate document names
-      if (mppFile && !mppDocName.trim()) {
-        message.error('Please enter MPP document name');
-        return;
-      }
-      if (drawingFile && !drawingDocName.trim()) {
-        message.error('Please enter Engineering Drawing document name');
-        return;
-      }
-
-      // Validate file objects
-      if (mppFile && !(mppFile instanceof File || mppFile.originFileObj)) {
-        message.error('Invalid MPP file format');
-        return;
-      }
-      if (drawingFile && !(drawingFile instanceof File || drawingFile.originFileObj)) {
-        message.error('Invalid Engineering Drawing file format');
-        return;
-      }
-
-      const result = await createManualOrder(
-        values,
-        mppFile,
-        drawingFile,
-        mppDocName.trim(),
-        mppDescription.trim(),
-        mppVersion.trim(),
-        drawingDocName.trim(),
-        drawingDescription.trim(),
-        drawingVersion.trim()
-      );
-
-      if (result.fileUploadError) {
-        message.warning('Order was saved but there was an issue uploading some files: ' + result.fileUploadError);
-      } else {
-        message.success('Order and documents saved successfully');
-      }
-
-      // Call onCreate with the result and wait for it to complete
-      await onCreate(result);
-      
-      // Clear the form and close the modal
-      handleCancel();
-    } catch (error) {
-      console.error('Submit Error:', error);
-      message.error(error.message || 'Failed to save order');
-    }
-  };
-
   const handleSubmit = async (values) => {
     try {
       form.setFields([{ name: 'submit', errors: [] }]);
@@ -306,20 +255,20 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       const storageKey = `oarcData_${productionOrder}`;
       const storedData = JSON.parse(localStorage.getItem(storageKey));
       
+      console.log('Retrieved stored data:', storedData);
+
       if (!storedData) {
         throw new Error('No stored data found');
       }
 
       const result = await saveOarcDataToDb(storedData);
+      console.log('Save to DB Response:', result);
 
       if (result && result.message === "Data saved successfully") {
         localStorage.removeItem(storageKey);
         localStorage.removeItem('currentProductionOrder');
-        
-        // Call onCreate with the result and wait for it to complete
-        await onCreate(result);
-        
-        // Clear form and close modal
+        message.success('Order created successfully');
+        onCreate(result);
         form.resetFields();
         onCancel();
       } else {
@@ -710,6 +659,53 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     </Form>
   );
 
+  const handleManualSubmit = async (values) => {
+    try {
+      // Validate document names
+      if (mppFile && !mppDocName.trim()) {
+        message.error('Please enter MPP document name');
+        return;
+      }
+      if (drawingFile && !drawingDocName.trim()) {
+        message.error('Please enter Engineering Drawing document name');
+        return;
+      }
+
+      // Validate file objects
+      if (mppFile && !(mppFile instanceof File || mppFile.originFileObj)) {
+        message.error('Invalid MPP file format');
+        return;
+      }
+      if (drawingFile && !(drawingFile instanceof File || drawingFile.originFileObj)) {
+        message.error('Invalid Engineering Drawing file format');
+        return;
+      }
+
+      const result = await createManualOrder(
+        values,
+        mppFile,
+        drawingFile,
+        mppDocName.trim(),
+        mppDescription.trim(),
+        mppVersion.trim(),
+        drawingDocName.trim(),
+        drawingDescription.trim(),
+        drawingVersion.trim()
+      );
+
+      if (result.fileUploadError) {
+        message.warning('Order was saved but there was an issue uploading some files: ' + result.fileUploadError);
+      } else {
+        message.success('Order and documents saved successfully');
+      }
+
+      handleCancel();
+    } catch (error) {
+      console.error('Submit Error:', error);
+      message.error(error.message || 'Failed to save order');
+    }
+  };
+  
   const renderFileUploadSection = () => (
     <>
       <Divider>Document Information</Divider>

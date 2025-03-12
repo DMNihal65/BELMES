@@ -15,7 +15,7 @@ const { Dragger } = Upload;
 const { TextArea } = Input;
 const { Step } = Steps;
 
-const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData = null }) => {
+const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) => {
   const [form] = Form.useForm();
   const { 
     uploadPDF, 
@@ -32,8 +32,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     documentError,
     fetchDocumentsByPartNumber,
     documentLoadingStates,
-    saveOarcDataToDb,
-    createManualOrder,
   } = useOrderStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [fileList, setFileList] = useState([]);
@@ -243,57 +241,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     onCancel();
   };
 
-  const handleManualSubmit = async (values) => {
-    try {
-      // Validate document names
-      if (mppFile && !mppDocName.trim()) {
-        message.error('Please enter MPP document name');
-        return;
-      }
-      if (drawingFile && !drawingDocName.trim()) {
-        message.error('Please enter Engineering Drawing document name');
-        return;
-      }
-
-      // Validate file objects
-      if (mppFile && !(mppFile instanceof File || mppFile.originFileObj)) {
-        message.error('Invalid MPP file format');
-        return;
-      }
-      if (drawingFile && !(drawingFile instanceof File || drawingFile.originFileObj)) {
-        message.error('Invalid Engineering Drawing file format');
-        return;
-      }
-
-      const result = await createManualOrder(
-        values,
-        mppFile,
-        drawingFile,
-        mppDocName.trim(),
-        mppDescription.trim(),
-        mppVersion.trim(),
-        drawingDocName.trim(),
-        drawingDescription.trim(),
-        drawingVersion.trim()
-      );
-
-      if (result.fileUploadError) {
-        message.warning('Order was saved but there was an issue uploading some files: ' + result.fileUploadError);
-      } else {
-        message.success('Order and documents saved successfully');
-      }
-
-      // Call onCreate with the result and wait for it to complete
-      await onCreate(result);
-      
-      // Clear the form and close the modal
-      handleCancel();
-    } catch (error) {
-      console.error('Submit Error:', error);
-      message.error(error.message || 'Failed to save order');
-    }
-  };
-
   const handleSubmit = async (values) => {
     try {
       form.setFields([{ name: 'submit', errors: [] }]);
@@ -306,20 +253,76 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       const storageKey = `oarcData_${productionOrder}`;
       const storedData = JSON.parse(localStorage.getItem(storageKey));
       
+      console.log('Retrieved stored data:', storedData);
+
       if (!storedData) {
         throw new Error('No stored data found');
       }
 
-      const result = await saveOarcDataToDb(storedData);
+      const submitData = {
+        data: {
+          "Project Name": storedData["Project Name"],
+          "Sale Order": storedData["Sale Order"],
+          "Part No": storedData["Part No"],
+          "Part Desc": storedData["Part Desc"],
+          "Required Qty": storedData["Required Qty"],
+          "Plant": storedData["Plant"],
+          "WBS": storedData["WBS"],
+          "Rtg Seq No": storedData["Rtg Seq No"],
+          "Sequence No": storedData["Sequence No"],
+          "Launched Qty": storedData["Launched Qty"],
+          "Prod Order No": storedData["Prod Order No"],
+          "Operations": storedData["Operations"],
+          "Raw Materials": storedData["Raw Materials"],
+          "Document Verification": {}
+        }
+      };
+
+      console.log('Sending order data:', submitData);
+
+      const maxRetries = 3;
+      let retryCount = 0;
+      let response;
+
+      while (retryCount < maxRetries) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+          response = await fetch('http://172.18.7.85:6797/api/v1/planning/save-to-db', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(submitData),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            break;
+          }
+
+          throw new Error(`Server responded with ${response.status}`);
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw new Error(`Failed after ${maxRetries} attempts: ${error.message}`);
+          }
+          console.log(`Attempt ${retryCount} failed, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+        }
+      }
+
+      const result = await response.json();
+      console.log('Save to DB Response:', result);
 
       if (result && result.message === "Data saved successfully") {
         localStorage.removeItem(storageKey);
         localStorage.removeItem('currentProductionOrder');
-        
-        // Call onCreate with the result and wait for it to complete
-        await onCreate(result);
-        
-        // Clear form and close modal
+        message.success('Order created successfully');
+        onCreate(result);
         form.resetFields();
         onCancel();
       } else {
@@ -377,16 +380,18 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
   }, [visible]);
 
   const handleMppFileChange = (info) => {
-    if (info.file && (info.file.originFileObj || info.file)) {
-      setMppFile(info.file.originFileObj || info.file);
-      console.log('MPP file selected:', info.file.originFileObj || info.file);
+    const file = info.fileList[info.fileList.length - 1]?.originFileObj;
+    if (file) {
+      setMppFile(file);
+      console.log('MPP file selected:', file);
     }
   };
 
   const handleDrawingFileChange = (info) => {
-    if (info.file && (info.file.originFileObj || info.file)) {
-      setDrawingFile(info.file.originFileObj || info.file);
-      console.log('Engineering Drawing file selected:', info.file.originFileObj || info.file);
+    const file = info.file.originFileObj || info.file;
+    if (file) {
+      setDrawingFile(file);
+      console.log('Engineering Drawing file selected:', file);
     }
   };
 
@@ -710,6 +715,85 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     </Form>
   );
 
+  const handleManualSubmit = async (values) => {
+    try {
+      if (mppFile && !mppDocName.trim()) {
+        message.error('Please enter MPP document name');
+        return;
+      }
+      if (drawingFile && !drawingDocName.trim()) {
+        message.error('Please enter Engineering Drawing document name');
+        return;
+      }
+
+      const requestData = {
+        data: {
+          "Project Name": values.project_name,
+          "Sale Order": values.sale_order,
+          "Part No": values.part_number,
+          "Part Desc": values.part_description,
+          "Required Qty": values.required_quantity.toString(),
+          "Plant": values.plant_id.toString(),
+          "WBS": values.wbs_element,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Launched Qty": values.launched_quantity.toString(),
+          "Prod Order No": values.production_order,
+          "Operations": [],
+          "Document Verification": {},
+          "Raw Materials": []
+        }
+      };
+
+      const response = await fetch('http://172.18.7.85:9671/api/v1/planning/save-to-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save order');
+      }
+
+      const savedData = await response.json();
+
+      try {
+        if (mppFile) {
+          await uploadMppFile(
+            mppFile.originFileObj || mppFile, 
+            values.production_order,
+            mppDocName.trim(),
+            mppDescription.trim(),
+            mppVersion.trim()
+          );
+        }
+        
+        if (drawingFile) {
+          await uploadEngineeringDrawing(
+            drawingFile.originFileObj || drawingFile, 
+            values.production_order,
+            drawingDocName.trim(),
+            drawingDescription.trim(),
+            drawingVersion.trim()
+          );
+        }
+      } catch (fileError) {
+        console.error('File upload error:', fileError);
+        message.warning('Order was saved but there was an issue uploading some files: ' + fileError.message);
+      }
+
+      message.success('Order saved successfully');
+      handleCancel();
+    } catch (error) {
+      console.error('Submit Error:', error);
+      message.error(error.message || 'Failed to save order');
+    }
+  };
+  
   const renderFileUploadSection = () => (
     <>
       <Divider>Document Information</Divider>

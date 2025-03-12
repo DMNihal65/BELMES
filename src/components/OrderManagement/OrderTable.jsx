@@ -1,27 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Table, Tag, Badge, Button, Space, Tooltip } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { message } from 'antd';
 import dayjs from 'dayjs';
 
 const OrderTable = ({ orders, onRefresh }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-    // Add useEffect for initial load and polling
-    React.useEffect(() => {
-      // Initial load
+  // Add useEffect for initial load and polling
+  React.useEffect(() => {
+    // Initial load
+    if (onRefresh) {
+      onRefresh();
+    }
+
+    // Set up polling every 30 seconds
+    const intervalId = setInterval(() => {
       if (onRefresh) {
         onRefresh();
       }
-  
-      // Set up polling every 30 seconds
-      const intervalId = setInterval(() => {
-        if (onRefresh) {
-          onRefresh();
-        }
-      }, 10000);
-  
-      return () => clearInterval(intervalId);
-    }, [onRefresh]);
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [onRefresh]);
 
   // Handle view action
   const handleViewDetails = (record) => {
@@ -31,10 +33,13 @@ const OrderTable = ({ orders, onRefresh }) => {
 
   const columns = [
     {
-      title: 'SI.No',
+      title: 'Sl.No',
       key: 'serialNumber',
-      render: (_, __, index) => index + 1,
-      width: 70,
+      width: 80,
+      render: (_, __, index) => {
+        // Calculate serial number based on current page
+        return ((currentPage - 1) * pageSize) + index + 1;
+      },
       fixed: 'left',
     },
     {
@@ -143,17 +148,29 @@ const OrderTable = ({ orders, onRefresh }) => {
       columns={columns}
       dataSource={orders}
       rowKey="id"
-      scroll={{ x: 1300, y: 'calc(100vh - 460px)' }}
-      rowClassName={(record) =>
-        record.project?.priority === 1 ? 'bg-red-50' : ''
-      }
-      pagination={{
-        defaultPageSize: 10,
-        showSizeChanger: true,
-        showQuickJumper: true,
-        showTotal: (total) => `Total ${total} orders`,
-        position: ['bottomCenter']
+      scroll={{ 
+        x: 1800, 
+        y: 'calc(100vh - 420px)' // Adjusted to make room for pagination
       }}
+      pagination={{
+        pageSize: pageSize,
+        position: ['bottomCenter'],
+        showSizeChanger: true,
+        showTotal: (total) => `Total ${total} items`,
+        onChange: (page, newPageSize) => {
+          setCurrentPage(page);
+          if (pageSize !== newPageSize) {
+            setPageSize(newPageSize);
+            setCurrentPage(1);
+          }
+        },
+        style: { 
+          marginBottom: '8px',
+          marginTop: '8px'
+        }
+      }}
+      size="middle"
+      bordered
     />
   );
 };

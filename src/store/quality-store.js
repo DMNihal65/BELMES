@@ -101,6 +101,23 @@ class QualityStore {
       throw error;
     }
   }
+
+  async launchQMSSoftware() {
+    try {
+      const response = await axios.get(
+        'http://172.18.7.93:9999/api/v1/quality/run',
+        this.getAuthHeaders()
+      );
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        console.error('Authentication failed. Please log in again.');
+        localStorage.removeItem('token');
+      }
+      console.error('Error launching QMS software:', error);
+      throw error;
+    }
+  }
 }
 
 export const qualityStore = new QualityStore();

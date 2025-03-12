@@ -27,7 +27,7 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
-import { qualityStore } from '../../store/Quality-store';
+import { qualityStore } from '../../store/quality-store';
 import QualityInspectionDetails from '../supervisorscreens/QualityManagement/QualityInspectionDetails';
 
 const { Option } = Select;

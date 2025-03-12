@@ -103,7 +103,7 @@ function Sidebar() {
     },
     {
       key: '/supervisor/production-monitoring',
-      icon: <Calendar size={20} />,
+      icon: <Activity size={20} />,
       label: 'Production Monitoring',
       children: [
         {

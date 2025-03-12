@@ -1157,7 +1157,7 @@ const Scheduling = () => {
 
           <h4>Interaction</h4>
           <ul>
-            <li>Click and drag timeline to move left/right</li>
+            {/* <li>Click and drag timeline to move left/right</li> */}
             <li>Click on any task to see its details</li>
             <li>Use the date picker to jump to specific dates</li>
             <li>Select view type (Day/Week/Month/Year) to change time scale</li>

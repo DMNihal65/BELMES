@@ -139,14 +139,9 @@ function Sidebar() {
       label: 'Quality Management',
     },
     // {
-    //   key: '/supervisor/inventory_master',
-    //   icon: <Archive size={20} />,
-    //   label: 'Inventory Management',
-    // },
-    // {
     //   key: 'inventory_master',
     //   icon: <Archive size={20} />,
-    //   label: 'Inventory Management',
+    //   label: 'Inventory Management Old',
     //   children: [
     //     {
     //       key: '/supervisor/inventory_master/inventory_usage_and_analytics',

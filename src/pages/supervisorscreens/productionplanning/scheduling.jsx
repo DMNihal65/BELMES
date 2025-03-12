@@ -19,7 +19,7 @@ import moment from 'moment';
 import AnalyticsDashboard from './Analytics/AnalyticsDashboard';
 import { ComponentLegend, MachineStatusCards } from './Schedule/ComponentsAndStatus';
 import OrderStatusDashboard from './OrderStatus/OrderStatusDashboard';
-import DynamicSchedulingGraphCopy from './DynamicScheduling/DynamicSchedulingGraphCopy';
+// import DynamicSchedulingGraphCopy from './DynamicScheduling/DynamicSchedulingGraphCopy';
 import DynamicSchedulingGraph from './DynamicScheduling/DynamicSchedulingGraph';
 
 

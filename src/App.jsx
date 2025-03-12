@@ -32,6 +32,7 @@ import MaintenanceDocuments from './pages/supervisorscreens/Monitoring/Maintenan
 import MaintenanceSchedule from './pages/supervisorscreens/Monitoring/MaintenanceSchedule';
 import './styles/maintenance.css';
 import FinalDocument from './pages/supervisorscreens/FinalDocument';
+// import './styles/production-monitoring.css';
 
 const App = () => {
   return (
@@ -51,7 +52,11 @@ const App = () => {
             <Route path="configuration" element={<WorkcenterDashboard />} />
             <Route path="production-planning/planning" element={<Planning />} />
             <Route path="production-planning/scheduling" element={<Scheduling />} />
-            <Route path="production-monitoring" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/dashboard" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/production-vs-actual" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-analysis" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/oee-overview" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/analytics" element={<ProductionMonitoring />} />
             <Route path="documents" element={<DocumentManagement />} />
             <Route path="final-document" element={<FinalDocument />} />
             <Route path="quality-management" element={<QualityManagementDashboard />} />

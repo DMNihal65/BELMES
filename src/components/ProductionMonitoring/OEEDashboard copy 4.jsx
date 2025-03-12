@@ -2,17 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { 
   Card, Row, Col, Progress, Space, DatePicker, 
   Select, Empty, Spin, Alert, Tabs, Table, Tag, Tooltip,
-  Button, Divider, Modal, Input, Statistic
+  Button, Divider, Modal, Input
 } from 'antd';
-import { Line, Pie, Column } from '@ant-design/plots';
+import { Line } from '@ant-design/plots';
 import useProductionStore from '../../stores/productionStore';
 import { 
   Activity, BarChart2, 
   AlertTriangle, RefreshCw,
-  ArrowUp, ArrowDown, Wrench,
-  Percent, Award, Clock, 
-  CheckCircle, XCircle, Target,
-  TrendingUp, PieChart, BarChart
+  ArrowUp, ArrowDown, Wrench
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { InfoCircleOutlined, DownloadOutlined } from '@ant-design/icons';
@@ -60,14 +57,11 @@ const OEEDashboard = () => {
   const [shiftSummaryData, setShiftSummaryData] = useState([]);
   const [isLoadingShiftSummary, setIsLoadingShiftSummary] = useState(false);
   const [trendData, setTrendData] = useState([]);
-  const [overallOEEData, setOverallOEEData] = useState(null);
-  const [isLoadingOverallOEE, setIsLoadingOverallOEE] = useState(false);
   
   // Initialize data on component mount
   useEffect(() => {
     loadShiftSummaryData();
     fetchAllMachinesOEE();
-    fetchOverallOEEAnalytics();
   }, [oeeData.dateRange, oeeData.selectedShift]);
   
   // Update filtered machines when selection changes
@@ -78,34 +72,6 @@ const OEEDashboard = () => {
       setFilteredMachines(allMachinesOEE);
     }
   }, [oeeData.selectedMachine, allMachinesOEE]);
-  
-  // Fetch overall OEE analytics
-  const fetchOverallOEEAnalytics = async () => {
-    setIsLoadingOverallOEE(true);
-    try {
-      const [startDate, endDate] = oeeData.dateRange;
-      const formattedStartDate = dayjs(startDate).format('YYYY-MM-DD');
-      const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
-      
-      const params = new URLSearchParams();
-      params.append('start_date', formattedStartDate);
-      params.append('end_date', formattedEndDate);
-      
-      if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
-        params.append('shift', oeeData.selectedShift);
-      }
-      
-      const response = await axios.get(
-        `http://172.18.7.89:4470/production_monitoring/overall-oee-analytics/?${params.toString()}`
-      );
-      
-      setOverallOEEData(response.data);
-    } catch (error) {
-      console.error('Error fetching overall OEE analytics:', error);
-    } finally {
-      setIsLoadingOverallOEE(false);
-    }
-  };
   
   // Load shift summary data
   const loadShiftSummaryData = async () => {
@@ -119,7 +85,7 @@ const OEEDashboard = () => {
       params.append('start_date', formattedStartDate);
       params.append('end_date', formattedEndDate);
       
-      if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
+      if (oeeData.selectedShift !== null) {
         params.append('shift', oeeData.selectedShift);
       }
       
@@ -244,7 +210,6 @@ const OEEDashboard = () => {
   const handleRefresh = () => {
     loadShiftSummaryData();
     fetchAllMachinesOEE();
-    fetchOverallOEEAnalytics();
   };
   
   // Sort shift summary data
@@ -322,14 +287,12 @@ const OEEDashboard = () => {
       key: 'availability',
       render: (value) => (
         <Tooltip title={`${value.toFixed(1)}%`}>
-          <div className="flex items-center">
-            <Progress 
-              percent={value} 
-              size="small" 
-              strokeColor="#1890ff"
-              format={(percent) => `${percent.toFixed(1)}%`}
-            />
-          </div>
+          <Progress 
+            percent={value} 
+            size="small" 
+            strokeColor="#1890ff"
+            format={(percent) => `${percent.toFixed(1)}%`}
+          />
         </Tooltip>
       ),
       width: 150
@@ -340,14 +303,12 @@ const OEEDashboard = () => {
       key: 'performance',
       render: (value) => (
         <Tooltip title={`${value.toFixed(1)}%`}>
-          <div className="flex items-center">
-            <Progress 
-              percent={value} 
-              size="small" 
-              strokeColor="#faad14"
-              format={(percent) => `${percent.toFixed(1)}%`}
-            />
-          </div>
+          <Progress 
+            percent={value} 
+            size="small" 
+            strokeColor="#faad14"
+            format={(percent) => `${percent.toFixed(1)}%`}
+          />
         </Tooltip>
       ),
       width: 150
@@ -358,14 +319,12 @@ const OEEDashboard = () => {
       key: 'quality',
       render: (value) => (
         <Tooltip title={`${value.toFixed(1)}%`}>
-          <div className="flex items-center">
-            <Progress 
-              percent={value} 
-              size="small" 
-              strokeColor="#722ed1"
-              format={(percent) => `${percent.toFixed(1)}%`}
-            />
-          </div>
+          <Progress 
+            percent={value} 
+            size="small" 
+            strokeColor="#722ed1"
+            format={(percent) => `${percent.toFixed(1)}%`}
+          />
         </Tooltip>
       ),
       width: 150
@@ -378,13 +337,13 @@ const OEEDashboard = () => {
         <div>
           <div><span className="font-medium">Total:</span> {record.totalParts}</div>
           <div><span className="text-green-600">Good:</span> {record.goodParts}</div>
-          <div><span className="text-red-600">Bad:</span> {record.badParts}</div>
+          <div><span className="text-red-500">Bad:</span> {record.badParts}</div>
         </div>
       ),
-      width: 150
+      width: 120
     }
   ];
-
+  
   return (
     <div className="p-4 space-y-4">
       {/* Header with filters */}
@@ -398,14 +357,14 @@ const OEEDashboard = () => {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-          <Space>
+            <Space>
               <span className="text-gray-500">Date Range:</span>
-            <RangePicker
+              <RangePicker 
                 value={oeeData.dateRange}
                 onChange={handleDateRangeChange}
                 allowClear={false}
-            />
-          </Space>
+              />
+            </Space>
             
             <Space>
               <span className="text-gray-500">Shift:</span>
@@ -416,394 +375,30 @@ const OEEDashboard = () => {
                 onChange={handleShiftChange}
                 allowClear
               >
-                <Option value="all">All Shifts</Option>
                 <Option value={1}>Shift 1</Option>
                 <Option value={2}>Shift 2</Option>
                 <Option value={3}>Shift 3</Option>
               </Select>
-        </Space>
+            </Space>
             
             <Button 
               icon={<RefreshCw size={16} />} 
               onClick={handleRefresh}
-              loading={isLoadingOverallOEE || isLoadingShiftSummary || isLoadingMachines}
+              loading={oeeData.isLoading}
             >
               Refresh
             </Button>
           </div>
         </div>
       </Card>
-
-      {/* Overall OEE Analytics Cards */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-sm h-full" loading={isLoadingOverallOEE}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-500 mb-1">Overall OEE</div>
-                <div className="text-2xl font-bold" style={{ 
-                  color: (overallOEEData?.overall_oee || 0) >= 85 ? '#10b981' : 
-                         (overallOEEData?.overall_oee || 0) >= 60 ? '#f59e0b' : '#ef4444' 
-                }}>
-                  {(overallOEEData?.overall_oee || 0).toFixed(1)}%
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-blue-50">
-                <Award size={24} className="text-blue-500" />
-              </div>
-            </div>
-            <div className="mt-3">
-            <Progress 
-                percent={overallOEEData?.overall_oee || 0} 
-                strokeColor={{
-                  '0%': '#ef4444',
-                  '60%': '#f59e0b',
-                  '85%': '#10b981',
-                }}
-                size="small"
-              />
-              <div className="flex justify-between text-xs mt-1">
-                <span>Poor</span>
-                <span>Average</span>
-                <span>Excellent</span>
-              </div>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-sm h-full" loading={isLoadingOverallOEE}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-500 mb-1">Availability</div>
-                <div className="text-2xl font-bold text-blue-500">
-                  {(overallOEEData?.overall_availability * 100 || 0).toFixed(1)}%
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-blue-50">
-                <Clock size={24} className="text-blue-500" />
-              </div>
-            </div>
-            <div className="mt-3">
-            <Progress 
-                percent={overallOEEData?.overall_availability * 100 || 0} 
-                strokeColor="#1890ff"
-                size="small"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                Planned vs. Actual Uptime
-              </div>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-sm h-full" loading={isLoadingOverallOEE}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-500 mb-1">Performance</div>
-                <div className="text-2xl font-bold text-amber-500">
-                  {(overallOEEData?.overall_performance * 100 || 0).toFixed(1)}%
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-amber-50">
-                <Target size={24} className="text-amber-500" />
-              </div>
-            </div>
-            <div className="mt-3">
-            <Progress 
-                percent={overallOEEData?.overall_performance * 100 || 0} 
-                strokeColor="#faad14"
-                size="small"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                Actual vs. Ideal Cycle Time
-              </div>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-sm h-full" loading={isLoadingOverallOEE}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-500 mb-1">Quality</div>
-                <div className="text-2xl font-bold text-purple-500">
-                  {(overallOEEData?.overall_quality * 100 || 0).toFixed(1)}%
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-purple-50">
-                <CheckCircle size={24} className="text-purple-500" />
-              </div>
-            </div>
-            <div className="mt-3">
-            <Progress 
-                percent={overallOEEData?.overall_quality * 100 || 0} 
-                strokeColor="#722ed1"
-                size="small"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                Good Parts vs. Total Parts
-              </div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
+      
       <Tabs activeKey={activeTab} onChange={setActiveTab}>
-        <TabPane tab="OEE Overview" key="1">
-      <Row gutter={[16, 16]}>
-            <Col xs={24} lg={12}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <TrendingUp size={16} className="mr-2 text-blue-500" />
-                    <span>OEE Daily Trends</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-                {overallOEEData?.daily_trends && overallOEEData.daily_trends.length > 0 ? (
-                  <div style={{ height: 300 }}>
-                    <Line 
-                      data={overallOEEData.daily_trends.flatMap(trend => [
-                        { date: trend.date, type: 'OEE', value: trend.oee },
-                        { date: trend.date, type: 'Availability', value: trend.availability * 100 },
-                        { date: trend.date, type: 'Performance', value: trend.performance * 100 },
-                        { date: trend.date, type: 'Quality', value: trend.quality * 100 }
-                      ])}
-                      xField="date"
-                      yField="value"
-                      seriesField="type"
-                      yAxis={{
-                        min: 0,
-                        max: 100,
-                        title: {
-                          text: 'Percentage (%)'
-                        }
-                      }}
-                      color={['#1890ff', '#52c41a', '#faad14', '#722ed1']}
-                      legend={{
-                        position: 'top'
-                      }}
-                      animation={false}
-                    />
-                  </div>
-                ) : (
-                  <Empty description="No trend data available" />
-                )}
-              </Card>
-            </Col>
-            
-            <Col xs={24} lg={12}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <PieChart size={16} className="mr-2 text-blue-500" />
-                    <span>Loss Analysis</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-                {overallOEEData?.losses ? (
-                  <div style={{ height: 300 }}>
-                    <Pie
-                      data={[
-                        { type: 'Availability Loss', value: overallOEEData.losses.availability_loss * 100 },
-                        { type: 'Performance Loss', value: overallOEEData.losses.performance_loss * 100 },
-                        { type: 'Quality Loss', value: overallOEEData.losses.quality_loss * 100 }
-                      ]}
-                      angleField="value"
-                      colorField="type"
-                      radius={0.8}
-                      innerRadius={0.5}
-                      label={{
-                        type: 'outer',
-                        content: '{name}: {percentage}',
-                      }}
-                      color={['#ff4d4f', '#faad14', '#722ed1']}
-                      legend={{
-                        position: 'bottom'
-                      }}
-                      animation={false}
-                    />
-                  </div>
-                ) : (
-                  <Empty description="No loss analysis data available" />
-                )}
-          </Card>
-        </Col>
-            
-            <Col xs={24}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <BarChart size={16} className="mr-2 text-blue-500" />
-                    <span>Shift Breakdown</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-                {overallOEEData?.shift_breakdown && overallOEEData.shift_breakdown.length > 0 ? (
-                  <div style={{ height: 300 }}>
-                    <Column
-                      data={overallOEEData.shift_breakdown.flatMap(shift => [
-                        { shift: `Shift ${shift.shift}`, type: 'OEE', value: shift.oee },
-                        { shift: `Shift ${shift.shift}`, type: 'Availability', value: shift.availability * 100 },
-                        { shift: `Shift ${shift.shift}`, type: 'Performance', value: shift.performance * 100 },
-                        { shift: `Shift ${shift.shift}`, type: 'Quality', value: shift.quality * 100 }
-                      ])}
-                      xField="shift"
-                      yField="value"
-                      seriesField="type"
-                      isGroup={true}
-                      yAxis={{
-                        min: 0,
-                        max: 100,
-                        title: {
-                          text: 'Percentage (%)'
-                        }
-                      }}
-                      color={['#1890ff', '#52c41a', '#faad14', '#722ed1']}
-                      legend={{
-                        position: 'top'
-                      }}
-                      animation={false}
-                    />
-                  </div>
-                ) : (
-                  <Empty description="No shift breakdown data available" />
-                )}
-          </Card>
-        </Col>
-            
-            <Col xs={24} md={12}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <Activity size={16} className="mr-2 text-blue-500" />
-                    <span>Production Summary</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-        <Row gutter={[16, 16]}>
-                  <Col span={8}>
-                    <Statistic 
-                      title="Total Production" 
-                      value={overallOEEData?.total_production || 0} 
-                      prefix={<Target size={16} className="mr-1" />}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Statistic 
-                      title="Good Parts" 
-                      value={overallOEEData?.total_good_parts || 0} 
-                      valueStyle={{ color: '#52c41a' }}
-                      prefix={<CheckCircle size={16} className="mr-1" />}
-                    />
-                  </Col>
-                  <Col span={8}>
-                <Statistic
-                      title="Bad Parts" 
-                      value={overallOEEData?.total_bad_parts || 0} 
-                      valueStyle={{ color: '#ff4d4f' }}
-                      prefix={<XCircle size={16} className="mr-1" />}
-                    />
-                  </Col>
-                </Row>
-                
-                <Divider />
-                
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="text-sm text-gray-500">Quality Rate</div>
-                    <div className="text-lg font-semibold">
-                      {overallOEEData?.total_production ? 
-                        ((overallOEEData.total_good_parts / overallOEEData.total_production) * 100).toFixed(1) : 
-                        0}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Machine Count</div>
-                    <div className="text-lg font-semibold">{overallOEEData?.machine_count || 0}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Period</div>
-                    <div className="text-lg font-semibold">
-                      {dayjs(overallOEEData?.period_start).format('MMM D')} - {dayjs(overallOEEData?.period_end).format('MMM D, YYYY')}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-            
-            <Col xs={24} md={12}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <Award size={16} className="mr-2 text-blue-500" />
-                    <span>OEE Performance</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-                <div className="flex justify-center mb-4">
-                  <div className="relative" style={{ width: 200, height: 200 }}>
-                <Progress
-                      type="circle" 
-                      percent={overallOEEData?.overall_oee * 100 || 0} 
-                      width={200}
-                      strokeColor={
-                        (overallOEEData?.overall_oee * 100 || 0) >= 85 ? '#52c41a' : 
-                        (overallOEEData?.overall_oee * 100 || 0) >= 60 ? '#faad14' : '#ff4d4f'
-                      }
-                      format={percent => (
-                        <div className="text-center">
-                          <div className="text-3xl font-bold">{percent.toFixed(1)}%</div>
-                          <div className="text-sm text-gray-500">Overall OEE</div>
-                        </div>
-                      )}
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-sm text-gray-500">Availability</div>
-                    <div className="text-lg font-semibold text-blue-500">
-                      {(overallOEEData?.overall_availability * 100 || 0).toFixed(1)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Performance</div>
-                    <div className="text-lg font-semibold text-amber-500">
-                      {(overallOEEData?.overall_performance * 100 || 0).toFixed(1)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Quality</div>
-                    <div className="text-lg font-semibold text-purple-500">
-                      {(overallOEEData?.overall_quality * 100 || 0).toFixed(1)}%
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        </TabPane>
-        
-        <TabPane tab="Shift Summary" key="2">
+        <TabPane tab="Shift Summary" key="1">
           <Card className="shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
+              <div className="flex items-center gap-3">
                 <SearchInput
-                  placeholder="Search by machine name..."
+                  placeholder="Search by machine or date"
                   style={{ width: 250 }}
                   value={shiftSummaryFilter.search}
                   onChange={e => setShiftSummaryFilter({
@@ -813,46 +408,44 @@ const OEEDashboard = () => {
                   allowClear
                 />
                 
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">Sort by:</span>
-                  <Select
-                    style={{ width: 150 }}
-                    value={shiftSummaryFilter.sortBy}
-                    onChange={value => setShiftSummaryFilter({
-                      ...shiftSummaryFilter,
-                      sortBy: value
-                    })}
-                  >
-                    <Option value="date">Date</Option>
-                    <Option value="machine">Machine</Option>
-                    <Option value="oee">OEE</Option>
-                    <Option value="availability">Availability</Option>
-                    <Option value="performance">Performance</Option>
-                    <Option value="quality">Quality</Option>
-                  </Select>
-                  
-                  <Select
-                    style={{ width: 120 }}
-                    value={shiftSummaryFilter.sortDirection}
-                    onChange={value => setShiftSummaryFilter({
-                      ...shiftSummaryFilter,
-                      sortDirection: value
-                    })}
-                  >
-                    <Option value="asc">
-                      <Space>
-                        <ArrowUp size={14} />
-                        Ascending
-                      </Space>
-                    </Option>
-                    <Option value="desc">
-                      <Space>
-                        <ArrowDown size={14} />
-                        Descending
-                      </Space>
-                    </Option>
-                  </Select>
-                </div>
+                <Select
+                  placeholder="Sort by"
+                  style={{ width: 150 }}
+                  value={shiftSummaryFilter.sortBy}
+                  onChange={value => setShiftSummaryFilter({
+                    ...shiftSummaryFilter,
+                    sortBy: value
+                  })}
+                >
+                  <Option value="date">Date</Option>
+                  <Option value="machine">Machine</Option>
+                  <Option value="oee">OEE</Option>
+                  <Option value="availability">Availability</Option>
+                  <Option value="performance">Performance</Option>
+                  <Option value="quality">Quality</Option>
+                </Select>
+                
+                <Select
+                  style={{ width: 120 }}
+                  value={shiftSummaryFilter.sortDirection}
+                  onChange={value => setShiftSummaryFilter({
+                    ...shiftSummaryFilter,
+                    sortDirection: value
+                  })}
+                >
+                  <Option value="asc">
+                    <Space>
+                      <ArrowUp size={14} />
+                      Ascending
+                    </Space>
+                  </Option>
+                  <Option value="desc">
+                    <Space>
+                      <ArrowDown size={14} />
+                      Descending
+                    </Space>
+                  </Option>
+                </Select>
               </div>
               
               <Button
@@ -883,7 +476,7 @@ const OEEDashboard = () => {
         
         <TabPane 
           tab="Machine Analysis" 
-          key="3"
+          key="2"
           className="p-1"
         >
           <div className="mb-6 bg-white rounded-lg p-4 shadow-sm flex justify-between items-center">
@@ -1009,7 +602,7 @@ const OEEDashboard = () => {
                   >
                     View OEE Trends
                   </Button>
-      </Card>
+                </Card>
               ))}
             </div>
           )}
@@ -1038,7 +631,7 @@ const OEEDashboard = () => {
             <Spin size="large" />
           </div>
         ) : trendData.length > 0 ? (
-          <div style={{ height: 500 }}>
+          <div className="h-[500px]">
             <Line 
               data={trendData}
               xField="date"
@@ -1066,4 +659,4 @@ const OEEDashboard = () => {
   );
 };
 
-export default OEEDashboard; 
+export default OEEDashboard;

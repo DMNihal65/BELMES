@@ -96,6 +96,35 @@ function Sidebar() {
         },
       ],
     },
+
+
+    {
+      key: '/supervisor/production-monitoring',
+      icon: <Calendar size={20} />,
+      label: 'Production Monitoring',
+      children: [
+        {
+          key: '/supervisor/production-monitoring/dashboard',
+          label: 'Live Monitoring',
+        },
+        {
+          key: '/supervisor/production-monitoring/production-vs-actual',
+          label: 'Production vs Actual',
+        },
+        {
+          key: '/supervisor/production-monitoring/order-analysis',
+          label: 'Order Analysis',
+        },
+        {
+          key: '/supervisor/production-monitoring/oee-overview',
+          label: 'OEE Overview',
+        },
+        {
+          key: '/supervisor/production-monitoring/analytics',
+          label: 'Analytics',
+        },
+      ],
+    },
     {
       key: '/supervisor/production-monitoring',
       icon: <Activity size={20} />,

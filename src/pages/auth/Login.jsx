@@ -75,6 +75,7 @@ const Login = () => {
       } else {
         if (currentStep === 0) {
           if (values.supervisorPin === '9999') {
+            
             setCurrentStep(1);
           } else {
             throw new Error('Invalid supervisor PIN');

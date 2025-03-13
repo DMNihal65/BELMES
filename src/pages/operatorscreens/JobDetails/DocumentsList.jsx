@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, List, Button, Tooltip } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Card, List, Button, Tooltip, Modal, Spin, message } from 'antd';
 import { 
   FileText, 
   BookText,
@@ -7,48 +7,74 @@ import {
   Download, 
   Eye 
 } from 'lucide-react';
+import useWebSocketStore from '../../../store/websocket-store';
+import useAuthStore from '../../../store/auth-store';
 
-const DocumentsList = ({ jobData }) => {
-  const documents = [
-    {
+const DocumentsList = () => {
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  
+  const { 
+    jobData,
+    fetchDocuments, 
+    downloadDocument,
+    documents,
+    loading 
+  } = useWebSocketStore();
+
+  const { token } = useAuthStore();
+
+  useEffect(() => {
+    if (jobData?.part_number) {
+      fetchDocuments(jobData.part_number);
+    }
+  }, [jobData?.part_number, fetchDocuments]);
+
+  // Only show documents that exist
+  const availableDocuments = [
+    documents?.mpp && {
       type: 'MPP',
       title: 'Manufacturing Process Plan',
       icon: <FileText className="text-blue-500" size={20} />,
-    //   docNumber: 'MPP-2024-001',
-    //   lastUpdated: '2024-03-01'
+      data: documents.mpp
     },
-    {
+    documents?.ipid && {
       type: 'IPID',
       title: 'In-Process Inspection Document',
       icon: <Eye className="text-green-500" size={20} />,
-    //   docNumber: 'IPID-2024-001',
-    //   lastUpdated: '2024-03-01'
+      data: documents.ipid
     },
-    {
-      type: 'Drawing',
+    documents?.engineering && {
+      type: 'ENGINEERING_DRAWING',
       title: 'Engineering Drawing',
       icon: <Settings2 className="text-orange-500" size={20} />,
-    //   docNumber: 'DWG-2024-001',
-    //   lastUpdated: '2024-03-01'
+      data: documents.engineering
     },
-    {
-      type: 'Manual',
-      title: 'Machine Manual',
+    documents?.oarc && {
+      type: 'OARC',
+      title: 'Operational Analysis Routine Chart',
       icon: <BookText className="text-purple-500" size={20} />,
-    //   docNumber: 'MAN-2024-001',
-    //   lastUpdated: '2024-02-28'
+      data: documents.oarc
     }
-  ];
+  ].filter(Boolean);
 
-  const handleViewDocument = (docType) => {
-    // Handle document viewing based on type
-    console.log(`Viewing ${docType}`);
+  const handleViewDocument = (doc) => {
+    setSelectedDocument(doc);
+    setViewModalVisible(true);
   };
 
-  const handleDownload = (docType) => {
-    // Handle document download
-    console.log(`Downloading ${docType}`);
+  const handleDownload = async (doc) => {
+    try {
+      await downloadDocument(jobData.part_number, doc.type);
+      message.success('Document downloaded successfully');
+    } catch (error) {
+      message.error('Failed to download document');
+    }
   };
+
+  if (loading) {
+    return <div className="flex justify-center p-8"><Spin /></div>;
+  }
 
   return (
     <div className="p-4">
@@ -62,26 +88,26 @@ const DocumentsList = ({ jobData }) => {
           xl: 2,
           xxl: 3 
         }}
-        dataSource={documents}
+        dataSource={availableDocuments}
         renderItem={(doc) => (
           <List.Item>
             <Card 
               className="shadow-sm hover:shadow-md transition-shadow"
               actions={[
-                <Tooltip title="View Document" key="view">
-                  <Button 
-                    type="text" 
-                    icon={<Eye size={16} />}
-                    onClick={() => handleViewDocument(doc.type)}
-                  >
-                    View
-                  </Button>
-                </Tooltip>,
+                // <Tooltip title="View Document" key="view">
+                //   <Button 
+                //     type="text" 
+                //     icon={<Eye size={16} />}
+                //     onClick={() => handleViewDocument(doc)}
+                //   >
+                //     View
+                //   </Button>
+                // </Tooltip>,
                 <Tooltip title="Download" key="download">
                   <Button 
                     type="text" 
                     icon={<Download size={16} />}
-                    onClick={() => handleDownload(doc.type)}
+                    onClick={() => handleDownload(doc)}
                   >
                     Download
                   </Button>
@@ -94,18 +120,31 @@ const DocumentsList = ({ jobData }) => {
                 </div>
                 <div>
                   <div className="font-medium">{doc.title}</div>
-                  {/* <div className="text-xs text-gray-500 mt-1">
-                    Doc No: {doc.docNumber}
+                  <div className="text-xs text-gray-500 mt-1">
+                    Version: {doc.data.latest_version.version_number}
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Last Updated: {doc.lastUpdated}
-                  </div> */}
                 </div>
               </div>
             </Card>
           </List.Item>
         )}
       />
+
+      <Modal
+        title={selectedDocument?.title}
+        open={viewModalVisible}
+        onCancel={() => setViewModalVisible(false)}
+        width="80%"
+        footer={null}
+      >
+        {selectedDocument && (
+          <iframe
+            src={`http://172.18.7.85:6768/api/v1/document-management/documents/view/${jobData.part_number}/${selectedDocument.type}?token=${token}`}
+            style={{ width: '100%', height: '80vh' }}
+            title="Document Viewer"
+          />
+        )}
+      </Modal>
     </div>
   );
 };

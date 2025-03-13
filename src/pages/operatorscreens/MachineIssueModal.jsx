@@ -9,34 +9,26 @@ const { TextArea } = Input;
 const MachineIssueModal = ({ 
   visible, 
   onClose, 
-  machineId,
-  partNumber
+  machineId
 }) => {
   const [form] = Form.useForm();
   const [issueType, setIssueType] = useState('machine');
-  const [localPartNumber, setLocalPartNumber] = useState(partNumber);
   
   const { 
     submitMachineIssue, 
     submitComponentIssue, 
     fetchMachineOperations,
-    maintenanceLoading 
+    maintenanceLoading,
+    jobData // Get jobData from the store
   } = useWebSocketStore();
 
-  // Fetch machine operations when modal opens to get the latest part number
+  // Get current part number from jobData
+  const currentPartNumber = jobData?.part_number;
+
+  // Fetch machine operations when modal opens
   useEffect(() => {
     if (visible && machineId) {
-      const fetchData = async () => {
-        const result = await fetchMachineOperations(machineId);
-        if (result.success && result.partNumber) {
-          setLocalPartNumber(result.partNumber);
-          console.log(`Using part number: ${result.partNumber} for component issues`);
-        } else if (!partNumber) {
-          console.warn('Could not determine part number for component issues');
-        }
-      };
-      
-      fetchData();
+      fetchMachineOperations(machineId);
     }
   }, [visible, machineId, fetchMachineOperations]);
 
@@ -44,7 +36,7 @@ const MachineIssueModal = ({
   useEffect(() => {
     if (visible) {
       form.resetFields();
-      setIssueType('machine'); // Default to machine issue
+      setIssueType('machine');
     }
   }, [visible, form]);
 
@@ -54,13 +46,18 @@ const MachineIssueModal = ({
       
       let result;
       if (issueType === 'machine') {
-        result = await submitMachineIssue(machineId || 1, {
+        result = await submitMachineIssue(machineId, {
           description: values.description,
           machineStatus: values.machineStatus
         });
       } else {
-        const pn = localPartNumber || partNumber || '211071570096';
-        result = await submitComponentIssue(pn, {
+        // Use current part number from jobData
+        if (!currentPartNumber) {
+          message.error('No part number available for current job');
+          return;
+        }
+        
+        result = await submitComponentIssue(currentPartNumber, {
           description: values.description,
           componentStatus: values.componentStatus
         });
@@ -82,7 +79,7 @@ const MachineIssueModal = ({
       title={
         <div className="flex items-center gap-2 text-red-500">
           <AlertTriangle className="h-5 w-5" />
-          <span>Raise Ticket</span>
+          <span>Raise Issue</span>
         </div>
       }
       open={visible}
@@ -155,9 +152,9 @@ const MachineIssueModal = ({
               </Select>
             </Form.Item>
             
-            {/* Show part number being used */}
+            {/* Show current part number from jobData */}
             <div className="mb-4 text-xs text-gray-500">
-              Using part number: {localPartNumber || partNumber || '211071570096'}
+              Using part number: {currentPartNumber || 'No part number available'}
             </div>
           </>
         )}

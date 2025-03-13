@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Table, Card, Button, Space, Drawer, Upload, 
   Tabs, Typography, Tag, Image, Tooltip, Steps,
-  Divider, Row, Col, Progress, Badge, Descriptions,Collapse,List
+  Divider, Row, Col, Progress, Badge, Descriptions,Collapse,List, Spin
 } from 'antd';
 import { 
   FileTextOutlined, EyeOutlined, UploadOutlined,
@@ -13,14 +13,25 @@ import {
   Timer,  Settings, AlertTriangle,
   CheckCircle2, Image as ImageIcon, Clock
 } from 'lucide-react';
+import { format } from 'date-fns';
+import useWebSocketStore from '../../../store/websocket-store';
+import useAuthStore from '../../../store/auth-store';
 
 const { Title, Text } = Typography;
 const { Step } = Steps;
 const { Panel } = Collapse;
 
-const OperationDetails = ({ jobData }) => {
+const OperationDetails = () => {
+  const { currentMachine } = useAuthStore();
+  const { fetchMachineOperations, machineOperations, loading } = useWebSocketStore();
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [showDrawer, setShowDrawer] = useState(false);
+
+  useEffect(() => {
+    if (currentMachine?.id) {
+      fetchMachineOperations(currentMachine.id);
+    }
+  }, [currentMachine?.id, fetchMachineOperations]);
 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
@@ -35,109 +46,63 @@ const OperationDetails = ({ jobData }) => {
     }
   };
 
-  const operations = [
-    {
-      key: '1',
-      operationNumber: '10',
-      operation: 'CUTTING',
-      // description: 'Initial machine setup and calibration',
-      startTime: '08:00 AM',
-      endTime: '09:00 AM',
-      status: 'completed',
-    },
-    {
-      key: '2',
-      operationNumber: '20',
-      operation: 'Stud milling',
-      // description: 'CNC machining operation',
-      startTime: '09:15 AM',
-      endTime: null,
-      status: 'in progress',
-    },
-    {
-      key: '3',
-      operationNumber: '30',
-      operation: 'Top Ruf',
-      // description: 'Dimensional inspection',
-      status: 'pending',
-    },
-    // Add more operations as needed
-  ];
-
   const columns = [
     {
       title: 'Op. No',
-      dataIndex: 'operationNumber',
-      key: 'operationNumber',
-      width: 80,
-      render: (text) => (
-        <Text strong className="text-gray-700">
-          {text}
-        </Text>
-      ),
+      dataIndex: 'operation_number',
+      key: 'operation_number',
+      width: '10%',
     },
     {
       title: 'Operation',
-      dataIndex: 'operation',
-      key: 'operation',
-      render: (text) => (
-        <div className="font-medium">{text}</div>
-      ),
+      dataIndex: 'description',
+      key: 'description',
+      width: '30%',
     },
     {
       title: 'Start Time',
-      dataIndex: 'startTime',
-      key: 'startTime',
-      render: (text) => (
-        <div className="flex items-center gap-2">
-          <Clock size={14} className="text-gray-400" />
-          <span>{text || 'Not started'}</span>
-        </div>
-      ),
+      dataIndex: 'planned_start_time',
+      key: 'planned_start_time',
+      width: '20%',
+      render: (date) => format(new Date(date), 'dd/MM/yyyy HH:mm'),
     },
     {
       title: 'End Time',
-      dataIndex: 'endTime',
-      key: 'endTime',
-      render: (text) => (
-        <div className="flex items-center gap-2">
-          <Clock size={14} className="text-gray-400" />
-          <span>{text || 'Pending'}</span>
-        </div>
-      ),
+      dataIndex: 'planned_end_time',
+      key: 'planned_end_time',
+      width: '20%',
+      render: (date) => format(new Date(date), 'dd/MM/yyyy HH:mm'),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      width: '20%',
       render: (status) => {
-        const { color, bg, text } = getStatusColor(status);
+        const colors = {
+          completed: 'success',
+          inprogress: 'processing',
+          scheduled: 'default'
+        };
         return (
-          <Tag color={color} className={`${bg} ${text} border-0 font-medium`}>
-            {status === 'in progress' && <Timer size={14} className="mr-1 inline-block" />}
-            {status === 'completed' && <CheckCircle2 size={14} className="mr-1 inline-block" />}
-            {status}
+          <Tag color={colors[status]}>
+            {status.toUpperCase()}
           </Tag>
         );
       },
     },
-    {
-      title: 'Action',
-      key: 'action',
-      render: (_, record) => (
-        <Button 
-          type="text"
-          icon={<EyeOutlined />}
-          onClick={() => {
-            setSelectedOperation(record);
-            setShowDrawer(true);
-          }}
-        >
-          Details
-        </Button>
-      ),
-    },
   ];
+
+  if (loading) {
+    return <Spin />;
+  }
+
+  // Combine all operations for display
+  const allOperations = [
+    ...(machineOperations?.completed || []),
+    ...(machineOperations?.inprogress || []),
+    ...(machineOperations?.scheduled || [])
+  ].sort((a, b) => a.operation_number - b.operation_number);
 
   const partInfo = {
     partNumber: 'PT-001',
@@ -250,9 +215,7 @@ const OperationDetails = ({ jobData }) => {
                 showUploadList={false}
                 className="hover:scale-105 transition-transform"
               >
-                {/* <Button icon={<UploadOutlined />}>
-                  Upload MPP
-                </Button> */}
+               
               </Upload>
             </Space>
           </div>
@@ -260,7 +223,7 @@ const OperationDetails = ({ jobData }) => {
       >
         <Table 
           columns={columns} 
-          dataSource={operations}
+          dataSource={allOperations}
           className="operation-table"
           pagination={false}
           rowClassName={(record) => 

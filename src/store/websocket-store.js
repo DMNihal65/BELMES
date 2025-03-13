@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import useAuthStore from './auth-store';
 
 const useWebSocketStore = create((set, get) => ({
   machineStatus: null,
@@ -12,6 +13,7 @@ const useWebSocketStore = create((set, get) => ({
   reconnectDelay: 3000,
   maintenanceLoading: false,
   machineOperations: null,
+  jobData: null,
 
   initializeWebSocket: (machineId) => {
     if (!machineId) {
@@ -140,11 +142,11 @@ const useWebSocketStore = create((set, get) => ({
 
   fetchMachineOperations: async (machineId) => {
     try {
-      set({ maintenanceLoading: true });
+      set({ loading: true });
       console.log(`Fetching operations for machine ID: ${machineId}`);
       
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/operator/machines123/${machineId}/operations`
+        `http://172.18.7.85:6768/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -152,20 +154,112 @@ const useWebSocketStore = create((set, get) => ({
       }
 
       const data = await response.json();
-      console.log('Machine operations data:', data);
+      console.log('API Response:', data);
       
+      // Format operations data
+      const formattedOperations = {
+        completed: data.operations.completed.map(op => ({
+          ...op,
+          status: 'completed',
+          planned_start_time: op.schedule_info.planned_start_time,
+          planned_end_time: op.schedule_info.planned_end_time
+        })),
+        inprogress: data.operations.inprogress.map(op => ({
+          ...op,
+          status: 'inprogress',
+          planned_start_time: op.schedule_info.planned_start_time,
+          planned_end_time: op.schedule_info.planned_end_time
+        })),
+        scheduled: data.operations.scheduled.map(op => ({
+          ...op,
+          status: 'scheduled',
+          planned_start_time: op.schedule_info.planned_start_time,
+          planned_end_time: op.schedule_info.planned_end_time
+        }))
+      };
+
+      // Format current job data from the first order
+      let currentJob = null;
+      if (data.orders && data.orders.length > 0) {
+        const order = data.orders[0];
+        currentJob = {
+          jobId: `JOB-${order.production_order}`,
+          part_number: order.part_number,
+          production_order: order.production_order,
+          sale_order: order.sales_order,
+          wbs_element: order.wbs_element,
+          part_description: order.material_description,
+          total_operations: order.project_details.total_operations,
+          required_quantity: order.required_qty,
+          launched_quantity: order.launched_qty,
+          plant_id: '1154',
+          project: {
+            id: order.order_id,
+            name: order.project_details.project_name,
+            priority: order.priority,
+            delivery_date: new Date().toISOString() // Default as it's not in the API
+          },
+          partNumber: order.part_number,
+          partName: order.material_description,
+          batchSize: order.required_qty,
+          priority: order.priority > 3 ? 'High' : 'Normal',
+          jobDetails: {
+            customer: order.sales_order.split('/')[0] || 'BEL',
+            orderNumber: order.production_order,
+            dueDate: new Date().toISOString(), // Default as it's not in the API
+            orderQuantity: order.required_qty,
+            completedQuantity: Math.floor(order.required_qty * 0.6), // Example calculation
+            remainingQuantity: Math.ceil(order.required_qty * 0.4), // Example calculation
+            partnumber: order.part_number,
+            partname: order.material_description,
+            parameters: {
+              orderNumber: order.production_order,
+              customer: order.sales_order.split('/')[0] || 'BEL',
+              dueDate: new Date().toISOString() // Default as it's not in the API
+            }
+          },
+          machine: {
+            id: data.machine.id.toString(),
+            name: data.machine.make,
+            status: 'IDLE', // Default
+            efficiency: 92, // Default
+            currentCycle: '02:45', // Default
+            nextMaintenance: '4hrs', // Default
+            alerts: 0, // Default
+            totalParts: order.required_qty,
+            completedParts: Math.floor(order.required_qty * 0.6), // Example calculation
+            parameters: {
+              speed: '1200 RPM', // Default
+              feed: '300 mm/min', // Default
+              temperature: '28°C' // Default
+            }
+          },
+          quality: {
+            inspectionPoints: 5, // Default
+            completedInspections: 3, // Default
+            lastInspection: '11:30 AM', // Default
+            deviations: 0 // Default
+          }
+        };
+      }
+
       set({ 
-        machineOperations: data,
-        maintenanceLoading: false
+        machineOperations: formattedOperations,
+        jobData: currentJob,
+        loading: false 
       });
 
       return {
         success: true,
-        data
+        data: {
+          operations: formattedOperations,
+          orders: data.orders,
+          jobData: currentJob
+        }
       };
     } catch (error) {
       console.error('Error fetching machine operations:', error);
-      set({ maintenanceLoading: false });
+      set({ loading: false });
       return {
         success: false,
         error: error.message
@@ -267,6 +361,76 @@ const useWebSocketStore = create((set, get) => ({
       };
     } finally {
       set({ maintenanceLoading: false });
+    }
+  },
+
+  fetchDocuments: async (partNumber) => {
+    try {
+      set({ loading: true });
+      const token = useAuthStore.getState().token;
+
+      const response = await fetch(
+        `http://172.18.7.85:6768/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const data = await response.json();
+      set({ 
+        documents: {
+          mpp: data.mpp_document,
+          oarc: data.oarc_document,
+          engineering: data.engineering_drawing_document,
+          ipid: data.ipid_document
+        },
+        loading: false 
+      });
+      return data;
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      set({ loading: false });
+      return null;
+    }
+  },
+
+  downloadDocument: async (partNumber, docType) => {
+    try {
+      const token = useAuthStore.getState().token;
+
+      const response = await fetch(
+        `http://172.18.7.85:6768/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${docType}_${partNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      throw error;
     }
   }
 }));

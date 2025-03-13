@@ -105,7 +105,7 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
       const sortedVersions = data.sort((a, b) => {
         const aNum = parseInt(a.version_number.replace('v', ''));
         const bNum = parseInt(b.version_number.replace('v', ''));
-        return aNum - bNum;
+        return bNum - aNum; // Sort in descending order
       });
       setVersions(sortedVersions);
     } catch (error) {
@@ -115,6 +115,7 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
     }
   };
 
+  // Refresh data when modal becomes visible
   useEffect(() => {
     if (visible && document) {
       loadVersions();
@@ -125,7 +126,8 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
     try {
       await updateVersion(document.id, versionId, file);
       message.success('Version updated successfully');
-      loadVersions(); // Refresh the versions list
+      await loadVersions(); // Refresh versions list
+      await fetchFolderDocuments(); // Refresh main document list
     } catch (error) {
       message.error('Failed to update version');
     }
@@ -135,15 +137,27 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
     try {
       await uploadNewVersion(document.id, file);
       message.success('New version uploaded successfully');
-      loadVersions(); // Refresh the versions list
+      await loadVersions(); // Refresh versions list
+      await fetchFolderDocuments(); // Refresh main document list
     } catch (error) {
       message.error('Failed to upload new version');
     }
   };
 
+  const handleVersionDelete = async (versionId) => {
+    try {
+      await deleteVersion(document.id, versionId);
+      message.success('Version deleted successfully');
+      await loadVersions(); // Refresh versions list
+      await fetchFolderDocuments(); // Refresh main document list
+    } catch (error) {
+      message.error('Failed to delete version');
+    }
+  };
+
   return (
     <Modal
-      title="Version Management"
+      title={`Versions - ${document?.name || ''}`}
       visible={visible}
       onCancel={onClose}
       footer={null}
@@ -224,9 +238,7 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
                       okType: 'danger',
                       onOk: async () => {
                         try {
-                          await deleteVersion(document.id, record.id);
-                          message.success('Version deleted successfully');
-                          loadVersions();
+                          await handleVersionDelete(record.id);
                         } catch (error) {
                           message.error('Failed to delete version');
                         }
@@ -1861,10 +1873,11 @@ const DocumentManagement = () => {
   }, [selectedFolder, versionModalVisible]); // Add versionModalVisible to dependencies
 
   // Add this function to handle version modal close
-  const handleVersionModalClose = () => {
+  const handleVersionModalClose = async () => {
     setVersionModalVisible(false);
     setSelectedVersionDoc(null);
-    setSelectedVersions([]);
+    // Refresh the document list to show updated version numbers
+    await fetchFolderDocuments();
   };
 
   // Update the preview modal close handler

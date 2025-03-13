@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Table, Card, Button, Space, Drawer, Upload, 
   Tabs, Typography, Tag, Image, Tooltip, Steps,
@@ -16,16 +16,107 @@ import {
 import { format } from 'date-fns';
 import useWebSocketStore from '../../../store/websocket-store';
 import useAuthStore from '../../../store/auth-store';
+import { memo } from 'react';
 
 const { Title, Text } = Typography;
 const { Step } = Steps;
 const { Panel } = Collapse;
+
+const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => (
+  <Drawer
+    title={
+      <Space>
+        <Text strong className="text-lg">
+          Operation {selectedOperation?.operation_number}
+        </Text>
+        <Tag color="blue">{selectedOperation?.description}</Tag>
+      </Space>
+    }
+    placement="right"
+    width={720}
+    onClose={onClose}
+    open={showDrawer}
+    destroyOnClose={true}
+  >
+    {selectedOperation && (
+      <div className="space-y-6">
+        {/* Fixture and IPID Information */}
+        <Card title="Fixture & IPID Details">
+          <Descriptions column={1} bordered>
+            <Descriptions.Item label="Fixture No with Rev.">
+              <Text strong>Fx-62805080AA-70.80-Rev.01</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="IPID No with Rev.">
+              <Text strong>IPID-62805080AA-80-Rev.01</Text>
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
+
+        {/* Datum Information */}
+        <Card title="Datum Information">
+          <Descriptions column={1} bordered>
+            <Descriptions.Item label="Datum X Axis">
+              <Text strong>0 at the job center</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Datum Y Axis">
+              <Text strong>0 at the job center</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Datum Z Axis">
+              <Text strong>+0.25mm at top of the job</Text>
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
+
+        {/* Work Holding Instructions */}
+        <Card title="Work Holding Instructions">
+          <Collapse defaultActiveKey={['1']} ghost>
+            <Panel header="Fixture Setup" key="1">
+              <List>
+                <List.Item>
+                  <Text>Hold the fixture in vise with around 3 to 5 mm projection over jaws.</Text>
+                </List.Item>
+                <List.Item>
+                  <Text>Clamp the job on fixture with (14X) MS screws while ensuring longest edge to be parallel to X axis within +/-0.1 mm through dialing.</Text>
+                </List.Item>
+              </List>
+            </Panel>
+          </Collapse>
+        </Card>
+
+        {/* Reference Images */}
+        <Card title="Reference Images">
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <Image
+                src="/images/job_loading.png"
+                alt="Job Loading"
+              />
+              <Text className="block mt-2 text-center">Job Loading</Text>
+            </Col>
+            <Col span={12}>
+              <Image
+                src="/images/post_machine.png"
+                alt="Post Machining"
+              />
+              <Text className="block mt-2 text-center">Post Machining</Text>
+            </Col>
+          </Row>
+        </Card>
+      </div>
+    )}
+  </Drawer>
+);
 
 const OperationDetails = () => {
   const { currentMachine } = useAuthStore();
   const { fetchMachineOperations, machineOperations, loading } = useWebSocketStore();
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [showDrawer, setShowDrawer] = useState(false);
+
+  const handleDrawerClose = useCallback(() => {
+    setShowDrawer(false);
+    setSelectedOperation(null);
+  }, []);
 
   useEffect(() => {
     if (currentMachine?.id) {
@@ -46,7 +137,7 @@ const OperationDetails = () => {
     }
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'Op. No',
       dataIndex: 'operation_number',
@@ -91,18 +182,38 @@ const OperationDetails = () => {
         );
       },
     },
-  ];
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 100,
+      render: (_, record) => (
+        <Button 
+          type="primary"
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedOperation(record);
+            setShowDrawer(true);
+          }}
+        >
+          Details
+        </Button>
+      ),
+    }
+  ], []);
+
+  const allOperations = useMemo(() => {
+    return [
+      ...(machineOperations?.completed || []),
+      ...(machineOperations?.inprogress || []),
+      ...(machineOperations?.scheduled || [])
+    ].sort((a, b) => a.operation_number - b.operation_number);
+  }, [machineOperations]);
 
   if (loading) {
     return <Spin />;
   }
-
-  // Combine all operations for display
-  const allOperations = [
-    ...(machineOperations?.completed || []),
-    ...(machineOperations?.inprogress || []),
-    ...(machineOperations?.scheduled || [])
-  ].sort((a, b) => a.operation_number - b.operation_number);
 
   const partInfo = {
     partNumber: 'PT-001',
@@ -229,105 +340,17 @@ const OperationDetails = () => {
           rowClassName={(record) => 
             `operation-row ${record.status === 'in progress' ? 'bg-blue-50' : ''}`
           }
+          rowKey={(record) => record.operation_number}
         />
       </Card>
 
-     {/* Operation Details Drawer */}
-     <Drawer
-        title={
-          <div className="flex items-center gap-2">
-            <Settings className="text-blue-500" />
-            <span>Operation Details</span>
-          </div>
-        }
-        placement="right"
-        onClose={() => setShowDrawer(false)}
-        open={showDrawer}
-        width={500}
-        className="operation-drawer"
-      >
-        {selectedOperation && (
-          <div className="space-y-6">
-            {/* Fixture and IPID Information */}
-            <Descriptions title="Fixture & IPID Details" column={1} bordered>
-              <Descriptions.Item label="Fixture No with Rev.">
-                <Text strong>Fx-62805080AA-70.80-Rev.01</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="IPID No with Rev.">
-                <Text strong>IPID-62805080AA-80-Rev.01</Text>
-              </Descriptions.Item>
-            </Descriptions>
-
-            {/* Datum Information */}
-            <Descriptions title="Datum Information" column={1} bordered>
-              <Descriptions.Item label="Datum X Axis">
-                <Text strong>0 at the job center</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Datum Y Axis">
-                <Text strong>0 at the job center</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Datum Z Axis">
-                <Text strong>+0.25mm at top of the job</Text>
-              </Descriptions.Item>
-            </Descriptions>
-
-            {/* Work Holding Instructions */}
-            <Collapse defaultActiveKey={['1']}>
-              <Panel header="Work Holding Instructions" key="1">
-                <List
-                  size="small"
-                  bordered
-                  dataSource={[
-                    "1. Clean the fixture and job before loading",
-                    "2. Ensure proper clamping pressure",
-                    "3. Check for any debris or chips",
-                    "4. Verify datum alignment"
-                  ]}
-                  renderItem={(item) => <List.Item>{item}</List.Item>}
-                />
-              </Panel>
-            </Collapse>
-
-            {/* Reference Images */}
-            <Card title="Reference Images" className="shadow-sm">
-              <Row gutter={[16, 16]}>
-                <Col span={12}>
-                  <Image
-                    src="/images/job_loading.png"
-                    alt="Job Loading"
-                    className="rounded-lg shadow-sm hover:shadow-md transition-transform"
-                  />
-                  <Text className="block mt-2 text-center">Job Loading</Text>
-                </Col>
-                <Col span={12}>
-                  <Image
-                    src="/images/post_machine.png"
-                    alt="Post Machining"
-                    className="rounded-lg shadow-sm hover:shadow-md transition-transform"
-                  />
-                  <Text className="block mt-2 text-center">Post Machining</Text>
-                </Col>
-              </Row>
-            </Card>
-          </div>
-        )}
-      </Drawer>
+      <OperationDrawer 
+        selectedOperation={selectedOperation}
+        showDrawer={showDrawer}
+        onClose={handleDrawerClose}
+      />
 
       <style jsx global>{`
-        .operation-table .ant-table-cell {
-          padding: 12px 16px;
-        }
-
-        .operation-row {
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .operation-row:hover {
-          background-color: #f5f5f5;
-          transform: translateX(4px);
-        }
-
         .operation-drawer .ant-drawer-header {
           padding: 16px 24px;
           border-bottom: 1px solid #f0f0f0;
@@ -337,10 +360,19 @@ const OperationDetails = () => {
           padding: 24px;
         }
 
-        .ant-card {
+        /* Remove hover and animation effects from cards inside drawer */
+        .operation-drawer .ant-card {
           border-radius: 8px;
+          transform: none !important;
+          transition: none !important;
         }
 
+        .operation-drawer .ant-card:hover {
+          transform: none !important;
+          box-shadow: none !important;
+        }
+
+        /* Keep other styles for main content */
         .ant-card-head {
           border-bottom: 1px solid #f0f0f0;
           padding: 16px 24px;
@@ -358,16 +390,12 @@ const OperationDetails = () => {
           border-radius: 4px;
         }
 
-        /* Add subtle animations */
-        .ant-card, .ant-btn, .ant-tag {
-          transition: all 0.2s ease-in-out;
-        }
-
-        .ant-card:hover {
+        /* Keep animations only for main content */
+        .operation-table .ant-card:hover {
           transform: translateY(-2px);
         }
 
-        .ant-btn:hover {
+        .operation-table .ant-btn:hover {
           transform: translateY(-1px);
         }
       `}</style>
@@ -375,4 +403,4 @@ const OperationDetails = () => {
   );
 };
 
-export default OperationDetails;
+export default memo(OperationDetails);

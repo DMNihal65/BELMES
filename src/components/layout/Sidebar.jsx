@@ -33,11 +33,11 @@ function Sidebar() {
       icon: <ClipboardList size={20} />,
       label: 'Dashboard',
     },
-    {
-      key: '/operator/alerts',
-      icon: <AlertTriangle size={20} />,
-      label: 'Alert Screen',
-    },
+    // {
+    //   key: '/operator/alerts',
+    //   icon: <AlertTriangle size={20} />,
+    //   label: 'Alert Screen',
+    // },
     {
       key: '/operator/maintenance',
       icon: <Wrench size={20} />,

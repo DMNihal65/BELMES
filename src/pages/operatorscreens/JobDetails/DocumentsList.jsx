@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Card, List, Button, Tooltip, Modal, Spin, message, Space, Text } from 'antd';
+import { Card, List, Button, Tooltip, Modal, Spin, message, Space } from 'antd';
+import { Typography } from 'antd';
+const { Text } = Typography;
+
 import { 
   FileText, 
   BookText,
@@ -147,7 +150,7 @@ const DocumentsList = () => {
       >
         {selectedDocument && (
           <iframe
-            src={`http://172.18.7.85:6768/api/v1/document-management/documents/view/${jobData.part_number}/${selectedDocument.type}?token=${token}`}
+            src={`http://172.18.7.88:6699/api/v1/document-management/documents/view/${jobData.part_number}/${selectedDocument.type}?token=${token}`}
             style={{ width: '100%', height: '80vh' }}
             title="Document Viewer"
           />

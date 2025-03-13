@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Input, message } from 'antd';
+import { Table, Button, Modal, Input, message, Form } from 'antd';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import { SearchOutlined } from '@ant-design/icons';
+
+const { Search } = Input;
 
 const OperatorRequests = () => {
   const [searchText, setSearchText] = useState('');
@@ -13,8 +15,19 @@ const OperatorRequests = () => {
     loading 
   } = useMachineMaintenanceStore();
 
+  const [form] = Form.useForm();
+
   useEffect(() => {
+    // Initial fetch
     fetchOperatorPendingRequests();
+
+    // Set up interval for automatic updates every minute
+    const intervalId = setInterval(() => {
+      fetchOperatorPendingRequests();
+    }, 1000); // 10000 ms = 1 minute
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
   }, [fetchOperatorPendingRequests]);
 
   const handleApprove = async (machineId) => {
@@ -145,6 +158,8 @@ const OperatorRequests = () => {
     {
       title: 'Actions',
       key: 'actions',
+      fixed: 'right',
+      width: 200,
       render: (_, record) => (
         <div className="space-x-2">
           <Button type="primary" onClick={() => handleApprove(record.machine_id)}>
@@ -159,28 +174,42 @@ const OperatorRequests = () => {
   ];
 
   return (
-    <div className="p-4">
-      <div className="mb-4">
-        <Input
+    <div className="w-full">
+      <div className="mb-4 flex flex-wrap gap-4">
+        <Search
           placeholder="Search in all columns..."
-          onChange={(e) => handleSearch(e.target.value)}
-          style={{ width: 300 }}
           allowClear
+          enterButton
+          size="large"
+          onSearch={handleSearch}
+          prefix={<SearchOutlined />}
+          onChange={(e) => setSearchText(e.target.value)}
+          value={searchText}
+          style={{ maxWidth: '300px', width: '100%' }}
+       
         />
       </div>
-      <Table
-        columns={columns}
-        dataSource={filteredData}
-        loading={loading}
-        rowKey="machine_id"
-        pagination={{
-          position: ['bottomCenter'],
-          showSizeChanger: true,
-          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-          pageSize: 10,
-          pageSizeOptions: ['10', '20', '50', '100'],
-        }}
-      />
+
+      <Form form={form} component={false}>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="id"
+          loading={loading}
+          size="middle"
+          bordered
+          scroll={{ x: 'max-content' }}
+          className="responsive-table"
+          pagination={{
+            position: ['bottomCenter'],
+            showSizeChanger: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+            pageSize: 10,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            responsive: true
+          }}
+        />
+      </Form>
     </div>
   );
 };

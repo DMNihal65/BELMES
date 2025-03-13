@@ -60,7 +60,13 @@ const Workcenter = () => {
 
   useEffect(() => {
     console.log('Workcenters updated:', workcenters);
-    setData(workcenters || []);
+    // Sort the data by work_center_id before setting it
+    const sortedData = [...(workcenters || [])].sort((a, b) => {
+      const idA = String(a.work_center_id || '');
+      const idB = String(b.work_center_id || '');
+      return idA.localeCompare(idB, undefined, { numeric: true });
+    });
+    setData(sortedData);
   }, [workcenters]);
 
   const isEditing = (record) => record.id === editingKey;
@@ -106,9 +112,17 @@ const Workcenter = () => {
       console.log('Updating machine with data:', updatedItem);
 
       await updateWorkcenter(updatedItem);
+      
+      // Update the data state directly instead of fetching
+      const newData = [...data];
+      const index = newData.findIndex(item => item.id === key);
+      if (index > -1) {
+        newData[index] = { ...newData[index], ...updatedItem };
+        setData(newData);
+      }
+      
       setEditingKey('');
       message.success('Machine updated successfully');
-      await fetchWorkcenters(); // Refresh the table data
     } catch (errInfo) {
       console.error('Save failed:', errInfo);
       message.error(errInfo.message || 'Failed to update machine');
@@ -672,7 +686,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:2299/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:6999/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1239,8 +1253,7 @@ const Workcenter = () => {
                         }}
                         dataSource={data.map((item, index) => ({
                           ...item,
-                          key: `${item.work_center_id}_${index}`,
-                          sequential_id: index + 1,
+                          key: item.id || `${item.work_center_id}_${index}`,
                         }))}
                         columns={mergedColumns}
                         rowClassName={(record) => 
@@ -1272,7 +1285,7 @@ const Workcenter = () => {
                         bordered
                         className="ant-table-striped"
                         size="middle"
-                        rowKey={(record) => `${record.work_center_id}_${record.sequential_id}`}
+                        rowKey={(record) => record.id || `${record.work_center_id}_${record.sequential_id}`}
                       />
                     </Form>
                   </div>

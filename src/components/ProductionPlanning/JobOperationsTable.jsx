@@ -413,13 +413,16 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       width: 80,
       fixed: 'left',
       editable: false,
-      render: (text, record, index) => index + 1,
     },
     {
       title: 'Operation Number',
       dataIndex: 'operation_number',
       width: 150,
+      fixed: 'left',
       editable: false,
+      render: (text, record, index) => {
+        return `${(index + 1) * 10}`;
+      }
     },
     {
       title: 'Operation Description',
@@ -593,10 +596,10 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
             type="primary" 
             icon={<PlusOutlined />}
             onClick={() => {
+              const newOperationNumber = (operations.length + 1) * 10;
               const newOperation = {
                 key: `${operations.length + 1}`,
-                id: operations.length + 1,
-                operation_number: operations.length * 10 + 10,
+                operation_number: newOperationNumber,
                 operation_description: '',
                 setup_time: 0,
                 ideal_cycle_time: 0,

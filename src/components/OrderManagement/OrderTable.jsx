@@ -1,27 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Table, Tag, Badge, Button, Space, Tooltip } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { message } from 'antd';
 import dayjs from 'dayjs';
 
 const OrderTable = ({ orders, onRefresh }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-    // Add useEffect for initial load and polling
-    React.useEffect(() => {
-      // Initial load
+  // Add useEffect for initial load and polling
+  React.useEffect(() => {
+    // Initial load
+    if (onRefresh) {
+      onRefresh();
+    }
+
+    // Set up polling every 10 seconds
+    const intervalId = setInterval(() => {
       if (onRefresh) {
         onRefresh();
       }
-  
-      // Set up polling every 30 seconds
-      const intervalId = setInterval(() => {
-        if (onRefresh) {
-          onRefresh();
-        }
-      }, 10000);
-  
-      return () => clearInterval(intervalId);
-    }, [onRefresh]);
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [onRefresh]);
 
   // Handle view action
   const handleViewDetails = (record) => {
@@ -31,10 +33,13 @@ const OrderTable = ({ orders, onRefresh }) => {
 
   const columns = [
     {
-      title: 'SI.No',
+      title: 'Sl.No',
       key: 'serialNumber',
-      render: (_, __, index) => index + 1,
-      width: 70,
+      width: 80,
+      render: (_, __, index) => {
+        // Calculate serial number based on current page
+        return ((currentPage - 1) * pageSize) + index + 1;
+      },
       fixed: 'left',
     },
     {
@@ -88,11 +93,17 @@ const OrderTable = ({ orders, onRefresh }) => {
       render: (_, record) => (
         <div>
           <div>{record.project?.name}</div>
-          <Tag color={record.project?.priority === 1 ? 'red' : 'blue'}>
-            Priority: {record.project?.priority}
+          <Tag color={getPriorityColor(record.project?.priority)}>
+            Priority: {record.project?.priority || 'N/A'}
           </Tag>
         </div>
       ),
+      sorter: (a, b) => {
+        const priorityA = a.project?.priority || 999;
+        const priorityB = b.project?.priority || 999;
+        return priorityA - priorityB;
+      },
+      defaultSortOrder: 'ascend', // Sort by priority by default
     },
     {
       title: 'Status',
@@ -119,40 +130,84 @@ const OrderTable = ({ orders, onRefresh }) => {
       ],
       onFilter: (value, record) => record.status === value,
     },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space>
-          <Tooltip title="View Details">
-            <Button
-              icon={<EyeOutlined />}
-              size="small"
-              onClick={() => handleViewDetails(record)}
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
+    // {
+    //   title: 'Actions',
+    //   key: 'actions',
+    //   width: 100,
+    //   fixed: 'right',
+    //   render: (_, record) => (
+    //     <Space>
+    //       <Tooltip title="View Details">
+    //         <Button
+    //           icon={<EyeOutlined />}
+    //           size="small"
+    //           onClick={() => handleViewDetails(record)}
+    //         />
+    //       </Tooltip>
+    //     </Space>
+    //   ),
+    // },
   ];
+
+  // Helper function to determine priority tag color
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 1:
+        return 'red';
+      case 2:
+        return 'orange';
+      case 3:
+        return 'yellow';
+      case 4:
+        return 'blue';
+      default:
+        return 'default';
+    }
+  };
+
+  // Sort orders by priority before rendering
+  const sortedOrders = React.useMemo(() => {
+    return [...orders].sort((a, b) => {
+      const priorityA = a.project?.priority || 999;
+      const priorityB = b.project?.priority || 999;
+      return priorityA - priorityB;
+    });
+  }, [orders]);
 
   return (
     <Table
       columns={columns}
-      dataSource={orders}
+      dataSource={sortedOrders} // Use sorted orders
       rowKey="id"
-      scroll={{ x: 1300, y: 'calc(100vh - 460px)' }}
-      rowClassName={(record) =>
-        record.project?.priority === 1 ? 'bg-red-50' : ''
-      }
+      scroll={{ 
+        x: 1800, 
+        y: 'calc(100vh - 420px)'
+      }}
       pagination={{
-        defaultPageSize: 10,
+        pageSize: pageSize,
+        position: ['bottomCenter'],
         showSizeChanger: true,
-        showQuickJumper: true,
-        showTotal: (total) => `Total ${total} orders`,
-        position: ['bottomCenter']
+        showTotal: (total) => `Total ${total} items`,
+        onChange: (page, newPageSize) => {
+          setCurrentPage(page);
+          if (pageSize !== newPageSize) {
+            setPageSize(newPageSize);
+            setCurrentPage(1);
+          }
+        },
+        style: { 
+          marginBottom: '8px',
+          marginTop: '8px'
+        }
+      }}
+      size="middle"
+      bordered
+      rowClassName={(record) => {
+        const priority = record.project?.priority;
+        if (priority === 1) return 'bg-red-50';
+        if (priority === 2) return 'bg-orange-50';
+        if (priority === 3) return 'bg-yellow-50';
+        return '';
       }}
     />
   );

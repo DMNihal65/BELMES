@@ -1,16 +1,64 @@
 import { create } from 'zustand';
 import dayjs from 'dayjs';
 
+// API endpoints configuration
+const API_CONFIG = {
+  BASE_URL: 'http://172.18.7.88:6999',
+  QUALITY_URL: 'http://172.18.7.93:9999',
+  PLANNING_URL: 'http://172.18.7.85:9671',
+  endpoints: {
+    allOrders: '/api/v1/planning/all_orders',
+    saveOrder: '/api/v1/planning/save-to-db',
+    uploadPdf: '/api/v1/planning/upload-pdf',
+    updatePriority: (orderId) => `/api/v1/planning/order/${orderId}/priority`,
+    uploadMpp: '/api/v1/documents/mpp',
+    uploadDrawing: '/api/v1/documents/drawing',
+    documents: (productionOrder) => `/api/v1/documents/${productionOrder}`,
+    saveOarcToDb: '/api/v1/planning/save-to-db',
+    createOrder: '/api/v1/planning/create_order',
+    uploadDocumentByType: '/api/v1/document-management/documents/upload-by-type',
+    getDocumentsByPartNumber: (partNumber) => `/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+    updateProjectPriorities: '/api/v1/planning/projects/priority',
+  }
+};
 
-const useOrderStore = create((set) => ({
+// Update the polling interval constant to 1 hour (in milliseconds)
+const TIMELINE_POLLING_INTERVAL = 60 * 60 * 1000; // 1 hour
+
+const useOrderStore = create((set, get) => ({
   orders: [],
   isLoading: false,
   error: null,
+  timelineData: [],
+  isLoadingTimeline: false,
+  timelineError: null,
 
   // Add workcenter-related state
   workcenters: [],
   isLoadingWorkcenters: false,
   workcenterError: null,
+
+  documents: {
+    mpp_document: null,
+    engineering_drawing_document: null,
+    oarc_document: null,
+    ipid_document: null,
+    all_documents: []
+  },
+  isLoadingDocuments: false,
+  documentError: null,
+
+  // Add loading state specifically for document fetching
+  documentLoadingStates: {
+    mpp: false,
+    engineering: false
+  },
+
+  timelinePollingInterval: null,  // Add this to track the interval
+
+  priorityOrders: [], // Add new state for priority orders
+  isLoadingPriority: false,
+  priorityError: null,
 
   clearOrderDetails: () => set({ 
     orderDetails: null, 
@@ -21,25 +69,68 @@ const useOrderStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:6699/api/v1/planning/all_orders');
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.allOrders}`);
       const data = await response.json();
       
       if (!response.ok) {
         throw new Error(data.message || 'Failed to fetch orders');
       }
 
-      // Sort orders by priority
-      const sortedOrders = data.sort((a, b) => a.project.priority - b.project.priority);
+      // Ensure we're working with an array
+      const ordersArray = Array.isArray(data) ? data : [];
 
-      // Transform each order to include deliveryDate
-      const transformedOrders = sortedOrders.map(order => ({
+      let transformedOrders = ordersArray.map(order => ({
         ...order,
+        key: order.id || order.production_order || Math.random().toString(),
       }));
 
-      set({ orders: transformedOrders, isLoading: false });
+      // Get saved sequence from localStorage
+      const savedSequence = localStorage.getItem('orderSequence');
+      if (savedSequence) {
+        const { orders: savedOrders } = JSON.parse(savedSequence);
+        
+        // Sort orders based on priority
+        transformedOrders.sort((a, b) => {
+          const savedOrderA = savedOrders.find(
+            so => so.id === a.id || so.project_id === a.project?.id
+          );
+          const savedOrderB = savedOrders.find(
+            so => so.id === b.id || so.project_id === b.project?.id
+          );
+
+          // Get priorities (default to highest number if not found)
+          const priorityA = savedOrderA?.priority ?? 999;
+          const priorityB = savedOrderB?.priority ?? 999;
+
+          // Sort by priority (lower number comes first)
+          return priorityA - priorityB;
+        });
+
+        // Update priorities in the transformed orders
+        transformedOrders = transformedOrders.map(order => {
+          const savedOrder = savedOrders.find(
+            so => so.id === order.id || so.project_id === order.project?.id
+          );
+          if (savedOrder && order.project) {
+            order.project.priority = savedOrder.priority;
+          }
+          return order;
+        });
+      }
+
+      set({ 
+        orders: transformedOrders, 
+        isLoading: false 
+      });
+      
       return transformedOrders;
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      console.error('Error fetching orders:', error);
+      set({ 
+        error: error.message, 
+        isLoading: false,
+        orders: []
+      });
       throw error;
     }
   },
@@ -50,7 +141,7 @@ const useOrderStore = create((set) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.88:6699/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:6999/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -98,8 +189,12 @@ const useOrderStore = create((set) => ({
         })) || []
       };
 
-      set({ orderDetails: transformedData, isLoading: false });
-      return transformedData;
+      set({ 
+        orderDetails: transformedData, 
+        isLoading: false 
+      });
+      
+      return data;
     } catch (error) {
       set({ error: error.message, isLoading: false });
       throw error;
@@ -131,7 +226,7 @@ const useOrderStore = create((set) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.88:6699/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.88:6999/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -173,47 +268,165 @@ const useOrderStore = create((set) => ({
   createOrder: async (payload) => {
     set({ isLoading: true, error: null });
     try {
-      // Get the token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
+      const submitData = {
+        data: {
+          "Project Name": payload.project_name,
+          "Sale Order": payload.sale_order,
+          "Part No": payload.part_number,
+          "Part Desc": payload.part_description,
+          "Required Qty": payload.required_quantity.toString(),
+          "Plant": payload.plant_id.toString(),
+          "WBS": payload.wbs_element,
+          "Rtg Seq No": "0",
+          "Sequence No": "0",
+          "Launched Qty": payload.launched_quantity.toString(),
+          "Prod Order No": payload.production_order,
+          "Operations": [],
+          "Document Verification": {},
+          "Raw Materials": []
+        }
+      };
 
-      const response = await fetch('http://172.18.7.88:6699/api/v1/planning/create_order', {
+      const response = await fetch(`${API_CONFIG.PLANNING_URL}${API_CONFIG.endpoints.saveOrder}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(submitData)
       });
-  
-      const data = await response.json();
-      
+
       if (!response.ok) {
-        console.error('API Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          data
-        });
-        
-        throw new Error(data.message || data.detail || 'Failed to create order');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create order');
       }
-  
-      // Transform the response data to match your application's format
-      const transformedData = {
-        ...data,
-      };
-  
-      // Update the orders list with the new order
-      set((state) => ({ 
-        orders: [...state.orders, transformedData], 
-        isLoading: false 
-      }));
-  
-      return transformedData;
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
     } catch (error) {
-      console.error('Create Order Error:', error);
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
+
+  // Update saveOarcDataToDb to use the API_CONFIG
+  saveOarcDataToDb: async (storedData, mppFile, drawingFile, mppDocName, mppDescription, mppVersion, drawingDocName, drawingDescription, drawingVersion) => {
+    set({ isLoading: true, error: null });
+    try {
+      console.log('Saving OARC data with documents:', {
+        hasMppFile: !!mppFile,
+        hasDrawingFile: !!drawingFile,
+        partNumber: storedData["Part No"]
+      });
+
+      // First save the OARC data
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.saveOarcToDb}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ data: storedData })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save OARC data');
+      }
+
+      const savedData = await response.json();
+      console.log('OARC data saved successfully:', savedData);
+
+      // Step 2: Upload documents if provided
+      const fileUploadErrors = [];
+
+      // Function to handle document upload
+      const uploadDocument = async (file, docName, docType, description, version) => {
+        if (!file) {
+          console.log(`No ${docType} file provided, skipping upload`);
+          return;
+        }
+
+        console.log(`Preparing to upload ${docType} document:`, {
+          docName,
+          docType,
+          description,
+          version,
+          fileName: file.name
+        });
+
+        const formData = new FormData();
+        const fileObj = file.originFileObj || file;
+        
+        formData.append('file', fileObj);
+        formData.append('name', docName);
+        formData.append('doc_type', docType);
+        formData.append('part_number', storedData["Part No"]);
+        formData.append('description', description || '');
+        formData.append('version', version || '1.0');
+
+        // Log FormData contents (for debugging)
+        for (let pair of formData.entries()) {
+          console.log('FormData entry:', pair[0], pair[1]);
+        }
+
+        const uploadUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.uploadDocumentByType}`;
+        console.log('Uploading to URL:', uploadUrl);
+
+        const response = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: formData
+        });
+
+        console.log('Upload response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Upload error response:', errorText);
+          throw new Error(errorText || `Failed to upload ${docType}`);
+        }
+
+        const responseData = await response.json();
+        console.log(`${docType} upload successful:`, responseData);
+        return responseData;
+      };
+
+      // Upload MPP file if provided
+      if (mppFile) {
+        try {
+          console.log('Starting MPP file upload...');
+          await uploadDocument(mppFile, mppDocName, 'MPP', mppDescription, mppVersion);
+          console.log('MPP file uploaded successfully');
+        } catch (error) {
+          console.error('MPP upload error:', error);
+          fileUploadErrors.push(`MPP file: ${error.message}`);
+        }
+      }
+
+      // Upload Engineering Drawing if provided
+      if (drawingFile) {
+        try {
+          console.log('Starting Engineering Drawing upload...');
+          await uploadDocument(drawingFile, drawingDocName, 'ENGINEERING_DRAWING', drawingDescription, drawingVersion);
+          console.log('Engineering Drawing uploaded successfully');
+        } catch (error) {
+          console.error('Engineering Drawing upload error:', error);
+          fileUploadErrors.push(`Engineering Drawing: ${error.message}`);
+        }
+      }
+
+      set({ isLoading: false });
+      return {
+        message: "Data saved successfully",
+        fileUploadError: fileUploadErrors.length > 0 ? fileUploadErrors.join('; ') : null
+      };
+
+    } catch (error) {
+      console.error('Save OARC data error:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -248,7 +461,7 @@ const useOrderStore = create((set) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.88:6699/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.88:6999/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -299,21 +512,14 @@ const useOrderStore = create((set) => ({
       formData.append('production_order', productionOrder);
       formData.append('document_name', documentName);
       formData.append('description', description || '');
-      formData.append('version_number', version);
-      formData.append('metadata', JSON.stringify({}));
+      formData.append('version', version);
 
-      // Get the token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      const response = await fetch('http://172.18.7.88:6699/api/v1/documents/mpp/upload/', {
+      const response = await fetch(`${API_CONFIG.PLANNING_URL}${API_CONFIG.endpoints.uploadMpp}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: formData,
+        body: formData
       });
 
       if (!response.ok) {
@@ -321,10 +527,9 @@ const useOrderStore = create((set) => ({
         throw new Error(errorData.message || 'Failed to upload MPP file');
       }
 
-      const data = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('MPP Upload Error:', error);
+      console.error('Upload MPP file error:', error);
       throw error;
     }
   },
@@ -336,32 +541,554 @@ const useOrderStore = create((set) => ({
       formData.append('production_order', productionOrder);
       formData.append('document_name', documentName);
       formData.append('description', description || '');
-      formData.append('version_number', version);
-      formData.append('metadata', JSON.stringify({}));
+      formData.append('version', version);
 
-      // Get the token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      const response = await fetch('http://172.18.7.88:6699/api/v1/documents/engineering-drawing/upload/', {
+      const response = await fetch(`${API_CONFIG.PLANNING_URL}${API_CONFIG.endpoints.uploadDrawing}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: formData,
+        body: formData
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload engineering drawing');
+        throw new Error(errorData.message || 'Failed to upload Engineering Drawing');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Upload Engineering Drawing error:', error);
+      throw error;
+    }
+  },
+
+  fetchTimelineData: async () => {
+    set({ isLoadingTimeline: true, timelineError: null });
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/scheduling/part-production-timeline/`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch timeline data');
+      }
+      const data = await response.json();
+      
+      // Extract items array from the response
+      const timelineItems = data.items?.map(item => ({
+        ...item,
+        key: item.production_order // Use production_order as key
+      })) || [];
+
+      set({ 
+        timelineData: timelineItems,
+        isLoadingTimeline: false 
+      });
+    } catch (error) {
+      console.error('Error fetching timeline data:', error);
+      set({ 
+        timelineError: error.message, 
+        isLoadingTimeline: false,
+        timelineData: []
+      });
+    }
+  },
+
+  // Start polling when component mounts
+  startTimelinePolling: () => {
+    const { fetchTimelineData } = get();
+    
+    // Initial fetch
+    fetchTimelineData();
+    
+    // Set up polling interval (1 hour)
+    const intervalId = setInterval(fetchTimelineData, TIMELINE_POLLING_INTERVAL);
+    
+    // Store the interval ID
+    set({ timelinePollingInterval: intervalId });
+    
+    console.log('Timeline polling started with 1-hour interval');
+  },
+
+  // Stop polling when component unmounts
+  stopTimelinePolling: () => {
+    const { timelinePollingInterval } = get();
+    if (timelinePollingInterval) {
+      clearInterval(timelinePollingInterval);
+      set({ timelinePollingInterval: null });
+      console.log('Timeline polling stopped');
+    }
+  },
+
+  // Update fetchDocumentsByPartNumber to handle document caching
+  fetchDocumentsByPartNumber: async (partNumber) => {
+    set({ 
+      documentLoadingStates: {
+        mpp: true,
+        engineering: true
+      }
+    });
+
+    try {
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
       }
 
       const data = await response.json();
+      console.log('Fetched documents for part number:', partNumber, data);
+      
+      // Store the documents in state
+      set({ 
+        documents: {
+          mpp_document: data.mpp_document || null,
+          engineering_drawing_document: data.engineering_drawing_document || null,
+          oarc_document: data.oarc_document || null,
+          ipid_document: data.ipid_document || null,
+          all_documents: data.all_documents || []
+        },
+        documentLoadingStates: {
+          mpp: false,
+          engineering: false
+        }
+      });
+
       return data;
     } catch (error) {
-      console.error('Engineering Drawing Upload Error:', error);
+      console.error('Error fetching documents:', error);
+      set({ 
+        documentError: error.message,
+        documentLoadingStates: {
+          mpp: false,
+          engineering: false
+        }
+      });
+      throw error;
+    }
+  },
+
+  // Update clearDocuments to match new structure
+  clearDocuments: () => set({
+    documents: {
+      mpp_document: null,
+      engineering_drawing_document: null,
+      oarc_document: null,
+      ipid_document: null,
+      all_documents: []
+    },
+    documentError: null,
+    documentLoadingStates: {
+      mpp: false,
+      engineering: false
+    }
+  }),
+
+  swapOrderPriority: async (order1ProductionOrder, order2ProductionOrder, order1Priority, order2Priority) => {
+    try {
+      set({ isLoading: true, error: null });
+      const { orders } = get();
+
+      // Find orders in current state
+      const order1 = orders.find(order => String(order.production_order) === String(order1ProductionOrder));
+      const order2 = orders.find(order => String(order.production_order) === String(order2ProductionOrder));
+
+      if (!order1?.id || !order2?.id) {
+        throw new Error('Could not find order IDs for the selected orders');
+      }
+
+      // Make the priority update request
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/api/v1/planning/order/${order1.id}/priority`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            priority: order2Priority,
+            order_id: order2.id
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to update priority');
+      }
+
+      // Fetch latest priorities after successful swap
+      const priorityResponse = await fetch('http://172.18.7.88:6999/api/v1/planning/projects/priority', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+
+      if (!priorityResponse.ok) {
+        throw new Error('Failed to fetch updated priorities');
+      }
+
+      const priorityData = await priorityResponse.json();
+
+      // Transform and update the orders with latest priorities
+      const updatedOrders = orders.map(order => {
+        const projectWithOrder = priorityData.projects.find(project => 
+          project.orders.some(o => String(o.production_order) === String(order.production_order))
+        );
+
+        if (projectWithOrder) {
+          return {
+            ...order,
+            project: {
+              ...order.project,
+              priority: projectWithOrder.priority,
+              name: projectWithOrder.project_name
+            }
+          };
+        }
+        return order;
+      });
+
+      // Sort orders by priority
+      const sortedOrders = [...updatedOrders].sort((a, b) => {
+        const priorityA = a.project?.priority || 999;
+        const priorityB = b.project?.priority || 999;
+        return priorityA - priorityB;
+      });
+
+      set({ orders: sortedOrders, isLoading: false });
+
+      return {
+        updated_priorities: [
+          { production_order: order1ProductionOrder, priority: order2Priority },
+          { production_order: order2ProductionOrder, priority: order1Priority }
+        ]
+      };
+    } catch (error) {
+      console.error('Error updating order priorities:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+  // Add new function to fetch priority orders
+  fetchPriorityOrders: async () => {
+    set({ isLoadingPriority: true, priorityError: null });
+    try {
+      const response = await fetch('http://172.18.7.88:6999/api/v1/planning/projects/priority', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch priority orders');
+      }
+
+      const data = await response.json();
+      
+      // Transform the nested structure into a flat array of orders with project info
+      const flattenedOrders = data.projects.flatMap(project => 
+        project.orders.map(order => ({
+          ...order,
+          project_name: project.project_name,
+          project_priority: project.priority
+        }))
+      );
+      
+      set({ 
+        priorityOrders: flattenedOrders,
+        isLoadingPriority: false 
+      });
+      return flattenedOrders;
+    } catch (error) {
+      console.error('Fetch priority orders error:', error);
+      set({ 
+        priorityError: error.message, 
+        isLoadingPriority: false,
+        priorityOrders: [] 
+      });
+      throw error;
+    }
+  },
+
+  // Update createManualOrder to handle the sequence correctly
+  createManualOrder: async (values, mppFile, drawingFile, mppDocName, mppDescription, mppVersion, drawingDocName, drawingDescription, drawingVersion) => {
+    set({ isLoading: true, error: null });
+    try {
+      // Step 1: Create the order
+      const orderData = {
+        production_order: values.production_order,
+        sale_order: values.sale_order,
+        wbs_element: values.wbs_element,
+        part_number: values.part_number,
+        part_description: values.part_description,
+        total_operations: values.total_operations,
+        required_quantity: values.required_quantity,
+        launched_quantity: values.launched_quantity,
+        plant_id: values.plant_id,
+        project_name: values.project_name
+      };
+
+      const orderResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.createOrder}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      if (!orderResponse.ok) {
+        const errorData = await orderResponse.json();
+        throw new Error(errorData.message || 'Failed to create order');
+      }
+
+      const savedOrderData = await orderResponse.json();
+      console.log('Order created successfully:', savedOrderData);
+
+      // Step 2: Upload documents if provided
+      const fileUploadErrors = [];
+
+      // Upload MPP file if provided
+      if (mppFile) {
+        try {
+          const mppFormData = new FormData();
+          const mppFileObj = mppFile.originFileObj || mppFile;
+          
+          mppFormData.append('file', mppFileObj);
+          mppFormData.append('name', mppDocName);
+          mppFormData.append('doc_type', 'MPP');
+          mppFormData.append('part_number', values.part_number);
+          mppFormData.append('description', mppDescription || '');
+          mppFormData.append('version', mppVersion || '1.0');
+
+          console.log('Uploading MPP with data:', {
+            name: mppDocName,
+            doc_type: 'MPP',
+            part_number: values.part_number,
+            description: mppDescription,
+            version: mppVersion
+          });
+
+          const mppResponse = await fetch(
+            'http://172.18.7.88:6999/api/v1/document-management/documents/upload-by-type',
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: mppFormData
+            }
+          );
+
+          if (!mppResponse.ok) {
+            const mppError = await mppResponse.json();
+            throw new Error(mppError.detail?.[0]?.msg || 'Failed to upload MPP document');
+          }
+
+          console.log('MPP file uploaded successfully');
+        } catch (error) {
+          console.error('MPP upload error:', error);
+          fileUploadErrors.push(`MPP file: ${error.message}`);
+        }
+      }
+
+      // Upload Engineering Drawing if provided
+      if (drawingFile) {
+        try {
+          const drawingFormData = new FormData();
+          const drawingFileObj = drawingFile.originFileObj || drawingFile;
+          
+          drawingFormData.append('file', drawingFileObj);
+          drawingFormData.append('name', drawingDocName);
+          drawingFormData.append('doc_type', 'ENGINEERING_DRAWING');
+          drawingFormData.append('part_number', values.part_number);
+          drawingFormData.append('description', drawingDescription || '');
+          drawingFormData.append('version', drawingVersion || '1.0');
+
+          console.log('Uploading Engineering Drawing with data:', {
+            name: drawingDocName,
+            doc_type: 'ENGINEERING_DRAWING',
+            part_number: values.part_number,
+            description: drawingDescription,
+            version: drawingVersion
+          });
+
+          const drawingResponse = await fetch(
+            'http://172.18.7.88:6999/api/v1/document-management/documents/upload-by-type',
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: drawingFormData
+            }
+          );
+
+          if (!drawingResponse.ok) {
+            const drawingError = await drawingResponse.json();
+            throw new Error(drawingError.detail?.[0]?.msg || 'Failed to upload Engineering Drawing');
+          }
+
+          console.log('Engineering Drawing uploaded successfully');
+        } catch (error) {
+          console.error('Engineering Drawing upload error:', error);
+          fileUploadErrors.push(`Engineering Drawing: ${error.message}`);
+        }
+      }
+
+      // Return the final result
+      set({ isLoading: false });
+      
+      return {
+        order: savedOrderData,
+        fileUploadError: fileUploadErrors.length > 0 ? fileUploadErrors.join('; ') : null
+      };
+
+    } catch (error) {
+      console.error('Create manual order error:', error);
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
+
+  // Update the uploadDocumentByType function to fix the 422 error
+  uploadDocumentByType: async (file, partNumber, documentType, documentName, description, version) => {
+    try {
+      const formData = new FormData();
+      
+      // Make sure we're getting the actual File object
+      const fileObj = file.originFileObj || file;
+      formData.append('file', fileObj);
+      
+      // Add metadata as JSON string in a separate field
+      const metadata = {
+        part_number: partNumber,
+        document_type: documentType,
+        name: documentName,
+        description: description || '',
+        version: version || 'v1'
+      };
+      
+      formData.append('metadata', JSON.stringify(metadata));
+      
+      // Log the request for debugging
+      console.log('Uploading document with metadata:', metadata);
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.uploadDocumentByType}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          // Note: Don't set Content-Type header when using FormData
+        },
+        body: formData
+      });
+
+      // Log the response status for debugging
+      console.log(`Document upload response status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage;
+        
+        try {
+          // Try to parse as JSON
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorData.detail || `Failed to upload ${documentType} document`;
+        } catch (e) {
+          // If not JSON, use the raw text
+          errorMessage = errorText || `Failed to upload ${documentType} document (Status: ${response.status})`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Upload ${documentType} document error:`, error);
+      throw error;
+    }
+  },
+
+  // Add new function to check documents by part number
+  checkDocumentsByPartNumber: async (partNumber) => {
+    set({ 
+      documentLoadingStates: {
+        mpp: true,
+        engineering: true
+      }
+    });
+
+    try {
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const data = await response.json();
+      console.log('Checked documents for part number:', partNumber, data);
+      
+      // Update the document state with fetched data
+      set({ 
+        documents: {
+          mpp_document: data.mpp_document ? {
+            ...data.mpp_document,
+            existingFile: data.mpp_document.latest_version?.file_url || null,
+            existingName: data.mpp_document.name || '',
+            existingDescription: data.mpp_document.description || '',
+            existingVersion: data.mpp_document.latest_version?.version_number || 'v1',
+            uploadedFiles: data.mpp_document.versions || []
+          } : null,
+          engineering_drawing_document: data.engineering_drawing_document ? {
+            ...data.engineering_drawing_document,
+            existingFile: data.engineering_drawing_document.latest_version?.file_url || null,
+            existingName: data.engineering_drawing_document.name || '',
+            existingDescription: data.engineering_drawing_document.description || '',
+            existingVersion: data.engineering_drawing_document.latest_version?.version_number || 'v1',
+            uploadedFiles: data.engineering_drawing_document.versions || []
+          } : null,
+          oarc_document: data.oarc_document,
+          ipid_document: data.ipid_document,
+          all_documents: data.all_documents || []
+        },
+        documentLoadingStates: {
+          mpp: false,
+          engineering: false
+        }
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Error checking documents:', error);
+      set({ 
+        documents: {
+          mpp_document: null,
+          engineering_drawing_document: null,
+          oarc_document: null,
+          ipid_document: null,
+          all_documents: []
+        },
+        documentError: error.message,
+        documentLoadingStates: {
+          mpp: false,
+          engineering: false
+        }
+      });
       throw error;
     }
   },

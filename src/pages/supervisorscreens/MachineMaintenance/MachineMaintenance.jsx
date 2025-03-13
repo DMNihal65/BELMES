@@ -252,10 +252,10 @@ export default function MachineMaintenance() {
   }
 
   return (
-    <div className="p-6">
+    <div className="w-full">
       <div className="mb-6">
-        <Row gutter={16}>
-          <Col span={8}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={12} lg={8}>
             <Form.Item label="Machine Name" style={{ marginBottom: 0 }}>
               <Select
                 style={{ width: '100%' }}
@@ -273,7 +273,7 @@ export default function MachineMaintenance() {
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={12} lg={8}>
             <Form.Item label="Status" style={{ marginBottom: 0 }}>
               <Select
                 style={{ width: '100%' }}
@@ -294,9 +294,9 @@ export default function MachineMaintenance() {
         </Row>
       </div>
 
-      <Row gutter={16} className="mb-6">
-        <Col span={8}>
-          <Card>
+      <Row gutter={[16, 16]} className="mb-6">
+        <Col xs={24} md={8}>
+          <Card className="h-full">
             <div className="flex items-center">
               <ToolOutlined style={{ fontSize: '24px', marginRight: '12px', color: '#1890ff' }} />
               <div>
@@ -306,8 +306,8 @@ export default function MachineMaintenance() {
             </div>
           </Card>
         </Col>
-        <Col span={8}>
-          <Card>
+        <Col xs={24} md={8}>
+          <Card className="h-full">
             <div className="flex items-center">
               <CheckCircleOutlined style={{ fontSize: '24px', marginRight: '12px', color: '#52c41a' }} />
               <div>
@@ -319,8 +319,8 @@ export default function MachineMaintenance() {
             </div>
           </Card>
         </Col>
-        <Col span={8}>
-          <Card>
+        <Col xs={24} md={8}>
+          <Card className="h-full">
             <div className="flex items-center">
               <CloseCircleOutlined style={{ fontSize: '24px', marginRight: '12px', color: '#ff4d4f' }} />
               <div>
@@ -341,10 +341,15 @@ export default function MachineMaintenance() {
           loading={loading}
           rowKey="machine_make"
           onChange={handleTableChange}
-          pagination={tableParams.pagination}
+          pagination={{
+            ...tableParams.pagination,
+            responsive: true,
+            position: ['bottomCenter']
+          }}
           size="middle"
           bordered
-          scroll={{ x: 800 }}
+          scroll={{ x: 'max-content' }}
+          className="responsive-table"
         />
       </Form>
     </div>

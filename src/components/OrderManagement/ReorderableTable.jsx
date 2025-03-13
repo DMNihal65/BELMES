@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Tag, Badge, Button, Space, Tooltip, Modal } from 'antd';
+import { Table, Tag, Badge, Button, Space, Tooltip, Modal, message } from 'antd';
 import { EyeOutlined, MenuOutlined, SwapOutlined } from '@ant-design/icons';
 import {
   DndContext,
@@ -16,53 +16,33 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import useOrderStore from '../../store/order-store';
+import Row from './Row';
 
-// Separate SortableRow component
-const SortableRow = ({ children, ...props }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ 
-    id: props['data-row-key']
+const ReorderableTable = ({ orders = [] }) => {
+  const [localOrders, setLocalOrders] = useState([]);
+  const { swapOrderPriority } = useOrderStore();
+  const [swapConfirmation, setSwapConfirmation] = useState({
+    visible: false,
+    order1: null,
+    order2: null,
+    position1: null,
+    position2: null
   });
 
-  const style = {
-    ...props.style,
-    transform: CSS.Transform.toString(transform),
-    transition,
-    ...(isDragging ? {
-      position: 'relative',
-      zIndex: 999,
-      background: '#fafafa',
-      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-    } : {}),
-    cursor: 'move',
-  };
-
-  return (
-    <tr {...props} ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {children}
-    </tr>
-  );
-};
-
-const ReorderableTable = ({ orders, onOrdersReorder }) => {
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [pendingChanges, setPendingChanges] = useState(null);
-  const [swapDetails, setSwapDetails] = useState(null);
-  const [localOrders, setLocalOrders] = useState([]);
-
-  // Initialize and update local orders when props change
   useEffect(() => {
-    const ordersWithIds = orders.map((order, index) => ({
-      ...order,
-      id: order.id || `${index}`,
-    }));
-    setLocalOrders(ordersWithIds);
+    if (!Array.isArray(orders) || localOrders.length > 0) {
+      return;
+    }
+
+    // Sort orders by priority only on initial load
+    const sortedOrders = [...orders].sort((a, b) => {
+      const priorityA = a.project?.priority || a.priority || 999;
+      const priorityB = b.project?.priority || b.priority || 999;
+      return priorityA - priorityB;
+    });
+
+    setLocalOrders(sortedOrders);
   }, [orders]);
 
   const sensors = useSensors(
@@ -88,36 +68,30 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
       ),
     },
     {
-      title: 'SI.No',
-      key: 'serialNumber',
-      width: 70,
-      render: (_, __, index) => index + 1,
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+      width: 150,
     },
     {
       title: 'Production Order',
       dataIndex: 'production_order',
       key: 'production_order',
-      render: (text) => <a>{text}</a>,
-    },
-    {
-      title: 'Part Number',
-      dataIndex: 'part_number',
-      key: 'part_number',
+      width: 150,
     },
     {
       title: 'Material Description',
       dataIndex: 'part_description',
       key: 'part_description',
-      render: (text) => (
-        <div className="font-medium">{text}</div>
-      ),
+      width: 200,
     },
     {
       title: 'Quantity',
       key: 'quantity',
+      width: 150,
       render: (_, record) => (
         <div>
-          <div>Target: {record.required_quantity}</div>
+          <div>Target: {record.required_quantity || 0}</div>
           <div className="text-xs text-gray-500">
             Launched: {record.launched_quantity || 0}
           </div>
@@ -125,189 +99,229 @@ const ReorderableTable = ({ orders, onOrdersReorder }) => {
       ),
     },
     {
-      title: 'Status',
-      key: 'status',
-      render: (_, record) => {
-        const status = record.status || 'pending';
-        const statusColors = {
-          in_progress: 'processing',
-          completed: 'success',
-          delayed: 'error',
-          pending: 'default'
-        };
-        return (
-          <Badge
-            status={statusColors[status]}
-            text={status.replace('_', ' ').toUpperCase()}
-          />
-        );
-      },
-    },
-    {
       title: 'WBS Element',
       dataIndex: 'wbs_element',
       key: 'wbs_element',
+      width: 250,
     },
     {
       title: 'Sales Order',
       dataIndex: 'sale_order',
       key: 'sale_order',
+      width: 150,
     },
     {
       title: 'Project',
       key: 'project',
+      width: 200,
       render: (_, record) => (
         <div>
-          <div>{record.project?.name}</div>
-          <Tag color={record.project?.priority === 1 ? 'red' : 'blue'}>
-            Priority: {record.project?.priority}
-          </Tag>
+          {record.project?.name || record.project_name}
+          <div>
+            <Tag color="blue">Priority: {record.project?.priority || record.priority || 'N/A'}</Tag>
+          </div>
         </div>
       ),
     },
-    // {
-    //   title: 'Priority',
-    //   key: 'priority',
-    //   render: (_, record) => {
-    //     const priority = record.project?.priority;
-    //     let displayPriority = 'normal';
-    //     let tagColor = 'blue';
-
-    //     if (priority === 1) {
-    //       displayPriority = 'high';
-    //       tagColor = 'red';
-    //     } else if (priority === 2) {
-    //       displayPriority = 'medium';
-    //       tagColor = 'orange';
-    //     } else if (priority === 3) {
-    //       displayPriority = 'low';
-    //       tagColor = 'blue';
-    //     }
-
-    //     return (
-    //       <Tag color={tagColor}>
-    //         {displayPriority.toUpperCase()}
-    //       </Tag>
-    //     );
-    //   },
-    // }
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (status) => (
+        <div className="flex items-center">
+          <span className="mr-2">•</span>
+          <span>PENDING</span>
+        </div>
+      ),
+    }
   ];
+
+  // Helper function to determine tag color based on priority
+  const getTagColor = (priority) => {
+    switch (priority) {
+      case 1:
+        return 'red';
+      case 2:
+        return 'orange';
+      case 3:
+        return 'yellow';
+      case 4:
+        return 'blue';
+      case 5:
+        return 'cyan';
+      default:
+        return 'default';
+    }
+  };
 
   const onDragEnd = ({ active, over }) => {
     if (active.id !== over?.id) {
-      const activeIndex = localOrders.findIndex(i => i.id === active.id);
-      const overIndex = localOrders.findIndex(i => i.id === over.id);
+      const oldIndex = localOrders.findIndex(i => i.id === active.id);
+      const newIndex = localOrders.findIndex(i => i.id === over.id);
       
-      if (activeIndex !== -1 && overIndex !== -1) {
-        // Create new array with only the swapped items changed
-        const newData = [...localOrders];
-        const temp = newData[activeIndex];
-        newData[activeIndex] = newData[overIndex];
-        newData[overIndex] = temp;
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const activeOrder = localOrders[oldIndex];
+        const overOrder = localOrders[newIndex];
 
-        // Store swap details for modal
-        setSwapDetails({
-          from: {
-            position: activeIndex + 1,
-            order: localOrders[activeIndex].production_order,
-            partNumber: localOrders[activeIndex].part_number
-          },
-          to: {
-            position: overIndex + 1,
-            order: localOrders[overIndex].production_order,
-            partNumber: localOrders[overIndex].part_number
-          }
+        setSwapConfirmation({
+          visible: true,
+          order1: activeOrder,
+          order2: overOrder,
+          position1: oldIndex + 1,
+          position2: newIndex + 1
         });
-
-        setPendingChanges(newData);
-        setIsModalVisible(true);
       }
     }
   };
 
-  const handleConfirmReorder = () => {
-    if (pendingChanges) {
-      setLocalOrders(pendingChanges);
-      onOrdersReorder(pendingChanges);
-      setPendingChanges(null);
-      setSwapDetails(null);
+  const handleSwapConfirm = async () => {
+    try {
+      const { order1, order2, position1, position2 } = swapConfirmation;
+      
+      // Create a new array by removing the dragged item and inserting it at the new position
+      let newOrders = [...localOrders];
+      const [draggedItem] = newOrders.splice(position1 - 1, 1);
+      newOrders.splice(position2 - 1, 0, draggedItem);
+
+      // Update priorities based on new positions
+      newOrders = newOrders.map((order, index) => {
+        return {
+          ...order,
+          project: {
+            ...order.project,
+            priority: index + 1
+          },
+          priority: index + 1
+        };
+      });
+
+      // Update the local state first for immediate UI feedback
+      setLocalOrders(newOrders);
+
+      // Then try to update the backend
+      try {
+        await swapOrderPriority(
+          order1.production_order,
+          order2.production_order,
+          position1,
+          position2
+        );
+        message.success('Orders reordered successfully');
+      } catch (error) {
+        // If backend update fails, keep the UI change but show error
+        message.warning('Order display updated locally only. Server sync failed: ' + error.message);
+      }
+    } catch (error) {
+      message.error('Failed to reorder: ' + error.message);
+    } finally {
+      setSwapConfirmation({ visible: false, order1: null, order2: null, position1: null, position2: null });
     }
-    setIsModalVisible(false);
   };
 
   return (
-    <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={onDragEnd}
-      >
-        <SortableContext
-          items={localOrders.map(item => item.id)}
-          strategy={verticalListSortingStrategy}
+    <>
+      <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onDragEnd}
         >
-          <Table
-            components={{
-              body: {
-                row: SortableRow,
-              },
-            }}
-            columns={columns}
-            dataSource={localOrders}
-            rowKey="id"
-            pagination={false}
-            rowClassName={(record) =>
-              record.project?.priority === 1 ? 'bg-red-50' : ''
-            }
-            scroll={{ y: 480 }}
-            size="middle"
-          />
-        </SortableContext>
+          <SortableContext
+            items={localOrders.map(item => item.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <Table
+              components={{
+                body: {
+                  row: Row,
+                },
+              }}
+              columns={columns}
+              dataSource={localOrders}
+              rowKey={record => record.id || record.production_order}
+              pagination={false}
+              rowClassName={(record) => {
+                const priority = record.project?.priority;
+                if (priority === 1) return 'bg-red-50';
+                if (priority === 2) return 'bg-orange-50';
+                if (priority === 3) return 'bg-yellow-50';
+                return '';
+              }}
+              scroll={{ y: 480 }}
+              size="middle"
+              onChange={(pagination, filters, sorter) => {
+                if (sorter.field === 'project') {
+                  console.log('Project column sorted:', sorter.order);
+                }
+              }}
+            />
+          </SortableContext>
+        </DndContext>
+      </div>
 
-        <Modal
-          title={
-            <Space>
-              <SwapOutlined />
-              Confirm Position Swap
-            </Space>
-          }
-          open={isModalVisible}
-          onOk={handleConfirmReorder}
-          onCancel={() => {
-            setIsModalVisible(false);
-            setPendingChanges(null);
-            setSwapDetails(null);
-          }}
-          okText="Yes, Swap Positions"
-          cancelText="Cancel"
-        >
-          {swapDetails && (
-            <div>
-              <p>Are you sure you want to swap the following orders?</p>
-              <div className="bg-gray-50 p-4 rounded-md my-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <div>
-                    <div className="font-medium">From Position {swapDetails.from.position}</div>
-                    <div>PO: {swapDetails.from.order}</div>
-                    <div className="text-gray-500">Part: {swapDetails.from.partNumber}</div>
-                  </div>
-                  <SwapOutlined className="mx-4 text-blue-500" />
-                  <div>
-                    <div className="font-medium">To Position {swapDetails.to.position}</div>
-                    <div>PO: {swapDetails.to.order}</div>
-                    <div className="text-gray-500">Part: {swapDetails.to.partNumber}</div>
-                  </div>
-                </div>
-              </div>
-              <p className="text-gray-500">
-                This action will swap the positions of these orders while maintaining the positions of all other orders.
-              </p>
-            </div>
-          )}
-        </Modal>
-      </DndContext>
-    </div>
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <SwapOutlined className="text-blue-500" />
+            <span>Confirm Position Swap</span>
+          </div>
+        }
+        open={swapConfirmation.visible}
+        onOk={handleSwapConfirm}
+        onCancel={() => setSwapConfirmation({ visible: false, order1: null, order2: null })}
+        footer={[
+          <Button key="cancel" onClick={() => setSwapConfirmation({ visible: false, order1: null, order2: null })}>
+            Cancel
+          </Button>,
+          <Button key="submit" type="primary" onClick={handleSwapConfirm}>
+            Yes, Swap Positions
+          </Button>
+        ]}
+        width={400}
+        className="position-swap-modal"
+      >
+        <p className="text-gray-600 mb-6">Are you sure you want to swap the following orders?</p>
+        
+        <div className="flex justify-between items-center gap-4">
+          <div className="flex-1 bg-gray-50 p-4 rounded-lg">
+            <div className="text-gray-600 mb-2">From Position</div>
+            <div className="text-2xl font-semibold mb-4">{swapConfirmation.position1}</div>
+            
+            <div className="text-gray-600 text-sm mb-1">Production Order</div>
+            <div className="font-medium mb-3">{swapConfirmation.order1?.production_order}</div>
+            
+            <div className="text-gray-600 text-sm mb-1">Part Number</div>
+            <div className="font-medium">{swapConfirmation.order1?.part_number}</div>
+          </div>
+
+          <div className="bg-blue-100 rounded-full p-2">
+            <SwapOutlined className="text-blue-500 text-lg" rotate={90} />
+          </div>
+
+          <div className="flex-1 bg-gray-50 p-4 rounded-lg">
+            <div className="text-gray-600 mb-2">To Position</div>
+            <div className="text-2xl font-semibold mb-4">{swapConfirmation.position2}</div>
+            
+            <div className="text-gray-600 text-sm mb-1">Production Order</div>
+            <div className="font-medium mb-3">{swapConfirmation.order2?.production_order}</div>
+            
+            <div className="text-gray-600 text-sm mb-1">Part Number</div>
+            <div className="font-medium">{swapConfirmation.order2?.part_number}</div>
+          </div>
+        </div>
+
+        <div className="mt-6 bg-blue-50 p-3 rounded-lg text-sm text-gray-600">
+          This action will swap the positions of these orders while maintaining the positions of all other orders.
+        </div>
+      </Modal>
+    </>
   );
+};
+
+ReorderableTable.defaultProps = {
+  orders: [],
+  onRefresh: () => {}
 };
 
 export default ReorderableTable;

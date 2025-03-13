@@ -11,125 +11,262 @@ import {
   Modal,
   Row,
   Col,
-  Divider 
+  Divider,
+  Alert,
+  message,
+  Badge,
+  Tabs
 } from 'antd';
-import { EyeOutlined } from '@ant-design/icons';
+import { EyeOutlined, FileSearchOutlined, FileTextOutlined, FilePdfOutlined, AppstoreOutlined } from '@ant-design/icons';
+import moment from 'moment';
+import InspectionReport from './InspectionReport';
+// import { launchQMSApplication } from '../../../utils/qmsLauncher';
 
 const { Text, Title } = Typography;
 const { Option } = Select;
+const { TabPane } = Tabs;
 
 const QualityInspectionDetails = ({ 
   selectedPart, 
   inspectionDetails, 
-  loading
+  loading,
+  openQMSSoftware 
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState(null);
+  const [isQmsModalVisible, setIsQmsModalVisible] = useState(false);
+  const [operationMeasurements, setOperationMeasurements] = useState(null);
 
-  // Summary columns for the order details
+  const hasIpid = inspectionDetails?.operation_groups?.length > 0;
+
+  // Get IPID number from operation groups
+  const getIpidNumber = () => {
+    if (!hasIpid) return null;
+    // Get the first operation group's IPID
+    return inspectionDetails.operation_groups[0]?.ipid;
+  };
+
+  const handleOperationClick = async (op) => {
+    setSelectedOperation(op);
+    
+    // Check if the operation has measurements in operation_groups
+    const operationData = inspectionDetails?.operation_groups?.filter(
+      group => group.op_no === op && group.details
+    );
+
+    if (operationData && operationData.length > 0) {
+      // Operation has measurements, show measurements modal
+      setOperationMeasurements(operationData);
+      setIsModalVisible(true);
+    } else {
+      // Operation has no measurements, show QMS modal
+      setIsQmsModalVisible(true);
+    }
+  };
+
+  const handleLaunchQMS = async () => {
+    try {
+      // const success = await launchQMSApplication();
+      if (success) {
+        message.success('QMS application launched successfully');
+        setIsQmsModalVisible(false);
+      } else {
+        message.error('Failed to launch QMS. Please check if the application is installed correctly.');
+      }
+    } catch (error) {
+      console.error('Failed to launch QMS application:', error);
+      message.error('Failed to launch QMS. Please ensure the application is properly installed.');
+    }
+  };
+
   const summaryColumns = [
     {
       title: 'IPID No.',
       dataIndex: 'ipid_no',
       key: 'ipid_no',
-      width: '12%',
-      render: () => 'Null'  // or you can use '-' or 'N/A'
-    },
-    {
-      title: 'Order ID',
-      dataIndex: 'order_id',
-      key: 'order_id',
-      width: '12%',
+      width: '15%',
+      render: () => {
+        const ipidNumber = getIpidNumber();
+        return (
+          <Tag color={hasIpid ? 'blue' : 'default'} className="text-md px-3 py-1">
+            {ipidNumber || 'No IPID'}
+          </Tag>
+        );
+      }
     },
     {
       title: 'Production Order',
       dataIndex: 'production_order',
       key: 'production_order',
-      width: '12%',
+      width: '20%',
+      render: (text) => (
+        <Typography.Text disabled={!hasIpid} strong>
+          {text}
+        </Typography.Text>
+      )
     },
     {
       title: 'Part Number',
       dataIndex: 'part_number',
       key: 'part_number',
-      width: '12%',
+      width: '20%',
+      render: (text) => (
+        <Typography.Text disabled={!hasIpid}>
+          {text}
+        </Typography.Text>
+      )
     },
     {
       title: 'Operations',
       key: 'operations',
-      width: '37%',
+      width: '30%',
       render: (_, record) => (
-        <Space wrap size="middle" style={{ display: 'flex', flexWrap: 'wrap' }}>
-          {record.operations.map(op => (
-            <Button 
-              key={op}
-              type={selectedOperation === op ? 'primary' : 'default'}
-              onClick={() => {
-                setSelectedOperation(op);
-                setIsModalVisible(true);
-              }}
-              style={{ marginBottom: 8 }}
-            >
-              Operation {op}
-            </Button>
-          ))}
+        <Space wrap size="middle">
+          {(record.operations || []).map(op => {
+            // Check if operation has measurements
+            const hasOperationMeasurements = inspectionDetails?.operation_groups?.some(
+              group => group.op_no === op && group.details
+            );
+
+            return (
+              <Button 
+                key={op}
+                type={selectedOperation === op ? 'primary' : 'default'}
+                onClick={() => handleOperationClick(op)}
+                icon={hasOperationMeasurements ? <EyeOutlined /> : <FileSearchOutlined />}
+                className={`
+                  transition-all duration-300
+                  ${hasOperationMeasurements 
+                    ? 'bg-green-600 text-white hover:bg-green-700 border-green-600 hover:border-green-700' 
+                    : 'bg-yellow-100 hover:bg-yellow-200 border-yellow-200 hover:border-yellow-300'}
+                  ${selectedOperation === op ? 'shadow-md' : 'hover:shadow-sm'}
+                `}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  height: '32px',
+                  padding: '4px 12px',
+                  fontSize: '14px',
+                  fontWeight: hasOperationMeasurements ? '500' : 'normal'
+                }}
+              >
+                <span>Operation {op}</span>
+                {hasOperationMeasurements && (
+                  <Badge 
+                    count={inspectionDetails?.operation_groups?.filter(group => group.op_no === op).length} 
+                    className="ml-1"
+                    style={{ 
+                      backgroundColor: '#fff',
+                      color: '#16a34a',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  />
+                )}
+              </Button>
+            );
+          })}
         </Space>
-      ),
+      )
     },
     {
-      title: 'Inspection Details',
-      key: 'inspection_details',
+      title: 'Actions',
+      key: 'actions',
       width: '15%',
       render: (_, record) => (
-        <Space direction="vertical" size="small">
-          <Text>Total Operations: {record.operations.length}</Text>
-          <Text>
-            Status: <Tag color="processing">In Progress</Tag>
-          </Text>
+        <Space>
+          {!hasIpid ? (
+            <Button 
+              type="primary"
+              icon={<FileSearchOutlined />}
+              onClick={() => setIsQmsModalVisible(true)}
+              className="hover:shadow-md transition-all duration-300"
+            >
+              Open QMS
+            </Button>
+          ) : (
+            <Button
+              type="primary"
+              icon={<FilePdfOutlined />}
+              onClick={() => generatePDF(record)}
+              className="bg-red-500 hover:bg-red-600 border-red-500 hover:border-red-600 hover:shadow-md transition-all duration-300"
+            >
+              Report
+            </Button>
+          )}
         </Space>
-      ),
+      )
     }
   ];
 
-  // Create a single row of summary data
+  // Create summary data with IPID number
   const summaryData = inspectionDetails ? [{
     key: 'summary',
-    ipid_no: null,  // Added IPID No field
-    order_id: inspectionDetails.order_id,
-    production_order: inspectionDetails.production_order,
-    part_number: inspectionDetails.part_number,
-    operations: inspectionDetails.operations
+    ipid_no: getIpidNumber() || 'No IPID',
+    order_id: inspectionDetails.order_id || selectedPart?.value || '',
+    production_order: inspectionDetails.production_order || selectedPart?.partDetails?.production_order || '',
+    part_number: inspectionDetails.part_number || selectedPart?.partDetails?.part_number || '',
+    operations: inspectionDetails.operations || selectedPart?.partDetails?.operations || []
   }] : [];
 
+  // Style for the entire table when no IPID
+  const tableStyle = !hasIpid ? {
+    opacity: 0.8,
+    backgroundColor: '#f5f5f5'
+  } : {};
+
   const getOperationDetails = () => {
-    if (!selectedOperation || !inspectionDetails) return null;
-    return inspectionDetails.inspection_data.find(
-      op => op.operation_number === selectedOperation
+    if (!selectedOperation) return null;
+    
+    // If no operation_groups, return basic structure
+    if (!inspectionDetails?.operation_groups?.length) {
+      return {
+        ipid: 'No IPID',
+        operation_number: selectedOperation,
+        details: []
+      };
+    }
+    
+    const operationData = inspectionDetails.operation_groups.filter(
+      group => group.op_no === selectedOperation
     );
+
+    return {
+      ipid: operationData[0]?.ipid || 'No IPID',
+      operation_number: selectedOperation,
+      details: operationData.map((item, index) => ({
+        key: index,
+        zone: item.details?.zone || '',
+        dimension_type: item.details?.dimension_type || '',
+        nominal: item.details?.nominal || '',
+        uppertol: item.details?.uppertol || '',
+        lowertol: item.details?.lowertol || '',
+        measured_instrument: item.details?.measured_instrument || ''
+      }))
+    };
   };
 
-  const renderInspectionDetails = () => {
-    const operationData = getOperationDetails();
-    if (!operationData) return null;
+  const renderOperationDetails = () => {
+    const data = getOperationDetails();
+    if (!data) return null;
 
     const columns = [
       {
-        title: 'Sl. No.',
-        dataIndex: 'id',
-        key: 'id',
-        width: 80,
-        fixed: 'left',
+        title: 'Zone',
+        dataIndex: 'zone',
+        key: 'zone',
+        width: 100,
       },
       {
         title: 'Description',
         dataIndex: 'dimension_type',
         key: 'dimension_type',
         width: 150,
-        fixed: 'left',
       },
       {
         title: 'Nominal',
-        dataIndex: 'nominal_value',
-        key: 'nominal_value',
+        dataIndex: 'nominal',
+        key: 'nominal',
         width: 100,
       },
       {
@@ -145,36 +282,6 @@ const QualityInspectionDetails = ({
         width: 100,
       },
       {
-        title: 'Zone',
-        dataIndex: 'zone',
-        key: 'zone',
-        width: 100,
-      },
-      {
-        title: 'Measurement 1',
-        dataIndex: 'measured_1',
-        key: 'measured_1',
-        width: 120,
-      },
-      {
-        title: 'Measurement 2',
-        dataIndex: 'measured_2',
-        key: 'measured_2',
-        width: 120,
-      },
-      {
-        title: 'Measurement 3',
-        dataIndex: 'measured_3',
-        key: 'measured_3',
-        width: 120,
-      },
-      {
-        title: 'Mean',
-        dataIndex: 'measured_mean',
-        key: 'measured_mean',
-        width: 100,
-      },
-      {
         title: 'Instrument',
         dataIndex: 'measured_instrument',
         key: 'measured_instrument',
@@ -183,92 +290,235 @@ const QualityInspectionDetails = ({
     ];
 
     return (
-      <Table
-        columns={columns}
-        dataSource={operationData.inspections}
-        rowKey="id"
-        pagination={false}
-        scroll={{ x: 1500, y: 500 }}
-        size="small"
-      />
-    );
-  };
-
-  const renderIPIDHeader = () => {
-    return (
-      <Card className="mb-4">
-        <Title level={4}>FABRICATION COMPONENTS</Title>
-        <Text type="secondary">IN PROCESS INSPECTION DOCUMENT (IPID)</Text>
-        <Divider />
-        <Row gutter={[24, 16]}>
-          <Col span={12}>
-            <Row>
-              <Col span={8}><Text strong>IPID No.:</Text></Col>
-              <Col span={16}><Text>NULL</Text></Col>
-            </Row>
-            <Row>
-              <Col span={8}><Text strong>Part No.:</Text></Col>
-              <Col span={16}><Text>{inspectionDetails?.part_number || 'NULL'}</Text></Col>
-            </Row>
-            <Row>
-              <Col span={8}><Text strong>Date:</Text></Col>
-              <Col span={16}><Text>{new Date().toLocaleDateString()}</Text></Col>
-            </Row>
-            <Row>
-              <Col span={8}><Text strong>Time:</Text></Col>
-              <Col span={16}><Text>{new Date().toLocaleTimeString()}</Text></Col>
-            </Row>
-          </Col>
-          <Col span={12}>
-            <Row>
-              <Col span={12}><Text strong>Order No. - Batch No.:</Text></Col>
-              <Col span={12}><Text>{inspectionDetails?.order_id || 'NULL'}</Text></Col>
-            </Row>
-            <Row>
-              <Col span={12}><Text strong>Operation No.:</Text></Col>
-              <Col span={12}><Text>{selectedOperation || 'NULL'}</Text></Col>
-            </Row>
-            <Row>
-              <Col span={12}><Text strong>Sheet No.:</Text></Col>
-              <Col span={12}><Text>1</Text></Col>
-            </Row>
-          </Col>
-        </Row>
-        <Divider />
-        <Text strong>Info:</Text>
-        <ul>
-          <li>Entry to be made in all the fields highlighted in yellow</li>
-          <li>In Case of 3D PDF drawing or Drawing with '10 of' less dimensions, Drg. Zone is not Mandatory</li>
-          <li>Additional observations can be noted in the designated area at the bottom of the page</li>
-          <li>Text of OK measurement values turn to green colour & Not OK values turn to Red colour</li>
-        </ul>
-      </Card>
-    );
-  };
-
-  return (
-    <>
-      <Card>
+      <>
+        <div className="mb-4">
+          <Text strong>Operation: {data.operation_number}</Text>
+          <br />
+          <Text strong>IPID: {data.ipid}</Text>
+        </div>
         <Table
-          columns={summaryColumns}
-          dataSource={summaryData}
+          columns={columns}
+          dataSource={data.details}
           pagination={false}
+          scroll={{ x: 800, y: 400 }}
           size="small"
         />
-      </Card>
+      </>
+    );
+  };
 
+  const renderModalHeader = () => {
+    const data = getOperationDetails();
+    if (!data) return null;
+
+    return (
+      <div className="border-b pb-4 mb-4">
+        <div className="grid grid-cols-2 gap-4">
+          {/* Left Column */}
+          <div>
+            <div className="mb-2 flex">
+              <Text strong className="w-24">IPID No.:</Text>
+              <Text>{data.ipid}</Text>
+            </div>
+            <div className="mb-2 flex">
+              <Text strong className="w-24">Part No.:</Text>
+              <Text>{inspectionDetails.part_number}</Text>
+            </div>
+            <div className="mb-2 flex">
+              <Text strong className="w-24">Date:</Text>
+              <Text>{moment().format('DD-MM-YYYY')}</Text>
+            </div>
+            <div className="mb-2 flex">
+              <Text strong className="w-24">Time:</Text>
+              <Text>{moment().format('HH:mm A')}</Text>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div>
+            <div className="mb-2 flex">
+              <Text strong className="w-32">Order No. - Batch No.:</Text>
+              <Text>{inspectionDetails.production_order}</Text>
+            </div>
+            <div className="mb-2 flex">
+              <Text strong className="w-32">Operation No.:</Text>
+              <Text>{data.operation_number}</Text>
+            </div>
+            <div className="mb-2 flex">
+              <Text strong className="w-32">Sheet No.:</Text>
+              <Text>1</Text>
+            </div>
+          </div>
+        </div>
+
+        {/* Info Section */}
+        <div className="mt-4">
+          <Text strong className="block mb-2">Info:</Text>
+          <ul className="list-disc pl-5 text-sm">
+            <li>Entry to be made in all the fields highlighted in yellow</li>
+            <li>In Case of 3D PDF drawing or Drawing with '10 off' less dimensions, Drg. Zone is not Mandatory</li>
+            <li>Additional observations can be noted in the designated area at the bottom of the page</li>
+            <li>Text of OK measurement values turn to green colour & Not OK values turn to Red colour</li>
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
+  const renderQmsModal = () => (
+    <Modal
+      title="No Measurements Available"
+      open={isQmsModalVisible}
+      onCancel={() => setIsQmsModalVisible(false)}
+      footer={[
+        <Button key="cancel" onClick={() => setIsQmsModalVisible(false)}>
+          Cancel
+        </Button>,
+        <Button 
+          key="launch" 
+          type="primary" 
+          onClick={handleLaunchQMS}
+          icon={<AppstoreOutlined />}
+        >
+          Open QMS Software
+        </Button>
+      ]}
+    >
+      <p>No measurement data is available for Operation {selectedOperation}.</p>
+      <p>Would you like to open the QMS software to view or add measurements?</p>
+    </Modal>
+  );
+
+  return (
+    <div className="p-4">
+      <Tabs 
+        defaultActiveKey="details" 
+        type="card"
+        className="bg-white rounded-lg shadow-sm"
+      >
+        <TabPane 
+          tab={
+            <span className="px-2">
+              <FileTextOutlined /> Inspection Details
+            </span>
+          } 
+          key="details"
+        >
+          <Card 
+            className={`
+              ${!hasIpid ? 'bg-gray-50' : 'bg-white'} 
+              transition-all duration-300 hover:shadow-md
+            `}
+            title={
+              <div className="flex justify-between items-center">
+                <Typography.Title level={4} className="mb-0">
+                  Inspection Details
+                </Typography.Title>
+                {hasIpid && (
+                  <Tag color="green" className="px-3 py-1">
+                    IPID Available
+                  </Tag>
+                )}
+              </div>
+            }
+          >
+            <Table
+              columns={summaryColumns}
+              dataSource={summaryData}
+              pagination={false}
+              size="middle"
+              loading={loading}
+              className={!hasIpid ? 'no-ipid-table' : ''}
+            />
+          </Card>
+        </TabPane>
+
+        <TabPane 
+          tab={
+            <span className="px-2">
+              <FilePdfOutlined /> Inspection Report
+            </span>
+          } 
+          key="report"
+        >
+          <InspectionReport />
+        </TabPane>
+      </Tabs>
+
+      {/* QMS Launch Modal */}
+      {renderQmsModal()}
+
+      {/* Existing Measurements Modal */}
       <Modal
-        title={null}
-        open={isModalVisible}
+        title={`Operation ${selectedOperation} Measurements`}
+        visible={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
-        width={1200}
+        width={1000}
         footer={null}
       >
-        {renderIPIDHeader()}
-        {renderInspectionDetails()}
+        {renderModalHeader()}
+        {renderOperationDetails()}
       </Modal>
-    </>
+    </div>
   );
 };
+
+// Enhanced styles
+const styles = `
+  .no-ipid-table .ant-table-cell {
+    color: rgba(0, 0, 0, 0.45);
+    transition: all 0.3s;
+  }
+  
+  .no-ipid-table .ant-table-row:hover {
+    cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.02);
+  }
+
+  .ant-table-row {
+    transition: all 0.3s;
+  }
+
+  .ant-card {
+    border-radius: 8px;
+  }
+
+  .ant-tag {
+    border-radius: 4px;
+  }
+
+  .ant-btn {
+    border-radius: 6px;
+  }
+
+  .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+    border-radius: 6px 6px 0 0;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    margin-right: 2px;
+    transition: all 0.3s;
+  }
+
+  .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
+    background: #ffffff;
+    border-bottom-color: #ffffff;
+  }
+
+  .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab:hover {
+    background: #ffffff;
+  }
+
+  .ant-tabs-nav {
+    margin-bottom: 0 !important;
+  }
+
+  .ant-tabs-content {
+    background: #ffffff;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+  }
+`;
 
 export default QualityInspectionDetails;

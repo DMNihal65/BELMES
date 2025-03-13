@@ -1,0 +1,50 @@
+.timeline-item {
+    padding: 8px;
+    border-radius: 4px;
+  }
+  
+  .timeline-item.scheduled {
+    background-color: rgba(24, 144, 255, 0.1);
+    border: 1px solid #1890ff;
+  }
+  
+  .timeline-item.actual {
+    background-color: rgba(82, 196, 26, 0.1);
+    border: 1px solid #52c41a;
+  }
+  
+  .item-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  
+  .item-desc {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.65);
+  }
+  
+  .item-qty {
+    font-size: 11px;
+    color: rgba(0, 0, 0, 0.45);
+    margin-top: 4px;
+  }
+  
+  .vis-timeline {
+    border: none;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  }
+  
+  .vis-item {
+    border-radius: 4px;
+    border-width: 1px;
+  }
+  
+  .vis-item.scheduled-operation {
+    background-color: rgba(24, 144, 255, 0.1);
+    border-color: #1890ff;
+  }
+  
+  .vis-item.actual-production {
+    background-color: rgba(82, 196, 26, 0.1);
+    border-color: #52c41a;
+  } 

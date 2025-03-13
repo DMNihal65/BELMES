@@ -218,6 +218,34 @@ const LogsDashboard = () => {
         </div>
 
         <Tabs activeKey={activeTab} onChange={handleTabChange}>
+        <TabPane
+            tab={
+              <Badge count={0} offset={[10, 0]}>
+                <span>Notifications</span>
+              </Badge>
+            }
+            key="notifications"
+          >
+            <Table
+              columns={notificationColumns}
+              dataSource={[]}
+              rowKey={(record) => record.id}
+              loading={loading && activeTab === 'notifications'}
+              pagination={{
+                current: currentPage,
+                pageSize: notificationsLimit === -1 ? undefined : pageSize,
+                total: 0,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total) => `Total ${total} notifications`,
+                position: ['bottomCenter'],
+              }}
+              onChange={handleTableChange}
+              size="middle"
+              bordered
+              locale={{ emptyText: 'No notifications available' }}
+            />
+          </TabPane>
           <TabPane 
             tab={
               <Badge count={totalMachineNotifications} offset={[10, 0]}>
@@ -272,34 +300,7 @@ const LogsDashboard = () => {
               bordered
             />
           </TabPane>
-          <TabPane
-            tab={
-              <Badge count={0} offset={[10, 0]}>
-                <span>Notifications</span>
-              </Badge>
-            }
-            key="notifications"
-          >
-            <Table
-              columns={notificationColumns}
-              dataSource={[]}
-              rowKey={(record) => record.id}
-              loading={loading && activeTab === 'notifications'}
-              pagination={{
-                current: currentPage,
-                pageSize: notificationsLimit === -1 ? undefined : pageSize,
-                total: 0,
-                showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total) => `Total ${total} notifications`,
-                position: ['bottomCenter'],
-              }}
-              onChange={handleTableChange}
-              size="middle"
-              bordered
-              locale={{ emptyText: 'No notifications available' }}
-            />
-          </TabPane>
+          
         </Tabs>
       </Card>
     </div>

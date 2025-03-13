@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Card, Row, Col, Empty } from 'antd';
 import ReactECharts from 'echarts-for-react';

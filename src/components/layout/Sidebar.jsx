@@ -105,21 +105,43 @@ function Sidebar() {
       key: '/supervisor/production-monitoring',
       icon: <Activity size={20} />,
       label: 'Production Monitoring',
+      children: [
+        {
+          key: '/supervisor/production-monitoring/dashboard',
+          label: 'Live Monitoring',
+        },
+        {
+          key: '/supervisor/production-monitoring/production-vs-actual',
+          label: 'Production vs Actual',
+        },
+        {
+          key: '/supervisor/production-monitoring/order-analysis',
+          label: 'Order Analysis',
+        },
+        {
+          key: '/supervisor/production-monitoring/oee-overview',
+          label: 'OEE Overview',
+        },
+        {
+          key: '/supervisor/production-monitoring/analytics',
+          label: 'Analytics',
+        },
+      ],
     },
+    // {
+    //   key: '/supervisor/production-monitoring',
+    //   icon: <Activity size={20} />,
+    //   label: 'Production Monitoring',
+    // },
     {
       key: '/supervisor/quality-management',
       icon: <CheckSquare size={20} />,
       label: 'Quality Management',
     },
     // {
-    //   key: '/supervisor/inventory_master',
-    //   icon: <Archive size={20} />,
-    //   label: 'Inventory Management',
-    // },
-    // {
     //   key: 'inventory_master',
     //   icon: <Archive size={20} />,
-    //   label: 'Inventory Management',
+    //   label: 'Inventory Management Old',
     //   children: [
     //     {
     //       key: '/supervisor/inventory_master/inventory_usage_and_analytics',

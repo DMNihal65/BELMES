@@ -53,7 +53,7 @@ function Productivity() {
       backgroundColor: 'transparent',
     },
     title: {
-      text: machine.machine_name || `Machine ${machine.id}`,
+      text: machine.machine_name,
       style: { fontSize: '16px', fontWeight: '600' }
     },
     pane: {
@@ -72,7 +72,7 @@ function Productivity() {
     tooltip: {
       enabled: true,
       formatter: function() {
-        return `<b>${machine.machine_name || `Machine ${machine.id}`}</b><br/>
+        return `<b>${machine.machine_name}</b><br/>
                 Energy: ${this.y} kWh<br/>
                 Total: ${machine?.total_energy || 0} kWh`;
       }
@@ -120,6 +120,11 @@ function Productivity() {
 
   const handleDateChange = async (date) => {
     try {
+      // Ensure machines are loaded first
+      if (machines.length === 0) {
+        await fetchMachines();
+      }
+
       if (!date) {
         clearSelectedDate();
         await fetchShiftLiveData();
@@ -130,21 +135,28 @@ function Productivity() {
       }
     } catch (error) {
       console.error('Error handling date change:', error);
+      message.error('Failed to fetch data');
     }
   };
 
   const handleReportClick = () => {
-    fetchReportData(selectedDate);
+    if (selectedDate) {
+      navigate(`/report?date=${selectedDate}`, {
+        state: { date: selectedDate }
+      });
+    }
   };
 
   const handleBackFromReport = () => {
     setShowReport(false);
   };
 
+  // Fetch machines when component mounts
   useEffect(() => {
     fetchMachines();
   }, []);
 
+  // Fetch live data when machines are loaded
   useEffect(() => {
     if (machines.length > 0 && !selectedDate) {
       fetchShiftLiveData();
@@ -231,37 +243,39 @@ function Productivity() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {Array.isArray(shiftLiveData) && shiftLiveData.length > 0 ? (
-                  shiftLiveData.map((machine, index) => (
-                    <Card 
-                      key={machine.id || index}
-                      className="shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border-0 backdrop-blur-sm bg-white/90 transform hover:-translate-y-1"
-                      bodyStyle={{ padding: '24px' }}
-                    >
-                      <HighchartsReact
-                        highcharts={Highcharts}
-                        options={getGaugeOptions(machine)}
-                      />
-                      <div className="text-center mt-4">
-                        <Text strong className="text-lg block mb-3 text-gray-800">
-                          {machine.machine_name || `Machine ${machine.id}`}
-                        </Text>
-                        <div className="space-y-2 bg-gray-50 rounded-lg p-3">
-                          <div className="flex justify-between items-center px-3">
-                            <Text type="secondary" className="text-sm">Energy:</Text>
-                            <Text strong className="text-emerald-600">
-                              {machine.first_shift?.toFixed(2) || 0} kWh
-                            </Text>
-                          </div>
-                          <div className="flex justify-between items-center px-3">
-                            <Text type="secondary" className="text-sm">Cost:</Text>
-                            <Text strong className="text-emerald-600">
-                              ₹{machine.total_cost?.toFixed(2) || 0}
-                            </Text>
+                  shiftLiveData.map((machine, index) => {
+                    return (
+                      <Card 
+                        key={machine.id || index}
+                        className="shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border-0 backdrop-blur-sm bg-white/90 transform hover:-translate-y-1"
+                        bodyStyle={{ padding: '24px' }}
+                      >
+                        <HighchartsReact
+                          highcharts={Highcharts}
+                          options={getGaugeOptions(machine)}
+                        />
+                        <div className="text-center mt-4">
+                          <Text strong className="text-lg block mb-3 text-gray-800">
+                            {machine.machine_name}
+                          </Text>
+                          <div className="space-y-2 bg-gray-50 rounded-lg p-3">
+                            <div className="flex justify-between items-center px-3">
+                              <Text type="secondary" className="text-sm">Energy:</Text>
+                              <Text strong className="text-emerald-600">
+                                {machine.first_shift?.toFixed(2) || 0} kWh
+                              </Text>
+                            </div>
+                            <div className="flex justify-between items-center px-3">
+                              <Text type="secondary" className="text-sm">Cost:</Text>
+                              <Text strong className="text-emerald-600">
+                                ₹{machine.total_cost?.toFixed(2) || 0}
+                              </Text>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))
+                      </Card>
+                    );
+                  })
                 ) : (
                   <div className="col-span-full flex justify-center items-center h-64 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg">
                     <Empty 
@@ -305,34 +319,11 @@ function Productivity() {
                 </div>
               </div>
 
-              {isLoading ? (
-                <div className="flex justify-center p-8">
-                  <Spin size="large" />
-                </div>
-              ) : (
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  {reportData && (
-                    <>
-                      <div className="mb-6">
-                        <Title level={5}>Shift Data</Title>
-                        <pre>{JSON.stringify(reportData.shiftData, null, 2)}</pre>
-                      </div>
-                      <div className="mb-6">
-                        <Title level={5}>Cost Data</Title>
-                        <pre>{JSON.stringify(reportData.costData, null, 2)}</pre>
-                      </div>
-                      <div className="mb-6">
-                        <Title level={5}>Daily Energy Data</Title>
-                        <pre>{JSON.stringify(reportData.dailyEnergyData, null, 2)}</pre>
-                      </div>
-                      <div className="mb-6">
-                        <Title level={5}>Production Data</Title>
-                        <pre>{JSON.stringify(reportData.productionData, null, 2)}</pre>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <Title level={1} className="text-center">
+                  hiii
+                </Title>
+              </div>
             </Card>
           )}
         </div>

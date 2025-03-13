@@ -1,0 +1,221 @@
+/* Dashboard Cards */
+.dashboard-stat-card {
+    transition: all 0.3s ease;
+    border-radius: 8px;
+  }
+  
+  .dashboard-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .dashboard-statistic .ant-statistic-title {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.65);
+  }
+  
+  .dashboard-statistic .ant-statistic-content {
+    font-size: 24px;
+    font-weight: 600;
+  }
+  
+  /* Machine Cards */
+  .machine-card {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .machine-card .status-tag {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  
+  .machine-card .program-info {
+    background-color: rgba(0, 0, 0, 0.02);
+    padding: 8px;
+    border-radius: 4px;
+  }
+  
+  .machine-card .custom-progress {
+    margin-top: 8px;
+  }
+  
+  /* Timeline */
+  .timeline-container {
+    min-height: 600px;
+    width: 100%;
+    background: white;
+  }
+  
+  .timeline-item {
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  
+  .timeline-item.scheduled {
+    background-color: rgba(24, 144, 255, 0.1);
+    border: 1px solid #1890ff;
+  }
+  
+  .timeline-item.actual {
+    background-color: rgba(82, 196, 26, 0.1);
+    border: 1px solid #52c41a;
+  }
+  
+  .item-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  
+  .item-desc {
+    color: rgba(0, 0, 0, 0.65);
+  }
+  
+  .item-qty {
+    color: rgba(0, 0, 0, 0.45);
+    margin-top: 4px;
+  }
+  
+  /* Machine Details Modal */
+  .machine-details-modal .ant-modal-content {
+    border-radius: 8px;
+  }
+  
+  .machine-details-modal .ant-descriptions-item-label {
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.65);
+  }
+  
+  .machine-details .status-timeline {
+    padding: 16px;
+  }
+  
+  .machine-details .status-item {
+    padding: 8px;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+  
+  /* OEE Dashboard */
+  .machine-oee-card {
+    text-align: center;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+  }
+  
+  .machine-oee-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Production Tabs */
+  .production-tabs .ant-tabs-nav {
+    margin-bottom: 16px;
+  }
+  
+  .production-tabs .ant-tabs-tab {
+    padding: 12px 24px;
+    transition: all 0.3s ease;
+  }
+  
+  .production-tabs .ant-tabs-tab:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+  
+  .production-tabs .ant-tabs-tab-active {
+    background-color: #1890ff;
+    border-radius: 4px;
+  }
+  
+  .production-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: white !important;
+  }
+  
+  /* Timeline specific styles */
+  .vis-timeline {
+    border: none !important;
+  }
+  
+  .vis-item {
+    border-radius: 4px !important;
+    border-width: 1px !important;
+  }
+  
+  .vis-item.scheduled-operation {
+    background-color: rgba(24, 144, 255, 0.1) !important;
+    border-color: #1890ff !important;
+  }
+  
+  .vis-item.actual-production {
+    background-color: rgba(82, 196, 26, 0.1) !important;
+    border-color: #52c41a !important;
+  }
+  
+  .vis-item .timeline-item {
+    border-radius: 2px;
+  }
+  
+  .vis-item .vis-item-content {
+    padding: 0 !important;
+  }
+  
+  .vis-item.vis-selected {
+    background-color: rgba(24, 144, 255, 0.2) !important;
+    border-color: #1890ff !important;
+  }
+  
+  .vis-time-axis .vis-text {
+    color: #666;
+  }
+  
+  .vis-timeline .vis-group {
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .timeline-planned {
+    background-color: rgba(82, 196, 26, 0.1) !important;
+    border-color: #52c41a !important;
+    color: #237804;
+  }
+  
+  .timeline-actual {
+    background-color: rgba(24, 144, 255, 0.1) !important;
+    border-color: #1890ff !important;
+    color: #0050b3;
+  }
+  
+  .timeline-item-content {
+    padding: 4px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .timeline-tooltip {
+    padding: 8px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  
+  .machine-label {
+    font-weight: 500;
+    padding: 4px 8px;
+    background: #f5f5f5;
+    border-radius: 4px;
+  }
+  
+  .vis-time-axis .vis-grid.vis-minor {
+    border-width: 1px;
+    border-color: #f0f0f0;
+  }
+  
+  .vis-time-axis .vis-grid.vis-major {
+    border-width: 2px;
+    border-color: #e8e8e8;
+  } 

@@ -64,9 +64,12 @@ const Login = () => {
             machinePassword: form.getFieldValue('machinePassword')
           });
           
-          message.success(`Welcome ${values.operatorName}!`);
-          if (response.user.role === 'operator') {
+          // Check role from response
+          if (response.role === 'operator') {
+            message.success(`Welcome ${values.operatorName}!`);
             navigate('/operator/dashboard', { replace: true });
+          } else {
+            throw new Error('You do not have operator access');
           }
         }
       } else {
@@ -83,14 +86,22 @@ const Login = () => {
             role: 'supervisor'
           });
           
-          message.success(`Welcome Supervisor ${values.supervisorName}!`);
-          if (response.user.role === 'supervisor') {
+          // Check role from response
+          if (response.role === 'supervisor') {
+            message.success(`Welcome ${values.supervisorName}!`);
             navigate('/supervisor/dashboard', { replace: true });
+          } else {
+            throw new Error('You do not have supervisor access');
           }
         }
       }
     } catch (error) {
-      message.error(error.message);
+      // Show more user-friendly error messages
+      if (error.message.includes('access')) {
+        message.error('Access Denied: ' + error.message);
+      } else {
+        message.error('Login failed: ' + error.message);
+      }
     }
   };
 

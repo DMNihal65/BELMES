@@ -26,37 +26,76 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.88:6699/api/v1/planning/all_orders',
+        'http://172.18.7.88:6999/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
         value: order.id,
         label: `${order.production_order} - ${order.part_number}`,
-        partDetails: order
+        partDetails: order,
+        operations: order.operations || [],
+        production_order: order.production_order,
+        part_number: order.part_number,
+        order_id: order.id
       }));
     } catch (error) {
       if (error.response?.status === 401) {
         console.error('Authentication failed. Please log in again.');
-        // Optionally redirect to login page or show login modal
-        localStorage.removeItem('token'); // Clear invalid token
+        localStorage.removeItem('token');
       }
       console.error('Error fetching orders:', error);
       throw error;
     }
   }
 
-  async fetchInspectionDetails(orderId) {
+  async fetchInspectionByOrderId(orderId) {
     try {
+      console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.88:6699/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.88:6999/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
+      
+      console.log('Inspection data received:', response.data);
       return response.data;
     } catch (error) {
+      if (error.response?.status === 404) {
+        console.log('No inspection data found for order ID:', orderId);
+        return {
+          order_id: orderId,
+          inspection_data: []
+        };
+      }
       if (error.response?.status === 401) {
         console.error('Authentication failed. Please log in again.');
-        // Optionally redirect to login page or show login modal
-        localStorage.removeItem('token'); // Clear invalid token
+        localStorage.removeItem('token');
+      }
+      console.error('Error fetching inspection details:', error);
+      throw error;
+    }
+  }
+
+  async fetchInspectionDetails(ipId) {
+    try {
+      const response = await axios.get(
+        `http://172.18.7.88:6999/api/v1/quality/master-boc/ipids/${ipId}`,
+        this.getAuthHeaders()
+      );
+      return {
+        ...response.data,
+        operation_groups: response.data.operation_groups || []
+      };
+    } catch (error) {
+      if (error.response?.status === 404) {
+        return {
+          order_id: ipId,
+          operation_groups: [],
+          operations: []
+        };
+      }
+      if (error.response?.status === 401) {
+        console.error('Authentication failed. Please log in again.');
+        localStorage.removeItem('token');
       }
       console.error('Error fetching inspection details:', error);
       throw error;

@@ -17,10 +17,10 @@ import {
   Badge,
   Tabs
 } from 'antd';
-import { EyeOutlined, FileSearchOutlined, FileTextOutlined, FilePdfOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { EyeOutlined, FileSearchOutlined, FileTextOutlined, FilePdfOutlined, AppstoreOutlined, LoadingOutlined } from '@ant-design/icons';
 import moment from 'moment';
 import InspectionReport from './InspectionReport';
-// import { launchQMSApplication } from '../../../utils/qmsLauncher';
+import { qualityStore } from '../../../store/quality-store';
 
 const { Text, Title } = Typography;
 const { Option } = Select;
@@ -36,6 +36,7 @@ const QualityInspectionDetails = ({
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [isQmsModalVisible, setIsQmsModalVisible] = useState(false);
   const [operationMeasurements, setOperationMeasurements] = useState(null);
+  const [isLaunching, setIsLaunching] = useState(false);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
 
@@ -64,35 +65,75 @@ const QualityInspectionDetails = ({
     }
   };
 
-  const handleLaunchQMS = async () => {
-    try {
-      // const success = await launchQMSApplication();
-      if (success) {
-        message.success('QMS application launched successfully');
-        setIsQmsModalVisible(false);
-      } else {
-        message.error('Failed to launch QMS. Please check if the application is installed correctly.');
-      }
-    } catch (error) {
-      console.error('Failed to launch QMS application:', error);
-      message.error('Failed to launch QMS. Please ensure the application is properly installed.');
-    }
+  const handleLaunchQMS = () => {
+    setIsLaunching(true);
+    
+    // Close the QMS modal
+    setIsQmsModalVisible(false);
+    
+    // Show the loading modal
+    Modal.info({
+      title: 'Launching QMS Software',
+      content: (
+        <div className="py-8 text-center">
+          <div className="mb-6">
+            <LoadingOutlined style={{ fontSize: 48 }} spin />
+          </div>
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Please wait while QMS software is launching...</h3>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-64 bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 rounded-full animate-progress"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <p className="text-gray-500 text-sm">This may take a few moments</p>
+            </div>
+          </div>
+        </div>
+      ),
+      icon: null,
+      closable: false,
+      maskClosable: false,
+      centered: true,
+      okButtonProps: { style: { display: 'none' } },
+      width: 400,
+      className: "qms-loading-modal",
+      onOk: () => setIsLaunching(false)
+    });
+
+    // Auto close the loading modal after 5 seconds and show success message
+    setTimeout(() => {
+      Modal.destroyAll();
+      setIsLaunching(false);
+      message.success('QMS software launched successfully');
+    }, 5000);
   };
+
+  // Check if we have data
+  const hasData = inspectionDetails && inspectionDetails.order_id;
+
+  // Create summary data from the response
+  const summaryData = hasData ? [{
+    key: 'summary',
+    order_id: inspectionDetails.order_id,
+    production_order: inspectionDetails.production_order,
+    part_number: inspectionDetails.part_number,
+    operations: inspectionDetails.operations || []
+  }] : [];
 
   const summaryColumns = [
     {
-      title: 'IPID No.',
-      dataIndex: 'ipid_no',
-      key: 'ipid_no',
+      title: 'Order ID',
+      dataIndex: 'order_id',
+      key: 'order_id',
       width: '15%',
-      render: () => {
-        const ipidNumber = getIpidNumber();
-        return (
-          <Tag color={hasIpid ? 'blue' : 'default'} className="text-md px-3 py-1">
-            {ipidNumber || 'No IPID'}
-          </Tag>
-        );
-      }
+      render: (text) => (
+        <Tag color="blue" className="text-md px-3 py-1">
+          {text}
+        </Tag>
+      )
     },
     {
       title: 'Production Order',
@@ -100,7 +141,7 @@ const QualityInspectionDetails = ({
       key: 'production_order',
       width: '20%',
       render: (text) => (
-        <Typography.Text disabled={!hasIpid} strong>
+        <Typography.Text strong>
           {text}
         </Typography.Text>
       )
@@ -109,22 +150,17 @@ const QualityInspectionDetails = ({
       title: 'Part Number',
       dataIndex: 'part_number',
       key: 'part_number',
-      width: '20%',
-      render: (text) => (
-        <Typography.Text disabled={!hasIpid}>
-          {text}
-        </Typography.Text>
-      )
+      width: '20%'
     },
     {
       title: 'Operations',
       key: 'operations',
-      width: '30%',
+      width: '45%',
       render: (_, record) => (
         <Space wrap size="middle">
           {(record.operations || []).map(op => {
-            // Check if operation has measurements
-            const hasOperationMeasurements = inspectionDetails?.operation_groups?.some(
+            // Check if operation has measurements in operation_groups
+            const hasOperationData = inspectionDetails?.operation_groups?.some(
               group => group.op_no === op && group.details
             );
 
@@ -133,87 +169,77 @@ const QualityInspectionDetails = ({
                 key={op}
                 type={selectedOperation === op ? 'primary' : 'default'}
                 onClick={() => handleOperationClick(op)}
-                icon={hasOperationMeasurements ? <EyeOutlined /> : <FileSearchOutlined />}
+                icon={hasOperationData ? <EyeOutlined /> : <FileSearchOutlined />}
                 className={`
                   transition-all duration-300
-                  ${hasOperationMeasurements 
-                    ? 'bg-green-600 text-white hover:bg-green-700 border-green-600 hover:border-green-700' 
-                    : 'bg-yellow-100 hover:bg-yellow-200 border-yellow-200 hover:border-yellow-300'}
-                  ${selectedOperation === op ? 'shadow-md' : 'hover:shadow-sm'}
+                  ${hasOperationData 
+                    ? 'bg-green-100 hover:bg-green-200 border-green-200 hover:border-green-300 text-green-700' 
+                    : 'bg-yellow-100 hover:bg-yellow-200 border-yellow-200 hover:border-yellow-300 text-yellow-700'}
                 `}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  height: '32px',
-                  padding: '4px 12px',
-                  fontSize: '14px',
-                  fontWeight: hasOperationMeasurements ? '500' : 'normal'
-                }}
               >
-                <span>Operation {op}</span>
-                {hasOperationMeasurements && (
-                  <Badge 
-                    count={inspectionDetails?.operation_groups?.filter(group => group.op_no === op).length} 
-                    className="ml-1"
-                    style={{ 
-                      backgroundColor: '#fff',
-                      color: '#16a34a',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}
-                  />
-                )}
+                <span>OP {op}</span>
               </Button>
             );
           })}
         </Space>
       )
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: '15%',
-      render: (_, record) => (
-        <Space>
-          {!hasIpid ? (
-            <Button 
-              type="primary"
-              icon={<FileSearchOutlined />}
-              onClick={() => setIsQmsModalVisible(true)}
-              className="hover:shadow-md transition-all duration-300"
-            >
-              Open QMS
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              icon={<FilePdfOutlined />}
-              onClick={() => generatePDF(record)}
-              className="bg-red-500 hover:bg-red-600 border-red-500 hover:border-red-600 hover:shadow-md transition-all duration-300"
-            >
-              Report
-            </Button>
-          )}
-        </Space>
-      )
     }
   ];
 
-  // Create summary data with IPID number
-  const summaryData = inspectionDetails ? [{
-    key: 'summary',
-    ipid_no: getIpidNumber() || 'No IPID',
-    order_id: inspectionDetails.order_id || selectedPart?.value || '',
-    production_order: inspectionDetails.production_order || selectedPart?.partDetails?.production_order || '',
-    part_number: inspectionDetails.part_number || selectedPart?.partDetails?.part_number || '',
-    operations: inspectionDetails.operations || selectedPart?.partDetails?.operations || []
-  }] : [];
+  // Add this function to check if any operations have data
+  const hasAnyOperationData = () => {
+    if (!inspectionDetails?.operation_groups || inspectionDetails.operation_groups.length === 0) {
+      return false;
+    }
+    
+    return inspectionDetails.operation_groups.some(group => group.details);
+  };
 
-  // Style for the entire table when no IPID
-  const tableStyle = !hasIpid ? {
-    opacity: 0.8,
-    backgroundColor: '#f5f5f5'
-  } : {};
+  const items = [
+    {
+      key: 'details',
+      label: (
+        <span className="px-2">
+          <FileTextOutlined /> Inspection Details
+        </span>
+      ),
+      children: (
+        <Card 
+          className="bg-white transition-all duration-300 hover:shadow-md"
+          title={
+            <div className="flex justify-between items-center w-full">
+              <Typography.Title level={4} className="mb-0">
+                Inspection Details
+              </Typography.Title>
+              <Tag 
+                color={hasAnyOperationData() ? "success" : "error"} 
+                className="px-3 py-1"
+              >
+                {hasAnyOperationData() ? "Data Available" : "No Data"}
+              </Tag>
+            </div>
+          }
+        >
+          <Table
+            columns={summaryColumns}
+            dataSource={summaryData}
+            pagination={false}
+            size="middle"
+            loading={loading}
+          />
+        </Card>
+      )
+    },
+    {
+      key: 'report',
+      label: (
+        <span className="px-2">
+          <FilePdfOutlined /> Inspection Report
+        </span>
+      ),
+      children: <InspectionReport />
+    }
+  ];
 
   const getOperationDetails = () => {
     if (!selectedOperation) return null;
@@ -368,7 +394,7 @@ const QualityInspectionDetails = ({
   const renderQmsModal = () => (
     <Modal
       title="No Measurements Available"
-      open={isQmsModalVisible}
+      visible={isQmsModalVisible}
       onCancel={() => setIsQmsModalVisible(false)}
       footer={[
         <Button key="cancel" onClick={() => setIsQmsModalVisible(false)}>
@@ -376,90 +402,70 @@ const QualityInspectionDetails = ({
         </Button>,
         <Button 
           key="launch" 
-          type="primary" 
+          type="primary"
           onClick={handleLaunchQMS}
-          icon={<AppstoreOutlined />}
+          loading={isLaunching}
         >
           Open QMS Software
         </Button>
       ]}
     >
-      <p>No measurement data is available for Operation {selectedOperation}.</p>
-      <p>Would you like to open the QMS software to view or add measurements?</p>
+      <p>No measurement data is available for this operation. Would you like to open the QMS software?</p>
     </Modal>
   );
 
+  // Add these styles to your CSS
+  const styles = `
+    @keyframes progress {
+      0% {
+        transform: translateX(-100%);
+      }
+      100% {
+        transform: translateX(100%);
+      }
+    }
+    
+    .animate-progress {
+      animation: progress 2s infinite linear;
+    }
+
+    .qms-loading-modal .ant-modal-content {
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .qms-loading-modal .ant-modal-body {
+      padding: 24px;
+    }
+  `;
+
   return (
-    <div className="p-4">
-      <Tabs 
-        defaultActiveKey="details" 
-        type="card"
-        className="bg-white rounded-lg shadow-sm"
-      >
-        <TabPane 
-          tab={
-            <span className="px-2">
-              <FileTextOutlined /> Inspection Details
-            </span>
-          } 
-          key="details"
+    <>
+      <style>{styles}</style>
+      <div className="p-4">
+        <Tabs 
+          defaultActiveKey="details" 
+          type="card"
+          className="bg-white rounded-lg shadow-sm"
+          items={items}
+        />
+
+        {/* QMS Launch Modal */}
+        {renderQmsModal()}
+
+        {/* Existing Measurements Modal */}
+        <Modal
+          title={`Operation ${selectedOperation} Measurements`}
+          visible={isModalVisible}
+          onCancel={() => setIsModalVisible(false)}
+          width={1000}
+          footer={null}
         >
-          <Card 
-            className={`
-              ${!hasIpid ? 'bg-gray-50' : 'bg-white'} 
-              transition-all duration-300 hover:shadow-md
-            `}
-            title={
-              <div className="flex justify-between items-center">
-                <Typography.Title level={4} className="mb-0">
-                  Inspection Details
-                </Typography.Title>
-                {hasIpid && (
-                  <Tag color="green" className="px-3 py-1">
-                    IPID Available
-                  </Tag>
-                )}
-              </div>
-            }
-          >
-            <Table
-              columns={summaryColumns}
-              dataSource={summaryData}
-              pagination={false}
-              size="middle"
-              loading={loading}
-              className={!hasIpid ? 'no-ipid-table' : ''}
-            />
-          </Card>
-        </TabPane>
-
-        <TabPane 
-          tab={
-            <span className="px-2">
-              <FilePdfOutlined /> Inspection Report
-            </span>
-          } 
-          key="report"
-        >
-          <InspectionReport />
-        </TabPane>
-      </Tabs>
-
-      {/* QMS Launch Modal */}
-      {renderQmsModal()}
-
-      {/* Existing Measurements Modal */}
-      <Modal
-        title={`Operation ${selectedOperation} Measurements`}
-        visible={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        width={1000}
-        footer={null}
-      >
-        {renderModalHeader()}
-        {renderOperationDetails()}
-      </Modal>
-    </div>
+          {renderModalHeader()}
+          {renderOperationDetails()}
+        </Modal>
+      </div>
+    </>
   );
 };
 

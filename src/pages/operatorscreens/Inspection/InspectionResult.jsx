@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert } from 'antd';
-import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, PlusCircleOutlined, CloseOutlined, DatabaseOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert, message } from 'antd';
+import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, PlusCircleOutlined, CloseOutlined, DatabaseOutlined, UserOutlined, ClockCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import moment from 'moment';
-import { qualityStore } from '../../../store/Quality-store';
+import { qualityStore } from '../../../store/quality-store';
+import axios from 'axios';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -24,6 +25,7 @@ function InspectionResult() {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [selectedOperationData, setSelectedOperationData] = useState(null);
   const [isQmsModalVisible, setIsQmsModalVisible] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
 
   useEffect(() => {
     const fetchPartNumbers = async () => {
@@ -58,23 +60,44 @@ function InspectionResult() {
       setSelectedPartNumber(value);
       setSelectedOrderId(value);
       
-      const data = await qualityStore.fetchInspectionByOrderId(value);
-      console.log('Received inspection data:', data);
+      // Use the correct endpoint
+      const response = await axios.get(
+        `http://localhost:8002/quality/inspection/${value}/detailed`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
       
-      // Transform the data to match the API response structure
+      console.log('Received inspection data:', response.data);
+      
+      // Transform the data to match the expected structure
       const transformedData = [{
-        key: data.order_id,
-        order_id: data.order_id,
-        production_order: data.production_order,
-        part_number: data.part_number,
-        operations: data.operations || [],
-        inspection_data: data.inspection_data || []
+        key: response.data.order_id,
+        order_id: response.data.order_id,
+        production_order: response.data.production_order,
+        part_number: response.data.part_number,
+        operations: response.data.operations || [],
+        inspection_data: response.data.inspection_data || []
       }];
       
       setInspectionData(transformedData);
     } catch (error) {
       console.error('Error fetching inspection details:', error);
-      setInspectionData([]);
+      
+      // If there's an error, set empty data with the structure
+      setInspectionData([{
+        key: value,
+        order_id: value,
+        production_order: '',
+        part_number: '',
+        operations: [],
+        inspection_data: []
+      }]);
+      
+      message.error('Failed to load inspection data');
     } finally {
       setLoading(false);
     }
@@ -101,6 +124,49 @@ function InspectionResult() {
       // If no measurements, show QMS modal
       setIsQmsModalVisible(true);
     }
+  };
+
+  const handleLaunchQMS = () => {
+    setIsLaunching(true);
+    setIsQmsModalVisible(false);
+    
+    // Show the loading modal
+    Modal.info({
+      title: 'Launching QMS Software',
+      content: (
+        <div className="py-8 text-center">
+          <div className="mb-6">
+            <LoadingOutlined style={{ fontSize: 48 }} spin />
+          </div>
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Please wait while QMS software is launching...</h3>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-64 bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 rounded-full animate-progress"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <p className="text-gray-500 text-sm">This may take a few moments</p>
+            </div>
+          </div>
+        </div>
+      ),
+      icon: null,
+      closable: false,
+      maskClosable: false,
+      centered: true,
+      okButtonProps: { style: { display: 'none' } },
+      width: 400,
+      className: "qms-loading-modal"
+    });
+
+    // Auto close the loading modal after 5 seconds
+    setTimeout(() => {
+      Modal.destroyAll();
+      setIsLaunching(false);
+      message.success('QMS software launched successfully');
+    }, 5000);
   };
 
   const measurementColumns = [
@@ -479,11 +545,8 @@ function InspectionResult() {
         <Button 
           key="openQms" 
           type="primary"
-          onClick={() => {
-            // Add your QMS software opening logic here
-            console.log('Opening QMS software...');
-            setIsQmsModalVisible(false);
-          }}
+          onClick={handleLaunchQMS}
+          loading={isLaunching}
         >
           Open QMS Software
         </Button>
@@ -516,6 +579,7 @@ function InspectionResult() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
+      <style>{styles}</style>
       <div className="flex-1 p-6 space-y-6">
         {/* Header Card */}
         <Card className="shadow-sm border-0 rounded-lg">
@@ -542,7 +606,6 @@ function InspectionResult() {
                 optionRender={(option) => (
                   <Space className="flex justify-between w-full">
                     <span>{option.data.label}</span>
-                    <Tag color="blue">Production</Tag>
                   </Space>
                 )}
                 dropdownStyle={{ maxHeight: 400 }}
@@ -562,22 +625,7 @@ function InspectionResult() {
                   <span className="text-lg font-semibold">Inspection History</span>
                   {loading && <Spin size="small" />}
                 </Space>
-                <Space>
-                  <Button 
-                    icon={<DownloadOutlined />} 
-                    onClick={handleExport}
-                    className="hover:scale-105 transition-transform"
-                  >
-                    Export
-                  </Button>
-                  <Button 
-                    type="primary" 
-                    onClick={() => navigate('/operator/new-inspection')}
-                    className="hover:scale-105 transition-transform"
-                  >
-                    New Inspection
-                  </Button>
-                </Space>
+              
               </div>
             }
             className="shadow-sm border-0 rounded-lg"
@@ -829,6 +877,28 @@ const styles = `
     font-weight: 500;
     color: #4b5563;
     background: #f3f4f6;
+  }
+
+  @keyframes progress {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  
+  .animate-progress {
+    animation: progress 2s infinite linear;
+  }
+
+  .qms-loading-modal .ant-modal-content {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .qms-loading-modal .ant-modal-body {
+    padding: 24px;
   }
 `;
 

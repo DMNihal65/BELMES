@@ -52,7 +52,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://localhost:8002/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://localhost:8002/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -63,6 +63,9 @@ class QualityStore {
         console.log('No inspection data found for order ID:', orderId);
         return {
           order_id: orderId,
+          production_order: '',
+          part_number: '',
+          operations: [],
           inspection_data: []
         };
       }
@@ -75,29 +78,58 @@ class QualityStore {
     }
   }
 
-  async fetchInspectionDetails(ipId) {
+  async fetchInspectionDetails(orderId) {
     try {
+      console.log(`Attempting to fetch inspection details for Order ID: ${orderId}`);
+      
       const response = await axios.get(
-        `http://localhost:8002/api/v1/quality/master-boc/ipids/${ipId}`,
+        `http://localhost:8002/quality/master-boc/ipids/${orderId}`,
         this.getAuthHeaders()
       );
+      
+      console.log('Successfully fetched inspection details:', response.data);
+      
       return {
         ...response.data,
-        operation_groups: response.data.operation_groups || []
+        order_id: orderId,
+        operation_groups: response.data.operation_groups || [],
+        operations: response.data.operations || [],
+        production_order: response.data.production_order || '',
+        part_number: response.data.part_number || ''
       };
+      
     } catch (error) {
-      if (error.response?.status === 404) {
-        return {
-          order_id: ipId,
-          operation_groups: [],
-          operations: []
-        };
-      }
+      console.log('Error details:', error.response || error);
+      
+      return {
+        order_id: orderId,
+        operation_groups: [],
+        operations: [],
+        production_order: '',
+        part_number: '',
+        details: [],
+        status: 'not_found',
+        error: error.response?.status === 404 ? 'NOT_FOUND' : 'ERROR',
+        message: error.response?.status === 404 
+          ? 'No inspection details found for this Order ID'
+          : 'Error fetching inspection details'
+      };
+    }
+  }
+
+  async launchQMSSoftware() {
+    try {
+      const response = await axios.get(
+        'http://localhost:8002/api/v1/quality/run',
+        this.getAuthHeaders()
+      );
+      return response.data;
+    } catch (error) {
       if (error.response?.status === 401) {
         console.error('Authentication failed. Please log in again.');
         localStorage.removeItem('token');
       }
-      console.error('Error fetching inspection details:', error);
+      console.error('Error launching QMS software:', error);
       throw error;
     }
   }

@@ -26,7 +26,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.88:6999/api/v1/planning/all_orders',
+        'http://localhost:8002/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -52,7 +52,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.88:6999/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://localhost:8002/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -78,7 +78,7 @@ class QualityStore {
   async fetchInspectionDetails(ipId) {
     try {
       const response = await axios.get(
-        `http://172.18.7.88:6999/api/v1/quality/master-boc/ipids/${ipId}`,
+        `http://localhost:8002/api/v1/quality/master-boc/ipids/${ipId}`,
         this.getAuthHeaders()
       );
       return {

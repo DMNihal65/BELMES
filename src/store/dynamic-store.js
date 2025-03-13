@@ -14,7 +14,7 @@ const useDynamicStore = create((set) => ({
   fetchDynamicScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.get('http://172.18.7.88:6999/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
       set({ 
         documents: formattedDocuments,
         totalDocuments: formattedDocuments.length,
@@ -37,7 +37,7 @@ const useDynamicStore = create((set) => ({
         return { items: [], total: 0 };
       }
 
-      let url = `http://172.18.7.88:6999/api/v1/document-management/documents/by-part-number/${encodeURIComponent(partNumber)}`;
+      let url = `http://localhost:8002/api/v1/document-management/documents/by-part-number/${encodeURIComponent(partNumber)}`;
       if (docTypeId) {
         url += `?doc_type_id=${docTypeId}`;
       }
@@ -90,8 +90,8 @@ const useDynamicStore = create((set) => ({
 
       // Construct URL based on whether versionId is provided
       const url = versionId 
-        ? `http://172.18.7.88:6999/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
-        : `http://172.18.7.88:6999/api/v1/document-management/documents/${documentId}/download-latest`;
+        ? `http://localhost:8002/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://localhost:8002/api/v1/document-management/documents/${documentId}/download-latest`;
 
       const response = await fetch(url, {
         headers: {
@@ -122,7 +122,7 @@ const useDynamicStore = create((set) => ({
       }
 
       const response = await fetch(
-        `http://172.18.7.88:6999/api/v1/document-management/documents/${documentId}/versions`,
+        `http://localhost:8002/api/v1/document-management/documents/${documentId}/versions`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -152,9 +152,9 @@ const useDynamicStore = create((set) => ({
         throw new Error('No authentication token found');
       }
 
-      console.log('Making DELETE request to:', `http://172.18.7.85:6651/api/v1/documents/folders/${folderId}`);
+      console.log('Making DELETE request to:', `http://localhost:8002/api/v1/documents/folders/${folderId}`);
       
-      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/folders/${folderId}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/documents/folders/${folderId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -194,7 +194,7 @@ const useDynamicStore = create((set) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${copyData.document_id}/copy`, {
+      const response = await fetch(`http://localhost:8002/api/v1/documents/${copyData.document_id}/copy`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -234,7 +234,7 @@ const useDynamicStore = create((set) => ({
       formData.append('metadata', '{}');
 
       const response = await fetch(
-        `http://172.18.7.88:6999/api/v1/document-management/documents/${documentId}/versions`,
+        `http://localhost:8002/api/v1/document-management/documents/${documentId}/versions`,
         {
           method: 'POST',
           headers: {
@@ -267,7 +267,7 @@ const useDynamicStore = create((set) => ({
       formData.append('metadata', JSON.stringify(metadata));
 
       const response = await fetch(
-        `http://172.18.7.88:6999/api/v1/document-management/documents/${documentId}/version/${versionId}`,
+        `http://localhost:8002/api/v1/document-management/documents/${documentId}/version/${versionId}`,
         {
           method: 'PUT',
           headers: {
@@ -305,7 +305,7 @@ const useDynamicStore = create((set) => ({
     try {
       const token = useAuthStore.getState().token;
 
-      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/versions/${versionId}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/documents/${documentId}/versions/${versionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -333,7 +333,7 @@ const useDynamicStore = create((set) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/download-count`, {
+      const response = await fetch(`http://localhost:8002/api/v1/documents/${documentId}/download-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -379,7 +379,7 @@ const useDynamicStore = create((set) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://172.18.7.85:6651/api/v1/documents/${documentId}/view-count`, {
+      const response = await fetch(`http://localhost:8002/api/v1/documents/${documentId}/view-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -422,7 +422,7 @@ const useDynamicStore = create((set) => ({
 
       console.log('Creating folder with data:', requestData); // Debug log
 
-      const response = await fetch('http://172.18.7.88:6999/api/v1/document-management/folders/', {
+      const response = await fetch('http://localhost:8002/api/v1/document-management/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -455,8 +455,8 @@ const useDynamicStore = create((set) => ({
       }
 
       const url = versionId 
-        ? `http://172.18.7.88:6999/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
-        : `http://172.18.7.88:6999/api/v1/document-management/documents/${documentId}/download-latest`;
+        ? `http://localhost:8002/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://localhost:8002/api/v1/document-management/documents/${documentId}/download-latest`;
 
       const response = await fetch(url, {
         headers: {
@@ -486,7 +486,7 @@ const useDynamicStore = create((set) => ({
         return { items: [], total: 0 };
       }
 
-      let url = `http://172.18.7.88:6999/api/v1/document-management/documents/by-production-order/${productionOrderId}`;
+      let url = `http://localhost:8002/api/v1/document-management/documents/by-production-order/${productionOrderId}`;
       if (docTypeId) {
         url += `?doc_type_id=${docTypeId}`;
       }
@@ -533,7 +533,7 @@ const useDynamicStore = create((set) => ({
       const token = useAuthStore.getState().token;
       set({ isLoadingOrders: true });
 
-      const response = await fetch('http://172.18.7.88:6999/planning/all_orders', {
+      const response = await fetch('http://localhost:8002/planning/all_orders', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'

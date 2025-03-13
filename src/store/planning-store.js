@@ -23,7 +23,7 @@ const usePlanningStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:6999/api/v1/planning/all_orders');
+      const response = await fetch('http://localhost:8002/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -60,7 +60,7 @@ const usePlanningStore = create((set) => ({
   searchOrders: async (productionOrder) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/planning/search_order2?production_order=${productionOrder}`);
+      const response = await fetch(`http://localhost:8002/api/v1/planning/search_order2?production_order=${productionOrder}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -116,7 +116,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Fetching MPP for production order:', productionOrder); // Debug log
 
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/documents/mpp/${selectedOrder}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/documents/mpp/${selectedOrder}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -183,7 +183,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.88:6999/api/v1/mpp', {
+      const response = await fetch('http://localhost:8002/api/v1/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ const usePlanningStore = create((set) => ({
   // Add new function to fetch active parts
   fetchActiveParts: async () => {
     try {
-      const response = await fetch('http://172.18.7.88:6999/api/v1/scheduling/active-parts');
+      const response = await fetch('http://localhost:8002/api/v1/scheduling/active-parts');
       const data = await response.json();
       
       if (!response.ok) {
@@ -262,7 +262,7 @@ const usePlanningStore = create((set) => ({
   changePartStatus: async (partNumber, newStatus) => {
     try {
       // Ensure we're using the exact same URL format as the working endpoint
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
         method: 'POST',  // Changed to POST since GET is not allowed
         headers: {
           'Content-Type': 'application/json'
@@ -289,7 +289,7 @@ const usePlanningStore = create((set) => ({
   // Add this new function to fetch machine details
   fetchMachineDetails: async (machineId) => {
     try {
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/master-order/machines/${machineId}`);
+      const response = await fetch(`http://localhost:8002/api/v1/master-order/machines/${machineId}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -306,7 +306,7 @@ const usePlanningStore = create((set) => ({
   // Add the updateMachine function to the store
   updateMachine: async (machineId, updatedData) => {
     try {
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/master-order/machines/${machineId}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/master-order/machines/${machineId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -330,7 +330,7 @@ const usePlanningStore = create((set) => ({
   // Function to update operation details
   updateOperationDetails: async (partNumber, operationNumber, updateData) => {
     try {
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -359,7 +359,7 @@ const usePlanningStore = create((set) => ({
   // Function to update machine for operation
   updateOperationMachine: async (partNumber, operationNumber, currentData, newMachineId) => {
     try {
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -394,7 +394,7 @@ const usePlanningStore = create((set) => ({
       }
 
       // First try to get MPP documents using production order
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/documents/mpp/${productionOrder}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/documents/mpp/${productionOrder}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -416,7 +416,7 @@ const usePlanningStore = create((set) => ({
   // Function to fetch MPP by identifier (production order and operation)
   fetchMppByIdentifier: async (productionOrder, operationNumber) => {
     try {
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/mpp/by-identifier?operation_number=${operationNumber}&production_order=${productionOrder}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/mpp/by-identifier?operation_number=${operationNumber}&production_order=${productionOrder}`, {
         headers: {
           'accept': 'application/json'
         }
@@ -441,7 +441,7 @@ const usePlanningStore = create((set) => ({
   // Function to create new MPP
   createNewMpp: async (mppData) => {
     try {
-      const response = await fetch('http://172.18.7.88:6999/api/v1/mpp', {
+      const response = await fetch('http://localhost:8002/api/v1/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -480,7 +480,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch(`http://172.18.7.88:6999/api/v1/documents/${versionId}/download`, {
+      const response = await fetch(`http://localhost:8002/api/v1/documents/${versionId}/download`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'

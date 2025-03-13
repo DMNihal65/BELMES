@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, List, Button, Tooltip, Modal, Spin, message } from 'antd';
+import { Card, List, Button, Tooltip, Modal, Spin, message, Space, Text } from 'antd';
 import { 
   FileText, 
   BookText,
@@ -13,13 +13,17 @@ import useAuthStore from '../../../store/auth-store';
 const DocumentsList = () => {
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [downloadModalVisible, setDownloadModalVisible] = useState(false);
+  const [downloadVersions, setDownloadVersions] = useState([]);
+  const [selectedDownloadVersion, setSelectedDownloadVersion] = useState(null);
   
   const { 
     jobData,
     fetchDocuments, 
     downloadDocument,
     documents,
-    loading 
+    loading,
+    handleVersionDownload
   } = useWebSocketStore();
 
   const { token } = useAuthStore();
@@ -65,10 +69,14 @@ const DocumentsList = () => {
 
   const handleDownload = async (doc) => {
     try {
-      await downloadDocument(jobData.part_number, doc.type);
-      message.success('Document downloaded successfully');
+      const result = await downloadDocument(jobData.part_number, doc.type);
+      if (result.success && result.versions.length > 0) {
+        setDownloadVersions(result.versions);
+        setSelectedDocument(doc);
+        setDownloadModalVisible(true);
+      }
     } catch (error) {
-      message.error('Failed to download document');
+      message.error('Failed to fetch document versions');
     }
   };
 
@@ -144,6 +152,60 @@ const DocumentsList = () => {
             title="Document Viewer"
           />
         )}
+      </Modal>
+
+      <Modal
+        title="Select Version to Download"
+        open={downloadModalVisible}
+        onCancel={() => {
+          setDownloadModalVisible(false);
+          setSelectedDownloadVersion(null);
+        }}
+        footer={[
+          <Button key="cancel" onClick={() => setDownloadModalVisible(false)}>
+            Cancel
+          </Button>,
+          <Button
+            key="download"
+            type="primary"
+            disabled={!selectedDownloadVersion}
+            onClick={async () => {
+              try {
+                await handleVersionDownload(
+                  selectedDocument.data.id,
+                  selectedDownloadVersion.id
+                );
+                setDownloadModalVisible(false);
+                message.success('Document downloaded successfully');
+              } catch (error) {
+                message.error('Failed to download document');
+              }
+            }}
+          >
+            Download
+          </Button>
+        ]}
+      >
+        <List
+          dataSource={downloadVersions}
+          renderItem={version => (
+            <List.Item
+              className={`cursor-pointer p-3 rounded-lg ${
+                selectedDownloadVersion?.id === version.id ? 'bg-blue-50' : ''
+              }`}
+              onClick={() => setSelectedDownloadVersion(version)}
+            >
+              <Space direction="vertical" size={1}>
+                <Text strong>Version {version.version_number}</Text>
+                <Text type="secondary" className="text-sm">
+                  Created: {version.created_at}
+                  <br />
+                  Size: {version.file_size}
+                </Text>
+              </Space>
+            </List.Item>
+          )}
+        />
       </Modal>
     </div>
   );

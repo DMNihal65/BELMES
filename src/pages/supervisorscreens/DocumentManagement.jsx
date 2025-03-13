@@ -557,7 +557,7 @@ const DocumentManagement = () => {
             <Button
               type="text"
               icon={<DownloadOutlined />}
-              onClick={() => handleDownload(record.id)}
+              onClick={() => handleDownload(record)}
             />
           </Tooltip>
           <Dropdown
@@ -619,7 +619,7 @@ const DocumentManagement = () => {
     fetchFolderDocuments,
     searchDocuments,
     searchByPartNumber,
-    downloadDocumentVersion,
+    downloadDocument,
     fetchDocumentVersions,
     folders,
     columns,
@@ -675,7 +675,8 @@ const DocumentManagement = () => {
   // Add new state for download modal
   const [downloadModalVisible, setDownloadModalVisible] = useState(false);
   const [downloadVersions, setDownloadVersions] = useState([]);
-  const [selectedVersions, setSelectedVersions] = useState([]);
+  const [selectedDownloadDoc, setSelectedDownloadDoc] = useState(null);
+  const [selectedVersion, setSelectedVersion] = useState(null);
 
   // Add new state for preview version selection
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
@@ -707,6 +708,9 @@ const DocumentManagement = () => {
 
   // Add this state for search input
   const [searchInput, setSearchInput] = useState('');
+
+  // Update state to handle multiple selections
+  const [selectedVersions, setSelectedVersions] = useState([]);
 
   // Update useEffect to use store's fetchAllOrders
   useEffect(() => {
@@ -1620,41 +1624,17 @@ const DocumentManagement = () => {
     </Row>
   );
 
-  // Add these functions for handling downloads and previews
-  const handleDownload = async (documentId) => {
+  // Update the handleDownload function
+  const handleDownload = async (record) => {
     try {
-      const token = useAuthStore.getState().token;
-      const response = await fetch(
-        `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download-latest`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Download failed');
+      const result = await downloadDocument(record.id);
+      if (result.success && result.versions) {
+        setDownloadVersions(result.versions);
+        setSelectedDownloadDoc(record);
+        setDownloadModalVisible(true);
       }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      // Get filename from Content-Disposition header or use a default name
-      const contentDisposition = response.headers.get('content-disposition');
-      const fileName = contentDisposition
-        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
-        : 'document';
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      message.success('Document downloaded successfully');
     } catch (error) {
-      console.error('Download error:', error);
-      message.error('Failed to download document');
+      message.error('Failed to fetch document versions');
     }
   };
 
@@ -1675,7 +1655,8 @@ const DocumentManagement = () => {
             setSelectedDocument({
               ...record,
               versionUrl: url,
-              version_number: versions[0].version_number
+              version_number: versions[0].version_number,
+              selectedVersionId: versions[0].id
             });
             setIsPreviewModalVisible(true);
             
@@ -1706,7 +1687,7 @@ const DocumentManagement = () => {
               content: `This file type cannot be previewed. Would you like to download "${record.name}" instead?`,
               okText: 'Download',
               cancelText: 'Cancel',
-              onOk: () => handleDownload(record.id)
+              onOk: () => handleDownload(record)
             });
           }
         } catch (error) {
@@ -1735,7 +1716,7 @@ const DocumentManagement = () => {
           key="download"
           type="primary"
           icon={<DownloadOutlined />}
-          onClick={() => handleDownload(selectedDocument.id)}
+          onClick={() => downloadDocument(selectedDocument.id, selectedDocument.selectedVersionId)}
         >
           Download
         </Button>
@@ -1783,7 +1764,8 @@ const DocumentManagement = () => {
                 setSelectedDocument({
                   ...selectedDocument,
                   versionUrl: url,
-                  version_number: selectedPreviewVersion.version_number
+                  version_number: selectedPreviewVersion.version_number,
+                  selectedVersionId: selectedPreviewVersion.id
                 });
                 setPreviewModalVisible(false);
                 setIsPreviewModalVisible(true);
@@ -1815,7 +1797,7 @@ const DocumentManagement = () => {
                   content: `This file type cannot be previewed. Would you like to download "${selectedDocument.name}" (${selectedPreviewVersion.version_number}) instead?`,
                   okText: 'Download',
                   cancelText: 'Cancel',
-                  onOk: () => handleDownload(selectedDocument.id)
+                  onOk: () => handleDownload(selectedDocument)
                 });
               }
             } catch (error) {
@@ -2089,26 +2071,29 @@ const DocumentManagement = () => {
   // Update the download version modal
   const renderDownloadVersionModal = () => (
     <Modal
-      title={`Select Versions to Download - ${selectedDocument?.name || ''} ${selectedDocument?.version_number ? `(${selectedDocument.version_number})` : ''}`}
+      title="Select Versions to Download"
       visible={downloadModalVisible}
-      onCancel={handleDownloadModalClose}
+      onCancel={() => {
+        setDownloadModalVisible(false);
+        setSelectedVersions([]);
+      }}
       footer={[
-        <Button key="cancel" onClick={handleDownloadModalClose}>
+        <Button key="cancel" onClick={() => setDownloadModalVisible(false)}>
           Cancel
         </Button>,
         <Button
           key="download"
           type="primary"
-          icon={<DownloadOutlined />}
           disabled={selectedVersions.length === 0}
           onClick={async () => {
             try {
+              // Download all selected versions
               for (const version of selectedVersions) {
-                await handleDownload(selectedDocument.id, version);
+                await downloadDocument(selectedDownloadDoc.id, version.id);
               }
               setDownloadModalVisible(false);
               setSelectedVersions([]);
-              message.success('Download started');
+              message.success(`Successfully downloaded ${selectedVersions.length} version(s)`);
             } catch (error) {
               message.error('Failed to download selected versions');
             }
@@ -2143,7 +2128,7 @@ const DocumentManagement = () => {
                 <Text type="secondary" className="text-sm">
                   Created: {new Date(version.created_at).toLocaleDateString()}
                   <br />
-                  Size: {(version.file_size / (1024 * 1024)).toFixed(2)} MB
+                  Size: {version.file_size}
                 </Text>
               </Space>
             </Checkbox>

@@ -939,6 +939,102 @@ const useDocumentStore = create((set, get) => ({
       console.error('Error fetching orders:', error);
       set({ isLoadingOrders: false });
     }
+  },
+
+  // Add this function to handle version selection for downloads
+  handleVersionDownload: async (documentId, versionId) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      const url = versionId 
+        ? `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download-latest`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/pdf'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `${documentId}_${versionId || 'latest'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+
+      // Track download
+      await get().incrementDownloadCount(documentId);
+
+    } catch (error) {
+      console.error('Download error:', error);
+      throw error;
+    }
+  },
+
+  // Update the downloadDocument function to handle batch downloads
+  downloadDocument: async (documentId, versionId = null) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // If no versionId is provided, return all versions for selection
+      if (!versionId) {
+        const versions = await get().fetchDocumentVersions(documentId);
+        return {
+          success: true,
+          versions: versions.map(version => ({
+            ...version,
+            key: version.id,
+            created_at: new Date(version.created_at).toLocaleString(),
+            file_size: (version.file_size / (1024 * 1024)).toFixed(2) + ' MB'
+          }))
+        };
+      }
+
+      // Download specific version
+      const url = `http://172.18.7.89:4470/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/pdf'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `document_${documentId}_v${versionId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+
+      // Track download
+      await get().incrementDownloadCount(documentId);
+      return { success: true };
+
+    } catch (error) {
+      console.error('Download error:', error);
+      throw error;
+    }
   }
 }));
 

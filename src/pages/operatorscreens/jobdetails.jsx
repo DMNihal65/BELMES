@@ -501,7 +501,7 @@ const JobDetails = () => {
                   onClick={() => setShowIssueModal(true)}
                   className="w-full"
                 >
-                  Raise Ticket
+                  Raise Issue
                 </Button>
 
                 {/* WebSocket Error Display */}

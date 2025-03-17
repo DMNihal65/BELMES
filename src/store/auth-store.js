@@ -15,7 +15,7 @@ const useAuthStore = create(
       fetchRoles: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.85:6768/api/v1/auth/roles');
+          const response = await fetch('http://localhost:8002/api/v1/auth/roles');
           const data = await response.json();
           set({ roles: data, isLoading: false });
         } catch (error) {
@@ -26,7 +26,7 @@ const useAuthStore = create(
       fetchMachines: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.85:6768/api/v1/master-order/all-machines/');
+          const response = await fetch('http://localhost:8002/api/v1/master-order/all-machines/');
           const data = await response.json();
           // Extracting the "code" from each machine's work_center
           const machinesWithCode = data.map(machine => ({
@@ -46,8 +46,8 @@ const useAuthStore = create(
           let data;
 
           if (credentials.role === 'operator') {
-            // Operator login endpoint
-            response = await fetch('http://172.18.7.85:6768/api/v1/auth/machine-login', {
+            // Use machine login endpoint for operators
+            response = await fetch('http://localhost:8002/api/v1/auth/machine-login', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -65,31 +65,28 @@ const useAuthStore = create(
               throw new Error(data.detail?.[0]?.msg || 'Authentication failed');
             }
 
-            // Store user data including role from response
+            // Store machine details from the response
             const userData = {
               username: credentials.username,
-              role: data.role, // Use role from response
+              role: data.role,
               access: data.access_list,
             };
 
             set({ 
               token: data.access_token,
               user: userData,
-              currentMachine: data.machine,
+              currentMachine: data.machine, // Store the machine details
               isLoading: false,
               error: null
             });
 
-            // Store in localStorage
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', JSON.stringify(userData));
             localStorage.setItem('currentMachine', JSON.stringify(data.machine));
-            localStorage.setItem('userRole', data.role); // Store role separately
 
             return { ...data, user: userData };
-
           } else {
-            // Supervisor login endpoint
+            // Existing supervisor login logic
             const formData = new URLSearchParams({
               grant_type: 'password',
               username: credentials.username,
@@ -99,7 +96,7 @@ const useAuthStore = create(
               client_secret: 'string'
             });
 
-            response = await fetch('http://172.18.7.85:6768/api/v1/auth/login', {
+            response = await fetch('http://localhost:8002/api/v1/auth/login', {
               method: 'POST',
               headers: {
                 'accept': 'application/json',
@@ -113,11 +110,10 @@ const useAuthStore = create(
               throw new Error(data.detail?.[0]?.msg || 'Authentication failed');
             }
             
-            // Store user data including role from response
             const userData = {
               username: credentials.username,
-              role: data.role, // Use role from response
-              access: data.access_list,
+              role: credentials.role || data.role,
+              access: data.access,
             };
 
             set({ 
@@ -127,10 +123,8 @@ const useAuthStore = create(
               error: null
             });
 
-            // Store in localStorage
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', JSON.stringify(userData));
-            localStorage.setItem('userRole', data.role); // Store role separately
 
             return { ...data, user: userData };
           }
@@ -139,7 +133,6 @@ const useAuthStore = create(
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('currentMachine');
-          localStorage.removeItem('userRole');
           throw error;
         }
       },
@@ -147,7 +140,7 @@ const useAuthStore = create(
       register: async (userData) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch('http://172.18.7.85:6768/api/v1/auth/register', {
+          const response = await fetch('http://localhost:8002/api/v1/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -180,6 +173,9 @@ const useAuthStore = create(
       },
 
       clearError: () => set({ error: null }),
+
+      setCurrentMachine: (machine) => set({ currentMachine: machine }),
+      clearCurrentMachine: () => set({ currentMachine: null }),
     }),
     {
       name: 'auth-storage',

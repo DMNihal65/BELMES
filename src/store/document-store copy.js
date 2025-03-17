@@ -2,19 +2,417 @@ import { create } from 'zustand';
 import useAuthStore from './auth-store';
 import { message } from 'antd';
 
-const useDynamicStore = create((set) => ({
-  scheduleData: null,
-  loading: false,
-  error: null,
+const useDocumentStore = create((set, get) => ({
+  folders: [],
+  documents: [],
+  documentTypes: [],
+  currentFolder: null,
+  versions: {},
+  isLoading: false,
+  error: null, 
+  partNumbers: [],
+  metrics: null,
+  isLoadingMetrics: false,
+  metricsError: null,
+  totalDocuments: 0,
+  selectedFolder: null,
+  allOrders: [],
+  isLoadingOrders: false,
 
-  clearScheduleData: () => {
-    set({ scheduleData: null, loading: false, error: null });
+  // Fetch document types
+  fetchDocTypes: async () => {
+    set({ isLoading: true });
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://localhost:8002/api/v1/document-management/document-types/', {
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch document types');
+      }
+
+      const data = await response.json();
+      set({ 
+        documentTypes: data,
+        isLoading: false 
+      });
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      message.error(error.message);
+    }
   },
 
-  fetchDynamicScheduleData: async () => {
-    set({ loading: true, error: null });
+  // List folders with proper tree structure
+  fetchFolders: async (parentId = null) => {
+    set({ isLoading: true });
     try {
-      const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const url = parentId 
+        ? `http://localhost:8002/api/v1/document-management/folders/?parent_id=${parentId}`
+        : 'http://localhost:8002/api/v1/document-management/folders/';
+
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch folders');
+      }
+
+      const data = await response.json();
+      
+      // Transform the response to match the expected format
+      const transformedFolders = data.map(folder => ({
+        id: folder.id,
+        folder_name: folder.name,
+        parent_folder_id: folder.parent_folder_id,
+        is_active: folder.is_active,
+        created_at: folder.created_at,
+        created_by_id: folder.created_by_id,
+        path: folder.path,
+        children: []
+      }));
+
+      set(state => {
+        if (!parentId) {
+          return { folders: transformedFolders, isLoading: false };
+        } else {
+          const updateFolderChildren = (folders) => {
+            return folders.map(folder => {
+              if (folder.id === Number(parentId)) {
+                return { ...folder, children: transformedFolders };
+              }
+              if (folder.children?.length > 0) {
+                return { ...folder, children: updateFolderChildren(folder.children) };
+              }
+              return folder;
+            });
+          };
+          
+          return { 
+            folders: updateFolderChildren(state.folders),
+            isLoading: false 
+          };
+        }
+      });
+
+      return transformedFolders;
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      message.error(error.message);
+      return [];
+    }
+  },
+
+  // Fetch part numbers
+  fetchPartNumbers: async () => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://localhost:8002/api/v1/planning/all_orders', {
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch part numbers');
+      }
+
+      const data = await response.json();
+      set({ partNumbers: data });
+      return data;
+    } catch (error) {
+      message.error(error.message);
+      throw error;
+    }
+  },
+
+  // Upload document
+  uploadDocument: async (formData) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Log the FormData contents for debugging
+      for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + pair[1]);
+      }
+
+      const response = await fetch('http://localhost:8002/api/v1/document-management/documents/upload/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Upload error response:', errorData); // Debug log
+        throw new Error(errorData.detail || 'Failed to upload document');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Upload error:', error);
+      throw error;
+    }
+  },
+
+  // Fetch folder documents
+  fetchFolderDocuments: async (folderId, page = 1, pageSize = 10) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token || !folderId) {
+        // Silently return empty data instead of throwing error
+        return { items: [], total: 0 };
+      }
+
+      const response = await fetch(
+        `http://localhost:8002/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${pageSize}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        // Don't show error popup, just return empty data
+        return { items: [], total: 0 };
+      }
+
+      const data = await response.json();
+      
+      // Format the documents data
+      const formattedDocuments = await Promise.all(data.items.map(async doc => {
+        // Fetch versions for each document
+        const versions = await get().fetchDocumentVersions(doc.id);
+        return {
+          ...doc,
+          key: doc.id,
+          versions,
+          file_size: doc.latest_version?.file_size 
+            ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+            : null,
+          created_at: new Date(doc.created_at).toISOString(),
+          version_number: doc.latest_version?.version_number || '1.0'
+        };
+      }));
+
+      set({ 
+        documents: formattedDocuments,
+        totalDocuments: data.total,
+        isLoading: false 
+      });
+
+      return data;
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      // Remove error popup
+      return { items: [], total: 0 };
+    }
+  },
+
+  // Create document version
+  createVersion: async (documentId, versionData) => {
+    set({ isLoading: true });
+    try {
+      const response = await fetch(`/api/v1/documents/${documentId}/versions/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(versionData),
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
+
+  // List versions
+  fetchVersions: async (documentId) => {
+    set({ isLoading: true });
+    try {
+      const response = await fetch(`/api/v1/documents/${documentId}/versions`);
+      const data = await response.json();
+      set(state => ({
+        versions: { ...state.versions, [documentId]: data },
+        isLoading: false
+      }));
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+    }
+  },
+
+  // Delete document
+  deleteDocument: async (documentId) => {
+    set({ isLoading: true });
+    try {
+      await fetch(`/api/v1/documents/${documentId}`, {
+        method: 'DELETE',
+      });
+      set(state => ({
+        documents: state.documents.filter(doc => doc.id !== documentId),
+        isLoading: false
+      }));
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
+
+  // Update folder
+  updateFolder: async (folderId, updateData) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`http://localhost:8002/api/v1/documents/folders/${folderId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          folder_name: updateData.folder_name,
+          parent_folder_id: updateData.parent_folder_id,
+          is_active: true,
+          move_documents: updateData.move_documents
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update folder');
+      }
+
+      await get().fetchFolders();
+      return true;
+    } catch (error) {
+      console.error('Update folder error:', error);
+      throw error;
+    }
+  },
+
+  // Create document type
+  createDocType: async (docTypeData) => {
+    set({ isLoading: true });
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const requestBody = {
+        name: docTypeData.type_name,
+        description: docTypeData.description,
+        allowed_extensions: docTypeData.extensions.split(',').map(ext => ext.trim())
+      };
+
+      const response = await fetch('http://localhost:8002/api/v1/document-management/document-types/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create document type');
+      }
+
+      const data = await response.json();
+      set(state => ({
+        documentTypes: [...state.documentTypes, data],
+        isLoading: false
+      }));
+      return data;
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      message.error(error.message);
+      throw error;
+    }
+  },
+
+  // Search documents by text and other parameters
+  searchDocuments: async (query, docTypeId = null, folderId = null) => {
+    try {
+      const token = useAuthStore.getState().token;
+      
+      if (!token || query.length < 3) {
+        return { items: [], total: 0 };
+      }
+
+      let url = `http://localhost:8002/api/v1/document-management/documents/search/?query=${encodeURIComponent(query)}`;
+      if (docTypeId) url += `&doc_type_id=${docTypeId}`;
+      if (folderId) url += `&folder_id=${folderId}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        return { items: [], total: 0 };
+      }
+
+      const data = await response.json();
+      
+      // Format the documents data similar to fetchFolderDocuments
+      const formattedDocuments = await Promise.all(data.map(async doc => {
+        return {
+          ...doc,
+          key: doc.id,
+          file_size: doc.latest_version?.file_size 
+            ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+            : null,
+          created_at: new Date(doc.created_at).toISOString(),
+          version_number: doc.latest_version?.version_number || '1.0'
+        };
+      }));
+
       set({ 
         documents: formattedDocuments,
         totalDocuments: formattedDocuments.length,
@@ -533,7 +931,7 @@ const useDynamicStore = create((set) => ({
       const token = useAuthStore.getState().token;
       set({ isLoadingOrders: true });
 
-      const response = await fetch('http://localhost:8002/planning/all_orders', {
+      const response = await fetch('http://localhost:8002/api/v1/planning/all_orders', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'

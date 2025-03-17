@@ -3,9 +3,9 @@ import dayjs from 'dayjs';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.85:6768',
-  QUALITY_URL: 'http://172.18.7.93:9999',
-  PLANNING_URL: 'http://172.18.7.85:9671',
+  BASE_URL: 'http://localhost:8002',
+  QUALITY_URL: 'http://localhost:8002',
+  PLANNING_URL: 'http://localhost:8002',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
     saveOrder: '/api/v1/planning/save-to-db',
@@ -17,9 +17,13 @@ const API_CONFIG = {
     saveOarcToDb: '/api/v1/planning/save-to-db',
     createOrder: '/api/v1/planning/create_order',
     uploadDocumentByType: '/api/v1/document-management/documents/upload-by-type',
-    getDocumentsByPartNumber: (partNumber) => `/api/v1/document-management/documents/by-part-number-all/${partNumber}`
+    getDocumentsByPartNumber: (partNumber) => `/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+    updateProjectPriorities: '/api/v1/planning/projects/priority',
   }
 };
+
+// Update the polling interval constant to 1 hour (in milliseconds)
+const TIMELINE_POLLING_INTERVAL = 60 * 60 * 1000; // 1 hour
 
 const useOrderStore = create((set, get) => ({
   orders: [],
@@ -65,15 +69,19 @@ const useOrderStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:6768/api/v1/planning/all_orders');
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.allOrders}`);
       const data = await response.json();
       
       if (!response.ok) {
         throw new Error(data.message || 'Failed to fetch orders');
       }
 
-      let transformedOrders = data.map(order => ({
+      // Ensure we're working with an array
+      const ordersArray = Array.isArray(data) ? data : [];
+
+      let transformedOrders = ordersArray.map(order => ({
         ...order,
+        key: order.id || order.production_order || Math.random().toString(),
       }));
 
       // Get saved sequence from localStorage
@@ -110,10 +118,19 @@ const useOrderStore = create((set, get) => ({
         });
       }
 
-      set({ orders: transformedOrders, isLoading: false });
+      set({ 
+        orders: transformedOrders, 
+        isLoading: false 
+      });
+      
       return transformedOrders;
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      console.error('Error fetching orders:', error);
+      set({ 
+        error: error.message, 
+        isLoading: false,
+        orders: []
+      });
       throw error;
     }
   },
@@ -124,7 +141,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.85:6768/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://localhost:8002/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -209,7 +226,7 @@ const useOrderStore = create((set, get) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://localhost:8002/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -444,7 +461,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.85:6768/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://localhost:8002/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -549,81 +566,55 @@ const useOrderStore = create((set, get) => ({
   fetchTimelineData: async () => {
     set({ isLoadingTimeline: true, timelineError: null });
     try {
-      const response = await fetch(
-        'http://172.18.7.85:6768/api/v1/scheduling/part-production-timeline/',
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/scheduling/part-production-timeline/`);
       if (!response.ok) {
         throw new Error('Failed to fetch timeline data');
       }
-
       const data = await response.json();
       
-      // Extract items array from response
-      const timelineArray = data.items || [];
-      
-      // Transform data if needed
-      const transformedData = timelineArray.map(item => ({
+      // Extract items array from the response
+      const timelineItems = data.items?.map(item => ({
         ...item,
-        key: item.production_order,
-      }));
+        key: item.production_order // Use production_order as key
+      })) || [];
 
       set({ 
-        timelineData: transformedData, 
-        isLoadingTimeline: false,
-        totalParts: data.total_parts
+        timelineData: timelineItems,
+        isLoadingTimeline: false 
       });
-      
-      return transformedData;
     } catch (error) {
-      console.error('Error fetching timeline:', error);
+      console.error('Error fetching timeline data:', error);
       set({ 
         timelineError: error.message, 
         isLoadingTimeline: false,
-        timelineData: [], 
-        totalParts: 0
+        timelineData: []
       });
     }
   },
 
   // Start polling when component mounts
   startTimelinePolling: () => {
-    // Clear any existing interval first
-    const { timelinePollingInterval } = get();
-    if (timelinePollingInterval) {
-      console.log('Clearing existing polling interval');
-      clearInterval(timelinePollingInterval);
-      set({ timelinePollingInterval: null });
-    }
-
-    // Set new interval for 1 hour
-    const ONE_HOUR = 3600000; // 1 hour in milliseconds
-    console.log('Starting new polling interval with delay:', ONE_HOUR, 'ms');
+    const { fetchTimelineData } = get();
     
-    const intervalId = setInterval(() => {
-      console.log('Polling timeline data at:', new Date().toLocaleTimeString());
-      get().fetchTimelineData();
-    }, ONE_HOUR);
-
+    // Initial fetch
+    fetchTimelineData();
+    
+    // Set up polling interval (1 hour)
+    const intervalId = setInterval(fetchTimelineData, TIMELINE_POLLING_INTERVAL);
+    
     // Store the interval ID
     set({ timelinePollingInterval: intervalId });
-    console.log('Timeline polling started - updating every hour');
-    console.log('Next update at:', new Date(Date.now() + ONE_HOUR).toLocaleTimeString());
+    
+    console.log('Timeline polling started with 1-hour interval');
   },
 
   // Stop polling when component unmounts
   stopTimelinePolling: () => {
     const { timelinePollingInterval } = get();
     if (timelinePollingInterval) {
-      console.log('Stopping timeline polling');
       clearInterval(timelinePollingInterval);
       set({ timelinePollingInterval: null });
+      console.log('Timeline polling stopped');
     }
   },
 
@@ -701,20 +692,11 @@ const useOrderStore = create((set, get) => ({
   swapOrderPriority: async (order1ProductionOrder, order2ProductionOrder, order1Priority, order2Priority) => {
     try {
       set({ isLoading: true, error: null });
+      const { orders } = get();
 
-      const allOrdersResponse = await fetch('http://172.18.7.85:6768/api/v1/planning/all_orders');
-      const allOrdersData = await allOrdersResponse.json();
-
-      if (!allOrdersResponse.ok) {
-        throw new Error('Failed to fetch orders data');
-      }
-
-      const order1 = allOrdersData.find(order => 
-        String(order.production_order) === String(order1ProductionOrder)
-      );
-      const order2 = allOrdersData.find(order => 
-        String(order.production_order) === String(order2ProductionOrder)
-      );
+      // Find orders in current state
+      const order1 = orders.find(order => String(order.production_order) === String(order1ProductionOrder));
+      const order2 = orders.find(order => String(order.production_order) === String(order2ProductionOrder));
 
       if (!order1?.id || !order2?.id) {
         throw new Error('Could not find order IDs for the selected orders');
@@ -722,7 +704,7 @@ const useOrderStore = create((set, get) => ({
 
       // Make the priority update request
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/planning/order/${order1.id}/priority`,
+        `${API_CONFIG.BASE_URL}/api/v1/planning/order/${order1.id}/priority`,
         {
           method: 'PUT',
           headers: {
@@ -736,64 +718,61 @@ const useOrderStore = create((set, get) => ({
         }
       );
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         throw new Error(data.message || 'Failed to update priority');
       }
 
-      // Update both orders and priorityOrders in the store
-      set(state => {
-        // Update main orders array
-        const updatedOrders = state.orders.map(order => {
-          if (order.id === order1.id && order.project) {
-            return { ...order, project: { ...order.project, priority: order2Priority }};
-          } else if (order.id === order2.id && order.project) {
-            return { ...order, project: { ...order.project, priority: order1Priority }};
-          }
-          return order;
-        });
-
-        // Update priority orders array
-        const updatedPriorityOrders = state.priorityOrders.map(order => {
-          if (order.production_order === order1ProductionOrder) {
-            return { ...order, project_priority: order2Priority };
-          } else if (order.production_order === order2ProductionOrder) {
-            return { ...order, project_priority: order1Priority };
-          }
-          return order;
-        });
-
-        // Sort both arrays by priority
-        const sortedOrders = [...updatedOrders].sort((a, b) => 
-          (a.project?.priority ?? 999) - (b.project?.priority ?? 999)
-        );
-
-        const sortedPriorityOrders = [...updatedPriorityOrders].sort((a, b) => 
-          (a.project_priority ?? 999) - (b.project_priority ?? 999)
-        );
-
-        // Save the sorted sequence to localStorage
-        localStorage.setItem('orderSequence', JSON.stringify({
-          orders: sortedOrders.map(order => ({
-            id: order.id,
-            project_id: order.project?.id,
-            priority: order.project?.priority
-          })),
-          timestamp: Date.now()
-        }));
-
-        return {
-          orders: sortedOrders,
-          priorityOrders: sortedPriorityOrders,
-          isLoading: false
-        };
+      // Fetch latest priorities after successful swap
+      const priorityResponse = await fetch('http://localhost:8002/api/v1/planning/projects/priority', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
       });
 
-      return data;
+      if (!priorityResponse.ok) {
+        throw new Error('Failed to fetch updated priorities');
+      }
+
+      const priorityData = await priorityResponse.json();
+
+      // Transform and update the orders with latest priorities
+      const updatedOrders = orders.map(order => {
+        const projectWithOrder = priorityData.projects.find(project => 
+          project.orders.some(o => String(o.production_order) === String(order.production_order))
+        );
+
+        if (projectWithOrder) {
+          return {
+            ...order,
+            project: {
+              ...order.project,
+              priority: projectWithOrder.priority,
+              name: projectWithOrder.project_name
+            }
+          };
+        }
+        return order;
+      });
+
+      // Sort orders by priority
+      const sortedOrders = [...updatedOrders].sort((a, b) => {
+        const priorityA = a.project?.priority || 999;
+        const priorityB = b.project?.priority || 999;
+        return priorityA - priorityB;
+      });
+
+      set({ orders: sortedOrders, isLoading: false });
+
+      return {
+        updated_priorities: [
+          { production_order: order1ProductionOrder, priority: order2Priority },
+          { production_order: order2ProductionOrder, priority: order1Priority }
+        ]
+      };
     } catch (error) {
-      console.error('Swap priority error:', error);
-      set({ error: error.message || 'Failed to swap priorities', isLoading: false });
+      console.error('Error updating order priorities:', error);
+      set({ isLoading: false, error: error.message });
       throw error;
     }
   },
@@ -802,7 +781,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.85:6768/api/v1/planning/projects/priority', {
+      const response = await fetch('http://localhost:8002/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -899,7 +878,7 @@ const useOrderStore = create((set, get) => ({
           });
 
           const mppResponse = await fetch(
-            'http://172.18.7.85:6768/api/v1/document-management/documents/upload-by-type',
+            'http://localhost:8002/api/v1/document-management/documents/upload-by-type',
             {
               method: 'POST',
               headers: {
@@ -943,7 +922,7 @@ const useOrderStore = create((set, get) => ({
           });
 
           const drawingResponse = await fetch(
-            'http://172.18.7.85:6768/api/v1/document-management/documents/upload-by-type',
+            'http://localhost:8002/api/v1/document-management/documents/upload-by-type',
             {
               method: 'POST',
               headers: {

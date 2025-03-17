@@ -454,7 +454,7 @@ const columns = [
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            {/* <Col span={8}>
               <Form.Item
                 name="available_from" // New field
                 label="Available From"
@@ -462,7 +462,7 @@ const columns = [
               >
                 <Input type="date" />
               </Form.Item>
-            </Col>
+            </Col> */}
           </Row>
           <Form.Item>
             <Space className="w-full justify-end">

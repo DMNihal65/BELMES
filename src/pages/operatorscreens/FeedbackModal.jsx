@@ -94,7 +94,7 @@ const FeedbackModal = ({ visible, onClose, onSubmit }) => {
   return (
     <Modal
       title="Operator Feedback"
-      visible={visible}
+      open={visible}
       onCancel={onClose}
       footer={null} // Set footer to null to customize it
       width={800} // Increase the width of the modal

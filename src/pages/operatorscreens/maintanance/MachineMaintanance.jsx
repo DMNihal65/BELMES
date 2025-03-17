@@ -66,12 +66,12 @@ function MachineMaintenance() {
       dataIndex: 'description',
       key: 'description',
     },
-    {
-      title: 'Available From',
-      dataIndex: 'available_from',
-      key: 'available_from',
-      render: (date) => dayjs(date).format('YYYY-MM-DD HH:mm'),
-    },
+    // {
+    //   title: 'Available From',
+    //   dataIndex: 'available_from',
+    //   key: 'available_from',
+    //   render: (date) => dayjs(date).format('YYYY-MM-DD HH:mm'),
+    // },
     {
       title: 'Actions',
       key: 'actions',
@@ -310,13 +310,13 @@ function MachineMaintenance() {
             >
               <Input.TextArea />
             </Form.Item>
-            <Form.Item
+            {/* <Form.Item
               name="available_from"
               label="Available From"
               rules={[{ required: true }]}
             >
               <DatePicker showTime />
-            </Form.Item>
+            </Form.Item> */}
           </Form>
         </Modal>
       </Card>

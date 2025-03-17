@@ -37,7 +37,7 @@ import Report from './pages/supervisorscreens/EnergyMonitoring/Report';
 import InspectionReport from './pages/supervisorscreens/QualityManagement/InspectionReport';
 
 import QualityInspectionDetails from './pages/supervisorscreens/QualityManagement/QualityInspectionDetails';
-import LogsDashboard from './pages/supervisorscreens/Logs/LogsDashboard';
+import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
 
 const App = () => {
   return (

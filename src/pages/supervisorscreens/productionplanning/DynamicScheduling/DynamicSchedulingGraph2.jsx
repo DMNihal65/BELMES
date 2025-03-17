@@ -115,43 +115,12 @@ const DynamicSchedulingGraph2 = () => {
   const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState(null);
   const [viewType, setViewType] = useState('week');
-  const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
-  const [selectedComponent, setSelectedComponent] = useState(null);
-  const [productionOrders, setProductionOrders] = useState([]);
-  const [components, setComponents] = useState([]);
 
   const fetchScheduleData = async () => {
     setLoading(true);
     try {
       const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
-      // const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
       setScheduleData(response.data);
-      
-      // Extract unique production orders and components from all operation types
-      const uniqueProductionOrders = new Set();
-      const uniqueComponents = new Set();
-      
-      // From scheduled operations
-      response.data.scheduled_operations.forEach(op => {
-        if (op.production_order) uniqueProductionOrders.add(op.production_order);
-        if (op.component) uniqueComponents.add(op.component);
-      });
-      
-      // From production logs
-      response.data.production_logs.forEach(log => {
-        if (log.production_order) uniqueProductionOrders.add(log.production_order);
-        if (log.part_number) uniqueComponents.add(log.part_number);
-      });
-      
-      // From rescheduled operations
-      response.data.reschedule.forEach(reschedule => {
-        if (reschedule.production_order) uniqueProductionOrders.add(reschedule.production_order);
-        if (reschedule.part_number) uniqueComponents.add(reschedule.part_number);
-      });
-      
-      setProductionOrders(Array.from(uniqueProductionOrders).sort());
-      setComponents(Array.from(uniqueComponents).sort());
-      
       setLoading(false);
     } catch (err) {
       setError('Failed to fetch schedule data');
@@ -235,83 +204,57 @@ const DynamicSchedulingGraph2 = () => {
       });
     });
 
-    // Update the filter operation function to handle all operation types
-    const filterOperation = (op, type) => {
-      if (selectedProductionOrder && op.production_order !== selectedProductionOrder) {
-        return false;
-      }
-      
-      if (selectedComponent) {
-        switch (type) {
-          case 'planned':
-            if (op.component !== selectedComponent) return false;
-            break;
-          case 'actual':
-          case 'rescheduled':
-            if (op.part_number !== selectedComponent) return false;
-            break;
-        }
-      }
-      
-      return true;
-    };
-
-    // Add scheduled operations (Planned) with filters
+    // Add scheduled operations (Planned)
     scheduleData.scheduled_operations.forEach((op, index) => {
-      if (filterOperation(op, 'planned')) {
-        items.add({
-          id: `planned-${index}`,
-          group: `${op.machine}-planned`,
-          start: new Date(op.start_time),
-          end: new Date(op.end_time),
-          content: '',
-          className: 'planned-bar',
-          title: `
-            <div>
-              <strong>Planned Operation</strong><br/>
-              Part Number: ${op.component}<br/>
-              Production Order: ${op.production_order}<br/>
-              Description: ${op.description}<br/>
-              Quantity: ${op.quantity}<br/>
-              Start: ${moment(op.start_time).format('DD/MM/YYYY HH:mm')}<br/>
-              End: ${moment(op.end_time).format('DD/MM/YYYY HH:mm')}
-            </div>
-          `
-        });
-      }
+      items.add({
+        id: `planned-${index}`,
+        group: `${op.machine}-planned`,
+        start: new Date(op.start_time),
+        end: new Date(op.end_time),
+        content: '',
+        className: 'planned-bar',
+        title: `
+          <div>
+            <strong>Planned Operation</strong><br/>
+            Component: ${op.component}<br/>
+            Description: ${op.description}<br/>
+            Quantity: ${op.quantity}<br/>
+            Production Order: ${op.production_order}<br/>
+            Start: ${moment(op.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+            End: ${moment(op.end_time).format('DD/MM/YYYY HH:mm')}
+          </div>
+        `
+      });
     });
 
-    // Add production logs (Actual) with filters
+    // Add production logs (Actual)
     scheduleData.production_logs.forEach((log, index) => {
-      if (filterOperation(log, 'actual')) {
-        items.add({
-          id: `actual-${index}`,
-          group: `${log.machine_name}-actual`,
-          start: new Date(log.start_time),
-          end: new Date(log.end_time),
-          content: '',
-          className: 'actual-bar',
-          title: `
-            <div>
-              <strong>Actual Production</strong><br/>
-              Part Number: ${log.part_number}<br/>
-              Production Order: ${log.production_order}<br/>
-              Operation: ${log.operation_description}<br/>
-              Completed: ${log.quantity_completed}<br/>
-              Rejected: ${log.quantity_rejected}<br/>
-              Notes: ${log.notes}<br/>
-              Start: ${moment(log.start_time).format('DD/MM/YYYY HH:mm')}<br/>
-              End: ${moment(log.end_time).format('DD/MM/YYYY HH:mm')}
-            </div>
-          `
-        });
-      }
+      items.add({
+        id: `actual-${index}`,
+        group: `${log.machine_name}-actual`,
+        start: new Date(log.start_time),
+        end: new Date(log.end_time),
+        content: '',
+        className: 'actual-bar',
+        title: `
+          <div>
+            <strong>Actual Production</strong><br/>
+            Part: ${log.part_number}<br/>
+            Operation: ${log.operation_description}<br/>
+            Completed: ${log.quantity_completed}<br/>
+            Rejected: ${log.quantity_rejected}<br/>
+            Notes: ${log.notes}<br/>
+            Start: ${moment(log.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+            End: ${moment(log.end_time).format('DD/MM/YYYY HH:mm')}
+          </div>
+        `
+      });
     });
 
-    // Add rescheduled operations with filters
+    // Add rescheduled operations
     scheduleData.reschedule.forEach((reschedule, index) => {
       const machineName = machineMapping[reschedule.machine_id.toString()];
-      if (machineName && filterOperation(reschedule, 'rescheduled')) {
+      if (machineName) {
         items.add({
           id: `rescheduled-${index}`,
           group: `${machineName}-rescheduled`,
@@ -322,8 +265,6 @@ const DynamicSchedulingGraph2 = () => {
           title: `
             <div>
               <strong>Rescheduled Operation</strong><br/>
-              Part Number: ${reschedule.part_number}<br/>
-              Production Order: ${reschedule.production_order}<br/>
               Version: ${reschedule.new_version} (from ${reschedule.old_version})<br/>
               Completed Qty: ${reschedule.completed_qty}<br/>
               Remaining Qty: ${reschedule.remaining_qty}<br/>
@@ -347,14 +288,10 @@ const DynamicSchedulingGraph2 = () => {
       groups,
       {
         stack: false,
-        horizontalScroll: false,
-        verticalScroll: true,
+        horizontalScroll: true,
         zoomKey: 'ctrlKey',
         orientation: 'top',
         height: '670px',
-        margin: { item: { vertical: 10 } },
-        groupHeightMode: 'fixed',
-        maxHeight: '670px',
         groupOrder: function(a, b) {
           const aOrder = a.order || 0;
           const bOrder = b.order || 0;
@@ -416,22 +353,6 @@ const DynamicSchedulingGraph2 = () => {
       .vis-nested-group {
         background-color: #f5f5f5;
       }
-      .vis-panel.vis-center {
-        overflow: hidden !important;
-      }
-      .vis-panel.vis-left {
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
-      }
-      .vis-labelset {
-        overflow-x: hidden !important;
-      }
-      .vis-panel.vis-bottom {
-        overflow: hidden !important;
-      }
-      .vis-timeline {
-        overflow: hidden !important;
-      }
       .planned-group {
         border-left: 4px solid #1890ff;
         background-color: rgba(24, 144, 255, 0.05);
@@ -462,7 +383,7 @@ const DynamicSchedulingGraph2 = () => {
       timeline.destroy();
       document.head.removeChild(style);
     };
-  }, [timelineContainerRef, scheduleData, viewType, dateRange, selectedProductionOrder, selectedComponent]);
+  }, [timelineContainerRef, scheduleData, viewType, dateRange]);
 
   const handleViewTypeChange = (newViewType) => {
     setViewType(newViewType);
@@ -563,19 +484,6 @@ const DynamicSchedulingGraph2 = () => {
     fetchScheduleData();
   };
 
-  const handleProductionOrderChange = (value) => {
-    setSelectedProductionOrder(value);
-  };
-
-  const handleComponentChange = (value) => {
-    setSelectedComponent(value);
-  };
-
-  const handleClearFilters = () => {
-    setSelectedProductionOrder(null);
-    setSelectedComponent(null);
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -609,34 +517,6 @@ const DynamicSchedulingGraph2 = () => {
             <Option value="month">Monthly</Option>
             <Option value="year">Yearly</Option>
           </Select>
-          
-          <Select
-            placeholder="Select Production Order"
-            value={selectedProductionOrder}
-            onChange={handleProductionOrderChange}
-            style={{ width: 200 }}
-            allowClear
-          >
-            {productionOrders.map(po => (
-              <Option key={po} value={po}>{po}</Option>
-            ))}
-          </Select>
-
-          <Select
-            placeholder="Select Part Number"
-            value={selectedComponent}
-            onChange={handleComponentChange}
-            style={{ width: 200 }}
-            allowClear
-          >
-            {components.map(component => (
-              <Option key={component} value={component}>{component}</Option>
-            ))}
-          </Select>
-
-          <Button onClick={handleClearFilters}>
-            Clear Filters
-          </Button>
           
           <DatePicker.RangePicker
             value={dateRange}
@@ -703,9 +583,6 @@ const DynamicSchedulingGraph2 = () => {
           <span>Rescheduled</span>
         </div>
       </div>
-
-
-      
     </Card>
   );
 };

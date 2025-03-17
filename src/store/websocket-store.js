@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import useAuthStore from './auth-store';
 
 const useWebSocketStore = create((set, get) => ({
   machineStatus: null,
@@ -28,7 +29,7 @@ const useWebSocketStore = create((set, get) => ({
 
     try {
       console.log(`Connecting WebSocket for machine: ${machineId}`);
-      const ws = new WebSocket('ws://172.18.7.89:4470/production_monitoring/ws/live-status/');
+      const ws = new WebSocket('ws://localhost:8002/production_monitoring/ws/live-status/');
       
       ws.onopen = () => {
         console.log('WebSocket Connected Successfully');
@@ -145,7 +146,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Fetching operations for machine ID: ${machineId}`);
       
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/operator/machines/${machineId}/operations`
+        `http://localhost:8002/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -272,7 +273,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting machine issue for machine ID: ${machineId}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://localhost:8002/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -325,7 +326,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting component issue for part number: ${partNumber}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.85:6768/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://localhost:8002/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -361,31 +362,77 @@ const useWebSocketStore = create((set, get) => ({
     } finally {
       set({ maintenanceLoading: false });
     }
+  },
+
+  fetchDocuments: async (partNumber) => {
+    try {
+      set({ loading: true });
+      const token = useAuthStore.getState().token;
+
+      const response = await fetch(
+        `http://localhost:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const data = await response.json();
+      set({ 
+        documents: {
+          mpp: data.mpp_document,
+          oarc: data.oarc_document,
+          engineering: data.engineering_drawing_document,
+          ipid: data.ipid_document
+        },
+        loading: false 
+      });
+      return data;
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      set({ loading: false });
+      return null;
+    }
+  },
+
+  downloadDocument: async (partNumber, docType) => {
+    try {
+      const token = useAuthStore.getState().token;
+
+      const response = await fetch(
+        `http://localhost:8002/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${docType}_${partNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      throw error;
+    }
   }
 }));
 
-export default useWebSocketStore;  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+export default useWebSocketStore; 

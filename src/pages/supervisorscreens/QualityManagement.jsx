@@ -27,7 +27,7 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
-import { qualityStore } from '../../store/Quality-store';
+import { qualityStore } from '../../store/quality-store';
 import QualityInspectionDetails from '../supervisorscreens/QualityManagement/QualityInspectionDetails';
 
 const { Option } = Select;
@@ -65,16 +65,6 @@ const QualityManagementDashboard = () => {
   const [error, setError] = useState(null);
   const [inspectionDetails, setInspectionDetails] = useState(null);
   const [selectedOperation, setSelectedOperation] = useState(null);
-
-  // Stats data
-  const qualityStats = {
-    totalParts: 100,
-    goodParts: 85,
-    badParts: 10,
-    nonConformance: 5,
-    yield: 85,
-    deviations: 8
-  };
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -631,76 +621,7 @@ const QualityManagementDashboard = () => {
         <Typography.Title level={3} className="mb-0">
           Quality Management Dashboard
         </Typography.Title>
-        <Space>
-          <Button type="primary" icon={<FileSearchOutlined />}>
-            Generate Report
-          </Button>
-        </Space>
       </div>
-
-      {/* Stats Overview with improved styling */}
-      <Row gutter={[16, 16]}>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
-            <Statistic 
-              title={<span className="text-gray-600">Total Parts</span>}
-              value={qualityStats.totalParts}
-              prefix={<PieChartOutlined className="text-blue-500" />}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
-            <Statistic 
-              title={<span className="text-gray-600">Good Parts</span>}
-              value={qualityStats.goodParts}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
-            <Statistic 
-              title={<span className="text-gray-600">Bad Parts</span>}
-              value={qualityStats.badParts}
-              prefix={<CloseCircleOutlined />}
-              valueStyle={{ color: '#ff4d4f' }}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
-            <Statistic 
-              title={<span className="text-gray-600">Non Conformance</span>}
-              value={qualityStats.nonConformance}
-              prefix={<WarningOutlined />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
-            <Statistic 
-              title={<span className="text-gray-600">Yield</span>}
-              value={qualityStats.yield}
-              suffix="%"
-              prefix={<PieChartOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col span={4}>
-          <Card bordered={false} className="hover:shadow-lg transition-all duration-300">
-            <Statistic 
-              title={<span className="text-gray-600">Deviations</span>}
-              value={qualityStats.deviations}
-              prefix={<WarningOutlined />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-      </Row>
 
       {/* Part Selection with improved UI */}
       <Card className="shadow-sm hover:shadow-md transition-all duration-300">
@@ -747,7 +668,6 @@ const QualityManagementDashboard = () => {
           loading={loading}
           selectedOperation={selectedOperation}
           setSelectedOperation={setSelectedOperation}
-          openQMSSoftware={openQMSSoftware}
         />
       )}
 
@@ -773,32 +693,6 @@ const QualityManagementDashboard = () => {
         className="ipid-modal"
       >
         {selectedIPID && <IPIDModalContent ipid={selectedIPID} />}
-      </Modal>
-
-      {/* Add Upload Modal */}
-      <Modal
-        title="Upload Files"
-        visible={uploadModalVisible}
-        onCancel={() => setUploadModalVisible(false)}
-        footer={null}
-      >
-        <Upload.Dragger
-          multiple
-          beforeUpload={(file) => {
-            return false; // Prevent automatic upload
-          }}
-          onChange={(info) => {
-            handleUpload(info.fileList.map(f => f.originFileObj));
-          }}
-        >
-          <p className="ant-upload-drag-icon">
-            <UploadOutlined />
-          </p>
-          <p className="ant-upload-text">Click or drag files to upload</p>
-          <p className="ant-upload-hint">
-            Files will be uploaded to folder: {selectedFolder}
-          </p>
-        </Upload.Dragger>
       </Modal>
     </div>
   );

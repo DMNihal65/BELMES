@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import axios from 'axios';///
+import axios from 'axios';
 
 const useScheduleStore = create((set, get) => ({
   scheduleData: null,
@@ -17,7 +17,6 @@ const useScheduleStore = create((set, get) => ({
   leadTimeData: [],
   leadTimeLoading: false,
   leadTimeError: null,
-  workCenters: [],
   productionStatusData: {
     daily_production: [],
     total_planned: {},
@@ -25,38 +24,20 @@ const useScheduleStore = create((set, get) => ({
   },
   productionStatusLoading: false,
   productionStatusError: null,
-  combinedScheduleData: null,
-  combinedScheduleLoading: false,
-  combinedScheduleError: null,
   
   // Fetch schedule data
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://localhost:8002/api/v1/operations/schedule-batch/');
+      const response = await fetch('http://localhost:8002/operations/schedule-batch/');
       const data = await response.json();
 
+        
       // Extract unique production orders
       const uniqueProductionOrders = [...new Set(data.scheduled_operations.map(op => op.production_order))];
-      
-      // Store work centers data
-      const workCenters = data.work_centers || [];
-      
-      
-      // Create a mapping of machines to their work centers
-      const machineToWorkCenter = {};
-      workCenters.forEach(wc => {
-        wc.machines.forEach(machine => {
-          machineToWorkCenter[machine.id] = {
-            work_center_code: wc.work_center_code,
-            work_center_name: wc.work_center_name,
-            machine_name: machine.name,
-            machine_id: machine.id,
-            display_name: `${wc.work_center_code} - ${machine.name}`
-          };
-        });
-      });
+      set({ availableProductionOrders: uniqueProductionOrders });
 
+      
       // Transform the data for Gantt chart
       const tasks = data.scheduled_operations.map((op, index) => ({
         id: `${op.component}-${op.description}-${index}`,
@@ -64,7 +45,6 @@ const useScheduleStore = create((set, get) => ({
         start: new Date(op.start_time),
         end: new Date(op.end_time),
         machine: op.machine,
-        work_center: machineToWorkCenter[op.machine],
         component: op.component,
         production_order: op.production_order,
         progress: calculateProgress(op, data.component_status[op.component]),
@@ -72,7 +52,7 @@ const useScheduleStore = create((set, get) => ({
         quantity: op.quantity,
         styles: getTaskStyles(op, data.component_status[op.component])
       }));
-
+//check 
       set({ 
         scheduleData: {
           ...data,
@@ -83,8 +63,6 @@ const useScheduleStore = create((set, get) => ({
             delayedDelays: data.delayed_complete
           }
         },
-        workCenters,
-        availableProductionOrders: uniqueProductionOrders,
         loading: false 
       });
     } catch (error) {
@@ -149,7 +127,7 @@ const useScheduleStore = create((set, get) => ({
     // fetchScheduleData: async () => {
     //   set({ loading: true, error: null });
     //   try {
-    //     const response = await fetch('http://localhost:8002/api/v1/operations/unit_schedule/');
+    //     const response = await fetch('http://localhost:8002/operations/unit_schedule/');
     //     const operations = await response.json();
         
     //     // Transform the array response into the expected format
@@ -419,7 +397,7 @@ const useScheduleStore = create((set, get) => ({
   fetchProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://localhost:8002/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://localhost:8002/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -439,7 +417,7 @@ const useScheduleStore = create((set, get) => ({
   fetchWeeklyProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://localhost:8002/api/v1/production/weekly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://localhost:8002/production/weekly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -463,7 +441,7 @@ const useScheduleStore = create((set, get) => ({
   fetchMonthlyProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://localhost:8002/api/v1/production/monthly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://localhost:8002/production/monthly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -498,11 +476,7 @@ const useScheduleStore = create((set, get) => ({
 
   fetchPartNumberSuggestions: async (searchText) => {
     try {
-      // Get a date range that covers last 365 days to ensure we get all part numbers
-      const endEpoch = Math.floor(Date.now() / 1000);
-      const startEpoch = endEpoch - (365 * 24 * 60 * 60); // 365 days ago
-      
-      const response = await axios.get(`http://localhost:8002/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`);
+      const response = await axios.get(`http://localhost:8002/production/daily/?start_epoch=1739245961&end_epoch=1739245961`);
       const allPartNumbers = response.data.daily_production || [];
       
       // Get unique part numbers
@@ -510,7 +484,7 @@ const useScheduleStore = create((set, get) => ({
       
       // Filter based on search text
       return uniquePartNumbers
-        .filter(pn => pn && pn.toLowerCase().includes(searchText.toLowerCase()))
+        .filter(pn => pn.toLowerCase().includes(searchText.toLowerCase()))
         .map(pn => ({
           value: pn,
           label: pn
@@ -520,29 +494,7 @@ const useScheduleStore = create((set, get) => ({
       return [];
     }
   },
-
-  fetchCombinedScheduleData: async () => {
-    set({ combinedScheduleLoading: true, combinedScheduleError: null });
-    try {
-      const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
-      set({ 
-        combinedScheduleData: response.data,
-        combinedScheduleLoading: false 
-      });
-      return response.data;
-    } catch (error) {
-      set({ 
-        combinedScheduleError: error.message, 
-        combinedScheduleLoading: false 
-      });
-      throw error;
-    }
-  },
 }));
-
-
-
-
 
 // Helper function to calculate progress
 const calculateProgress = (operation, status) => {

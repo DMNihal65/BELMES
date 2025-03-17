@@ -21,9 +21,18 @@ const OrderDashboard = () => {
     fetchAllOrders();
   }, [fetchTimelineData, fetchAllOrders]);
 
+  // Add effect to refresh orders when priorities change
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      fetchAllOrders();
+    }, 20000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [fetchAllOrders]);
+
   useEffect(() => {
     fetchAllOrders();
-    fetchTimelineData(); // Fetch timeline data on component mount
+    fetchTimelineData();
   }, []);
 
   const fadeIn = {
@@ -62,7 +71,6 @@ const OrderDashboard = () => {
       title: 'Status', 
       dataIndex: 'status', 
       key: 'status',
-      fixed: 'right',
       width: 120,
       render: (status) => (
         <span className={`
@@ -95,58 +103,7 @@ const OrderDashboard = () => {
       
       <div className="flex-1 p-4 overflow-hidden flex flex-col">
         {/* Quick Stats Row */}
-        <Row gutter={[16, 16]} className="mb-6" ref={parent}>
-          <Col xs={24} sm={12} lg={6}>
-            <motion.div {...fadeIn}>
-              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
-                <Statistic
-                  title="Total Orders"
-                  value={orders.length}
-                  prefix={<MenuOutlined />}
-                  valueStyle={{ color: '#3f8600' }}
-                />
-              </Card>
-            </motion.div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <motion.div {...fadeIn}>
-              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
-                <Statistic
-                  title="In  Progress"
-                  value={orders.filter(o => o.status === 'in_progress').length}
-                  prefix={<ArrowUpOutlined />}
-                  valueStyle={{ color: '#1890ff' }}
-                />
-              </Card>
-            </motion.div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <motion.div {...fadeIn}>
-              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
-                <Statistic
-                  title="Revenue"
-                  value={orders.reduce((acc, curr) => acc + curr.revenue, 0)}
-                  prefix="$"
-                  precision={2}
-                  valueStyle={{ color: '#cf1322' }}
-                />
-              </Card>
-            </motion.div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <motion.div {...fadeIn}>
-              <Card bordered={false} className="hover:shadow-lg transition-shadow duration-300">
-                <Statistic
-                  title="On-Time Delivery"
-                  value={92}
-                  suffix="%"
-                  prefix={<ArrowUpOutlined />}
-                  valueStyle={{ color: '#3f8600' }}
-                />
-              </Card>
-            </motion.div>
-          </Col>
-        </Row>
+        <Row gutter={[16, 16]} className="mb-6" ref={parent}></Row>
 
         {/* Main Content Area - Full Width Order Management */}
         <Row className="flex-1">
@@ -156,7 +113,7 @@ const OrderDashboard = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-base font-semibold">Order Management</span>
                   <Space>
-                    <Button icon={<FilterOutlined />} size="small">Filter</Button>
+                    {/* <Button icon={<FilterOutlined />} size="small">Filter</Button> */}
                     <Button 
                       type="primary" 
                       icon={<PlusOutlined />} 
@@ -182,9 +139,13 @@ const OrderDashboard = () => {
                 className="h-full flex flex-col"
                 style={{ flex: 1 }}
               >
-                <TabPane tab="All Order" key="all">
+                <TabPane tab="All Orders" key="all">
                   <div className="h-[calc(100vh-320px)] overflow-auto">
-                    <OrderTable orders={orders} onRefresh={handleRefresh} />
+                    <OrderTable 
+                      orders={orders} 
+                      onRefresh={handleRefresh}
+                      key={JSON.stringify(orders)} // Force re-render when orders change
+                    />
                   </div>
                 </TabPane>
                 <TabPane tab="In Progress" key="in_progress">
@@ -211,26 +172,13 @@ const OrderDashboard = () => {
                     <OrderTable orders={orders.filter(order => order.status === 'completed')} onRefresh={handleRefresh} />
                   </div>
                 </TabPane>
-                <TabPane tab="Priority" key="reorder">
+                <TabPane tab="Priority" key="priority">
                   <div className="h-full overflow-auto">
                     <ReorderableTable 
-                      orders={Array.isArray(orders) ? orders.map(order => ({
-                        ...order,
-                        key: order.id || order.production_order,
-                        id: order.id || order.production_order
-                      })) : []} 
-                      onOrdersReorder={(newOrders) => {
-                        console.log('Orders reordered:', newOrders);
-                        message.success('Order sequence updated successfully');
-                      }} 
+                      orders={orders}
                     />
                   </div>
                 </TabPane>
-                {/* <TabPane tab="Workcenter" key="workcenter">
-                  <div className="h-full overflow-auto">
-                    <Workcenter />
-                  </div>
-                </TabPane> */}
               </Tabs>
             </Card>
           </Col>

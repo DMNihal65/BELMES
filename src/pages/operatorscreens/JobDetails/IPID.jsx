@@ -44,7 +44,7 @@ const IPID = () => {
   const handleIPIDClick = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/open-exe', { method: 'POST' });
+      const response = await fetch('http://172.18.7.155:3001/open-exe', { method: 'POST' });
       if (response.ok) {
         console.log('QMS application opened successfully');
       } else {

@@ -40,7 +40,7 @@ const useOrderStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://localhost:8002/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.155:8002/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -99,7 +99,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://localhost:8002/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -152,7 +152,7 @@ const useOrderStore = create((set, get) => ({
         const token = localStorage.getItem('token');
         if (token) {
           const documentsResponse = await fetch(
-            `http://localhost:8002/api/v1/document-management/documents/by-part-number-all/${transformedData.partNumber}`,
+            `http://172.18.7.155:8002/api/v1/document-management/documents/by-part-number-all/${transformedData.partNumber}`,
             {
               method: 'GET',
               headers: {
@@ -223,7 +223,7 @@ const useOrderStore = create((set, get) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://localhost:8002/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.155:8002/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -268,7 +268,7 @@ const useOrderStore = create((set, get) => ({
 
       console.log('Sending order data:', orderData);
 
-      const response = await fetch('http://localhost:8002/api/v1/planning/save-to-db', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/planning/save-to-db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,7 +327,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://localhost:8002/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -382,7 +382,7 @@ const useOrderStore = create((set, get) => ({
       formData.append('doc_type', 'MPP');
       formData.append('metadata', JSON.stringify({}));
 
-      const response = await fetch('http://localhost:8002/api/v1/document-management/documents/upload-by-type', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/document-management/documents/upload-by-type', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -413,7 +413,7 @@ const useOrderStore = create((set, get) => ({
       formData.append('doc_type', 'ENGINEERING_DRAWING');
       formData.append('metadata', JSON.stringify({}));
 
-      const response = await fetch('http://localhost:8002/api/v1/document-management/documents/upload-by-type', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/document-management/documents/upload-by-type', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -436,7 +436,7 @@ const useOrderStore = create((set, get) => ({
   fetchTimelineData: async () => {
     set({ isLoadingTimeline: true, timelineError: null });
     try {
-      const response = await fetch('http://localhost:8002/api/v1/scheduling/part-production-timeline/');
+      const response = await fetch('http://172.18.7.155:8002/api/v1/scheduling/part-production-timeline/');
       const data = await response.json();
       
       if (!response.ok) {
@@ -484,7 +484,7 @@ const useOrderStore = create((set, get) => ({
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(
-        `http://localhost:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.155:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           method: 'GET',
           headers: {
@@ -570,7 +570,7 @@ const useOrderStore = create((set, get) => ({
       set({ isLoading: true, error: null });
 
       // First, fetch all orders to get the correct order_ids
-      const allOrdersResponse = await fetch('http://localhost:8002/api/v1/planning/all_orders');
+      const allOrdersResponse = await fetch('http://172.18.7.155:8002/api/v1/planning/all_orders');
       const allOrdersData = await allOrdersResponse.json();
 
       if (!allOrdersResponse.ok) {
@@ -591,7 +591,7 @@ const useOrderStore = create((set, get) => ({
 
       // Make the priority update request using the order IDs from all_orders
       const response = await fetch(
-        `http://localhost:8002/api/v1/planning/order/${order1.id}/priority`,
+        `http://172.18.7.155:8002/api/v1/planning/order/${order1.id}/priority`,
         {
           method: 'PUT',
           headers: {

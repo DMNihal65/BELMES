@@ -17,8 +17,20 @@ const useWebSocketStore = create((set, get) => ({
 
   initializeWebSocket: (machineId) => {
     if (!machineId) {
-      console.error('No machine ID provided for WebSocket connection');
-      return;
+      // Try to get machine ID from localStorage
+      const storedMachine = localStorage.getItem('currentMachine');
+      if (storedMachine) {
+        try {
+          const machineData = JSON.parse(storedMachine);
+          machineId = machineData.id;
+        } catch (error) {
+          console.error('Error parsing stored machine data:', error);
+          return;
+        }
+      } else {
+        console.error('No machine ID provided for WebSocket connection');
+        return;
+      }
     }
 
     const currentSocket = get().socket;
@@ -29,7 +41,7 @@ const useWebSocketStore = create((set, get) => ({
 
     try {
       console.log(`Connecting WebSocket for machine: ${machineId}`);
-      const ws = new WebSocket('ws://localhost:8002/production_monitoring/ws/live-status/');
+      const ws = new WebSocket('ws://172.18.7.88:6970/production_monitoring/ws/live-status/');
       
       ws.onopen = () => {
         console.log('WebSocket Connected Successfully');
@@ -143,10 +155,22 @@ const useWebSocketStore = create((set, get) => ({
   fetchMachineOperations: async (machineId) => {
     try {
       set({ loading: true });
-      console.log(`Fetching operations for machine ID: ${machineId}`);
       
+      // Ensure we have a valid machine ID
+      if (!machineId) {
+        const storedMachine = localStorage.getItem('currentMachine');
+        if (storedMachine) {
+          const machineData = JSON.parse(storedMachine);
+          machineId = machineData?.id;
+        }
+        
+        if (!machineId) {
+          throw new Error('No machine ID available');
+        }
+      }
+
       const response = await fetch(
-        `http://localhost:8002/api/v1/operator/machines/${machineId}/operations`
+        `http://172.18.7.88:6970/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -154,7 +178,6 @@ const useWebSocketStore = create((set, get) => ({
       }
 
       const data = await response.json();
-      console.log('API Response:', data);
       
       // Format operations data
       const formattedOperations = {
@@ -178,7 +201,9 @@ const useWebSocketStore = create((set, get) => ({
         }))
       };
 
-      // Format current job data from the first order
+      // Store operations data
+      localStorage.setItem('operationsData', JSON.stringify(formattedOperations));
+      
       let currentJob = null;
       if (data.orders && data.orders.length > 0) {
         const order = data.orders[0];
@@ -197,7 +222,7 @@ const useWebSocketStore = create((set, get) => ({
             id: order.order_id,
             name: order.project_details.project_name,
             priority: order.priority,
-            delivery_date: new Date().toISOString() // Default as it's not in the API
+            delivery_date: new Date().toISOString()
           },
           partNumber: order.part_number,
           partName: order.material_description,
@@ -206,41 +231,38 @@ const useWebSocketStore = create((set, get) => ({
           jobDetails: {
             customer: order.sales_order.split('/')[0] || 'BEL',
             orderNumber: order.production_order,
-            dueDate: new Date().toISOString(), // Default as it's not in the API
+            dueDate: new Date().toISOString(),
             orderQuantity: order.required_qty,
-            completedQuantity: Math.floor(order.required_qty * 0.6), // Example calculation
-            remainingQuantity: Math.ceil(order.required_qty * 0.4), // Example calculation
+            completedQuantity: Math.floor(order.required_qty * 0.6),
+            remainingQuantity: Math.ceil(order.required_qty * 0.4),
             partnumber: order.part_number,
             partname: order.material_description,
             parameters: {
               orderNumber: order.production_order,
               customer: order.sales_order.split('/')[0] || 'BEL',
-              dueDate: new Date().toISOString() // Default as it's not in the API
+              dueDate: new Date().toISOString()
             }
           },
           machine: {
-            id: data.machine.id.toString(),
-            name: data.machine.make,
-            status: 'IDLE', // Default
-            efficiency: 92, // Default
-            currentCycle: '02:45', // Default
-            nextMaintenance: '4hrs', // Default
-            alerts: 0, // Default
+            ...data.machine,
+            status: 'IDLE',
+            efficiency: 92,
+            currentCycle: '02:45',
+            nextMaintenance: '4hrs',
+            alerts: 0,
             totalParts: order.required_qty,
-            completedParts: Math.floor(order.required_qty * 0.6), // Example calculation
-            parameters: {
-              speed: '1200 RPM', // Default
-              feed: '300 mm/min', // Default
-              temperature: '28°C' // Default
-            }
+            completedParts: Math.floor(order.required_qty * 0.6)
           },
           quality: {
-            inspectionPoints: 5, // Default
-            completedInspections: 3, // Default
-            lastInspection: '11:30 AM', // Default
-            deviations: 0 // Default
+            inspectionPoints: 5,
+            completedInspections: 3,
+            lastInspection: '11:30 AM',
+            deviations: 0
           }
         };
+
+        // Store job data
+        localStorage.setItem('currentJobData', JSON.stringify(currentJob));
       }
 
       set({ 
@@ -259,11 +281,33 @@ const useWebSocketStore = create((set, get) => ({
       };
     } catch (error) {
       console.error('Error fetching machine operations:', error);
+      
+      // Try to load from localStorage on error
+      const storedOperations = localStorage.getItem('operationsData');
+      const storedJobData = localStorage.getItem('currentJobData');
+      
+      if (storedOperations && storedJobData) {
+        const parsedOperations = JSON.parse(storedOperations);
+        const parsedJobData = JSON.parse(storedJobData);
+        
+        set({
+          machineOperations: parsedOperations,
+          jobData: parsedJobData,
+          loading: false
+        });
+        
+        return {
+          success: true,
+          data: {
+            operations: parsedOperations,
+            jobData: parsedJobData,
+            orders: [parsedJobData] // Include orders for consistency
+          }
+        };
+      }
+      
       set({ loading: false });
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   },
 
@@ -273,7 +317,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting machine issue for machine ID: ${machineId}`, payload);
       
       const response = await fetch(
-        `http://localhost:8002/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://172.18.7.88:6970/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -326,7 +370,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting component issue for part number: ${partNumber}`, payload);
       
       const response = await fetch(
-        `http://localhost:8002/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://172.18.7.88:6970/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -370,7 +414,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://localhost:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:6970/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -406,7 +450,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://localhost:8002/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        `http://172.18.7.88:6970/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

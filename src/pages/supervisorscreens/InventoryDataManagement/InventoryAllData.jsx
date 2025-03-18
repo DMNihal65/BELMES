@@ -525,7 +525,7 @@ const InventoryAllData = () => {
 
           try {
             const response = await axios.post(
-              'http://localhost:8002/api/v1/api/inventory/items/bulk/',
+              'http://172.18.7.88:6970/api/v1/api/inventory/items/bulk/',
               {
                 created_by: 1,
                 subcategory_id: selectedCategory.id,
@@ -653,14 +653,15 @@ const InventoryAllData = () => {
           setExpandedKeys(prevKeys => [...prevKeys, `category-${newCategory.id}`]);
         }
       } else if (modalType === 'subcategory') {
-        // Transform dynamic fields into required format
+        // Transform dynamic fields into required format while preserving order
         const dynamicFields = {};
-        values.dynamic_fields?.forEach(field => {
+        values.dynamic_fields?.forEach((field, index) => {
           if (field.name) {
             dynamicFields[field.name] = {
               type: field.type,
               required: field.required || false,
-              unit: field.unit || null
+              unit: field.unit || null,
+              order: index // Store the order of fields
             };
           }
         });
@@ -668,23 +669,13 @@ const InventoryAllData = () => {
         const isEditing = rightClickedNode?.data?.id && !rightClickedNode?.key?.startsWith('category-');
         
         if (isEditing) {
-          // For updating existing subcategory
-          const updateData = {
+          result = await updateSubcategory(rightClickedNode.data.id, {
             name: values.name,
             description: values.description,
             category_id: rightClickedNode.data.category_id,
-            dynamic_fields: rightClickedNode.data.dynamic_fields || {} // Use existing dynamic fields
-          };
-
-          // If new dynamic fields are defined, update them
-          if (Object.keys(dynamicFields).length > 0) {
-            updateData.dynamic_fields = dynamicFields;
-          }
-
-          console.log('Updating subcategory with data:', updateData);
-          result = await updateSubcategory(rightClickedNode.data.id, updateData);
+            dynamic_fields: dynamicFields
+          });
         } else {
-          // For creating new subcategory
           result = await addSubcategory({
             name: values.name,
             description: values.description,
@@ -1045,7 +1036,11 @@ const InventoryAllData = () => {
     // Get the subcategory to access its dynamic fields
     const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
     if (subcategory?.dynamic_fields) {
-      Object.entries(subcategory.dynamic_fields).forEach(([fieldName, fieldConfig]) => {
+      // Get dynamic fields in the order they were defined
+      const orderedDynamicFields = Object.entries(subcategory.dynamic_fields)
+        .sort((a, b) => (a[1].order || 0) - (b[1].order || 0));
+
+      orderedDynamicFields.forEach(([fieldName, fieldConfig]) => {
         const uniqueValues = [...new Set(items
           .filter(item => item.subcategory_id === selectedCategory.id)
           .map(item => item.dynamic_data?.[fieldName])
@@ -1201,6 +1196,10 @@ const InventoryAllData = () => {
       return null;
     }
 
+    // Get dynamic fields in the order they were defined
+    const orderedDynamicFields = Object.entries(subcategory.dynamic_fields || {})
+      .sort((a, b) => (a[1].order || 0) - (b[1].order || 0));
+
     return (
       <Form
         form={form}
@@ -1354,26 +1353,17 @@ const InventoryAllData = () => {
         
         <div style={{ 
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)', // Exactly 4 columns
+          gridTemplateColumns: 'repeat(4, 1fr)',
           gap: '16px',
           marginBottom: '24px'
         }}>
-          {Object.entries(subcategory.dynamic_fields || {}).map(([fieldName, config], index) => (
+          {orderedDynamicFields.map(([fieldName, config], index) => (
             <Form.Item
               key={fieldName}
               name={['dynamic_data', fieldName]}
               label={
                 <Space>
                   {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
-                  {/* <Tag color={
-                    config.type === 'number' ? 'blue' :
-                    config.type === 'boolean' ? 'green' :
-                    config.type === 'date' ? 'purple' : 
-                    'default'
-                  }>
-                    {config.type.toUpperCase()}
-                  </Tag> */}
-                  {/* {config.required && <Tag color="red">Required</Tag>} */}
                 </Space>
               }
               rules={[
@@ -1394,7 +1384,7 @@ const InventoryAllData = () => {
               }
               style={{ 
                 margin: 0,
-                minWidth: 0 // Ensures content fits in grid cell
+                minWidth: 0
               }}
             >
               {config.type === 'number' ? (

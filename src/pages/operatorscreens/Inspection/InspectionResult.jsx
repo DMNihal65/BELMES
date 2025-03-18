@@ -60,34 +60,15 @@ function InspectionResult() {
       setSelectedPartNumber(value);
       setSelectedOrderId(value);
       
-      // Use the correct endpoint
-      const response = await axios.get(
-        `http://localhost:8002/quality/inspection/${value}/detailed`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const inspectionData = await qualityStore.fetchInspectionByOrderId(value);
+      console.log('Received inspection data:', inspectionData);
+      setInspectionData(inspectionData);
       
-      console.log('Received inspection data:', response.data);
-      
-      // Transform the data to match the expected structure
-      const transformedData = [{
-        key: response.data.order_id,
-        order_id: response.data.order_id,
-        production_order: response.data.production_order,
-        part_number: response.data.part_number,
-        operations: response.data.operations || [],
-        inspection_data: response.data.inspection_data || []
-      }];
-      
-      setInspectionData(transformedData);
     } catch (error) {
       console.error('Error fetching inspection details:', error);
+      message.error('Failed to load inspection data');
       
-      // If there's an error, set empty data with the structure
+      // Set empty data with the structure
       setInspectionData([{
         key: value,
         order_id: value,
@@ -96,8 +77,6 @@ function InspectionResult() {
         operations: [],
         inspection_data: []
       }]);
-      
-      message.error('Failed to load inspection data');
     } finally {
       setLoading(false);
     }
@@ -126,47 +105,18 @@ function InspectionResult() {
     }
   };
 
-  const handleLaunchQMS = () => {
-    setIsLaunching(true);
-    setIsQmsModalVisible(false);
-    
-    // Show the loading modal
-    Modal.info({
-      title: 'Launching QMS Software',
-      content: (
-        <div className="py-8 text-center">
-          <div className="mb-6">
-            <LoadingOutlined style={{ fontSize: 48 }} spin />
-          </div>
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Please wait while QMS software is launching...</h3>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-64 bg-gray-200 rounded-full h-2 overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full animate-progress"
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <p className="text-gray-500 text-sm">This may take a few moments</p>
-            </div>
-          </div>
-        </div>
-      ),
-      icon: null,
-      closable: false,
-      maskClosable: false,
-      centered: true,
-      okButtonProps: { style: { display: 'none' } },
-      width: 400,
-      className: "qms-loading-modal"
-    });
+  const handleLaunchQMS = async () => {
+    try {
+      // Use the custom protocol handler to launch QMS
+      window.location.href = "belmes://launch-qms";
+      
+      // Close the QMS modal
+      setIsQmsModalVisible(false);
 
-    // Auto close the loading modal after 5 seconds
-    setTimeout(() => {
-      Modal.destroyAll();
-      setIsLaunching(false);
-      message.success('QMS software launched successfully');
-    }, 5000);
+    } catch (error) {
+      console.error('Failed to launch QMS:', error);
+      message.error('Failed to launch QMS software');
+    }
   };
 
   const measurementColumns = [

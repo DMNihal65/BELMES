@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import moment from 'moment';
 import axios from 'axios';
+import useDynamicStore from '../../../../store/dynamic-store';
 
 const { Option } = Select;
 
@@ -110,9 +111,6 @@ const getTimeRange = (viewType, dateRange) => {
 const DynamicSchedulingGraph2 = () => {
   const [timelineRef, setTimelineRef] = useState(null);
   const [timelineContainerRef, setTimelineContainerRef] = useState(null);
-  const [scheduleData, setScheduleData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState(null);
   const [viewType, setViewType] = useState('week');
   const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
@@ -120,31 +118,31 @@ const DynamicSchedulingGraph2 = () => {
   const [productionOrders, setProductionOrders] = useState([]);
   const [components, setComponents] = useState([]);
 
+  // Get store values and functions
+  const { scheduleData, loading, error, fetchDynamicScheduleData } = useDynamicStore();
+
   const fetchScheduleData = async () => {
-    setLoading(true);
     try {
-      const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
-      // const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
-      setScheduleData(response.data);
+      const data = await fetchDynamicScheduleData();
       
       // Extract unique production orders and components from all operation types
       const uniqueProductionOrders = new Set();
       const uniqueComponents = new Set();
       
       // From scheduled operations
-      response.data.scheduled_operations.forEach(op => {
+      data.scheduled_operations.forEach(op => {
         if (op.production_order) uniqueProductionOrders.add(op.production_order);
         if (op.component) uniqueComponents.add(op.component);
       });
       
       // From production logs
-      response.data.production_logs.forEach(log => {
+      data.production_logs.forEach(log => {
         if (log.production_order) uniqueProductionOrders.add(log.production_order);
         if (log.part_number) uniqueComponents.add(log.part_number);
       });
       
       // From rescheduled operations
-      response.data.reschedule.forEach(reschedule => {
+      data.reschedule.forEach(reschedule => {
         if (reschedule.production_order) uniqueProductionOrders.add(reschedule.production_order);
         if (reschedule.part_number) uniqueComponents.add(reschedule.part_number);
       });
@@ -152,10 +150,9 @@ const DynamicSchedulingGraph2 = () => {
       setProductionOrders(Array.from(uniqueProductionOrders).sort());
       setComponents(Array.from(uniqueComponents).sort());
       
-      setLoading(false);
     } catch (err) {
-      setError('Failed to fetch schedule data');
-      setLoading(false);
+      // Error handling is managed by the store
+      console.error('Error fetching schedule data:', err);
     }
   };
 

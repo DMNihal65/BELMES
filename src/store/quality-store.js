@@ -26,7 +26,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://localhost:8002/api/v1/planning/all_orders',
+        'http://172.18.7.88:6970/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -52,22 +52,34 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://localhost:8002/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.88:6970/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
       console.log('Inspection data received:', response.data);
-      return response.data;
+      
+      // Transform the data to match the expected structure
+      const transformedData = [{
+        key: response.data.order_id,
+        order_id: response.data.order_id,
+        production_order: response.data.production_order,
+        part_number: response.data.part_number,
+        operations: response.data.operations || [],
+        inspection_data: response.data.inspection_data || []
+      }];
+      
+      return transformedData;
     } catch (error) {
       if (error.response?.status === 404) {
         console.log('No inspection data found for order ID:', orderId);
-        return {
+        return [{
+          key: orderId,
           order_id: orderId,
           production_order: '',
           part_number: '',
           operations: [],
           inspection_data: []
-        };
+        }];
       }
       if (error.response?.status === 401) {
         console.error('Authentication failed. Please log in again.');
@@ -83,7 +95,7 @@ class QualityStore {
       console.log(`Attempting to fetch inspection details for Order ID: ${orderId}`);
       
       const response = await axios.get(
-        `http://localhost:8002/quality/master-boc/ipids/${orderId}`,
+        `http://172.18.7.88:6970/quality/master-boc/ipids/${orderId}`,
         this.getAuthHeaders()
       );
       
@@ -120,7 +132,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://localhost:8002/api/v1/quality/run',
+        'http://172.18.7.88:6970/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;

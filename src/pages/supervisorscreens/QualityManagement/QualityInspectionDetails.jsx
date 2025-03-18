@@ -65,50 +65,18 @@ const QualityInspectionDetails = ({
     }
   };
 
-  const handleLaunchQMS = () => {
-    setIsLaunching(true);
-    
-    // Close the QMS modal
-    setIsQmsModalVisible(false);
-    
-    // Show the loading modal
-    Modal.info({
-      title: 'Launching QMS Software',
-      content: (
-        <div className="py-8 text-center">
-          <div className="mb-6">
-            <LoadingOutlined style={{ fontSize: 48 }} spin />
-          </div>
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Please wait while QMS software is launching...</h3>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-64 bg-gray-200 rounded-full h-2 overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full animate-progress"
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <p className="text-gray-500 text-sm">This may take a few moments</p>
-            </div>
-          </div>
-        </div>
-      ),
-      icon: null,
-      closable: false,
-      maskClosable: false,
-      centered: true,
-      okButtonProps: { style: { display: 'none' } },
-      width: 400,
-      className: "qms-loading-modal",
-      onOk: () => setIsLaunching(false)
-    });
+  const handleLaunchQMS = async () => {
+    try {
+      // Use the custom protocol handler to launch QMS
+      window.location.href = "belmes://launch-qms";
+      
+      // Close the QMS modal
+      setIsQmsModalVisible(false);
 
-    // Auto close the loading modal after 5 seconds and show success message
-    setTimeout(() => {
-      Modal.destroyAll();
-      setIsLaunching(false);
-      message.success('QMS software launched successfully');
-    }, 5000);
+    } catch (error) {
+      console.error('Failed to launch QMS:', error);
+      message.error('Failed to launch QMS software');
+    }
   };
 
   // Check if we have data
@@ -186,15 +154,6 @@ const QualityInspectionDetails = ({
     }
   ];
 
-  // Add this function to check if any operations have data
-  const hasAnyOperationData = () => {
-    if (!inspectionDetails?.operation_groups || inspectionDetails.operation_groups.length === 0) {
-      return false;
-    }
-    
-    return inspectionDetails.operation_groups.some(group => group.details);
-  };
-
   const items = [
     {
       key: 'details',
@@ -212,10 +171,10 @@ const QualityInspectionDetails = ({
                 Inspection Details
               </Typography.Title>
               <Tag 
-                color={hasAnyOperationData() ? "success" : "error"} 
+                color={hasData ? "success" : "error"} 
                 className="px-3 py-1"
               >
-                {hasAnyOperationData() ? "Data Available" : "No Data"}
+                {hasData ? "Data Available" : "No Data"}
               </Tag>
             </div>
           }

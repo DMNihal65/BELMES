@@ -76,7 +76,7 @@ const mockJobData = {
     nextMaintenance: '4hrs',
     alerts: 2,
     totalParts: 120,
-    completedParts: 75,
+    completedParts: 5,
     parameters: {
       speed: '1200 RPM',
       feed: '300 mm/min',
@@ -155,33 +155,70 @@ const JobDetails = () => {
 
   // Initialize WebSocket when component mounts
   useEffect(() => {
-    if (currentMachine?.id) {
-      console.log('Initializing WebSocket with machine ID:', currentMachine.id);
-      initializeWebSocket(currentMachine.id);
-    }
-    
+    const initializeData = async () => {
+      // Get machine data from localStorage
+      const storedMachine = localStorage.getItem('currentMachine');
+      if (storedMachine) {
+        try {
+          const machineData = JSON.parse(storedMachine);
+          if (machineData?.id) {
+            // Initialize WebSocket
+            initializeWebSocket(machineData.id);
+            
+            // Fetch machine operations and job data
+            const result = await fetchMachineOperations(machineData.id);
+            
+            if (result?.success) {
+              // Update job data
+              if (result.data?.jobData) {
+                setJobData(result.data.jobData);
+                setJobOrderData(result.data.orders?.[0] || null);
+              }
+              
+              // If we have part number, fetch documents
+              if (result.data?.jobData?.part_number) {
+                await fetchDocuments(result.data.jobData.part_number);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error initializing data:', error);
+        }
+      }
+    };
+
+    initializeData();
+
     return () => {
-      console.log('Cleaning up WebSocket connection');
       closeWebSocket();
     };
-  }, [currentMachine?.id]);
+  }, []); // Empty dependency array for initial load
 
   // Update machine status from WebSocket
   useEffect(() => {
     if (machineStatus) {
-      console.log('Received machine status update:', machineStatus);
-      setJobData(prev => ({
-        ...prev,
+      const storedMachine = localStorage.getItem('currentMachine');
+      const machineData = storedMachine ? JSON.parse(storedMachine) : null;
+      
+      // Get current job data from localStorage or state
+      const storedJobData = localStorage.getItem('currentJobData');
+      const currentJobData = storedJobData ? JSON.parse(storedJobData) : jobData;
+      
+      const updatedJobData = {
+        ...currentJobData,
         machine: {
-          ...prev.machine,
+          ...currentJobData?.machine,
           status: machineStatus.status,
-          id: machineStatus.machine_id,
-          name: machineStatus.machine_name,
+          id: machineStatus.machine_id || machineData?.id,
+          name: machineStatus.machine_name || machineData?.name,
           completedParts: machineStatus.part_count || 0,
           current_order: machineStatus.production_order || 'N/A',
           current_operation: machineStatus.operation_description || 'N/A'
         }
-      }));
+      };
+      
+      setJobData(updatedJobData);
+      localStorage.setItem('jobData', JSON.stringify(updatedJobData));
     }
   }, [machineStatus]);
 
@@ -258,6 +295,21 @@ const JobDetails = () => {
 
     fetchJobData();
   }, [currentMachine?.id, fetchMachineOperations]);
+
+  // Add an effect to handle machine operations updates
+  useEffect(() => {
+    const storedMachine = localStorage.getItem('currentMachine');
+    if (storedMachine) {
+      try {
+        const machineData = JSON.parse(storedMachine);
+        if (machineData?.id && (!jobData || !jobData.machine?.id)) {
+          fetchMachineOperations(machineData.id);
+        }
+      } catch (error) {
+        console.error('Error fetching machine operations:', error);
+      }
+    }
+  }, [jobData]);
 
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
@@ -362,6 +414,18 @@ const JobDetails = () => {
         };
     }
   };
+
+  // Add effect to restore data from localStorage on mount
+  useEffect(() => {
+    const storedJobData = localStorage.getItem('jobData');
+    if (storedJobData) {
+      try {
+        setJobData(JSON.parse(storedJobData));
+      } catch (error) {
+        console.error('Error parsing stored job data:', error);
+      }
+    }
+  }, []);
 
   return (
     <Layout className="h-screen flex flex-col bg-gray-50">

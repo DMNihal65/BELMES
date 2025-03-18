@@ -330,44 +330,93 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     }
   };
 
+  const handleMppFileChange = (info) => {
+    if (info.fileList.length > 0) {
+      setMppFile(info.fileList[0].originFileObj);
+    } else {
+      setMppFile(null);
+    }
+  };
+
+  const handleDrawingFileChange = (info) => {
+    if (info.fileList.length > 0) {
+      setDrawingFile(info.fileList[0].originFileObj);
+    } else {
+      setDrawingFile(null);
+    }
+  };
+
   const handleManualSubmit = async (values) => {
     try {
-      // Validate document names
-      if (mppFile && !mppDocName.trim()) {
-        message.error('Please enter MPP document name');
-        return;
-      }
-      if (drawingFile && !drawingDocName.trim()) {
-        message.error('Please enter Engineering Drawing document name');
-        return;
+      // First create the order with basic information
+      const orderData = {
+        production_order: values.production_order,
+        sale_order: values.sale_order,
+        wbs_element: values.wbs_element,
+        part_number: values.part_number,
+        part_description: values.part_description,
+        total_operations: values.total_operations,
+        required_quantity: values.required_quantity,
+        launched_quantity: values.launched_quantity,
+        plant_id: values.plant_id,
+        project_name: values.project_name
+      };
+
+      // Create FormData for MPP document if either file exists or document exists
+      let mppFormData = null;
+      if (mppFile || documents?.mpp_document) {
+        mppFormData = new FormData();
+        if (mppFile) {
+          // If new file is uploaded
+          mppFormData.append('file', mppFile);
+          mppFormData.append('name', mppDocName);
+          mppFormData.append('doc_type', 'MPP');
+          mppFormData.append('part_number', values.part_number);
+          mppFormData.append('description', mppDescription);
+          mppFormData.append('version', mppVersion);
+        } else if (documents?.mpp_document) {
+          // If using existing document
+          mppFormData.append('file', documents.mpp_document.latest_version.file_url);
+          mppFormData.append('name', documents.mpp_document.name);
+          mppFormData.append('doc_type', 'MPP');
+          mppFormData.append('part_number', values.part_number);
+          mppFormData.append('description', documents.mpp_document.description || '');
+          mppFormData.append('version', documents.mpp_document.latest_version.version_number);
+        }
       }
 
-      // Validate file objects
-      if (mppFile && !(mppFile instanceof File || mppFile.originFileObj)) {
-        message.error('Invalid MPP file format');
-        return;
-      }
-      if (drawingFile && !(drawingFile instanceof File || drawingFile.originFileObj)) {
-        message.error('Invalid Engineering Drawing file format');
-        return;
+      // Create FormData for Engineering Drawing if either file exists or document exists
+      let drawingFormData = null;
+      if (drawingFile || documents?.engineering_drawing_document) {
+        drawingFormData = new FormData();
+        if (drawingFile) {
+          // If new file is uploaded
+          drawingFormData.append('file', drawingFile);
+          drawingFormData.append('name', drawingDocName);
+          drawingFormData.append('doc_type', 'ENGINEERING_DRAWING');
+          drawingFormData.append('part_number', values.part_number);
+          drawingFormData.append('description', drawingDescription);
+          drawingFormData.append('version', drawingVersion);
+        } else if (documents?.engineering_drawing_document) {
+          // If using existing document
+          drawingFormData.append('file', documents.engineering_drawing_document.latest_version.file_url);
+          drawingFormData.append('name', documents.engineering_drawing_document.name);
+          drawingFormData.append('doc_type', 'ENGINEERING_DRAWING');
+          drawingFormData.append('part_number', values.part_number);
+          drawingFormData.append('description', documents.engineering_drawing_document.description || '');
+          drawingFormData.append('version', documents.engineering_drawing_document.latest_version.version_number);
+        }
       }
 
-      // First create the order
-      const result = await createManualOrder(
-        values,
-        mppFile,
-        drawingFile,
-        mppDocName.trim(),
-        mppDescription.trim(),
-        mppVersion.trim(),
-        drawingDocName.trim(),
-        drawingDescription.trim(),
-        drawingVersion.trim()
-      );
+      // Call createManualOrder with all the data
+      const result = await createManualOrder({
+        ...orderData,
+        mppFormData,
+        drawingFormData
+      });
 
-      // Handle file upload results
-      if (result.fileUploadError) {
-        message.warning('Order was saved but there was an issue uploading some files: ' + result.fileUploadError);
+      if (result.fileUploadErrors) {
+        message.warning('Order was saved but there were issues uploading some files: ' + result.fileUploadErrors.join(', '));
       } else {
         message.success('Order and documents saved successfully');
       }
@@ -523,20 +572,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       clearDocuments();
     }
   }, [visible, form]);
-
-  const handleMppFileChange = (info) => {
-    if (info.file && (info.file.originFileObj || info.file)) {
-      setMppFile(info.file.originFileObj || info.file);
-      console.log('MPP file selected:', info.file.originFileObj || info.file);
-    }
-  };
-
-  const handleDrawingFileChange = (info) => {
-    if (info.file && (info.file.originFileObj || info.file)) {
-      setDrawingFile(info.file.originFileObj || info.file);
-      console.log('Engineering Drawing file selected:', info.file.originFileObj || info.file);
-    }
-  };
 
   const renderOrderForm = () => (
     <Form

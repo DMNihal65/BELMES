@@ -314,6 +314,25 @@ const useWebSocketStore = create((set, get) => ({
   submitMachineIssue: async (machineId, payload) => {
     try {
       set({ maintenanceLoading: true });
+      
+      // Get machine ID from localStorage if not provided
+      if (!machineId) {
+        const storedMachine = localStorage.getItem('currentMachine');
+        if (storedMachine) {
+          try {
+            const machineData = JSON.parse(storedMachine);
+            machineId = machineData.id;
+          } catch (error) {
+            console.error('Error parsing stored machine data:', error);
+            throw new Error('No valid machine ID available');
+          }
+        }
+      }
+
+      if (!machineId) {
+        throw new Error('No machine ID available');
+      }
+
       console.log(`Submitting machine issue for machine ID: ${machineId}`, payload);
       
       const response = await fetch(

@@ -40,9 +40,11 @@ import QualityInspectionDetails from './pages/supervisorscreens/QualityManagemen
 import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
 
 const App = () => {
+
+  console.log("app version 1.0 deployed on 17-03-2025")
   return (
     <ConfigProvider>
-      <BrowserRouter>
+      <BrowserRouter basename="/belmes">
         <Routes>
           <Route path="/login" element={<Login />} />
           

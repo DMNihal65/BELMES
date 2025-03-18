@@ -41,7 +41,7 @@ const useWebSocketStore = create((set, get) => ({
 
     try {
       console.log(`Connecting WebSocket for machine: ${machineId}`);
-      const ws = new WebSocket('ws://172.18.7.88:6970/production_monitoring/ws/live-status/');
+      const ws = new WebSocket('ws://172.18.7.155:8002/production_monitoring/ws/live-status/');
       
       ws.onopen = () => {
         console.log('WebSocket Connected Successfully');
@@ -170,7 +170,7 @@ const useWebSocketStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/operator/machines/${machineId}/operations`
+        `http://172.18.7.155:8002/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -336,7 +336,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting machine issue for machine ID: ${machineId}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://172.18.7.155:8002/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -389,7 +389,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting component issue for part number: ${partNumber}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://172.18.7.155:8002/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -433,7 +433,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.155:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -469,7 +469,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        `http://172.18.7.155:8002/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

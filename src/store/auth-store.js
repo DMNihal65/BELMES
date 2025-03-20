@@ -177,6 +177,7 @@ const useAuthStore = create(
       setCurrentMachine: (machine) => set({ currentMachine: machine }),
       clearCurrentMachine: () => set({ currentMachine: null }),
     }),
+    
     {
       name: 'auth-storage',
       partialize: (state) => ({ token: state.token, user: state.user }),

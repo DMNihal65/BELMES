@@ -8,29 +8,18 @@ const { TextArea } = Input;
 
 const MachineIssueModal = ({ 
   visible, 
-  onClose, 
-  machineId
+  onClose
 }) => {
   const [form] = Form.useForm();
   const [issueType, setIssueType] = useState('machine');
   
   const { 
     submitMachineIssue, 
-    submitComponentIssue, 
-    fetchMachineOperations,
+    submitComponentIssue,
+    machineStatus,
     maintenanceLoading,
-    jobData // Get jobData from the store
+    jobData
   } = useWebSocketStore();
-
-  // Get current part number from jobData
-  const currentPartNumber = jobData?.part_number;
-
-  // Fetch machine operations when modal opens
-  useEffect(() => {
-    if (visible && machineId) {
-      fetchMachineOperations(machineId);
-    }
-  }, [visible, machineId, fetchMachineOperations]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -40,10 +29,51 @@ const MachineIssueModal = ({
     }
   }, [visible, form]);
 
+  // Get machine ID from localStorage
+  const getMachineId = () => {
+    try {
+      const storedMachine = localStorage.getItem('currentMachine');
+      if (storedMachine) {
+        const machineData = JSON.parse(storedMachine);
+        return machineData.id;
+      }
+    } catch (error) {
+      console.error('Error getting machine ID:', error);
+    }
+    return null;
+  };
+
+  // Get current part number from jobData
+  const getCurrentPartNumber = () => {
+    // First try to get from jobData
+    if (jobData?.part_number) {
+      return jobData.part_number;
+    }
+    
+    // Fallback to localStorage
+    try {
+      const storedJobData = localStorage.getItem('jobData');
+      if (storedJobData) {
+        const parsedJobData = JSON.parse(storedJobData);
+        return parsedJobData.part_number;
+      }
+    } catch (error) {
+      console.error('Error getting part number from localStorage:', error);
+    }
+    return null;
+  };
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
+      const machineId = getMachineId();
+      const partNumber = getCurrentPartNumber();
+
+      if (!machineId) {
+        message.error('No machine ID available');
+        return;
+      }
+
       let result;
       if (issueType === 'machine') {
         result = await submitMachineIssue(machineId, {
@@ -51,13 +81,12 @@ const MachineIssueModal = ({
           machineStatus: values.machineStatus
         });
       } else {
-        // Use current part number from jobData
-        if (!currentPartNumber) {
-          message.error('No part number available for current job');
+        if (!partNumber) {
+          message.error('No part number available for the current job');
           return;
         }
         
-        result = await submitComponentIssue(currentPartNumber, {
+        result = await submitComponentIssue(partNumber, {
           description: values.description,
           componentStatus: values.componentStatus
         });
@@ -73,6 +102,9 @@ const MachineIssueModal = ({
       console.error('Form validation failed:', error);
     }
   };
+
+  // Get current part number for display
+  const currentPartNumber = getCurrentPartNumber();
 
   return (
     <Modal
@@ -106,7 +138,7 @@ const MachineIssueModal = ({
         className="mt-4"
         initialValues={{ 
           issueType: 'machine',
-          machineStatus: 'ON'  // Default to ON
+          machineStatus: 'ON'
         }}
       >
         <Form.Item name="issueType">
@@ -152,7 +184,7 @@ const MachineIssueModal = ({
               </Select>
             </Form.Item>
             
-            {/* Show current part number from jobData */}
+            {/* Show current part number from job data */}
             <div className="mb-4 text-xs text-gray-500">
               Using part number: {currentPartNumber || 'No part number available'}
             </div>

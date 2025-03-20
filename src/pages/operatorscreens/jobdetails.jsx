@@ -387,7 +387,6 @@ const JobDetails = () => {
 
   const getTimerStyles = (status) => {
     switch (status) {
-      case 'IDLE':
       case 'ON':
         return {
           containerClass: 'bg-yellow-50 border-yellow-200',
@@ -427,6 +426,19 @@ const JobDetails = () => {
     }
   }, []);
 
+  const [lastUpdateTime, setLastUpdateTime] = useState('');
+
+  // Update the last updated time every minute
+  useEffect(() => {
+    if (machineStatus?.last_updated) {
+      const updateTimer = setInterval(() => {
+        setLastUpdateTime(formatDistanceToNow(parseISO(machineStatus.last_updated), { addSuffix: true }));
+      }, 60000);
+
+      return () => clearInterval(updateTimer);
+    }
+  }, [machineStatus?.last_updated]);
+
   return (
     <Layout className="h-screen flex flex-col bg-gray-50">
       {/* Top Header Bar */}
@@ -464,8 +476,12 @@ const JobDetails = () => {
                   <span className="font-semibold">Machine Status</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${getMachineStatusColor(machineStatus?.status).bgColor}`}>
-                    <span className={`w-2 h-2 rounded-full bg-${getMachineStatusColor(machineStatus?.status).color}-500 animate-pulse`} />
+                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
+                    getMachineStatusColor(machineStatus?.status).bgColor
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full bg-${
+                      getMachineStatusColor(machineStatus?.status).color
+                    }-500 animate-pulse`} />
                     <span className={getMachineStatusColor(machineStatus?.status).textColor}>
                       {machineStatus?.status || 'N/A'}
                     </span>
@@ -486,8 +502,8 @@ const JobDetails = () => {
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                      <div className="text-lg font-bold text-white">{machineStatus?.machine_name || 'No Machine Selected'}</div>
-                      <div className="text-white/80 text-sm">ID: {machineStatus?.machine_id}</div>
+                      <div className="text-lg font-bold text-white">{machineStatus?.machine_name || 'Loading...'}</div>
+                      <div className="text-white/80 text-sm">ID: {machineStatus?.machine_id || 'N/A'}</div>
                     </div>
                   </div>
                 </div>
@@ -505,7 +521,7 @@ const JobDetails = () => {
                     <div>
                       <div className="text-xs text-gray-500">Active Program</div>
                       <div className="font-medium truncate">
-                        {machineStatus?.active_program !== 'x' ? machineStatus?.active_program : 'No Program'}
+                        {machineStatus?.active_program || 'x'}
                       </div>
                     </div>
                     <div>
@@ -524,14 +540,46 @@ const JobDetails = () => {
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500">Last Updated</div>
-                      <div className="font-medium text-xs">
-                        {machineStatus?.last_updated ? 
-                          formatDistanceToNow(parseISO(machineStatus.last_updated), { addSuffix: true }) : 
-                          'N/A'}
+                      <div className="text-xs text-gray-500">Part Count</div>
+                      <div className="font-medium">
+                        {machineStatus?.part_count || '0'}
                       </div>
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">Operation</div>
+                      <div className="font-medium truncate">
+                        {machineStatus?.operation_number 
+                          ? `${machineStatus.operation_number} - ${machineStatus.operation_description || ''}`
+                          : 'No Operation'
+                        }
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Last Updated</div>
+                      <div className="font-medium text-xs">
+                        {machineStatus?.last_updated 
+                          ? formatDistanceToNow(parseISO(machineStatus.last_updated), { addSuffix: true })
+                          : 'N/A'
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  {machineStatus?.part_number && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <div className="text-xs text-gray-500">Production Order</div>
+                      <div className="font-medium">
+                        {machineStatus.production_order || 'N/A'}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">Part Details</div>
+                      <div className="text-sm">
+                        {machineStatus.part_number} - {machineStatus.part_description || 'N/A'}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Timer Display - Always Visible */}
@@ -540,15 +588,17 @@ const JobDetails = () => {
                     <div className="flex items-center gap-2">
                       <Clock className={`w-4 h-4 ${getTimerStyles(machineStatus?.status).iconClass}`} />
                       <span className={`text-sm ${getTimerStyles(machineStatus?.status).textClass}`}>
-                        {machineStatus?.status === 'IDLE' || machineStatus?.status === 'ON' 
+                        {machineStatus?.status === 'ON' && !machineStatus?.job_in_progress
                           ? 'Idle Time'
                           : machineStatus?.status === 'PRODUCTION'
                           ? 'Production Time'
-                          : 'IDLE Time'}
+                          : machineStatus?.status === 'OFF'
+                          ? 'Machine OFF'
+                          : 'Status Unknown'}
                       </span>
                     </div>
                     <div className={`text-lg font-mono font-bold ${getTimerStyles(machineStatus?.status).textClass}`}>
-                      {formatIdleTime(idleTime)}
+                      {machineStatus?.status === 'OFF' ? '--:--:--' : formatIdleTime(idleTime)}
                     </div>
                   </div>
                   {/* Status Indicator */}
@@ -1072,7 +1122,6 @@ const JobDetails = () => {
       {process.env.NODE_ENV === 'development' && (
         <div className="fixed bottom-4 right-4 bg-black/80 text-white p-2 rounded text-xs">
           <div>WebSocket: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
-          <div>Machine ID: {currentMachine?.id}</div>
           <div>Last Status: {machineStatus?.status}</div>
           {machineStatus?.error && <div className="text-red-400">Error: {machineStatus.error}</div>}
         </div>

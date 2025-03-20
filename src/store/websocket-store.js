@@ -17,7 +17,6 @@ const useWebSocketStore = create((set, get) => ({
 
   initializeWebSocket: (machineId) => {
     if (!machineId) {
-      // Try to get machine ID from localStorage
       const storedMachine = localStorage.getItem('currentMachine');
       if (storedMachine) {
         try {
@@ -27,96 +26,131 @@ const useWebSocketStore = create((set, get) => ({
           console.error('Error parsing stored machine data:', error);
           return;
         }
-      } else {
-        console.error('No machine ID provided for WebSocket connection');
-        return;
       }
     }
 
-    const currentSocket = get().socket;
-    if (currentSocket?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected');
-      return;
-    }
-
-    try {
-      console.log(`Connecting WebSocket for machine: ${machineId}`);
-      const ws = new WebSocket('ws://172.18.7.88:6970/production_monitoring/ws/live-status/');
-      
-      ws.onopen = () => {
-        console.log('WebSocket Connected Successfully');
+    // Restore machine status from localStorage on initialization
+    const storedStatus = localStorage.getItem('machineStatus');
+    if (storedStatus) {
+      try {
+        const parsedStatus = JSON.parse(storedStatus);
         set({ 
-          isConnected: true, 
-          socket: ws, 
-          error: null,
-          reconnectAttempts: 0
-        });
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          // Find the machine data that matches the logged-in machine ID
-          const machineData = data.find(machine => machine.machine_id === parseInt(machineId));
-          
-          if (machineData) {
-            const prevStatus = get().machineStatus?.status;
-            const newStatus = machineData.status;
-
-            // Improved idle timer logic
-            if ((newStatus === 'IDLE' || newStatus === 'ON')) {
-              // If status is IDLE/ON and we don't have a start time, set one
-              if (!get().idleStartTime) {
-                console.log('Starting idle timer');
-                set({ idleStartTime: Date.now() });
-              }
-              // Otherwise keep the existing timer running
-            } else {
-              // For any other status (like PRODUCTION), reset the timer
-              if (get().idleStartTime) {
-                console.log('Resetting idle timer');
-                set({ idleStartTime: null });
-              }
-            }
-
-            set({ 
-              machineStatus: machineData,
-              lastUpdate: new Date().toISOString()
-            });
+          machineStatus: {
+            ...parsedStatus,
+            last_updated: new Date(parsedStatus.last_updated).toISOString()
           }
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket Error:', error);
-        set({ error: 'Connection error' });
-      };
-
-      ws.onclose = (event) => {
-        console.log(`WebSocket Disconnected: ${event.code} ${event.reason}`);
-        set({ isConnected: false, socket: null });
-        
-        // Only attempt to reconnect if it wasn't intentionally closed
-        const { reconnectAttempts, maxReconnectAttempts, reconnectDelay } = get();
-        
-        if (reconnectAttempts < maxReconnectAttempts) {
-          console.log(`Attempting to reconnect (${reconnectAttempts + 1}/${maxReconnectAttempts})...`);
-          setTimeout(() => {
-            set(state => ({ reconnectAttempts: state.reconnectAttempts + 1 }));
-            get().initializeWebSocket(machineId);
-          }, reconnectDelay);
-        } else {
-          set({ error: 'Maximum reconnection attempts reached' });
-        }
-      };
-
-      set({ socket: ws });
-    } catch (error) {
-      console.error('WebSocket initialization error:', error);
-      set({ error: error.message, isConnected: false });
+        });
+      } catch (error) {
+        console.error('Error restoring machine status:', error);
+      }
     }
+
+    const ws = new WebSocket('ws://172.18.7.155:8002/production_monitoring/ws/live-status/');
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const storedMachine = localStorage.getItem('currentMachine');
+        const machineData = storedMachine ? JSON.parse(storedMachine) : null;
+        const machineId = machineData?.id;
+
+        const currentMachineData = data.find(machine => 
+          machine.machine_id === parseInt(machineId)
+        );
+
+        if (currentMachineData) {
+          const newStatus = currentMachineData.status;
+          const isInProduction = currentMachineData.job_in_progress !== null;
+
+          // Updated idle timer logic
+          if (newStatus === 'ON' && !isInProduction) {
+            // Start idle timer only when machine is ON and not in production
+            console.log('Starting idle timer - Machine ON but not in production');
+            if (!get().idleStartTime) {
+              set({ idleStartTime: Date.now() });
+            }
+          } else if (newStatus === 'OFF') {
+            // Stop timer when machine is OFF
+            console.log('Stopping idle timer - Machine OFF');
+            set({ idleStartTime: null });
+          } else if (isInProduction || newStatus === 'PRODUCTION') {
+            // Reset timer when in production
+            console.log('Resetting idle timer - Machine in production');
+            set({ idleStartTime: null });
+          }
+
+          // Format the machine status data with all fields
+          const formattedStatus = {
+            machine_id: currentMachineData.machine_id,
+            machine_name: currentMachineData.machine_name,
+            status: currentMachineData.status || 'N/A',
+            active_program: currentMachineData.active_program || 'x', // Keep 'x' as is
+            job_in_progress: currentMachineData.job_in_progress,
+            job_status: currentMachineData.job_status,
+            launched_quantity: currentMachineData.launched_quantity,
+            last_updated: currentMachineData.last_updated,
+            operation_description: currentMachineData.operation_description,
+            operation_number: currentMachineData.operation_number,
+            part_count: currentMachineData.part_count,
+            part_description: currentMachineData.part_description,
+            part_number: currentMachineData.part_number,
+            production_order: currentMachineData.production_order,
+            program_number: currentMachineData.program_number,
+            required_quantity: currentMachineData.required_quantity,
+            selected_program: currentMachineData.selected_program
+          };
+
+          // Update state while preserving other data
+          set(state => ({ 
+            machineStatus: {
+              ...state.machineStatus, // Keep existing state
+              ...formattedStatus // Update with new data
+            },
+            lastUpdate: new Date().toISOString()
+          }));
+
+          // Store in localStorage for persistence
+          localStorage.setItem('machineStatus', JSON.stringify(formattedStatus));
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    };
+
+    ws.onopen = () => {
+      console.log('WebSocket Connected Successfully');
+      set({ 
+        isConnected: true, 
+        socket: ws, 
+        error: null,
+        reconnectAttempts: 0
+      });
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket Error:', error);
+      set({ error: 'Connection error' });
+    };
+
+    ws.onclose = (event) => {
+      console.log(`WebSocket Disconnected: ${event.code} ${event.reason}`);
+      set({ isConnected: false, socket: null });
+      
+      // Only attempt to reconnect if it wasn't intentionally closed
+      const { reconnectAttempts, maxReconnectAttempts, reconnectDelay } = get();
+      
+      if (reconnectAttempts < maxReconnectAttempts) {
+        console.log(`Attempting to reconnect (${reconnectAttempts + 1}/${maxReconnectAttempts})...`);
+        setTimeout(() => {
+          set(state => ({ reconnectAttempts: state.reconnectAttempts + 1 }));
+          get().initializeWebSocket(machineId);
+        }, reconnectDelay);
+      } else {
+        set({ error: 'Maximum reconnection attempts reached' });
+      }
+    };
+
+    set({ socket: ws });
   },
 
   closeWebSocket: () => {
@@ -170,7 +204,7 @@ const useWebSocketStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/operator/machines/${machineId}/operations`
+        `http://172.18.7.155:8002/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -317,7 +351,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting machine issue for machine ID: ${machineId}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://172.18.7.155:8002/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -370,7 +404,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Submitting component issue for part number: ${partNumber}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://172.18.7.155:8002/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -414,7 +448,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.155:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -450,7 +484,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:6970/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        `http://172.18.7.155:8002/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

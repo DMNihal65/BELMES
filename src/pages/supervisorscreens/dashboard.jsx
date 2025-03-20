@@ -239,7 +239,7 @@ const SupervisorDashboard = () => {
   return (
     <div style={{ padding: '24px', height: '100vh', background: '#f0f2f5' }}>
       {/* Stats Cards */}
-      <Row gutter={16} className="mb-4">
+      {/* <Row gutter={16} className="mb-4">
         <Col span={6}>
           <Card bordered={false}>
             <Statistic
@@ -287,7 +287,7 @@ const SupervisorDashboard = () => {
             <ReactECharts option={getSparklineOption([90, 92, 91, 94, 90, 92, 92], '#cf1322')} style={{ height: '40px' }} />
           </Card>
         </Col>
-      </Row>
+      </Row> */}
 
       {/* Main Content Area */}
       <Row gutter={16} style={{ height: 'calc(100vh - 220px)' }}>

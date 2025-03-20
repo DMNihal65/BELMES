@@ -22,9 +22,9 @@ const machineData = [
     estimatedCompletion: '04:30 PM',
     cycleTime: '45 min',
     downtime: '2%',
-    position: [-7, 2, 1],
-    rotation: [0, Math.PI / 6, 0],
-    scale: 4,
+    position: [-4, 1, 5],  // Adjusted vertical position
+    rotation: [0, Math.PI / -1, 0],
+    scale: 3,
   },
   {
     id: 'DMG-002',
@@ -40,11 +40,46 @@ const machineData = [
     estimatedCompletion: '05:00 PM',
     cycleTime: '30 min',
     downtime: '5%',
-    position: [2, 2, -2],
-    rotation: [0, -Math.PI / 6, 0],
-    scale: 4,
+    position: [-4, 1, -5],  // Adjusted vertical position
+    rotation: [0, -Math.PI / -12, 0],
+    scale: 3,
   },
-  // ... other machines with similar enhanced data
+  {
+    id: 'DMG-003',
+    name: 'Haas VF-2',
+    status: 'running',
+    oee: 92,
+    currentProgram: 'OP-9012',
+    partNumber: 'PART-456',
+    totalCount: 180,
+    targetCount: 200,
+    operator: 'Mike Johnson',
+    startTime: '07:30 AM',
+    estimatedCompletion: '03:45 PM',
+    cycleTime: '40 min',
+    downtime: '1%',
+    position: [4, 1, 5],  // New machine on right side
+    rotation: [0, -Math.PI / 1, 0],
+    scale: 3,
+  },
+  {
+    id: 'DMG-004',
+    name: 'Mazak Variaxis',
+    status: 'idle',
+    oee: 70,
+    currentProgram: 'OP-3456',
+    partNumber: 'PART-987',
+    totalCount: 110,
+    targetCount: 150,
+    operator: 'Sarah Lee',
+    startTime: '10:00 AM',
+    estimatedCompletion: '06:00 PM',
+    cycleTime: '35 min',
+    downtime: '4%',
+    position: [4, 1, -5],  // New machine on right side
+    rotation: [0, Math.PI / -9, 0],
+    scale: 3,
+  }
 ];
 
 // Machine Model Component
@@ -297,7 +332,7 @@ const SupervisorDashboard = () => {
             title="Machine Overview" 
             bodyStyle={{ 
               padding: 0, 
-              height: 'calc(100vh - 220px)',
+              height: 'calc(100vh - 200px)',
               position: 'relative'
             }}
           >
@@ -349,7 +384,7 @@ const SupervisorDashboard = () => {
                   />
                 ))}
                 <Environment 
-                  files="/machine_shop_02_4k.hdr"
+                  files="/PANO_20250320_122016.hdr"
                   background={true}
                   blur={0.5}
                   // preset="forest"

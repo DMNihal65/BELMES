@@ -62,7 +62,7 @@ function InspectionResult() {
       
       // Use the correct endpoint
       const response = await axios.get(
-        `http://localhost:8002/quality/inspection/${value}/detailed`,
+        `http://172.18.7.88:6970/quality/inspection/${value}/detailed`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,

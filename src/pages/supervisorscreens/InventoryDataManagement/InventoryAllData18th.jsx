@@ -431,9 +431,6 @@ const InventoryAllData = () => {
       case 'date':
         instructions += ' - Enter date in YYYY-MM-DD format';
         break;
-      case 'variable':
-        instructions += ' - Enter any value (text, numbers, special characters)';
-        break;
       default:
         instructions += ' - Enter text value';
     }
@@ -1383,7 +1380,6 @@ const InventoryAllData = () => {
                 config.type === 'number' ? `Enter numeric value${config.unit ? ` in ${config.unit}` : ''}` :
                 config.type === 'boolean' ? 'Select Yes or No' :
                 config.type === 'date' ? 'Select a date' :
-                config.type === 'variable' ? 'Enter any value (text, numbers, special characters)' :
                 'Enter text value'
               }
               style={{ 
@@ -1409,13 +1405,6 @@ const InventoryAllData = () => {
                   style={{ width: '100%' }}
                   placeholder={`Select ${fieldName} date`}
                   format="YYYY-MM-DD"
-                />
-              ) : config.type === 'variable' ? (
-                <Input.TextArea
-                  placeholder={`Enter ${fieldName} (accepts any value)`}
-                  maxLength={1000}
-                  showCount
-                  autoSize={{ minRows: 1, maxRows: 3 }}
                 />
               ) : (
                 <Input 
@@ -1497,7 +1486,6 @@ const InventoryAllData = () => {
                           <Select.Option value="number">Number</Select.Option>
                           <Select.Option value="boolean">Boolean</Select.Option>
                           <Select.Option value="date">Date</Select.Option>
-                          <Select.Option value="variable">Variable</Select.Option>
                         </Select>
                       </Form.Item>
                       <Form.Item

@@ -234,7 +234,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       console.log('Sending to save-to-db:', orderData);
 
       // Create order
-      const response = await fetch('http://localhost:8002/api/v1/planning/save-to-db', {
+      const response = await fetch('http://172.18.7.88:6970/api/v1/planning/save-to-db', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -298,7 +298,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, initialData = null }) =
       };
 
       // Create order using the create_order endpoint
-      const response = await fetch('http://localhost:8002/api/v1/planning/create_order', {
+      const response = await fetch('http://172.18.7.88:6970/api/v1/planning/create_order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

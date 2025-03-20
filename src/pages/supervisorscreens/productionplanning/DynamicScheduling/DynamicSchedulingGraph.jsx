@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import moment from 'moment';
 import axios from 'axios';
+import useDynamicStore from '../../../../store/dynamic-store';
 
 const { Option } = Select;
 
@@ -110,41 +111,39 @@ const getTimeRange = (viewType, dateRange) => {
 const DynamicSchedulingGraph2 = () => {
   const [timelineRef, setTimelineRef] = useState(null);
   const [timelineContainerRef, setTimelineContainerRef] = useState(null);
-  const [scheduleData, setScheduleData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState(null);
   const [viewType, setViewType] = useState('week');
   const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
   const [selectedComponent, setSelectedComponent] = useState(null);
+  const [selectedMachine, setSelectedMachine] = useState(null);
   const [productionOrders, setProductionOrders] = useState([]);
   const [components, setComponents] = useState([]);
 
+  // Get store values and functions
+  const { scheduleData, loading, error, fetchDynamicScheduleData } = useDynamicStore();
+
   const fetchScheduleData = async () => {
-    setLoading(true);
     try {
-      const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
-      // const response = await axios.get('http://localhost:8002/api/v1/rescheduling/reschedule-actual-planned-combined');
-      setScheduleData(response.data);
+      const data = await fetchDynamicScheduleData();
       
       // Extract unique production orders and components from all operation types
       const uniqueProductionOrders = new Set();
       const uniqueComponents = new Set();
       
       // From scheduled operations
-      response.data.scheduled_operations.forEach(op => {
+      data.scheduled_operations.forEach(op => {
         if (op.production_order) uniqueProductionOrders.add(op.production_order);
         if (op.component) uniqueComponents.add(op.component);
       });
       
       // From production logs
-      response.data.production_logs.forEach(log => {
+      data.production_logs.forEach(log => {
         if (log.production_order) uniqueProductionOrders.add(log.production_order);
         if (log.part_number) uniqueComponents.add(log.part_number);
       });
       
       // From rescheduled operations
-      response.data.reschedule.forEach(reschedule => {
+      data.reschedule.forEach(reschedule => {
         if (reschedule.production_order) uniqueProductionOrders.add(reschedule.production_order);
         if (reschedule.part_number) uniqueComponents.add(reschedule.part_number);
       });
@@ -152,10 +151,9 @@ const DynamicSchedulingGraph2 = () => {
       setProductionOrders(Array.from(uniqueProductionOrders).sort());
       setComponents(Array.from(uniqueComponents).sort());
       
-      setLoading(false);
     } catch (err) {
-      setError('Failed to fetch schedule data');
-      setLoading(false);
+      // Error handling is managed by the store
+      console.error('Error fetching schedule data:', err);
     }
   };
 
@@ -235,12 +233,14 @@ const DynamicSchedulingGraph2 = () => {
       });
     });
 
-    // Update the filter operation function to handle all operation types
+    // Update the filter operation function to handle machine filtering
     const filterOperation = (op, type) => {
+      // First check production order filter
       if (selectedProductionOrder && op.production_order !== selectedProductionOrder) {
         return false;
       }
       
+      // Then check component filter
       if (selectedComponent) {
         switch (type) {
           case 'planned':
@@ -249,6 +249,22 @@ const DynamicSchedulingGraph2 = () => {
           case 'actual':
           case 'rescheduled':
             if (op.part_number !== selectedComponent) return false;
+            break;
+        }
+      }
+
+      // Finally check machine filter
+      if (selectedMachine) {
+        switch (type) {
+          case 'planned':
+            if (op.machine !== selectedMachine) return false;
+            break;
+          case 'actual':
+            if (op.machine_name !== selectedMachine) return false;
+            break;
+          case 'rescheduled':
+            const machineName = machineMapping[op.machine_id.toString()];
+            if (machineName !== selectedMachine) return false;
             break;
         }
       }
@@ -462,7 +478,7 @@ const DynamicSchedulingGraph2 = () => {
       timeline.destroy();
       document.head.removeChild(style);
     };
-  }, [timelineContainerRef, scheduleData, viewType, dateRange, selectedProductionOrder, selectedComponent]);
+  }, [timelineContainerRef, scheduleData, viewType, dateRange, selectedProductionOrder, selectedComponent, selectedMachine]);
 
   const handleViewTypeChange = (newViewType) => {
     setViewType(newViewType);
@@ -571,9 +587,14 @@ const DynamicSchedulingGraph2 = () => {
     setSelectedComponent(value);
   };
 
+  const handleMachineChange = (value) => {
+    setSelectedMachine(value);
+  };
+
   const handleClearFilters = () => {
     setSelectedProductionOrder(null);
     setSelectedComponent(null);
+    setSelectedMachine(null);
   };
 
   if (loading) {
@@ -632,6 +653,22 @@ const DynamicSchedulingGraph2 = () => {
             {components.map(component => (
               <Option key={component} value={component}>{component}</Option>
             ))}
+          </Select>
+
+          <Select
+            placeholder="Select Machine"
+            value={selectedMachine}
+            onChange={handleMachineChange}
+            style={{ width: 200 }}
+            allowClear
+          >
+            {scheduleData?.work_centers.map(wc => 
+              wc.machines.map(machine => (
+                <Option key={`${wc.work_center_code}-${machine.name}`} value={`${wc.work_center_code}-${machine.name}`}>
+                  {`${wc.work_center_code} - ${machine.name}`}
+                </Option>
+              ))
+            )}
           </Select>
 
           <Button onClick={handleClearFilters}>

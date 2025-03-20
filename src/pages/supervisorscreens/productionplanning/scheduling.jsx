@@ -1007,7 +1007,7 @@ const Scheduling = () => {
 
           
 
-          <TabPane 
+          {/* <TabPane 
             tab={ 
               <span>
                 <HistoryOutlined /> Analytics
@@ -1016,7 +1016,7 @@ const Scheduling = () => {
             key="analytics"
           >
             <AnalyticsDashboard  />
-          </TabPane>
+          </TabPane> */}
           {/* <TabPane 
             tab={ 
               <span>

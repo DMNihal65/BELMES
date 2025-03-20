@@ -215,8 +215,18 @@ const InventoryAllData = () => {
           menu={getContextMenu({ key: `category-${category.id}`, data: category })}
           overlayStyle={{ width: 200 }}
         >
-          <Space>
-            <FolderOutlined />
+          <Space 
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent tree node selection
+              const categoryKey = `category-${category.id}`;
+              setExpandedKeys(prev => 
+                prev.includes(categoryKey) 
+                  ? prev.filter(key => key !== categoryKey)
+                  : [...prev, categoryKey]
+              );
+            }}
+          >
+            <AppstoreAddOutlined /> {/* Category icon */}
             <span>{category.name}</span>
             <Tag color="blue">
               {subcategories.filter(sub => sub.category_id === category.id).length}
@@ -236,7 +246,7 @@ const InventoryAllData = () => {
               overlayStyle={{ width: 200 }}
             >
               <Space>
-                <FileOutlined />
+                <FileExcelOutlined /> {/* Changed from SettingOutlined to FileExcelOutlined */}
                 <span>{sub.name}</span>
                 <Tooltip title="Dynamic Fields">
                   <Tag color="green">
@@ -431,6 +441,9 @@ const InventoryAllData = () => {
       case 'date':
         instructions += ' - Enter date in YYYY-MM-DD format';
         break;
+      case 'variable':
+        instructions += ' - Enter any value (text, numbers, special characters)';
+        break;
       default:
         instructions += ' - Enter text value';
     }
@@ -525,7 +538,7 @@ const InventoryAllData = () => {
 
           try {
             const response = await axios.post(
-              'http://172.18.7.155:8002/api/v1/api/inventory/items/bulk/',
+              'http://172.18.7.85:9098/api/v1/api/inventory/items/bulk/',
               {
                 created_by: 1,
                 subcategory_id: selectedCategory.id,
@@ -648,6 +661,8 @@ const InventoryAllData = () => {
             fetchCategories(),
             fetchAllSubcategories()
           ]);
+          // Immediately refresh items if needed
+          setRefreshTrigger(prev => prev + 1);
           // Expand the newly added category
           const newCategory = result.data || result;
           setExpandedKeys(prevKeys => [...prevKeys, `category-${newCategory.id}`]);
@@ -691,6 +706,8 @@ const InventoryAllData = () => {
             fetchCategories(),
             fetchAllSubcategories()
           ]);
+          // Immediately refresh items
+          setRefreshTrigger(prev => prev + 1);
           // Expand the parent category
           if (!isEditing && rightClickedNode?.data?.id) {
             setExpandedKeys(prevKeys => [...prevKeys, `category-${rightClickedNode.data.id}`]);
@@ -771,8 +788,8 @@ const InventoryAllData = () => {
       setIsModalVisible(false);
       form.resetFields();
       
-      // Refresh items with the current subcategory ID
-      await fetchItems(selectedSubcategory.id);
+      // Immediately refresh the data
+      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error submitting item:', error);
       message.error(`Error: ${error.response?.data?.detail || error.message}`);
@@ -945,7 +962,8 @@ const InventoryAllData = () => {
       });
 
       setEditingKey('');
-      await fetchItems(selectedCategory.id);
+      // Immediately refresh the data
+      setRefreshTrigger(prev => prev + 1);
     } catch (errInfo) {
       console.log('Validate Failed:', errInfo);
     }
@@ -1142,7 +1160,8 @@ const InventoryAllData = () => {
                 try {
                   await deleteItem(record.id);
                   message.success('Item deleted successfully');
-                  await fetchItems(selectedCategory.id);
+                  // Immediately refresh the data
+                  setRefreshTrigger(prev => prev + 1);
                 } catch (error) {
                   console.error('Error deleting item:', error);
                   message.error('Failed to delete item');
@@ -1380,6 +1399,7 @@ const InventoryAllData = () => {
                 config.type === 'number' ? `Enter numeric value${config.unit ? ` in ${config.unit}` : ''}` :
                 config.type === 'boolean' ? 'Select Yes or No' :
                 config.type === 'date' ? 'Select a date' :
+                config.type === 'variable' ? 'Enter any value (text, numbers, special characters)' :
                 'Enter text value'
               }
               style={{ 
@@ -1405,6 +1425,13 @@ const InventoryAllData = () => {
                   style={{ width: '100%' }}
                   placeholder={`Select ${fieldName} date`}
                   format="YYYY-MM-DD"
+                />
+              ) : config.type === 'variable' ? (
+                <Input.TextArea
+                  placeholder={`Enter ${fieldName} (accepts any value)`}
+                  maxLength={1000}
+                  showCount
+                  autoSize={{ minRows: 1, maxRows: 3 }}
                 />
               ) : (
                 <Input 
@@ -1486,6 +1513,7 @@ const InventoryAllData = () => {
                           <Select.Option value="number">Number</Select.Option>
                           <Select.Option value="boolean">Boolean</Select.Option>
                           <Select.Option value="date">Date</Select.Option>
+                          <Select.Option value="variable">Variable</Select.Option>
                         </Select>
                       </Form.Item>
                       <Form.Item
@@ -1696,13 +1724,20 @@ const InventoryAllData = () => {
                     >
                       <Button
                         type="text"
-                        icon={<FolderOutlined />}
+                        icon={<AppstoreAddOutlined />}
                         onClick={() => {
                           setSelectedCategory({ type: 'category', id: category.id });
                           setBreadcrumbItems([
                             { title: 'Inventory' },
                             { title: category.name }
                           ]);
+                          // Expand the category when clicked
+                          const categoryKey = `category-${category.id}`;
+                          setExpandedKeys(prev => 
+                            prev.includes(categoryKey) 
+                              ? prev.filter(key => key !== categoryKey)
+                              : [...prev, categoryKey]
+                          );
                         }}
                         className="w-full !flex items-center justify-center"
                       />
@@ -1716,7 +1751,7 @@ const InventoryAllData = () => {
                       <Button 
                         type="text" 
                         size="small"
-                        icon={<FolderOpenOutlined />}
+                        icon={<AppstoreAddOutlined />}
                         onClick={handleExpandAll}
                       />
                     </Tooltip>

@@ -115,6 +115,7 @@ const DynamicSchedulingGraph2 = () => {
   const [viewType, setViewType] = useState('week');
   const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
   const [selectedComponent, setSelectedComponent] = useState(null);
+  const [selectedMachine, setSelectedMachine] = useState(null);
   const [productionOrders, setProductionOrders] = useState([]);
   const [components, setComponents] = useState([]);
 
@@ -232,12 +233,14 @@ const DynamicSchedulingGraph2 = () => {
       });
     });
 
-    // Update the filter operation function to handle all operation types
+    // Update the filter operation function to handle machine filtering
     const filterOperation = (op, type) => {
+      // First check production order filter
       if (selectedProductionOrder && op.production_order !== selectedProductionOrder) {
         return false;
       }
       
+      // Then check component filter
       if (selectedComponent) {
         switch (type) {
           case 'planned':
@@ -246,6 +249,22 @@ const DynamicSchedulingGraph2 = () => {
           case 'actual':
           case 'rescheduled':
             if (op.part_number !== selectedComponent) return false;
+            break;
+        }
+      }
+
+      // Finally check machine filter
+      if (selectedMachine) {
+        switch (type) {
+          case 'planned':
+            if (op.machine !== selectedMachine) return false;
+            break;
+          case 'actual':
+            if (op.machine_name !== selectedMachine) return false;
+            break;
+          case 'rescheduled':
+            const machineName = machineMapping[op.machine_id.toString()];
+            if (machineName !== selectedMachine) return false;
             break;
         }
       }
@@ -459,7 +478,7 @@ const DynamicSchedulingGraph2 = () => {
       timeline.destroy();
       document.head.removeChild(style);
     };
-  }, [timelineContainerRef, scheduleData, viewType, dateRange, selectedProductionOrder, selectedComponent]);
+  }, [timelineContainerRef, scheduleData, viewType, dateRange, selectedProductionOrder, selectedComponent, selectedMachine]);
 
   const handleViewTypeChange = (newViewType) => {
     setViewType(newViewType);
@@ -568,9 +587,14 @@ const DynamicSchedulingGraph2 = () => {
     setSelectedComponent(value);
   };
 
+  const handleMachineChange = (value) => {
+    setSelectedMachine(value);
+  };
+
   const handleClearFilters = () => {
     setSelectedProductionOrder(null);
     setSelectedComponent(null);
+    setSelectedMachine(null);
   };
 
   if (loading) {
@@ -607,7 +631,7 @@ const DynamicSchedulingGraph2 = () => {
             <Option value="year">Yearly</Option>
           </Select>
           
-          <Select
+          {/* <Select
             placeholder="Select Production Order"
             value={selectedProductionOrder}
             onChange={handleProductionOrderChange}
@@ -617,6 +641,22 @@ const DynamicSchedulingGraph2 = () => {
             {productionOrders.map(po => (
               <Option key={po} value={po}>{po}</Option>
             ))}
+          </Select> */}
+
+          <Select
+            placeholder="Select Machine"
+            value={selectedMachine}
+            onChange={handleMachineChange}
+            style={{ width: 200 }}
+            allowClear
+          >
+            {scheduleData?.work_centers.map(wc => 
+              wc.machines.map(machine => (
+                <Option key={`${wc.work_center_code}-${machine.name}`} value={`${wc.work_center_code}-${machine.name}`}>
+                  {`${wc.work_center_code} - ${machine.name}`}
+                </Option>
+              ))
+            )}
           </Select>
 
           <Select
@@ -630,6 +670,8 @@ const DynamicSchedulingGraph2 = () => {
               <Option key={component} value={component}>{component}</Option>
             ))}
           </Select>
+
+          
 
           <Button onClick={handleClearFilters}>
             Clear Filters

@@ -104,8 +104,8 @@ const InventoryAllData = () => {
       key: `category-${category.id}`,
       data: category,
       title: (
-        <Space>
-          <FolderOutlined />
+        <Space onClick={() => toggleCategoryExpansion(category.id)}>
+          <AppstoreAddOutlined />
           <span>{category.name}</span>
           <Tag color="blue">
             {subcategories.filter(sub => sub.category_id === category.id).length}
@@ -119,7 +119,7 @@ const InventoryAllData = () => {
           data: sub,
           title: (
             <Space>
-              <FileOutlined />
+              <FileExcelOutlined />
               <span>{sub.name}</span>
               <Tooltip title="Dynamic Fields">
                 <Tag color="green">
@@ -130,6 +130,22 @@ const InventoryAllData = () => {
           ),
         }))
     }));
+  };
+
+  // Add a function to toggle category expansion
+  const toggleCategoryExpansion = (categoryId) => {
+    setExpandedKeys(prevKeys => {
+      if (prevKeys.includes(`category-${categoryId}`)) {
+        return prevKeys.filter(key => key !== `category-${categoryId}`);
+      } else {
+        return [...prevKeys, `category-${categoryId}`];
+      }
+    });
+  };
+
+  // Update the expand all button icon
+  const handleExpandAll = () => {
+    setExpandedKeys(categories.map(cat => `category-${cat.id}`));
   };
 
   // Handlers
@@ -144,7 +160,7 @@ const InventoryAllData = () => {
       const subcategoryItems = getTableData();
       
       const response = await axios({
-        url: 'http://172.18.7.155:8002/api/v1/api/inventory/items/bulk/',
+        url: 'http://172.18.7.88:6970/api/v1/api/inventory/items/bulk/',
         method: 'POST',
         responseType: 'blob',
         headers: {
@@ -191,7 +207,7 @@ const InventoryAllData = () => {
   };
 
   const handleDownloadTemplate = () => {
-    window.open('http://172.18.7.155:8002/api/v1/api/inventory/items/bulk/', '_blank');
+    window.open('http://172.18.7.88:6970/api/v1/api/inventory/items/bulk/', '_blank');
   };
 
   const handleExcelUpload = (file) => {
@@ -205,7 +221,7 @@ const InventoryAllData = () => {
     formData.append('created_by', 1);
     formData.append('subcategory_id', selectedCategory.id);
 
-    axios.post('http://172.18.7.155:8002/api/v1/api/inventory/items/bulk/', formData, {
+    axios.post('http://172.18.7.88:6970/api/v1/api/inventory/items/bulk/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -225,10 +241,6 @@ const InventoryAllData = () => {
 
   const handleCollapseAll = () => {
     setExpandedKeys([]);
-  };
-
-  const handleExpandAll = () => {
-    setExpandedKeys(categories.map(cat => `category-${cat.id}`));
   };
 
   const handleEdit = (record) => {
@@ -954,7 +966,7 @@ const InventoryAllData = () => {
                     <Button 
                       type="text" 
                       size="small"
-                      icon={<FolderOpenOutlined />}
+                      icon={<AppstoreAddOutlined />}
                       onClick={handleExpandAll}
                     />
                   </Tooltip>

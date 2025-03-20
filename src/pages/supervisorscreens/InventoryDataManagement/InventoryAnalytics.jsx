@@ -22,9 +22,9 @@ function InventoryAnalytics() {
 
     return (
         <Tabs defaultActiveKey="analytics">
-            <TabPane tab="Analytics" key="analytics">
+            {/* <TabPane tab="Analytics" key="analytics">
                 <Analytics />
-            </TabPane>
+            </TabPane> */}
             <TabPane tab="Requests" key="requests">
                 <Requests />
             </TabPane>

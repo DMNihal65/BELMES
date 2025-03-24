@@ -27,6 +27,7 @@ import useAuthStore from '../../store/auth-store';
 import useWebSocketStore from '../../store/websocket-store';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import DocumentsList from '../operatorscreens/JobDetails/DocumentsList';
+import DowntimeTicketModal from './DowntimeTicketModal';
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
@@ -137,6 +138,7 @@ const JobDetails = () => {
   const [jobOrderData, setJobOrderData] = useState(null);
   const [isLoadingJobData, setIsLoadingJobData] = useState(false);
 
+  const [showDowntimeModal, setShowDowntimeModal] = useState(false);
   // Add WebSocket store
   const { 
     machineStatus, 
@@ -624,6 +626,24 @@ const JobDetails = () => {
                     Connection Error: {wsError}
                   </div>
                 )}
+
+                {/* Add Downtime Ticket Button */}
+                <Button
+                  type="primary"
+                  icon={<Clock3 className="w-4 h-4" />}
+                  onClick={() => setShowDowntimeModal(true)}
+                  className="w-full mt-2 bg-orange-500 hover:bg-orange-600"
+                >
+                  Downtime Ticket
+                </Button>
+
+                {/* Add this near your other modals */}
+                <DowntimeTicketModal
+                  visible={showDowntimeModal}
+                  onClose={() => setShowDowntimeModal(false)}
+                  machineId={currentMachine?.id}
+                  partNumber={jobData?.part_number}
+                />
               </div>
             </div>
 

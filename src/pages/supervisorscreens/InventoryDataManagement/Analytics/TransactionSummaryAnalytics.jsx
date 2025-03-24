@@ -44,10 +44,10 @@ const TransactionSummaryAnalytics = () => {
     try {
       setLoading(true);
       const [requestsRes, summaryRes, metricsRes, historyRes] = await Promise.all([
-        axios.get('http://172.18.7.155:8002/api/v1/api/inventory/analytics/requests-by-status'),
-        axios.get('http://172.18.7.155:8002/api/v1/api/inventory/analytics/transaction-summary'),
-        axios.get('http://172.18.7.155:8002/api/v1/api/inventory/analytics/transaction-metrics'),
-        axios.get('http://172.18.7.155:8002/api/v1/api/inventory/analytics/transaction-history?limit=100&offset=0')
+        axios.get('http://172.18.7.88:1887/api/v1/api/inventory/analytics/requests-by-status'),
+        axios.get('http://172.18.7.88:1887/api/v1/api/inventory/analytics/transaction-summary'),
+        axios.get('http://172.18.7.88:1887/api/v1/api/inventory/analytics/transaction-metrics'),
+        axios.get('http://172.18.7.88:1887/api/v1/api/inventory/analytics/transaction-history?limit=100&offset=0')
       ]);
 
       setRequestsByStatus(requestsRes.data);

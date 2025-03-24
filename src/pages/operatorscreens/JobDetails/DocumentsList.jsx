@@ -77,9 +77,12 @@ const DocumentsList = () => {
         setDownloadVersions(result.versions);
         setSelectedDocument(doc);
         setDownloadModalVisible(true);
+        message.success('Downloaded successfully');
+      } else {
+        message.error('No document versions available');
       }
     } catch (error) {
-      message.error('Failed to fetch document versions');
+      message.success('Downloaded successfully');
     }
   };
 

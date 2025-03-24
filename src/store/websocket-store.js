@@ -510,6 +510,30 @@ const useWebSocketStore = create((set, get) => ({
       console.error('Error downloading document:', error);
       throw error;
     }
+  },
+
+  fetchMppDetails: async (partNumber, operationNumber) => {
+    try {
+      const response = await fetch(
+        `http://172.18.7.88:1887/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch MPP details');
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data[0] || null // Get first entry if exists
+      };
+    } catch (error) {
+      console.error('Error fetching MPP details:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 }));
 

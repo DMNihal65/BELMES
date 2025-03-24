@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Table, Card, Button, Space, Drawer, Upload, 
   Tabs, Typography, Tag, Image, Tooltip, Steps,
-  Divider, Row, Col, Progress, Badge, Descriptions,Collapse,List, Spin
+  Divider, Row, Col, Progress, Badge, Descriptions,Collapse,List, Spin, Empty
 } from 'antd';
 import { 
   FileTextOutlined, EyeOutlined, UploadOutlined,
@@ -22,90 +22,114 @@ const { Title, Text } = Typography;
 const { Step } = Steps;
 const { Panel } = Collapse;
 
-const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => (
-  <Drawer
-    title={
-      <Space>
-        <Text strong className="text-lg">
-          Operation {selectedOperation?.operation_number}
-        </Text>
-        <Tag color="blue">{selectedOperation?.description}</Tag>
-      </Space>
+const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => {
+  const [mppDetails, setMppDetails] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const { fetchMppDetails } = useWebSocketStore();
+
+  useEffect(() => {
+    const fetchDetails = async () => {
+      if (selectedOperation?.part_number && selectedOperation?.operation_number) {
+        setLoading(true);
+        try {
+          const result = await fetchMppDetails(
+            selectedOperation.part_number,
+            selectedOperation.operation_number
+          );
+          
+          if (result.success) {
+            setMppDetails(result.data);
+          }
+        } catch (error) {
+          console.error('Error fetching MPP details:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    if (showDrawer) {
+      fetchDetails();
     }
-    placement="right"
-    width={720}
-    onClose={onClose}
-    open={showDrawer}
-    destroyOnClose={true}
-  >
-    {selectedOperation && (
-      <div className="space-y-6">
-        {/* Fixture and IPID Information */}
-        <Card title="Fixture & IPID Details">
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="Fixture No with Rev.">
-              <Text strong>Fx-62805080AA-70.80-Rev.01</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="IPID No with Rev.">
-              <Text strong>IPID-62805080AA-80-Rev.01</Text>
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
+  }, [selectedOperation, showDrawer, fetchMppDetails]);
 
-        {/* Datum Information */}
-        <Card title="Datum Information">
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="Datum X Axis">
-              <Text strong>0 at the job center</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Datum Y Axis">
-              <Text strong>0 at the job center</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Datum Z Axis">
-              <Text strong>+0.25mm at top of the job</Text>
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
+  return (
+    <Drawer
+      title={
+        <Space>
+          <Text strong className="text-lg">
+            Operation {selectedOperation?.operation_number}
+          </Text>
+          <Tag color="blue">{selectedOperation?.description}</Tag>
+        </Space>
+      }
+      placement="right"
+      width={720}
+      onClose={onClose}
+      open={showDrawer}
+      destroyOnClose={true}
+    >
+      {loading ? (
+        <div className="flex justify-center items-center h-96">
+          <Spin size="large" />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Fixture and IPID Information */}
+          <Card title="Fixture & IPID Details">
+            <Descriptions column={1} bordered>
+              <Descriptions.Item label="Fixture No with Rev.">
+                <Text strong>{mppDetails?.fixture_number || 'Not specified'}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="IPID No with Rev.">
+                <Text strong>{mppDetails?.ipid_number || 'Not specified'}</Text>
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
 
-        {/* Work Holding Instructions */}
-        <Card title="Work Holding Instructions">
-          <Collapse defaultActiveKey={['1']} ghost>
-            <Panel header="Fixture Setup" key="1">
-              <List>
-                <List.Item>
-                  <Text>Hold the fixture in vise with around 3 to 5 mm projection over jaws.</Text>
-                </List.Item>
-                <List.Item>
-                  <Text>Clamp the job on fixture with (14X) MS screws while ensuring longest edge to be parallel to X axis within +/-0.1 mm through dialing.</Text>
-                </List.Item>
-              </List>
-            </Panel>
-          </Collapse>
-        </Card>
+          {/* Datum Information */}
+          <Card title="Datum Information">
+            <Descriptions column={1} bordered>
+              <Descriptions.Item label="Datum X Axis">
+                <Text strong>{mppDetails?.datum_x || 'Not specified'}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Datum Y Axis">
+                <Text strong>{mppDetails?.datum_y || 'Not specified'}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Datum Z Axis">
+                <Text strong>{mppDetails?.datum_z || 'Not specified'}</Text>
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
 
-        {/* Reference Images */}
-        <Card title="Reference Images">
-          <Row gutter={[16, 16]}>
-            <Col span={12}>
-              <Image
-                src="/images/job_loading.png"
-                alt="Job Loading"
-              />
-              <Text className="block mt-2 text-center">Job Loading</Text>
-            </Col>
-            <Col span={12}>
-              <Image
-                src="/images/post_machine.png"
-                alt="Post Machining"
-              />
-              <Text className="block mt-2 text-center">Post Machining</Text>
-            </Col>
-          </Row>
-        </Card>
-      </div>
-    )}
-  </Drawer>
-);
+          {/* Work Holding Instructions */}
+          <Card title="Work Instructions">
+            <Collapse defaultActiveKey={['0']} ghost>
+              {mppDetails?.work_instructions?.sections.map((section, index) => (
+                <Panel header={section.title} key={index}>
+                  <List>
+                    {section.instructions ? (
+                      <List.Item>
+                        <Text>{section.instructions}</Text>
+                      </List.Item>
+                    ) : (
+                      <Empty description="No instructions available" />
+                    )}
+                  </List>
+                </Panel>
+              ))}
+            </Collapse>
+          </Card>
+
+          {/* Reference Images - Keep this if needed */}
+          <Card title="Reference Images">
+            <Empty description="No reference images available" />
+          </Card>
+        </div>
+      )}
+    </Drawer>
+  );
+};
 
 const OperationDetails = () => {
   const { currentMachine } = useAuthStore();

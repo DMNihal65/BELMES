@@ -46,12 +46,15 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   InfoCircleOutlined,
-  DownOutlined
+  DownOutlined,
+  MenuOutlined
 } from '@ant-design/icons';
 import useInventoryStore from '../../../store/inventory-store';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import { read, utils, write } from 'xlsx';
+import { DndProvider, useDrag, useDrop } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 const { Title, Text } = Typography;
 
@@ -91,11 +94,13 @@ const InventoryAllData = () => {
     isLoading,
     error,
     set,
+    bulkUploadItems,
   } = useInventoryStore();
 
   // Add function to generate sequential item code
   const generateItemCode = (categoryName, subcategoryName) => {
-    const prefix = `${categoryName}_${subcategoryName}_`.toUpperCase().replace(/\s+/g, '_');
+    // Allow special characters in the prefix but replace spaces with underscores
+    const prefix = `${categoryName}_${subcategoryName}_`.toUpperCase();
     const existingCodes = items
       .filter(item => item.item_code.startsWith(prefix))
       .map(item => {
@@ -146,6 +151,29 @@ const InventoryAllData = () => {
     refreshData();
   }, [refreshTrigger, selectedCategory]);
 
+  // Add a new useEffect for immediate data refresh
+  useEffect(() => {
+    const refreshAllData = async () => {
+      try {
+        set({ loading: true });
+        await Promise.all([
+          fetchCategories(),
+          fetchAllSubcategories(),
+          fetchItems()
+        ]);
+      } catch (error) {
+        console.error('Error refreshing data:', error);
+        message.error('Failed to refresh data');
+      } finally {
+        set({ loading: false });
+      }
+    };
+
+    // Debounce the refresh to prevent multiple rapid refreshes
+    const timeoutId = setTimeout(refreshAllData, 100);
+    return () => clearTimeout(timeoutId);
+  }, [refreshTrigger]);
+
   // Add context menu handler
   const getContextMenu = (node) => {
     const isCategory = node?.key?.startsWith('category-');
@@ -170,17 +198,26 @@ const InventoryAllData = () => {
           onClick: () => {
             setModalType(isCategory ? 'category' : 'subcategory');
             setRightClickedNode(node);
-            // Set form values for editing
-            form.setFieldsValue({
-              ...node.data,
-              dynamic_fields: node.data.dynamic_fields ? 
-                Object.entries(node.data.dynamic_fields).map(([name, config]) => ({
+            
+            // Set form values for editing with preserved order
+            if (!isCategory && node.data.dynamic_fields) {
+              const orderedFields = Object.entries(node.data.dynamic_fields)
+                .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
+                .map(([name, config]) => ({
                   name,
                   type: config.type,
                   required: config.required,
                   unit: config.unit
-                })) : []
-            });
+                }));
+              
+              form.setFieldsValue({
+                ...node.data,
+                dynamic_fields: orderedFields
+              });
+            } else {
+              form.setFieldsValue(node.data);
+            }
+            
             setIsModalVisible(true);
           }
         },
@@ -529,51 +566,16 @@ const InventoryAllData = () => {
             }, {})
           }));
 
-          // Log the request payload for debugging
-          console.log('Request Payload:', {
-            created_by: 1,
-            subcategory_id: selectedCategory.id,
-            items: formattedItems
-          });
-
           try {
-            const response = await axios.post(
-              'http://172.18.7.85:9098/api/v1/api/inventory/items/bulk/',
-              {
-                created_by: 1,
-                subcategory_id: selectedCategory.id,
-                items: formattedItems
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                }
-              }
-            );
-
-            if (response.data) {
-              loadingMessage();
-              message.success('Excel data imported successfully');
-              setRefreshTrigger(prev => prev + 1);
-            }
+            // Use the store's bulkUploadItems function instead of direct axios call
+            await bulkUploadItems(selectedCategory.id, formattedItems);
+            loadingMessage();
+            message.success('Excel data imported successfully');
+            setRefreshTrigger(prev => prev + 1);
           } catch (error) {
             loadingMessage();
-            console.error('Server Error Details:', {
-              status: error.response?.status,
-              data: error.response?.data,
-              error: error.message
-            });
-
-            if (error.response?.status === 500) {
-              message.error(
-                'Server error (500). Possible issues:\n' +
-                '1. Duplicate item codes\n' +
-                '2. Invalid data format\n' +
-                '3. Missing required fields\n' +
-                'Please check your data and try again.'
-              );
-            } else if (error.response?.data?.detail) {
-              message.error(`Upload failed: ${error.response.data.detail}`);
+            if (error.message) {
+              message.error(error.message);
             } else {
               message.error('Failed to upload data. Please check the server logs for details.');
             }
@@ -628,47 +630,30 @@ const InventoryAllData = () => {
       
       if (result) {
         message.success(`${record.category_id ? 'Subcategory' : 'Category'} deleted successfully`);
-        // Refresh both categories and subcategories
-        await fetchCategories();
-        await fetchAllSubcategories();
+        // Trigger immediate refresh
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (error) {
       message.error(`Error: ${error.message}`);
     }
   };
 
-  // Add category/subcategory form handler
+  // Modify handleFormSubmit for immediate refresh
   const handleFormSubmit = async (values) => {
     try {
       let result;
       if (modalType === 'category') {
-        if (rightClickedNode?.data?.id) {
-          result = await updateCategory(rightClickedNode.data.id, {
-            name: values.name,
-            description: values.description
-          });
-        } else {
-          result = await addCategory({
-            name: values.name,
-            description: values.description,
-            created_by: 1
-          });
-        }
-        
-        // Refresh both categories and subcategories after category operation
-        if (result) {
-          await Promise.all([
-            fetchCategories(),
-            fetchAllSubcategories()
-          ]);
-          // Immediately refresh items if needed
-          setRefreshTrigger(prev => prev + 1);
-          // Expand the newly added category
-          const newCategory = result.data || result;
-          setExpandedKeys(prevKeys => [...prevKeys, `category-${newCategory.id}`]);
-        }
+        result = rightClickedNode?.data?.id 
+          ? await updateCategory(rightClickedNode.data.id, {
+              name: values.name,
+              description: values.description
+            })
+          : await addCategory({
+              name: values.name,
+              description: values.description,
+              created_by: 1
+            });
       } else if (modalType === 'subcategory') {
-        // Transform dynamic fields into required format while preserving order
         const dynamicFields = {};
         values.dynamic_fields?.forEach((field, index) => {
           if (field.name) {
@@ -676,49 +661,34 @@ const InventoryAllData = () => {
               type: field.type,
               required: field.required || false,
               unit: field.unit || null,
-              order: index // Store the order of fields
+              order: index
             };
           }
         });
 
         const isEditing = rightClickedNode?.data?.id && !rightClickedNode?.key?.startsWith('category-');
-        
-        if (isEditing) {
-          result = await updateSubcategory(rightClickedNode.data.id, {
-            name: values.name,
-            description: values.description,
-            category_id: rightClickedNode.data.category_id,
-            dynamic_fields: dynamicFields
-          });
-        } else {
-          result = await addSubcategory({
-            name: values.name,
-            description: values.description,
-            category_id: rightClickedNode.data.id,
-            dynamic_fields: dynamicFields,
-            created_by: 1
-          });
-        }
-
-        // Refresh data after subcategory operation
-        if (result) {
-          await Promise.all([
-            fetchCategories(),
-            fetchAllSubcategories()
-          ]);
-          // Immediately refresh items
-          setRefreshTrigger(prev => prev + 1);
-          // Expand the parent category
-          if (!isEditing && rightClickedNode?.data?.id) {
-            setExpandedKeys(prevKeys => [...prevKeys, `category-${rightClickedNode.data.id}`]);
-          }
-        }
+        result = isEditing
+          ? await updateSubcategory(rightClickedNode.data.id, {
+              name: values.name,
+              description: values.description,
+              category_id: rightClickedNode.data.category_id,
+              dynamic_fields: dynamicFields
+            })
+          : await addSubcategory({
+              name: values.name,
+              description: values.description,
+              category_id: rightClickedNode.data.id,
+              dynamic_fields: dynamicFields,
+              created_by: 1
+            });
       }
 
       if (result) {
         setIsModalVisible(false);
         form.resetFields();
         message.success(`${modalType} ${rightClickedNode?.data?.id ? 'updated' : 'added'} successfully`);
+        // Trigger immediate refresh
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (error) {
       message.error(`Error: ${error.message}`);
@@ -780,23 +750,20 @@ const InventoryAllData = () => {
         result = await addItem(itemData);
       }
 
-      if (!result) {
-        throw new Error('Operation failed');
+      if (result) {
+        message.success(`Item ${values.id ? 'updated' : 'added'} successfully`);
+        setIsModalVisible(false);
+        form.resetFields();
+        // Trigger immediate refresh
+        setRefreshTrigger(prev => prev + 1);
       }
-
-      message.success(`Item ${values.id ? 'updated' : 'added'} successfully`);
-      setIsModalVisible(false);
-      form.resetFields();
-      
-      // Immediately refresh the data
-      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error submitting item:', error);
       message.error(`Error: ${error.response?.data?.detail || error.message}`);
     }
   };
 
-  // Update the Add Item button click handler
+  // Modify handleAddItemClick function
   const handleAddItemClick = () => {
     if (selectedCategory?.type === 'subcategory') {
       const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
@@ -808,13 +775,15 @@ const InventoryAllData = () => {
         setModalType('item');
         setRightClickedNode(null);
         form.resetFields();
-        setIsAutoGenerateCode(true);
+        setIsAutoGenerateCode(true); // Set auto-generate to true by default
+        
+        // Set default values
         form.setFieldsValue({
           status: 'Active',
           quantity: 0,
           available_quantity: 0,
           subcategory_id: selectedCategory.id,
-          item_code: generatedCode
+          item_code: generatedCode // Set the generated code
         });
         setIsModalVisible(true);
       } else {
@@ -962,7 +931,7 @@ const InventoryAllData = () => {
       });
 
       setEditingKey('');
-      // Immediately refresh the data
+      // Trigger immediate refresh
       setRefreshTrigger(prev => prev + 1);
     } catch (errInfo) {
       console.log('Validate Failed:', errInfo);
@@ -982,6 +951,7 @@ const InventoryAllData = () => {
         key: 'item_code',
         width: 150,
         editable: true,
+        align: 'center',
         sorter: (a, b) => a.item_code.localeCompare(b.item_code),
         filterSearch: true,
         filters: [...new Set(items
@@ -996,6 +966,7 @@ const InventoryAllData = () => {
         key: 'quantity',
         width: 100,
         editable: true,
+        align: 'center',
         sorter: (a, b) => a.quantity - b.quantity,
         filters: [
           { text: '0', value: '0' },
@@ -1017,6 +988,7 @@ const InventoryAllData = () => {
         key: 'available_quantity',
         width: 150,
         editable: true,
+        align: 'center',
         sorter: (a, b) => a.available_quantity - b.available_quantity,
         filters: [
           { text: '0', value: '0' },
@@ -1038,6 +1010,7 @@ const InventoryAllData = () => {
         key: 'status',
         width: 100,
         editable: true,
+        align: 'center',
         filters: [
           { text: 'Active', value: 'Active' },
           { text: 'Inactive', value: 'Inactive' },
@@ -1051,14 +1024,20 @@ const InventoryAllData = () => {
       }
     ];
 
+    
     // Get the subcategory to access its dynamic fields
     const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
     if (subcategory?.dynamic_fields) {
-      // Get dynamic fields in the order they were defined
+      // Get dynamic fields and sort by order
       const orderedDynamicFields = Object.entries(subcategory.dynamic_fields)
-        .sort((a, b) => (a[1].order || 0) - (b[1].order || 0));
+        .map(([fieldName, config]) => ({
+          fieldName,
+          config,
+          order: config.order || 0
+        }))
+        .sort((a, b) => a.order - b.order);
 
-      orderedDynamicFields.forEach(([fieldName, fieldConfig]) => {
+      orderedDynamicFields.forEach(({ fieldName, config }) => {
         const uniqueValues = [...new Set(items
           .filter(item => item.subcategory_id === selectedCategory.id)
           .map(item => item.dynamic_data?.[fieldName])
@@ -1067,10 +1046,10 @@ const InventoryAllData = () => {
 
         columns.push({
           title: (
-            <Tooltip title={`Type: ${fieldConfig.type}${fieldConfig.unit ? `, Unit: ${fieldConfig.unit}` : ''}`}>
+            <Tooltip title={`Type: ${config.type}${config.unit ? `, Unit: ${config.unit}` : ''}`}>
               <Space>
                 {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
-                {fieldConfig.required && <Tag color="red">Required</Tag>}
+                {config.required && <Tag color="red">Required</Tag>}
               </Space>
             </Tooltip>
           ),
@@ -1078,44 +1057,45 @@ const InventoryAllData = () => {
           key: fieldName,
           width: 150,
           editable: true,
-          fieldConfig: fieldConfig,
+          align: 'center',
+          fieldConfig: config,
           sorter: (a, b) => {
             const aValue = a.dynamic_data?.[fieldName];
             const bValue = b.dynamic_data?.[fieldName];
-            if (fieldConfig.type === 'number') {
+            if (config.type === 'number') {
               return (aValue || 0) - (bValue || 0);
             }
-            if (fieldConfig.type === 'date') {
+            if (config.type === 'date') {
               return dayjs(aValue).unix() - dayjs(bValue).unix();
             }
             return String(aValue || '').localeCompare(String(bValue || ''));
           },
           filters: uniqueValues.map(value => ({
-            text: fieldConfig.type === 'boolean' 
+            text: config.type === 'boolean' 
               ? (value ? 'Yes' : 'No')
-              : fieldConfig.type === 'date'
+              : config.type === 'date'
               ? dayjs(value).format('YYYY-MM-DD')
               : String(value),
             value: String(value)
           })),
           onFilter: (value, record) => {
             const recordValue = record.dynamic_data?.[fieldName];
-            if (fieldConfig.type === 'boolean') {
+            if (config.type === 'boolean') {
               return String(recordValue) === value;
             }
-            if (fieldConfig.type === 'date') {
+            if (config.type === 'date') {
               return dayjs(recordValue).format('YYYY-MM-DD') === value;
             }
             return String(recordValue) === value;
           },
           render: (value) => {
-            if (fieldConfig.type === 'boolean') {
+            if (config.type === 'boolean') {
               return value ? 'Yes' : 'No';
             }
-            if (fieldConfig.unit) {
-              return `${value} ${fieldConfig.unit}`;
+            if (config.unit) {
+              return `${value} ${config.unit}`;
             }
-            if (fieldConfig.type === 'date' && value) {
+            if (config.type === 'date' && value) {
               return dayjs(value).format('YYYY-MM-DD');
             }
             return value;
@@ -1130,6 +1110,7 @@ const InventoryAllData = () => {
       key: 'actions',
       fixed: 'right',
       width: 150,
+      align: 'center',
       render: (_, record) => {
         const editable = isEditing(record);
         return editable ? (
@@ -1205,7 +1186,104 @@ const InventoryAllData = () => {
     };
   });
 
-  // Render item form based on subcategory dynamic fields
+  // Add this new component for draggable field items
+  const DraggableFieldItem = ({ index, moveField, field, remove, restField, name }) => {
+    const ref = useRef(null);
+    
+    const [{ isDragging }, drag] = useDrag({
+      type: 'field',
+      item: { index },
+      collect: (monitor) => ({
+        isDragging: monitor.isDragging(),
+      }),
+    });
+
+    const [, drop] = useDrop({
+      accept: 'field',
+      hover(item, monitor) {
+        if (!ref.current) {
+          return;
+        }
+        const dragIndex = item.index;
+        const hoverIndex = index;
+        
+        if (dragIndex === hoverIndex) {
+          return;
+        }
+
+        const hoverBoundingRect = ref.current?.getBoundingClientRect();
+        const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+        const clientOffset = monitor.getClientOffset();
+        const hoverClientY = clientOffset.y - hoverBoundingRect.top;
+
+        if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) {
+          return;
+        }
+        if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) {
+          return;
+        }
+
+        moveField(dragIndex, hoverIndex);
+        item.index = hoverIndex;
+      },
+    });
+
+    drag(drop(ref));
+
+    return (
+      <div
+        ref={ref}
+        style={{
+          opacity: isDragging ? 0.5 : 1,
+          cursor: 'move',
+          marginBottom: 8,
+          padding: 8,
+          border: '1px dashed #ccc',
+          backgroundColor: '#fafafa',
+        }}
+      >
+        <Space align="baseline">
+          <MenuOutlined style={{ cursor: 'move', color: '#999' }} />
+          <Form.Item
+            {...restField}
+            name={[name, 'name']}
+            rules={[{ required: true, message: 'Missing field name' }]}
+          >
+            <Input placeholder="Field Name" />
+          </Form.Item>
+          <Form.Item
+            {...restField}
+            name={[name, 'type']}
+            rules={[{ required: true, message: 'Missing type' }]}
+          >
+            <Select style={{ width: 120 }} placeholder="Type">
+              <Select.Option value="string">Text</Select.Option>
+              <Select.Option value="number">Number</Select.Option>
+              <Select.Option value="boolean">Boolean</Select.Option>
+              <Select.Option value="date">Date</Select.Option>
+              <Select.Option value="variable">Variable</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            {...restField}
+            name={[name, 'unit']}
+          >
+            <Input placeholder="Unit (optional)" />
+          </Form.Item>
+          <Form.Item
+            {...restField}
+            name={[name, 'required']}
+            valuePropName="checked"
+          >
+            <Switch checkedChildren="Required" unCheckedChildren="Optional" />
+          </Form.Item>
+          <MinusCircleOutlined onClick={() => remove(name)} />
+        </Space>
+      </div>
+    );
+  };
+
+  // Modify the renderItemForm function
   const renderItemForm = () => {
     const subcategory = subcategories.find(sub => sub.id === selectedCategory?.id);
     const category = categories.find(cat => cat.id === subcategory?.category_id);
@@ -1225,10 +1303,11 @@ const InventoryAllData = () => {
         onFinish={handleItemFormSubmit}
         layout="vertical"
         initialValues={{
-          status: 'Active',
+          status: 'Active', // Set default status to Active
           quantity: 0,
           available_quantity: 0,
-          subcategory_id: selectedCategory.id
+          subcategory_id: selectedCategory.id,
+          item_code: generateItemCode(category.name, subcategory.name) // Set default item code
         }}
       >
         <Form.Item name="id" hidden>
@@ -1246,54 +1325,44 @@ const InventoryAllData = () => {
             label={
               <Space>
                 Item Code
-                {!form.getFieldValue('id') && (
-                  <Switch
-                    checked={isAutoGenerateCode}
-                    onChange={(checked) => {
-                      setIsAutoGenerateCode(checked);
-                      if (checked) {
-                        const newCode = generateItemCode(category.name, subcategory.name);
-                        form.setFieldsValue({ item_code: newCode });
-                      }
-                    }}
-                    checkedChildren="Auto"
-                    unCheckedChildren="Manual"
-                    size="small"
-                  />
-                )}
+                <Switch
+                  checked={isAutoGenerateCode}
+                  onChange={(checked) => {
+                    setIsAutoGenerateCode(checked);
+                    if (checked) {
+                      const newCode = generateItemCode(category.name, subcategory.name);
+                      form.setFieldsValue({ item_code: newCode });
+                    }
+                  }}
+                  checkedChildren="Auto"
+                  unCheckedChildren="Manual"
+                  size="small"
+                  defaultChecked={true}
+                />
               </Space>
             }
             rules={[
               { required: true, message: 'Please enter item code' },
               {
-                pattern: /^[A-Z0-9_]+$/,
-                message: 'Item code must contain only uppercase letters, numbers, and underscores'
+                pattern: /^[A-Z0-9-_.,&@#$%^*!+=()[\]{}|\\/<>?;:'"`~\s]+$/,
+                message: 'Item code must contain uppercase letters, numbers, or special characters'
               }
             ]}
             style={{ flex: 2 }}
-            extra={
-              !form.getFieldValue('id') 
-                ? isAutoGenerateCode 
-                  ? "Item code will be auto-generated based on category and subcategory names" 
-                  : "Enter a custom item code (uppercase letters, numbers, and underscores only)"
-                : null
-            }
           >
             <Input 
               placeholder="e.g., CATEGORY_SUBCATEGORY_001"
-              readOnly={!form.getFieldValue('id') && isAutoGenerateCode}
+              readOnly={isAutoGenerateCode}
               addonAfter={
                 <Space>
-                  {(form.getFieldValue('id') || !isAutoGenerateCode) && (
+                  {!isAutoGenerateCode && (
                     <Button
                       type="link"
                       size="small"
                       onClick={() => {
                         const newCode = generateItemCode(category.name, subcategory.name);
                         form.setFieldsValue({ item_code: newCode });
-                        if (!form.getFieldValue('id')) {
-                          setIsAutoGenerateCode(true);
-                        }
+                        setIsAutoGenerateCode(true);
                       }}
                     >
                       Generate New
@@ -1314,8 +1383,9 @@ const InventoryAllData = () => {
             label="Status"
             rules={[{ required: true, message: 'Please select status' }]}
             style={{ flex: 1 }}
+            initialValue="Active" // Set default value to Active
           >
-            <Select>
+            <Select defaultValue="Active">
               <Select.Option value="Active">Active</Select.Option>
               <Select.Option value="Inactive">Inactive</Select.Option>
             </Select>
@@ -1484,6 +1554,7 @@ const InventoryAllData = () => {
         <Form.Item
           name="description"
           label="Description"
+          rules={[{ required: true, message: 'Please enter a description' }]}
         >
           <Input.TextArea rows={4} />
         </Form.Item>
@@ -1491,55 +1562,30 @@ const InventoryAllData = () => {
         {modalType === 'subcategory' && (
           <div className="mb-4">
             <Divider>Dynamic Fields</Divider>
-            <Form.List name="dynamic_fields">
-              {(fields, { add, remove }) => (
-                <>
-                  {fields.map(({ key, name, ...restField }) => (
-                    <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
-                      <Form.Item
-                        {...restField}
-                        name={[name, 'name']}
-                        rules={[{ required: true, message: 'Missing field name' }]}
-                      >
-                        <Input placeholder="Field Name" />
-                      </Form.Item>
-                      <Form.Item
-                        {...restField}
-                        name={[name, 'type']}
-                        rules={[{ required: true, message: 'Missing type' }]}
-                      >
-                        <Select style={{ width: 120 }} placeholder="Type">
-                          <Select.Option value="string">Text</Select.Option>
-                          <Select.Option value="number">Number</Select.Option>
-                          <Select.Option value="boolean">Boolean</Select.Option>
-                          <Select.Option value="date">Date</Select.Option>
-                          <Select.Option value="variable">Variable</Select.Option>
-                        </Select>
-                      </Form.Item>
-                      <Form.Item
-                        {...restField}
-                        name={[name, 'unit']}
-                      >
-                        <Input placeholder="Unit (optional)" />
-                      </Form.Item>
-                      <Form.Item
-                        {...restField}
-                        name={[name, 'required']}
-                        valuePropName="checked"
-                      >
-                        <Switch checkedChildren="Required" unCheckedChildren="Optional" />
-                      </Form.Item>
-                      <MinusCircleOutlined onClick={() => remove(name)} />
-                    </Space>
-                  ))}
-                  <Form.Item>
-                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                      Add Field
-                    </Button>
-                  </Form.Item>
-                </>
-              )}
-            </Form.List>
+            <DndProvider backend={HTML5Backend}>
+              <Form.List name="dynamic_fields">
+                {(fields, { add, remove, move }) => (
+                  <>
+                    {fields.map((field, index) => (
+                      <DraggableFieldItem
+                        key={field.key}
+                        index={index}
+                        moveField={move}
+                        field={field}
+                        remove={remove}
+                        restField={field}
+                        name={field.name}
+                      />
+                    ))}
+                    <Form.Item>
+                      <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                        Add Field
+                      </Button>
+                    </Form.Item>
+                  </>
+                )}
+              </Form.List>
+            </DndProvider>
           </div>
         )}
 
@@ -1866,6 +1912,11 @@ const InventoryAllData = () => {
                       className: 'px-4'
                     }}
                     className="border border-gray-200 rounded"
+                    style={{
+                      '& .ant-table-thead > tr > th': {
+                        textAlign: 'center',
+                      }
+                    }}
                   />
                 </Form>
               )}
@@ -1875,11 +1926,12 @@ const InventoryAllData = () => {
       </div>
 
       {/* Modal */}
+
       <Modal
         title={modalType === 'item' ? 
           (form.getFieldValue('id') ? 'Edit Item' : 'Add Item') :
           (modalType === 'category' ? 'Add Category' : 
-          rightClickedNode?.data?.id ? 'Edit Subcategory' : 'Add Subcategory to ' + rightClickedNode?.data?.name)}
+          rightClickedNode?.data?.id ? 'Add Subcategory' : 'Add Subcategory to ' + rightClickedNode?.data?.name)}
         open={isModalVisible}
         onCancel={() => {
           setIsModalVisible(false);

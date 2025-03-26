@@ -33,7 +33,7 @@ const useScheduleStore = create((set, get) => ({
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:9709/api/v1/scheduling/schedule-batch/');
+      const response = await fetch('http://172.18.7.85:9738/api/v1/scheduling/schedule-batch/');
       const data = await response.json();
 
       // Extract unique production orders

@@ -744,6 +744,58 @@ const useInventoryStore = create((set, get) => ({
     } finally {
       set({ loading: false });
     }
+  },
+
+  // Update bulk upload function with correct endpoint
+  bulkUploadItems: async (subcategoryId, items) => {
+    set({ loading: true });
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/items/bulk/`,  // Updated endpoint
+        {
+          created_by: 1,
+          subcategory_id: subcategoryId,
+          items: items
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+
+
+      
+
+      if (response.data) {
+        message.success('Excel data imported successfully');
+        // Refresh items after bulk upload
+        await get().fetchItems();
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Server Error Details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        error: error.message
+      });
+
+      if (error.response?.status === 500) {
+        throw new Error(
+          'Server error (500). Possible issues:\n' +
+          '1. Duplicate item codes\n' +
+          '2. Invalid data format\n' +
+          '3. Missing required fields\n' +
+          'Please check your data and try again.'
+        );
+      } else if (error.response?.data?.detail) {
+        throw new Error(`Upload failed: ${error.response.data.detail}`);
+      } else {
+        throw new Error('Failed to upload data. Please check the server logs for details.');
+      }
+    } finally {
+      set({ loading: false });
+    }
   }
 }));
 

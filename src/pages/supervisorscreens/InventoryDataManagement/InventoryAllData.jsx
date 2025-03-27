@@ -97,7 +97,7 @@ const InventoryAllData = () => {
     bulkUploadItems,
   } = useInventoryStore();
 
-  // Add function to generate sequential item code
+  // Add function to generate sequential Name
   const generateItemCode = (categoryName, subcategoryName) => {
     // Allow special characters in the prefix but replace spaces with underscores
     const prefix = `${categoryName}_${subcategoryName}_`.toUpperCase();
@@ -183,7 +183,7 @@ const InventoryAllData = () => {
         {
           key: 'add',
           icon: <PlusOutlined />,
-          label: isCategory ? 'Add Subcategory' : 'Add Item',
+          label: isCategory ? 'Add Subcategory' : 'Add Row',
           onClick: () => {
             setModalType(isCategory ? 'subcategory' : 'item');
             setRightClickedNode(node);
@@ -305,36 +305,43 @@ const InventoryAllData = () => {
     }
 
     try {
-      // Get the current table data
+      // Get the current table columns (excluding actions column)
+      const columns = getColumns().filter(col => col.key !== 'actions');
       const tableData = getTableData();
       
-      // Get the subcategory to access its dynamic fields
-      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
-      
-      // Transform data for Excel
-      const excelData = tableData.map(item => {
-        const row = {
-          'Item Code': item.item_code,
-          'Quantity': item.quantity,
-          'Available Quantity': item.available_quantity,
-          'Status': item.status,
-        };
+      // Transform data for Excel maintaining column order from the table
+      const excelData = tableData.map(record => {
+        const row = {};
+        
+        // Map data according to column order
+        columns.forEach(col => {
+          const columnTitle = typeof col.title === 'string' ? col.title : 
+            (col.title.props?.children[0] || col.dataIndex[1]);
+          
+          let value;
+          if (Array.isArray(col.dataIndex)) {
+            // Handle dynamic fields
+            value = record[col.dataIndex[0]]?.[col.dataIndex[1]];
+          } else {
+            value = record[col.dataIndex];
+          }
 
-        // Add dynamic fields
-        if (subcategory?.dynamic_fields && item.dynamic_data) {
-          Object.entries(subcategory.dynamic_fields).forEach(([fieldName, fieldConfig]) => {
-            const value = item.dynamic_data[fieldName];
-            if (fieldConfig.type === 'boolean') {
-              row[fieldName] = value ? 'Yes' : 'No';
-            } else if (fieldConfig.type === 'date' && value) {
-              row[fieldName] = dayjs(value).format('YYYY-MM-DD');
-            } else if (fieldConfig.unit) {
-              row[fieldName] = `${value} ${fieldConfig.unit}`;
-            } else {
-              row[fieldName] = value;
+          // Format value based on column configuration
+          if (col.fieldConfig) {
+            if (col.fieldConfig.type === 'boolean') {
+              value = value ? 'Yes' : 'No';
+            } else if (col.fieldConfig.type === 'date' && value) {
+              value = dayjs(value).format('YYYY-MM-DD');
+            } else if (col.fieldConfig.unit) {
+              value = `${value} ${col.fieldConfig.unit}`;
             }
-          });
-        }
+          } else if (col.dataIndex === 'status') {
+            // Handle status column
+            value = value || 'Active';
+          }
+
+          row[columnTitle] = value;
+        });
 
         return row;
       });
@@ -353,6 +360,7 @@ const InventoryAllData = () => {
       });
 
       // Download file
+      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
       const fileName = `${subcategory?.name || 'inventory'}_items.xlsx`;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -377,53 +385,45 @@ const InventoryAllData = () => {
     }
 
     try {
-      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
-      if (!subcategory) {
-        throw new Error('Subcategory not found');
-      }
+      // Get the current table columns (excluding actions column and Name column)
+      const columns = getColumns().filter(col => 
+        col.key !== 'actions' && 
+        col.dataIndex !== 'item_code'
+      );
+      
+      // Create template row maintaining column order
+      const templateRow = {};
+      columns.forEach(col => {
+        const columnTitle = typeof col.title === 'string' ? col.title : 
+          (col.title.props?.children[0] || col.dataIndex[1]);
+        
+        // Set default values
+        if (col.dataIndex === 'status') {
+          templateRow[columnTitle] = 'Active';
+        } else {
+          templateRow[columnTitle] = '';
+        }
+      });
 
-      // Get all columns from the table
-      const columns = getColumns()
-        .filter(col => col.key !== 'actions') // Exclude actions column
-        .map(col => {
-          // Handle nested dataIndex for dynamic fields
-          const fieldName = Array.isArray(col.dataIndex) ? col.dataIndex[1] : col.dataIndex;
-          return {
-            header: typeof col.title === 'string' ? col.title : fieldName,
-            key: fieldName
-          };
-        });
-
-      // Create template data with example row
-      const templateData = [{
-        'Item Code': '',
-        'Quantity': '',
-        'Available Quantity': '',
-        'Status': 'Active',
-        ...Object.entries(subcategory.dynamic_fields || {}).reduce((acc, [fieldName, config]) => {
-          acc[fieldName] = '';
-          return acc;
-        }, {})
-      }];
-
-      // Create worksheet with headers
-      const ws = utils.json_to_sheet(templateData);
+      // Create worksheet with empty template
+      const ws = utils.json_to_sheet([templateRow]);
 
       // Customize column widths
-      const colWidths = columns.map(() => ({ wch: 20 })); // Set width of 20 for all columns
+      const colWidths = Object.keys(templateRow).map(() => ({ wch: 20 }));
       ws['!cols'] = colWidths;
 
-      // Add notes/instructions in a separate worksheet
+      // Add instructions worksheet
       const instructionsWS = utils.json_to_sheet([
         { Instructions: 'Please follow these guidelines:' },
-        { Instructions: '1. Item Code: Unique identifier for the item (e.g., EM-001)' },
-        { Instructions: '2. Quantity: Total quantity of the item (numeric value)' },
-        { Instructions: '3. Available Quantity: Currently available quantity (numeric value)' },
-        { Instructions: '4. Status: Must be either "Active" or "Inactive"' },
+        { Instructions: '1. Total Quantity: Total quantity of the item (numeric value)' },
+        { Instructions: '2. Available Quantity: Currently available quantity (numeric value)' },
+        { Instructions: '3. Status: Must be either "Active" or "Inactive"' },
         { Instructions: '\nDynamic Fields:' },
-        ...Object.entries(subcategory.dynamic_fields || {}).map(([fieldName, config]) => ({
-          Instructions: `${fieldName}: ${getFieldInstructions(config)}`
-        }))
+        ...columns
+          .filter(col => col.fieldConfig)
+          .map(col => ({
+            Instructions: `${col.title.props?.children[0] || col.dataIndex[1]}: ${getFieldInstructions(col.fieldConfig)}`
+          }))
       ], { header: ['Instructions'] });
 
       // Set column width for instructions
@@ -441,7 +441,8 @@ const InventoryAllData = () => {
       });
 
       // Download file
-      const fileName = `${subcategory.name}_template.xlsx`;
+      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
+      const fileName = `${subcategory?.name}_template.xlsx`;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -504,70 +505,112 @@ const InventoryAllData = () => {
           const data = new Uint8Array(e.target.result);
           const workbook = read(data, { type: 'array' });
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = utils.sheet_to_json(worksheet);
+          const jsonData = utils.sheet_to_json(worksheet, { 
+            raw: false, // This will preserve string values
+            defval: '', // Default value for empty cells
+          });
 
           const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
-          if (!subcategory) {
+          const category = categories.find(cat => cat.id === subcategory?.category_id);
+          
+          if (!subcategory || !category) {
             throw new Error('Subcategory not found');
           }
 
+          if (jsonData.length === 0) {
+            throw new Error('The Excel file is empty. Please add some data.');
+          }
+
+          // Check if required columns exist
+          const requiredColumns = ['Total Quantity', 'Available Quantity'];
+          const missingColumns = requiredColumns.filter(col => !Object.keys(jsonData[0]).includes(col));
+          if (missingColumns.length > 0) {
+            throw new Error(`Missing required columns: ${missingColumns.join(', ')}. Please use the template provided.`);
+          }
+
           // Validate data before sending
-          for (const row of jsonData) {
-            if (!row['Item Code']) {
-              throw new Error('Item Code is required for all items');
+          for (const [index, row] of jsonData.entries()) {
+            const rowNumber = index + 1;
+
+            // Validate Total Quantity
+            let quantity = row['Total Quantity']?.toString().trim();
+            if (!quantity) {
+              throw new Error(`Row ${rowNumber}: Total Quantity is required`);
             }
-            if (!row['Quantity'] || isNaN(parseInt(row['Quantity']))) {
-              throw new Error(`Invalid Quantity for item ${row['Item Code']}`);
+            const parsedQuantity = parseInt(quantity);
+            if (isNaN(parsedQuantity) || parsedQuantity < 0) {
+              throw new Error(`Row ${rowNumber}: Invalid Total Quantity - must be a positive number`);
             }
-            if (!row['Available Quantity'] || isNaN(parseInt(row['Available Quantity']))) {
-              throw new Error(`Invalid Available Quantity for item ${row['Item Code']}`);
+
+            // Validate Available Quantity
+            let availableQuantity = row['Available Quantity']?.toString().trim();
+            if (!availableQuantity) {
+              throw new Error(`Row ${rowNumber}: Available Quantity is required`);
+            }
+            const parsedAvailableQuantity = parseInt(availableQuantity);
+            if (isNaN(parsedAvailableQuantity) || parsedAvailableQuantity < 0) {
+              throw new Error(`Row ${rowNumber}: Invalid Available Quantity - must be a positive number`);
+            }
+            if (parsedAvailableQuantity > parsedQuantity) {
+              throw new Error(`Row ${rowNumber}: Available Quantity (${parsedAvailableQuantity}) cannot exceed Total Quantity (${parsedQuantity})`);
+            }
+
+            // Validate Status
+            if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'].trim())) {
+              throw new Error(`Row ${rowNumber}: Status must be either 'Active' or 'Inactive'`);
             }
             
             // Validate dynamic fields
             for (const [fieldName, config] of Object.entries(subcategory.dynamic_fields || {})) {
-              const value = row[fieldName];
-              if (config.required && (value === undefined || value === null || value === '')) {
-                throw new Error(`${fieldName} is required for item ${row['Item Code']}`);
+              const value = row[fieldName]?.toString().trim();
+              if (config.required && !value) {
+                throw new Error(`Row ${rowNumber}: ${fieldName} is required`);
               }
-              if (value !== undefined && value !== null && value !== '') {
+              if (value) {
                 if (config.type === 'number' && isNaN(parseFloat(value))) {
-                  throw new Error(`Invalid number value for ${fieldName} in item ${row['Item Code']}`);
+                  throw new Error(`Row ${rowNumber}: Invalid number value for ${fieldName}`);
                 }
                 if (config.type === 'date') {
                   const dateValue = dayjs(value);
                   if (!dateValue.isValid()) {
-                    throw new Error(`Invalid date format for ${fieldName} in item ${row['Item Code']}`);
+                    throw new Error(`Row ${rowNumber}: Invalid date format for ${fieldName} - use YYYY-MM-DD`);
                   }
+                }
+                if (config.type === 'boolean' && !['yes', 'no', 'true', 'false', '0', '1'].includes(value.toLowerCase())) {
+                  throw new Error(`Row ${rowNumber}: ${fieldName} must be Yes/No, True/False, or 1/0`);
                 }
               }
             }
           }
 
-          const formattedItems = jsonData.map(row => ({
-            item_code: String(row['Item Code'] || '').trim(),
-            quantity: parseInt(row['Quantity'] || 0),
-            available_quantity: parseInt(row['Available Quantity'] || 0),
-            status: String(row['Status'] || 'Active').trim(),
-            dynamic_data: Object.entries(subcategory.dynamic_fields || {}).reduce((acc, [fieldName, config]) => {
-              const value = row[fieldName];
-              if (value !== undefined && value !== null && value !== '') {
-                if (config.type === 'date') {
-                  const dateValue = dayjs(value);
-                  acc[fieldName] = dateValue.isValid() ? dateValue.format('YYYY-MM-DD') : null;
-                } else if (config.type === 'number') {
-                  acc[fieldName] = parseFloat(value);
-                } else if (config.type === 'boolean') {
-                  acc[fieldName] = value === true || value === 'true' || value === 'Yes' || value === 1;
-                } else {
-                  acc[fieldName] = String(value);
+          const formattedItems = jsonData.map(row => {
+            const generatedCode = generateItemCode(category.name, subcategory.name);
+
+            return {
+              item_code: generatedCode,
+              quantity: parseInt(row['Total Quantity'].toString().trim()),
+              available_quantity: parseInt(row['Available Quantity'].toString().trim()),
+              status: (row['Status']?.toString().trim() || 'Active'),
+              dynamic_data: Object.entries(subcategory.dynamic_fields || {}).reduce((acc, [fieldName, config]) => {
+                const value = row[fieldName]?.toString().trim();
+                if (value) {
+                  if (config.type === 'date') {
+                    const dateValue = dayjs(value);
+                    acc[fieldName] = dateValue.isValid() ? dateValue.format('YYYY-MM-DD') : null;
+                  } else if (config.type === 'number') {
+                    acc[fieldName] = parseFloat(value);
+                  } else if (config.type === 'boolean') {
+                    acc[fieldName] = ['yes', 'true', '1'].includes(value.toLowerCase());
+                  } else {
+                    acc[fieldName] = value;
+                  }
                 }
-              }
-              return acc;
-            }, {})
-          }));
+                return acc;
+              }, {})
+            };
+          });
 
           try {
-            // Use the store's bulkUploadItems function instead of direct axios call
             await bulkUploadItems(selectedCategory.id, formattedItems);
             loadingMessage();
             message.success('Excel data imported successfully');
@@ -943,88 +986,9 @@ const InventoryAllData = () => {
     if (!selectedCategory || selectedCategory.type === 'category') {
       return [];
     }
-
-    const columns = [
-      {
-        title: 'Name',
-        dataIndex: 'item_code',
-        key: 'item_code',
-        width: 150,
-        editable: true,
-        align: 'center',
-        sorter: (a, b) => a.item_code.localeCompare(b.item_code),
-        filterSearch: true,
-        filters: [...new Set(items
-          .filter(item => item.subcategory_id === selectedCategory.id)
-          .map(item => item.item_code))]
-          .map(code => ({ text: code, value: code })),
-        onFilter: (value, record) => record.item_code === value,
-      },
-      {
-        title: 'Quantity',
-        dataIndex: 'quantity',
-        key: 'quantity',
-        width: 100,
-        editable: true,
-        align: 'center',
-        sorter: (a, b) => a.quantity - b.quantity,
-        filters: [
-          { text: '0', value: '0' },
-          { text: '1-10', value: '1-10' },
-          { text: '11-50', value: '11-50' },
-          { text: '50+', value: '50+' },
-        ],
-        onFilter: (value, record) => {
-          if (value === '0') return record.quantity === 0;
-          if (value === '1-10') return record.quantity > 0 && record.quantity <= 10;
-          if (value === '11-50') return record.quantity > 10 && record.quantity <= 50;
-          if (value === '50+') return record.quantity > 50;
-          return true;
-        },
-      },
-      {
-        title: 'Available Quantity',
-        dataIndex: 'available_quantity',
-        key: 'available_quantity',
-        width: 150,
-        editable: true,
-        align: 'center',
-        sorter: (a, b) => a.available_quantity - b.available_quantity,
-        filters: [
-          { text: '0', value: '0' },
-          { text: '1-10', value: '1-10' },
-          { text: '11-50', value: '11-50' },
-          { text: '50+', value: '50+' },
-        ],
-        onFilter: (value, record) => {
-          if (value === '0') return record.available_quantity === 0;
-          if (value === '1-10') return record.available_quantity > 0 && record.available_quantity <= 10;
-          if (value === '11-50') return record.available_quantity > 10 && record.available_quantity <= 50;
-          if (value === '50+') return record.available_quantity > 50;
-          return true;
-        },
-      },
-      {
-        title: 'Status',
-        dataIndex: 'status',
-        key: 'status',
-        width: 100,
-        editable: true,
-        align: 'center',
-        filters: [
-          { text: 'Active', value: 'Active' },
-          { text: 'Inactive', value: 'Inactive' },
-        ],
-        onFilter: (value, record) => record.status === value,
-        render: (status) => (
-          <Tag color={status === 'Active' ? 'green' : 'red'}>
-            {status}
-          </Tag>
-        ),
-      }
-    ];
-
     
+    const columns = [];
+
     // Get the subcategory to access its dynamic fields
     const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
     if (subcategory?.dynamic_fields) {
@@ -1037,6 +1001,7 @@ const InventoryAllData = () => {
         }))
         .sort((a, b) => a.order - b.order);
 
+      // Add dynamic fields first
       orderedDynamicFields.forEach(({ fieldName, config }) => {
         const uniqueValues = [...new Set(items
           .filter(item => item.subcategory_id === selectedCategory.id)
@@ -1104,63 +1069,128 @@ const InventoryAllData = () => {
       });
     }
 
-    // Add action column
-    columns.push({
-      title: 'Actions',
-      key: 'actions',
-      fixed: 'right',
-      width: 150,
-      align: 'center',
-      render: (_, record) => {
-        const editable = isEditing(record);
-        return editable ? (
-          <Space>
-            <Button
-              type="link"
-              onClick={() => save(record)}
-              style={{ marginRight: 8 }}
-            >
-              Save
-            </Button>
-            <Popconfirm title="Sure to cancel?" onConfirm={cancel}>
-              <Button type="link">Cancel</Button>
-            </Popconfirm>
-          </Space>
-        ) : (
-          <Space>
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              disabled={editingKey !== ''}
-              onClick={() => edit(record)}
-            />
-            <Popconfirm
-              title="Delete Item"
-              description="Are you sure you want to delete this item?"
-              onConfirm={async () => {
-                try {
-                  await deleteItem(record.id);
-                  message.success('Item deleted successfully');
-                  // Immediately refresh the data
-                  setRefreshTrigger(prev => prev + 1);
-                } catch (error) {
-                  console.error('Error deleting item:', error);
-                  message.error('Failed to delete item');
-                }
-              }}
-              okText="Yes"
-              cancelText="No"
-            >
+    // Add Total Quantity, Available Quantity, Status, and Actions at the end
+    columns.push(
+      {
+        title: 'Total Quantity',
+        dataIndex: 'quantity',
+        key: 'quantity',
+        width: 100,
+        editable: true,
+        align: 'center',
+        sorter: (a, b) => a.quantity - b.quantity,
+        filters: [
+          { text: '0', value: '0' },
+          { text: '1-10', value: '1-10' },
+          { text: '11-50', value: '11-50' },
+          { text: '50+', value: '50+' },
+        ],
+        onFilter: (value, record) => {
+          if (value === '0') return record.quantity === 0;
+          if (value === '1-10') return record.quantity > 0 && record.quantity <= 10;
+          if (value === '11-50') return record.quantity > 10 && record.quantity <= 50;
+          if (value === '50+') return record.quantity > 50;
+          return true;
+        },
+      },
+      {
+        title: 'Status',
+        dataIndex: 'status',
+        key: 'status',
+        width: 100,
+        editable: true,
+        align: 'center',
+        filters: [
+          { text: 'Active', value: 'Active' },
+          { text: 'Inactive', value: 'Inactive' },
+        ],
+        onFilter: (value, record) => record.status === value,
+        render: (status) => (
+          <Tag color={status === 'Active' ? 'green' : 'red'}>
+            {status}
+          </Tag>
+        ),
+      },
+      {
+        title: 'Available Quantity',
+        dataIndex: 'available_quantity',
+        key: 'available_quantity',
+        width: 150,
+        editable: true,
+        align: 'center',
+        fixed: 'right',
+        sorter: (a, b) => a.available_quantity - b.available_quantity,
+        filters: [
+          { text: '0', value: '0' },
+          { text: '1-10', value: '1-10' },
+          { text: '11-50', value: '11-50' },
+          { text: '50+', value: '50+' },
+        ],
+        onFilter: (value, record) => {
+          if (value === '0') return record.available_quantity === 0;
+          if (value === '1-10') return record.available_quantity > 0 && record.available_quantity <= 10;
+          if (value === '11-50') return record.available_quantity > 10 && record.available_quantity <= 50;
+          if (value === '50+') return record.available_quantity > 50;
+          return true;
+        },
+      },
+      {
+        title: 'Actions',
+        key: 'actions',
+        fixed: 'right',
+        width: 150,
+        align: 'center',
+        render: (_, record) => {
+          const editable = isEditing(record);
+          return editable ? (
+            <Space>
+              <Button
+                type="link"
+                onClick={() => save(record)}
+                style={{ marginRight: 8 }}
+              >
+                Save
+              </Button>
+              <Popconfirm title="Sure to cancel?" onConfirm={cancel}>
+                <Button type="link">Cancel</Button>
+              </Popconfirm>
+            </Space>
+          ) : (
+            <Space>
               <Button
                 type="text"
-                danger
-                icon={<DeleteOutlined />}
+                icon={<EditOutlined />}
+                disabled={editingKey !== ''}
+                onClick={() => edit(record)}
               />
-            </Popconfirm>
-          </Space>
-        );
-      },
-    });
+              <Popconfirm
+                title="Delete Item"
+                description="Are you sure you want to delete this item?"
+                onConfirm={async () => {
+                  try {
+                    await deleteItem(record.id);
+                    message.success('Item deleted successfully');
+                    // Immediately refresh the data
+                    setRefreshTrigger(prev => prev + 1);
+                  } catch (error) {
+                    console.error('Error deleting item:', error);
+                    message.error('Failed to delete item');
+                  }
+                }}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                />
+              </Popconfirm>
+            </Space>
+          );
+        },
+      }
+    );
 
     return columns;
   };
@@ -1293,22 +1323,23 @@ const InventoryAllData = () => {
       return null;
     }
 
-    // Get dynamic fields in the order they were defined
-    const orderedDynamicFields = Object.entries(subcategory.dynamic_fields || {})
-      .sort((a, b) => (a[1].order || 0) - (b[1].order || 0));
-
     return (
       <Form
         form={form}
-        onFinish={handleItemFormSubmit}
+        onFinish={(values) => {
+          // Automatically generate and add item_code to values
+          const generatedCode = generateItemCode(category.name, subcategory.name);
+          handleItemFormSubmit({
+            ...values,
+            item_code: generatedCode
+          });
+        }}
         layout="vertical"
-        
         initialValues={{
-          status: 'Active', // Set default status to Active
+          status: 'Active',
           quantity: 0,
           available_quantity: 0,
           subcategory_id: selectedCategory.id,
-          item_code: generateItemCode(category.name, subcategory.name) // Set default item code
         }}
       >
         <Form.Item name="id" hidden>
@@ -1319,68 +1350,8 @@ const InventoryAllData = () => {
           <Input />
         </Form.Item>
 
-        {/* First Row: Combined Item Code, Status, Quantity and Available Quantity */}
+        {/* First Row: Status, Quantity and Available Quantity */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          <Form.Item
-            name="item_code"
-            label={
-              <Space>
-                Item Code
-                <Switch
-                  checked={isAutoGenerateCode}
-                  onChange={(checked) => {
-                    setIsAutoGenerateCode(checked);
-                    if (checked) {
-                      const newCode = generateItemCode(category.name, subcategory.name);
-                      form.setFieldsValue({ item_code: newCode });
-                    }
-                  }}
-                  checkedChildren="Auto"
-                  unCheckedChildren="Manual"
-                  size="small"
-                  defaultChecked={true}
-                />
-              </Space>
-            }
-            rules={[
-              { required: true, message: 'Please enter item code' },
-              {
-                pattern: /^[A-Z0-9-_.,&@#$%^*!+=()[\]{}|\\/<>?;:'"`~\s]+$/,
-                message: 'Item code must contain uppercase letters, numbers, or special characters'
-              }
-            ]}
-            style={{ flex: 2 }}
-            validateTrigger={['onChange', 'onBlur']}
-          >
-            <Input 
-              placeholder="e.g., CATEGORY_SUBCATEGORY_001"
-              readOnly={isAutoGenerateCode}
-              addonAfter={
-                <Space>
-                  {!isAutoGenerateCode && (
-                    <Button
-                      type="link"
-                      size="small"
-                      onClick={() => {
-                        const newCode = generateItemCode(category.name, subcategory.name);
-                        form.setFieldsValue({ item_code: newCode });
-                        setIsAutoGenerateCode(true);
-                      }}
-                    >
-                      Generate New
-                    </Button>
-                  )}
-                </Space>
-              }
-              onChange={(e) => {
-                form.setFieldsValue({ 
-                  item_code: e.target.value.toUpperCase() 
-                });
-                form.validateFields(['item_code']);
-              }}
-            />
-          </Form.Item>
-
           <Form.Item
             name="status"
             label="Status"
@@ -1453,7 +1424,7 @@ const InventoryAllData = () => {
           gap: '16px',
           marginBottom: '24px'
         }}>
-          {orderedDynamicFields.map(([fieldName, config], index) => (
+          {Object.entries(subcategory.dynamic_fields || {}).map(([fieldName, config], index) => (
             <Form.Item
               key={fieldName}
               name={['dynamic_data', fieldName]}
@@ -1662,7 +1633,8 @@ const InventoryAllData = () => {
         <div className="flex flex-col w-full xl:w-auto">
           <div className="flex items-center gap-2 mb-2">
             <Title level={4} className="!m-0 !text-lg">
-              {subcategories.find(sub => sub.id === selectedCategory.id)?.name} Items
+              {subcategories.find(sub => sub.id === selectedCategory.id)?.name} 
+              {/* all data */}
             </Title>
             {/* <Badge 
               count={getTableData().length} 
@@ -1695,7 +1667,7 @@ const InventoryAllData = () => {
               icon={<PlusOutlined />}
               onClick={handleAddItemClick}
             >
-              Add Item
+              Add Row
             </Button>
 
             {selectedCategory?.type === 'subcategory' && (
@@ -1977,7 +1949,7 @@ const InventoryAllData = () => {
 
       <Modal
         title={modalType === 'item' ? 
-          (form.getFieldValue('id') ? 'Edit Item' : 'Add Item') :
+          (form.getFieldValue('id') ? 'Edit Item' : 'Add Row') :
           (modalType === 'category' ? 'Add Category' : 
           rightClickedNode?.data?.id ? 'Add Subcategory' : 'Add Subcategory to ' + rightClickedNode?.data?.name)}
         open={isModalVisible}

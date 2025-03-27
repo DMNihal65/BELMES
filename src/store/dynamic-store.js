@@ -39,7 +39,7 @@ const useDynamicStore = create((set) => ({
   //     const token = useAuthStore.getState().token;
   //     set({ isLoadingOrders: true });
 
-  //     const response = await fetch('http://172.18.7.88:1887/planning/all_orders', {
+  //     const response = await fetch('http://172.18.7.85:9738/planning/all_orders', {
   //       headers: {
   //         'Authorization': `Bearer ${token}`,
   //         'Accept': 'application/json'

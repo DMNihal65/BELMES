@@ -946,7 +946,7 @@ const InventoryAllData = () => {
 
     const columns = [
       {
-        title: 'Item Code',
+        title: 'Name',
         dataIndex: 'item_code',
         key: 'item_code',
         width: 150,
@@ -1302,6 +1302,7 @@ const InventoryAllData = () => {
         form={form}
         onFinish={handleItemFormSubmit}
         layout="vertical"
+        
         initialValues={{
           status: 'Active', // Set default status to Active
           quantity: 0,
@@ -1318,8 +1319,8 @@ const InventoryAllData = () => {
           <Input />
         </Form.Item>
 
-        {/* First Row: Item Code and Status */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+        {/* First Row: Combined Item Code, Status, Quantity and Available Quantity */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <Form.Item
             name="item_code"
             label={
@@ -1349,6 +1350,7 @@ const InventoryAllData = () => {
               }
             ]}
             style={{ flex: 2 }}
+            validateTrigger={['onChange', 'onBlur']}
           >
             <Input 
               placeholder="e.g., CATEGORY_SUBCATEGORY_001"
@@ -1374,6 +1376,7 @@ const InventoryAllData = () => {
                 form.setFieldsValue({ 
                   item_code: e.target.value.toUpperCase() 
                 });
+                form.validateFields(['item_code']);
               }}
             />
           </Form.Item>
@@ -1383,17 +1386,18 @@ const InventoryAllData = () => {
             label="Status"
             rules={[{ required: true, message: 'Please select status' }]}
             style={{ flex: 1 }}
-            initialValue="Active" // Set default value to Active
+            initialValue="Active"
+            validateTrigger={['onChange', 'onBlur']}
           >
-            <Select defaultValue="Active">
+            <Select 
+              defaultValue="Active"
+              onChange={() => form.validateFields(['status'])}
+            >
               <Select.Option value="Active">Active</Select.Option>
               <Select.Option value="Inactive">Inactive</Select.Option>
             </Select>
           </Form.Item>
-        </div>
 
-        {/* Second Row: Quantity and Available Quantity */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <Form.Item
             name="quantity"
             label="Quantity"
@@ -1402,11 +1406,13 @@ const InventoryAllData = () => {
               { type: 'number', min: 0, message: 'Quantity must be greater than or equal to 0' }
             ]}
             style={{ flex: 1 }}
-          >
-            <InputNumber 
-              min={0} 
-              style={{ width: '100%' }}
+              validateTrigger={['onChange', 'onBlur']}
+            >
+                <InputNumber 
+                  min={0}
+                  style={{ width: '100%' }}
               placeholder="Enter total quantity"
+              onChange={() => form.validateFields(['quantity', 'available_quantity'])}
             />
           </Form.Item>
 
@@ -1420,19 +1426,20 @@ const InventoryAllData = () => {
                 validator(_, value) {
                   const totalQuantity = getFieldValue('quantity');
                   if (value > totalQuantity) {
-                    return Promise.reject('Available quantity cannot exceed total quantity');
+                    return Promise.reject('Cannot exceed total quantity');
                   }
                   return Promise.resolve();
                 },
               }),
             ]}
             style={{ flex: 1 }}
-            extra="Available quantity must be less than or equal to total quantity"
+            validateTrigger={['onChange', 'onBlur']}
           >
             <InputNumber 
               min={0} 
               style={{ width: '100%' }}
               placeholder="Enter available quantity"
+              onChange={() => form.validateFields(['available_quantity'])}
             />
           </Form.Item>
         </div>
@@ -1442,7 +1449,7 @@ const InventoryAllData = () => {
         
         <div style={{ 
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
           gap: '16px',
           marginBottom: '24px'
         }}>
@@ -1453,6 +1460,7 @@ const InventoryAllData = () => {
               label={
                 <Space>
                   {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
+                  {/* {config.required && <Tag color="red">Required</Tag>} */}
                 </Space>
               }
               rules={[
@@ -1463,19 +1471,39 @@ const InventoryAllData = () => {
                 config.type === 'number' && {
                   type: 'number',
                   message: 'Please enter a valid number'
+                },
+                {
+                  validator: async (_, value) => {
+                    if (value) {
+                      // Show validation message based on field type
+                      switch (config.type) {
+                        case 'number':
+                          if (isNaN(value)) {
+                            throw new Error(`Enter numeric value${config.unit ? ` in ${config.unit}` : ''}`);
+                          }
+                          break;
+                        case 'date':
+                          if (!dayjs(value).isValid()) {
+                            throw new Error('Select a valid date in YYYY-MM-DD format');
+                          }
+                          break;
+                        case 'boolean':
+                          if (typeof value !== 'boolean') {
+                            throw new Error('Select Yes or No');
+                          }
+                          break;
+                        default:
+                          // For text and variable types, validate length
+                          if (String(value).length > 255) {
+                            throw new Error('Text is too long (maximum 255 characters)');
+                          }
+                      }
+                    }
+                    return Promise.resolve();
+                  }
                 }
               ].filter(Boolean)}
-              extra={
-                config.type === 'number' ? `Enter numeric value${config.unit ? ` in ${config.unit}` : ''}` :
-                config.type === 'boolean' ? 'Select Yes or No' :
-                config.type === 'date' ? 'Select a date' :
-                config.type === 'variable' ? 'Enter any value (text, numbers, special characters)' :
-                'Enter text value'
-              }
-              style={{ 
-                margin: 0,
-                minWidth: 0
-              }}
+              validateTrigger={['onChange', 'onBlur']}
             >
               {config.type === 'number' ? (
                 <InputNumber 
@@ -1483,18 +1511,30 @@ const InventoryAllData = () => {
                   placeholder={`Enter ${fieldName} in ${config.unit || 'numbers'}`}
                   min={0}
                   addonAfter={config.unit}
+                  onChange={(value) => {
+                    // Trigger validation on change
+                    form.validateFields([['dynamic_data', fieldName]]);
+                  }}
                 />
               ) : config.type === 'boolean' ? (
                 <Switch 
                   checkedChildren="Yes" 
                   unCheckedChildren="No"
                   defaultChecked={false}
+                  onChange={(checked) => {
+                    // Trigger validation on change
+                    form.validateFields([['dynamic_data', fieldName]]);
+                  }}
                 />
               ) : config.type === 'date' ? (
                 <DatePicker 
                   style={{ width: '100%' }}
                   placeholder={`Select ${fieldName} date`}
                   format="YYYY-MM-DD"
+                  onChange={(date) => {
+                    // Trigger validation on change
+                    form.validateFields([['dynamic_data', fieldName]]);
+                  }}
                 />
               ) : config.type === 'variable' ? (
                 <Input.TextArea
@@ -1502,12 +1542,20 @@ const InventoryAllData = () => {
                   maxLength={1000}
                   showCount
                   autoSize={{ minRows: 1, maxRows: 3 }}
+                  onChange={(e) => {
+                    // Trigger validation on change
+                    form.validateFields([['dynamic_data', fieldName]]);
+                  }}
                 />
               ) : (
                 <Input 
                   placeholder={`Enter ${fieldName}`}
                   maxLength={255}
                   showCount
+                  onChange={(e) => {
+                    // Trigger validation on change
+                    form.validateFields([['dynamic_data', fieldName]]);
+                  }}
                 />
               )}
             </Form.Item>
@@ -1938,14 +1986,15 @@ const InventoryAllData = () => {
           form.resetFields();
         }}
         footer={null}
-        width={modalType === 'subcategory' ? '90vw' : '70vw'}
+        width={modalType === 'item' ? '80vw' : modalType === 'subcategory' ? '90vw' : '70vw'}
         style={{ 
-          maxWidth: modalType === 'subcategory' ? '800px' : '600px',
+          maxWidth: modalType === 'item' ? '1800px' : modalType === 'subcategory' ? '800px' : '600px',
           top: 20
         }}
         bodyStyle={{ 
-          maxHeight: 'calc(100vh - 200px)',
-          overflow: 'auto'
+          maxHeight: 'calc(120vh - 200px)',
+          overflow: 'auto',
+          padding: modalType === 'item' ? '24px 32px' : '16px'
         }}
       >
         {renderModalContent()}

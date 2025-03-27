@@ -26,7 +26,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.85:9738/api/v1/planning/all_orders',
+        'http://172.18.7.88:6454/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -52,7 +52,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.85:9738/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.88:6454/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -95,7 +95,7 @@ class QualityStore {
       console.log(`Attempting to fetch inspection details for Order ID: ${orderId}`);
       
       const response = await axios.get(
-        `http://172.18.7.85:9738/quality/master-boc/ipids/${orderId}`,
+        `http://172.18.7.88:6454/quality/master-boc/ipids/${orderId}`,
         this.getAuthHeaders()
       );
       
@@ -132,7 +132,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://172.18.7.85:9738/api/v1/quality/run',
+        'http://172.18.7.88:6454/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;

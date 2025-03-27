@@ -15,7 +15,7 @@ const useDynamicStore = create((set) => ({
   fetchDynamicScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.get('http://172.18.7.85:9738/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://172.18.7.88:6454/api/v1/rescheduling/reschedule-actual-planned-combined');
       set({ 
         scheduleData: response.data,
         loading: false,
@@ -39,7 +39,7 @@ const useDynamicStore = create((set) => ({
   //     const token = useAuthStore.getState().token;
   //     set({ isLoadingOrders: true });
 
-  //     const response = await fetch('http://172.18.7.85:9738/planning/all_orders', {
+  //     const response = await fetch('http://172.18.7.88:6454/planning/all_orders', {
   //       headers: {
   //         'Authorization': `Bearer ${token}`,
   //         'Accept': 'application/json'

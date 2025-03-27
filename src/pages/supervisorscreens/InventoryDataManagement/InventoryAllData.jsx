@@ -98,18 +98,21 @@ const InventoryAllData = () => {
   } = useInventoryStore();
 
   // Add function to generate sequential Name
-  const generateItemCode = (categoryName, subcategoryName) => {
+  const generateItemCode = (categoryName, subcategoryName, existingCodes) => {
     // Allow special characters in the prefix but replace spaces with underscores
     const prefix = `${categoryName}_${subcategoryName}_`.toUpperCase();
-    const existingCodes = items
-      .filter(item => item.item_code.startsWith(prefix))
-      .map(item => {
-        const num = parseInt(item.item_code.replace(prefix, ''));
-        return isNaN(num) ? 0 : num;
-      });
-    
-    const nextNumber = existingCodes.length > 0 ? Math.max(...existingCodes) + 1 : 1;
-    return `${prefix}${String(nextNumber).padStart(3, '0')}`;
+
+    let nextNumber = 1;
+    let newCode;
+    do {
+      newCode = `${prefix}${String(nextNumber).padStart(3, '0')}`;
+      nextNumber++;
+    } while (existingCodes.has(newCode));
+
+    // Add the new code to the set to prevent future duplicates
+    existingCodes.add(newCode);
+
+    return newCode;
   };
 
   useEffect(() => {
@@ -528,63 +531,11 @@ const InventoryAllData = () => {
             throw new Error(`Missing required columns: ${missingColumns.join(', ')}. Please use the template provided.`);
           }
 
-          // Validate data before sending
-          for (const [index, row] of jsonData.entries()) {
-            const rowNumber = index + 1;
-
-            // Validate Total Quantity
-            let quantity = row['Total Quantity']?.toString().trim();
-            if (!quantity) {
-              throw new Error(`Row ${rowNumber}: Total Quantity is required`);
-            }
-            const parsedQuantity = parseInt(quantity);
-            if (isNaN(parsedQuantity) || parsedQuantity < 0) {
-              throw new Error(`Row ${rowNumber}: Invalid Total Quantity - must be a positive number`);
-            }
-
-            // Validate Available Quantity
-            let availableQuantity = row['Available Quantity']?.toString().trim();
-            if (!availableQuantity) {
-              throw new Error(`Row ${rowNumber}: Available Quantity is required`);
-            }
-            const parsedAvailableQuantity = parseInt(availableQuantity);
-            if (isNaN(parsedAvailableQuantity) || parsedAvailableQuantity < 0) {
-              throw new Error(`Row ${rowNumber}: Invalid Available Quantity - must be a positive number`);
-            }
-            if (parsedAvailableQuantity > parsedQuantity) {
-              throw new Error(`Row ${rowNumber}: Available Quantity (${parsedAvailableQuantity}) cannot exceed Total Quantity (${parsedQuantity})`);
-            }
-
-            // Validate Status
-            if (row['Status'] && !['Active', 'Inactive'].includes(row['Status'].trim())) {
-              throw new Error(`Row ${rowNumber}: Status must be either 'Active' or 'Inactive'`);
-            }
-            
-            // Validate dynamic fields
-            for (const [fieldName, config] of Object.entries(subcategory.dynamic_fields || {})) {
-              const value = row[fieldName]?.toString().trim();
-              if (config.required && !value) {
-                throw new Error(`Row ${rowNumber}: ${fieldName} is required`);
-              }
-              if (value) {
-                if (config.type === 'number' && isNaN(parseFloat(value))) {
-                  throw new Error(`Row ${rowNumber}: Invalid number value for ${fieldName}`);
-                }
-                if (config.type === 'date') {
-                  const dateValue = dayjs(value);
-                  if (!dateValue.isValid()) {
-                    throw new Error(`Row ${rowNumber}: Invalid date format for ${fieldName} - use YYYY-MM-DD`);
-                  }
-                }
-                if (config.type === 'boolean' && !['yes', 'no', 'true', 'false', '0', '1'].includes(value.toLowerCase())) {
-                  throw new Error(`Row ${rowNumber}: ${fieldName} must be Yes/No, True/False, or 1/0`);
-                }
-              }
-            }
-          }
+          // Create a set to track existing item codes
+          const existingCodes = new Set(items.map(item => item.item_code));
 
           const formattedItems = jsonData.map(row => {
-            const generatedCode = generateItemCode(category.name, subcategory.name);
+            const generatedCode = generateItemCode(category.name, subcategory.name, existingCodes);
 
             return {
               item_code: generatedCode,
@@ -609,6 +560,14 @@ const InventoryAllData = () => {
               }, {})
             };
           });
+
+          // Check for duplicate item codes
+          const itemCodes = formattedItems.map(item => item.item_code);
+          const duplicateCodes = itemCodes.filter((code, index) => itemCodes.indexOf(code) !== index);
+
+          if (duplicateCodes.length > 0) {
+            throw new Error(`Duplicate item codes found: ${duplicateCodes.join(', ')}`);
+          }
 
           try {
             await bulkUploadItems(selectedCategory.id, formattedItems);
@@ -813,7 +772,7 @@ const InventoryAllData = () => {
       const category = categories.find(cat => cat.id === subcategory?.category_id);
       
       if (subcategory && category) {
-        const generatedCode = generateItemCode(category.name, subcategory.name);
+        const generatedCode = generateItemCode(category.name, subcategory.name, new Set());
         
         setModalType('item');
         setRightClickedNode(null);
@@ -1328,7 +1287,7 @@ const InventoryAllData = () => {
         form={form}
         onFinish={(values) => {
           // Automatically generate and add item_code to values
-          const generatedCode = generateItemCode(category.name, subcategory.name);
+          const generatedCode = generateItemCode(category.name, subcategory.name, new Set());
           handleItemFormSubmit({
             ...values,
             item_code: generatedCode
@@ -1925,7 +1884,7 @@ const InventoryAllData = () => {
                     rowKey="id"
                     pagination={{
                       onChange: cancel,
-                      pageSize: 10,
+                      pageSize: 5,
                       showSizeChanger: true,
                       showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
                       position: ['bottomRight'],
@@ -1976,4 +1935,3 @@ const InventoryAllData = () => {
 };
 
 export default InventoryAllData; 
-

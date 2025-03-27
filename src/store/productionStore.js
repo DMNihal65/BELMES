@@ -20,8 +20,8 @@ const calculateUptime = (lastUpdated) => {
   return moment(lastUpdated).fromNow();
 };
 
-const BASE_URL = 'http://172.18.7.85:9738/production_monitoring';
-const WS_URL = 'ws://172.18.7.85:9738/production_monitoring/ws/live-status/';
+const BASE_URL = 'http://172.18.7.88:6454/production_monitoring';
+const WS_URL = 'ws://172.18.7.88:6454/production_monitoring/ws/live-status/';
 
 const useProductionStore = create(
   devtools((set, get) => ({

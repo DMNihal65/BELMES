@@ -41,7 +41,7 @@ import axios from 'axios';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const BASE_URL = 'http://172.18.7.88:6454/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:9938/api/v1/api/inventory';
 
 function Calibration() {
   const [form] = Form.useForm();

@@ -150,7 +150,7 @@ const DocumentsList = () => {
       >
         {selectedDocument && (
           <iframe
-            src={`http://172.18.7.88:6454/api/v1/document-management/documents/view/${jobData.part_number}/${selectedDocument.type}?token=${token}`}
+            src={`http://172.18.7.85:9938/api/v1/document-management/documents/view/${jobData.part_number}/${selectedDocument.type}?token=${token}`}
             style={{ width: '100%', height: '80vh' }}
             title="Document Viewer"
           />

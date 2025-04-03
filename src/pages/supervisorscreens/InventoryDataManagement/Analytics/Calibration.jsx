@@ -1167,7 +1167,7 @@ function Calibration() {
                     children: inventoryItems
                       .filter(item => item.subcategory_id === subcategory.id)
                       .map(item => ({
-                        label: item.item_code,
+                        label: item.dynamic_data["Instrument code"],
                         value: item.id,
                         isLeaf: true
                       }))

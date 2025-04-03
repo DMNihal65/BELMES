@@ -706,19 +706,25 @@ const InventoryAllData = () => {
       if (values.dynamic_data) {
         Object.entries(values.dynamic_data).forEach(([key, value]) => {
           const fieldConfig = selectedSubcategory.dynamic_fields[key];
-          switch (fieldConfig.type) {
-            case 'number':
-              formattedDynamicData[key] = Number(value) || 0;
-              break;
-            case 'boolean':
-              formattedDynamicData[key] = Boolean(value);
-              break;
-            case 'date':
-              formattedDynamicData[key] = value ? value.toISOString() : null;
-              break;
-            case 'string':
-            default:
-              formattedDynamicData[key] = String(value || '').trim();
+          if (fieldConfig) {
+            // Only validate required fields
+            if (fieldConfig.required && !value) {
+              throw new Error(`Please enter ${key}`);
+            }
+            switch (fieldConfig.type) {
+              case 'number':
+                formattedDynamicData[key] = Number(value) || 0; // Default to 0 if not provided
+                break;
+              case 'boolean':
+                formattedDynamicData[key] = Boolean(value);
+                break;
+              case 'date':
+                formattedDynamicData[key] = value ? value.toISOString() : null;
+                break;
+              case 'string':
+              default:
+                formattedDynamicData[key] = String(value || '').trim();
+            }
           }
         });
       }
@@ -868,7 +874,7 @@ const InventoryAllData = () => {
             style={{ margin: 0 }}
             rules={[
               {
-                required: true,
+                required: false,
                 message: `Please Input ${title}!`,
               },
             ]}

@@ -109,6 +109,11 @@ const usePlanningStore = create((set) => ({
   // Fetch MPP details
   fetchMPPDetails: async (productionOrder) => {
     try {
+      if (!productionOrder) {
+        console.error('No production order provided to fetchMPPDetails');
+        return null;
+      }
+
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Authentication token not found');
@@ -116,7 +121,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Fetching MPP for production order:', productionOrder); // Debug log
 
-      const response = await fetch(`http://172.18.7.85:9938/api/v1/documents/mpp/${selectedOrder}`, {
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/documents/mpp/${productionOrder}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -126,6 +131,7 @@ const usePlanningStore = create((set) => ({
       console.log('Response status:', response.status); // Debug log
 
       if (response.status === 404) {
+        console.log('No MPP document found for production order:', productionOrder);
         return null;
       }
 
@@ -143,7 +149,7 @@ const usePlanningStore = create((set) => ({
         
         if (latestVersion) {
           // If we have a latest version, download it
-          await downloadMppDocument(latestVersion.id);
+          await usePlanningStore.getState().downloadMppDocument(latestVersion.id);
         }
 
         return latestDoc;
@@ -259,14 +265,17 @@ const usePlanningStore = create((set) => ({
   },
 
   // Add function to change part status
-  changePartStatus: async (partNumber, newStatus) => {
+  changePartStatus: async (productionOrder, newStatus) => {
     try {
       // Ensure we're using the exact same URL format as the working endpoint
-      const response = await fetch(`http://172.18.7.85:9938/api/v1/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
-        method: 'POST',  // Changed to POST since GET is not allowed
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/scheduling/set-part-status/${productionOrder}?status=${newStatus}`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          status: newStatus
+        })
       });
       
       const data = await response.json();
@@ -357,24 +366,32 @@ const usePlanningStore = create((set) => ({
   },
 
   // Function to update machine for operation
-  updateOperationMachine: async (partNumber, operationNumber, currentData, newMachineId) => {
+  updateOperationMachine: async (partNumber, operationNumber, updateData) => {
     try {
+      // Format the data according to the API requirements
+      const formattedData = {
+        operation_description: updateData.operation_description,
+        setup_time: parseFloat(updateData.setup_time),
+        ideal_cycle_time: parseFloat(updateData.ideal_cycle_time),
+        work_center_code: updateData.work_center_code,
+        machine_id: updateData.machine_id
+      };
+
+      console.log('Sending machine update data:', formattedData);
+
       const response = await fetch(`http://172.18.7.85:9938/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          operation_description: currentData.operation_description,
-          setup_time: currentData.setup_time,
-          ideal_cycle_time: currentData.ideal_cycle_time,
-          work_center_code: currentData.work_center,
-          machine_id: newMachineId
-        })
+        body: JSON.stringify(formattedData)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update machine');
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        throw new Error(errorData.detail || 'Failed to update machine');
       }
 
       const data = await response.json();
@@ -441,33 +458,47 @@ const usePlanningStore = create((set) => ({
   // Function to create new MPP
   createNewMpp: async (mppData) => {
     try {
+      // Format the data according to the API requirements
+      const formattedData = {
+        part_number: mppData.part_number,
+        operation_number: Number(mppData.operation_number),
+        fixture_number: String(mppData.fixture_number || ''),
+        ipid_number: String(mppData.ipid_number || ''),
+        datum_x: String(mppData.datum_x || ''),
+        datum_y: String(mppData.datum_y || ''),
+        datum_z: String(mppData.datum_z || ''),
+        work_instructions: (mppData.work_instructions?.sections || []).map((section, index) => ({
+          title: String(section.title || ''),
+          instructions: String(section.instructions || ''),
+          sequence: index
+        }))
+      };
+
+      console.log('Sending formatted MPP data:', formattedData);
+
       const response = await fetch('http://172.18.7.85:9938/api/v1/mpp', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          part_number: mppData.part_number,
-          operation_number: mppData.operation_number,
-          fixture_number: mppData.fixture_number,
-          ipid_number: mppData.ipid_number,
-          datum_x: mppData.datum_x,
-          datum_y: mppData.datum_y,
-          datum_z: mppData.datum_z,
-          work_instructions: mppData.work_instructions
-        })
+        body: JSON.stringify(formattedData)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create MPP');
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        throw new Error(errorData.detail || 'Failed to create MPP');
       }
 
       const data = await response.json();
-      // Store the data in the global state
-      set({ mppData: data });
       return data;
     } catch (error) {
       console.error('Error creating MPP:', error);
+      if (error.response) {
+        const errorData = await error.response.json();
+        throw new Error(errorData.detail || 'Failed to create MPP');
+      }
       throw error;
     }
   },
@@ -500,6 +531,385 @@ const usePlanningStore = create((set) => ({
       }, 100);
     } catch (error) {
       console.error('Error downloading document:', error);
+      throw error;
+    }
+  },
+
+  // Function to fetch documents by part number
+  fetchDocumentsByPartNumber: async (partNumber) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const data = await response.json();
+      console.log('Documents by part number:', data);
+      
+      // Find MPP document if it exists
+      const mppDocument = data.mpp_document;
+      if (mppDocument?.latest_version?.id) {
+        return mppDocument;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error fetching documents by part number:', error);
+      throw error;
+    }
+  },
+
+  // Function to download latest document version
+  downloadLatestDocument: async (documentId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/document-management/documents/${documentId}/download-latest`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+
+      // Check if there's a file to download
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType !== 'application/json') {
+        // It's a file - open in new tab
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        
+        // Cleanup
+        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+        return true;
+      }
+
+      return false; // No file to download
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      throw error;
+    }
+  },
+
+  // Update the handleMppView function
+  handleMppView: async (partNumber, operation) => {
+    try {
+      if (!partNumber) {
+        console.error('No part number provided to handleMppView');
+        return { hasFile: false };
+      }
+
+      console.log('Checking MPP document for part number:', partNumber);
+      
+      // 1. First check if MPP document exists
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const documentsData = await response.json();
+      console.log('Documents response:', documentsData);
+
+      // Check if MPP document exists and has latest version
+      if (documentsData.mpp_document?.latest_version?.id) {
+        console.log('Found MPP document, attempting download');
+        
+        // Download the document
+        const downloadResponse = await fetch(
+          `http://172.18.7.85:9938/api/v1/document-management/documents/${documentsData.mpp_document.latest_version.id}/download-latest`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'accept': '*/*'
+          }
+        });
+
+        if (downloadResponse.ok) {
+          const contentType = downloadResponse.headers.get('content-type');
+          if (contentType && !contentType.includes('application/json')) {
+            const blob = await downloadResponse.blob();
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            setTimeout(() => window.URL.revokeObjectURL(url), 100);
+            return { hasFile: true };
+          }
+        }
+      }
+
+      // 2. If no document exists, check for MPP data using the correct endpoint
+      console.log('Checking MPP data for part:', partNumber, 'operation:', operation.operation_number);
+      const mppResponse = await fetch(
+        `http://172.18.7.85:9938/api/v1/mpp/by-part/${partNumber}/${operation.operation_number}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (mppResponse.ok) {
+        const mppData = await mppResponse.json();
+        return { hasFile: false, mppData: Array.isArray(mppData) ? mppData[0] : mppData };
+      } 
+      
+      // If 404 or any other error, return null mppData to show empty drawer
+      console.log('No MPP data found or error, will show empty drawer');
+      return { hasFile: false, mppData: null };
+    } catch (error) {
+      console.error('Error handling MPP view:', error);
+      return { hasFile: false, mppData: null };
+    }
+  },
+
+  // Update the createOrFetchMPP function
+  createOrFetchMPP: async (partNumber, operationNumber) => {
+    try {
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const mppData = await response.json();
+        // Since the response is an array, get the first item
+        return mppData[0];
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in createOrFetchMPP:', error);
+      throw error;
+    }
+  },
+
+  // Update the updateMpp function
+  updateMpp: async (partNumber, operationNumber, mppData) => {
+    try {
+      // Format the data according to the API requirements
+      const formattedData = {
+        part_number: mppData.part_number,
+        operation_number: Number(mppData.operation_number),
+        fixture_number: String(mppData.fixture_number || ''),
+        ipid_number: String(mppData.ipid_number || ''),
+        datum_x: String(mppData.datum_x || ''),
+        datum_y: String(mppData.datum_y || ''),
+        datum_z: String(mppData.datum_z || ''),
+        work_instructions: (mppData.work_instructions?.sections || []).map((section, index) => ({
+          title: String(section.title || ''),
+          instructions: String(section.instructions || ''),
+          sequence: index
+        }))
+      };
+
+      console.log('Sending update MPP data:', formattedData);
+
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formattedData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        throw new Error(errorData.detail || 'Failed to update MPP');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating MPP:', error);
+      if (error.response) {
+        const errorData = await error.response.json();
+        throw new Error(errorData.detail || 'Failed to update MPP');
+      }
+      throw error;
+    }
+  },
+
+  // Update the createOperation function
+  createOperation: async (partNumber, operationData) => {
+    try {
+      console.log('Creating operation with data:', operationData);
+      
+      const response = await fetch('http://172.18.7.85:9938/api/v1/planning/operations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(operationData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error Response:', errorData);
+        throw new Error(errorData.detail || 'Failed to create operation');
+      }
+
+      const data = await response.json();
+
+      // Fetch machines for the work center
+      const workCenterMachines = await fetch(`http://172.18.7.85:9938/api/v1/planning/work-center-machines/${operationData.work_center_code}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      }).then(res => res.json());
+
+      // If we have machines, assign the first one as default
+      if (workCenterMachines && workCenterMachines.length > 0) {
+        const defaultMachine = workCenterMachines[0];
+        
+        // Update the operation with the default machine
+        await fetch(`http://172.18.7.85:9938/api/v1/planning/operations/${partNumber}/${operationData.operation_number}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...operationData,
+            machine_id: defaultMachine.id
+          })
+        });
+
+        // Return the operation with the machine information
+        return {
+          ...data,
+          primary_machine: {
+            id: defaultMachine.id,
+            name: defaultMachine.make
+          },
+          work_center_machines: workCenterMachines
+        };
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error creating operation:', error);
+      throw error;
+    }
+  },
+
+  // Add this to your store
+  fetchWorkCenters: async () => {
+    try {
+      const response = await fetch('http://172.18.7.85:9938/api/v1/planning/work_centers', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch work centers');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching work centers:', error);
+      throw error;
+    }
+  },
+
+  // Add this function to check IPID status
+  checkIpidStatus: async (productionOrder, operationNumber) => {
+    try {
+      const response = await fetch(`http://172.18.7.93:9999/api/v1/document-management/ipid/status?production_order=${productionOrder}&operation_number=${operationNumber}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check IPID status');
+      }
+
+      const data = await response.json();
+      return data.hasIpid || false;
+    } catch (error) {
+      console.error('Error checking IPID status:', error);
+      return false;
+    }
+  },
+
+  // Update the uploadIpidDocument function to return more details
+  uploadIpidDocument: async (file, productionOrder, operationNumber, documentName, description = '', versionNumber = '1', metadata = '{}') => {
+    try {
+      if (!productionOrder) {
+        throw new Error('Production order number is required');
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('production_order', productionOrder);
+      formData.append('operation_number', operationNumber);
+      formData.append('document_name', documentName);
+      formData.append('description', description || '');
+      formData.append('version_number', versionNumber);
+      formData.append('metadata', metadata);
+
+      console.log('Uploading IPID with data:', {
+        productionOrder,
+        operationNumber,
+        documentName,
+        description,
+        versionNumber,
+        metadata
+      });
+
+      const response = await fetch('http://172.18.7.93:9999/api/v1/document-management/ipid/upload/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload IPID document');
+      }
+
+      const data = await response.json();
+      console.log('IPID Upload Response:', data);
+      return {
+        success: true,
+        data,
+        operationNumber
+      };
+    } catch (error) {
+      console.error('Error uploading IPID document:', error);
       throw error;
     }
   },

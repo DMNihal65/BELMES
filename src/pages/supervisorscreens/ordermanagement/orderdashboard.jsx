@@ -12,28 +12,91 @@ import Workcenter from '../../../components/OrderManagement/Workcenter';
 const { TabPane } = Tabs;
 
 const OrderDashboard = () => {
-  const { orders, fetchAllOrders, fetchTimelineData, timelineData, isLoading, error } = useOrderStore();
+  const { 
+    orders, 
+    fetchAllOrders, 
+    fetchTimelineData, 
+    timelineData, 
+    isLoading, 
+    error,
+    startPolling,
+    stopPolling 
+  } = useOrderStore();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [localOrders, setLocalOrders] = useState([]);
+  const [priorityOrders, setPriorityOrders] = useState([]);
   const [parent] = useAutoAnimate();
   
-  const handleRefresh = useCallback(() => {
-    fetchTimelineData();
-    fetchAllOrders();
+  // Initialize orders and start polling when component mounts
+  useEffect(() => {
+    const initializeOrders = async () => {
+      await fetchAllOrders();
+      await fetchTimelineData();
+    };
+    initializeOrders();
+    
+    // Start polling with 1-hour interval
+    startPolling();
+
+    // Cleanup: stop polling when component unmounts
+    return () => stopPolling();
+  }, []);
+
+  // Update local state when orders change
+  useEffect(() => {
+    if (orders && orders.length > 0) {
+      const ordersWithPriority = orders.map((order, index) => ({
+        ...order,
+        priority: index + 1
+      }));
+      setLocalOrders(ordersWithPriority);
+      setPriorityOrders(ordersWithPriority);
+    }
+  }, [orders]);
+
+  const handleRefresh = useCallback(async () => {
+    await fetchTimelineData();
+    await fetchAllOrders();
   }, [fetchTimelineData, fetchAllOrders]);
 
-  // Add effect to refresh orders when priorities change
-  useEffect(() => {
-    const pollInterval = setInterval(() => {
-      fetchAllOrders();
-    }, 20000); // Poll every 2 seconds
+  const handleOrderCreate = async (newOrder) => {
+    try {
+      console.log('New order created:', newOrder);
+      
+      // Create the new order object with required properties
+      const newOrderWithProps = {
+        ...newOrder,
+        key: newOrder.production_order || newOrder.orderNumber,
+        status: 'scheduled',
+        priority: (localOrders.length || 0) + 1
+      };
 
-    return () => clearInterval(pollInterval);
-  }, [fetchAllOrders]);
+      // Update both local and priority orders immediately
+      const updatedOrders = [newOrderWithProps, ...localOrders];
+      setLocalOrders(updatedOrders);
+      setPriorityOrders(updatedOrders);
 
-  useEffect(() => {
-    fetchAllOrders();
-    fetchTimelineData();
-  }, []);
+      // Close modal and show success message
+      setIsModalVisible(false);
+      message.success('Order created successfully');
+
+      // Fetch fresh data in the background
+      await handleRefresh();
+    } catch (error) {
+      console.error('Error creating order:', error);
+      message.error('Failed to create order');
+    }
+  };
+
+  const handlePriorityUpdate = (updatedOrders) => {
+    // Update both tables when priority changes
+    const ordersWithUpdatedPriority = updatedOrders.map((order, index) => ({
+      ...order,
+      priority: index + 1
+    }));
+    setPriorityOrders(ordersWithUpdatedPriority);
+    setLocalOrders(ordersWithUpdatedPriority);
+  };
 
   const fadeIn = {
     initial: { opacity: 0, y: 20 },
@@ -142,9 +205,9 @@ const OrderDashboard = () => {
                 <TabPane tab="All Orders" key="all">
                   <div className="h-[calc(100vh-320px)] overflow-auto">
                     <OrderTable 
-                      orders={orders} 
+                      orders={localOrders} 
                       onRefresh={handleRefresh}
-                      key={JSON.stringify(orders)} // Force re-render when orders change
+                      key={JSON.stringify(localOrders)}
                     />
                   </div>
                 </TabPane>
@@ -175,7 +238,9 @@ const OrderDashboard = () => {
                 <TabPane tab="Priority" key="priority">
                   <div className="h-full overflow-auto">
                     <ReorderableTable 
-                      orders={orders}
+                      orders={priorityOrders}
+                      onOrdersUpdate={handlePriorityUpdate}
+                      key={JSON.stringify(priorityOrders)}
                     />
                   </div>
                 </TabPane>
@@ -187,12 +252,7 @@ const OrderDashboard = () => {
       <CreateOrderModal 
         visible={isModalVisible} 
         onCancel={() => setIsModalVisible(false)} 
-        onCreate={async (newOrder) => {
-          console.log('New order created:', newOrder);
-          await handleRefresh();
-          setIsModalVisible(false);
-          message.success('Order created successfully');
-        }} 
+        onCreate={handleOrderCreate}
         onRefresh={handleRefresh} 
       />
     </div>
@@ -200,3 +260,4 @@ const OrderDashboard = () => {
 };
 
 export default OrderDashboard;
+

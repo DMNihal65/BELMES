@@ -2,6 +2,9 @@
 import { create } from 'zustand';
 import axios from 'axios';
 import { message } from 'antd';
+import { v4 as uuidv4 } from 'uuid';
+import { read, utils } from 'xlsx';
+import dayjs from 'dayjs';
 
 const BASE_URL = 'http://172.18.7.85:9938/api/v1/api/inventory';
 
@@ -15,6 +18,11 @@ const getAuthHeaders = () => {
     }
   };
 };
+
+
+
+
+
 
 const useInventoryStore = create((set, get) => ({
   categories: [],
@@ -764,9 +772,6 @@ const useInventoryStore = create((set, get) => ({
         }
       );
 
-
-
-
       if (response.data) {
         message.success('Excel data imported successfully');
         // Refresh items after bulk upload
@@ -795,6 +800,136 @@ const useInventoryStore = create((set, get) => ({
       }
     } finally {
       set({ loading: false });
+    }
+  },
+
+  handleExcelUpload: async (file) => {
+    if (!selectedCategory || selectedCategory.type !== 'subcategory') {
+      message.warning('Please select a subcategory first');
+      return false;
+    }
+
+    const loadingMessage = message.loading('Processing file...', 0);
+
+    try {
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = utils.sheet_to_json(worksheet, { 
+            raw: false, // This will preserve string values
+            defval: '', // Default value for empty cells
+          });
+
+          const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
+          const category = categories.find(cat => cat.id === subcategory?.category_id);
+          
+          if (!subcategory || !category) {
+            throw new Error('Subcategory not found');
+          }
+
+          if (jsonData.length === 0) {
+            throw new Error('The Excel file is empty. Please add some data.');
+          }
+
+          // Process the items without truncating item codes
+          const formattedItems = jsonData.map(row => {
+            return {
+              item_code: row['Item Code'] || generateItemCode(), // Use the item code from the Excel or generate a new one
+              quantity: parseInt(row['Total Quantity'].toString().trim()),
+              available_quantity: parseInt(row['Available Quantity'].toString().trim()),
+              status: (row['Status']?.toString().trim() || 'Active'),
+              dynamic_data: Object.entries(subcategory.dynamic_fields || {}).reduce((acc, [fieldName, config]) => {
+                const value = row[fieldName]?.toString().trim();
+                if (value) {
+                  if (config.type === 'date') {
+                    const dateValue = dayjs(value);
+                    acc[fieldName] = dateValue.isValid() ? dateValue.format('YYYY-MM-DD') : null;
+                  } else if (config.type === 'number') {
+                    acc[fieldName] = parseFloat(value);
+                  } else if (config.type === 'boolean') {
+                    acc[fieldName] = ['yes', 'true', '1'].includes(value.toLowerCase());
+                  } else {
+                    acc[fieldName] = value;
+                  }
+                }
+                return acc;
+              }, {})
+            };
+          });
+
+          // Proceed with bulk upload
+          await bulkUploadItems(selectedCategory.id, formattedItems);
+          loadingMessage();
+          message.success('Excel data imported successfully');
+          setRefreshTrigger(prev => prev + 1);
+        } catch (error) {
+          loadingMessage();
+          console.error('Data Processing Error:', error);
+          message.error(error.message || 'Failed to process Excel file');
+        }
+      };
+
+      reader.onerror = () => {
+        loadingMessage();
+        message.error('Failed to read file');
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      loadingMessage();
+      console.error('File Processing Error:', error);
+      message.error('Failed to process file');
+    }
+
+    return false;
+  },
+
+  handleItemFormSubmit: async (values) => {
+    try {
+        if (!selectedCategory?.id || selectedCategory?.type !== 'subcategory') {
+            message.error('Please select a subcategory first');
+            return;
+        }
+
+        const selectedSubcategory = subcategories.find(s => s.id === selectedCategory.id);
+        if (!selectedSubcategory) {
+            message.error('Invalid subcategory');
+            return;
+        }
+
+        // Generate a new item code using UUID
+        const newItemCode = uuidv4().slice(0, 12); // Generate a unique ID and take the first 12 characters
+
+        const itemData = {
+            item_code: newItemCode, // Use the new unique item code
+            dynamic_data: formattedDynamicData,
+            quantity: Number(values.quantity) || 0,
+            available_quantity: Number(values.available_quantity) || 0,
+            status: values.status || 'Active',
+            subcategory_id: selectedSubcategory.id,
+            created_by: 1
+        };
+
+        let result;
+        if (values.id) {
+            result = await updateItem(values.id, itemData);
+        } else {
+            result = await addItem(itemData);
+        }
+
+        if (result) {
+            message.success(`Item ${values.id ? 'updated' : 'added'} successfully`);
+            setIsModalVisible(false);
+            form.resetFields();
+            setRefreshTrigger(prev => prev + 1);
+        }
+    } catch (error) {
+        console.error('Error submitting item:', error);
+        message.error(`Error: ${error.response?.data?.detail || error.message}`);
     }
   }
 }));
@@ -837,6 +972,17 @@ const compressImage = async (base64String) => {
   });
 };
 
+const generateItemCode = (existingCodes, categoryName, subcategoryName) => {
+  let nextNumber = 1;
+  let newCode;
+
+  do {
+    newCode = `${categoryName}_${subcategoryName}_${String(nextNumber).padStart(3, '0')}`;
+    nextNumber++;
+  } while (existingCodes.has(newCode));
+
+  return newCode;
+};
 
 export default useInventoryStore;
 

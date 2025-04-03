@@ -55,6 +55,7 @@ import axios from 'axios';
 import { read, utils, write } from 'xlsx';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { v4 as uuidv4 } from 'uuid';
 
 const { Title, Text } = Typography;
 
@@ -97,22 +98,9 @@ const InventoryAllData = () => {
     bulkUploadItems,
   } = useInventoryStore();
 
-  // Add function to generate sequential Name
-  const generateItemCode = (categoryName, subcategoryName, existingCodes) => {
-    // Allow special characters in the prefix but replace spaces with underscores
-    const prefix = `${categoryName}_${subcategoryName}_`.toUpperCase();
-
-    let nextNumber = 1;
-    let newCode;
-    do {
-      newCode = `${prefix}${String(nextNumber).padStart(3, '0')}`;
-      nextNumber++;
-    } while (existingCodes.has(newCode));
-
-    // Add the new code to the set to prevent future duplicates
-    existingCodes.add(newCode);
-
-    return newCode;
+  // Update the generateItemCode function
+  const generateItemCode = () => {
+    return uuidv4().slice(0, 12); // Generate a unique ID and take the first 12 characters
   };
 
   useEffect(() => {
@@ -535,7 +523,7 @@ const InventoryAllData = () => {
           const existingCodes = new Set(items.map(item => item.item_code));
 
           const formattedItems = jsonData.map(row => {
-            const generatedCode = generateItemCode(category.name, subcategory.name, existingCodes);
+            const generatedCode = generateItemCode(); // Generate a unique item code using UUID
 
             return {
               item_code: generatedCode,
@@ -711,7 +699,9 @@ const InventoryAllData = () => {
         return;
       }
 
-      // Format dynamic data - ensure proper type conversion
+      // Generate a new item code using UUID
+      const newItemCode = generateItemCode(); // Use the new unique item code
+
       const formattedDynamicData = {};
       if (values.dynamic_data) {
         Object.entries(values.dynamic_data).forEach(([key, value]) => {
@@ -734,7 +724,7 @@ const InventoryAllData = () => {
       }
 
       const itemData = {
-        item_code: String(values.item_code).trim(),
+        item_code: newItemCode, // Use the new unique item code
         dynamic_data: formattedDynamicData,
         quantity: Number(values.quantity) || 0,
         available_quantity: Number(values.available_quantity) || 0,
@@ -772,7 +762,7 @@ const InventoryAllData = () => {
       const category = categories.find(cat => cat.id === subcategory?.category_id);
       
       if (subcategory && category) {
-        const generatedCode = generateItemCode(category.name, subcategory.name, new Set());
+        const generatedCode = generateItemCode();
         
         setModalType('item');
         setRightClickedNode(null);
@@ -1287,7 +1277,7 @@ const InventoryAllData = () => {
         form={form}
         onFinish={(values) => {
           // Automatically generate and add item_code to values
-          const generatedCode = generateItemCode(category.name, subcategory.name, new Set());
+          const generatedCode = generateItemCode();
           handleItemFormSubmit({
             ...values,
             item_code: generatedCode
@@ -1390,7 +1380,6 @@ const InventoryAllData = () => {
               label={
                 <Space>
                   {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
-                  {/* {config.required && <Tag color="red">Required</Tag>} */}
                 </Space>
               }
               rules={[
@@ -1409,7 +1398,17 @@ const InventoryAllData = () => {
                       switch (config.type) {
                         case 'number':
                           if (isNaN(value)) {
-                            throw new Error(`Enter numeric value${config.unit ? ` in ${config.unit}` : ''}`);
+                            throw new Error(`Enter numeric value`);
+                          }
+                          break;
+                        case 'text':
+                          if (String(value).length > 255) {
+                            throw new Error('Text is too long (maximum 255 characters)');
+                          }
+                          break;
+                        case 'variable':
+                          if (String(value).length > 1000) {
+                            throw new Error('Variable is too long (maximum 1000 characters)');
                           }
                           break;
                         case 'date':

@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import dayjs from 'dayjs';
+import { message } from 'antd';
+import React from 'react';
+import { LoadingOutlined } from '@ant-design/icons';
 
 // API endpoints configuration
 const API_CONFIG = {
@@ -653,6 +656,12 @@ const useOrderStore = create((set, get) => ({
 
   // Update fetchDocumentsByPartNumber to handle document caching
   fetchDocumentsByPartNumber: async (partNumber) => {
+    // Configure message to appear in the middle of the screen
+    message.config({
+      top: '50vh',
+      maxCount: 1
+    });
+
     set({ 
       documentLoadingStates: {
         mpp: true,
@@ -675,15 +684,73 @@ const useOrderStore = create((set, get) => ({
       }
 
       const data = await response.json();
-      console.log('Fetched documents for part number:', partNumber, data);
+      console.log('Checked documents for part number:', partNumber, data);
+      
+      // Create detailed message about document existence
+      const hasMpp = !!data.mpp_document;
+      const hasDrawing = !!data.engineering_drawing_document;
+      
+      if (hasMpp || hasDrawing) {
+        const details = [];
+        if (hasMpp) {
+          details.push(`MPP Document (Version: ${data.mpp_document.latest_version?.version_number || 'N/A'})`);
+        }
+        if (hasDrawing) {
+          details.push(`Engineering Drawing (Version: ${data.engineering_drawing_document.latest_version?.version_number || 'N/A'})`);
+        }
+
+        message.info({
+          content: `Found existing documents for Part Number: ${partNumber}\n\n${details.join('\n')}`,
+          duration: 5,
+          style: { 
+            whiteSpace: 'pre-line',
+            width: '400px',
+            marginTop: '-20vh', // Adjust message position to be more centered
+            textAlign: 'left',
+            padding: '16px',
+            boxShadow: '0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08)',
+            background: '#ffffff',
+            borderRadius: '4px'
+          }
+        });
+      } else {
+        message.warning({
+          content: `No documents found for Part Number: ${partNumber}\n\nMPP Document: Not found\nEngineering Drawing: Not found`,
+          duration: 5,
+          style: { 
+            whiteSpace: 'pre-line',
+            width: '400px',
+            marginTop: '-20vh', // Adjust message position to be more centered
+            textAlign: 'left',
+            padding: '16px',
+            boxShadow: '0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08)',
+            background: '#ffffff',
+            borderRadius: '4px'
+          }
+        });
+      }
       
       // Store the documents in state
       set({ 
         documents: {
-          mpp_document: data.mpp_document || null,
-          engineering_drawing_document: data.engineering_drawing_document || null,
-          oarc_document: data.oarc_document || null,
-          ipid_document: data.ipid_document || null,
+          mpp_document: data.mpp_document ? {
+            ...data.mpp_document,
+            existingFile: data.mpp_document.latest_version?.file_url || null,
+            existingName: data.mpp_document.name || '',
+            existingDescription: data.mpp_document.description || '',
+            existingVersion: data.mpp_document.latest_version?.version_number || 'v1',
+            uploadedFiles: data.mpp_document.versions || []
+          } : null,
+          engineering_drawing_document: data.engineering_drawing_document ? {
+            ...data.engineering_drawing_document,
+            existingFile: data.engineering_drawing_document.latest_version?.file_url || null,
+            existingName: data.engineering_drawing_document.name || '',
+            existingDescription: data.engineering_drawing_document.description || '',
+            existingVersion: data.engineering_drawing_document.latest_version?.version_number || 'v1',
+            uploadedFiles: data.engineering_drawing_document.versions || []
+          } : null,
+          oarc_document: data.oarc_document,
+          ipid_document: data.ipid_document,
           all_documents: data.all_documents || []
         },
         documentLoadingStates: {
@@ -694,8 +761,30 @@ const useOrderStore = create((set, get) => ({
 
       return data;
     } catch (error) {
-      console.error('Error fetching documents:', error);
+      console.error('Error checking documents:', error);
+      message.error({
+        content: `Failed to check documents for Part Number: ${partNumber}\nError: ${error.message}`,
+        duration: 5,
+        style: { 
+          whiteSpace: 'pre-line',
+          width: '400px',
+          marginTop: '-20vh', // Adjust message position to be more centered
+          textAlign: 'left',
+          padding: '16px',
+          boxShadow: '0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08)',
+          background: '#ffffff',
+          borderRadius: '4px'
+        }
+      });
+      
       set({ 
+        documents: {
+          mpp_document: null,
+          engineering_drawing_document: null,
+          oarc_document: null,
+          ipid_document: null,
+          all_documents: []
+        },
         documentError: error.message,
         documentLoadingStates: {
           mpp: false,
@@ -991,82 +1080,6 @@ const useOrderStore = create((set, get) => ({
     }
   },
 
-  // Add new function to check documents by part number
-  checkDocumentsByPartNumber: async (partNumber) => {
-    set({ 
-      documentLoadingStates: {
-        mpp: true,
-        engineering: true
-      }
-    });
-
-    try {
-      const response = await fetch(
-        `${API_CONFIG.BASE_URL}/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch documents');
-      }
-
-      const data = await response.json();
-      console.log('Checked documents for part number:', partNumber, data);
-      
-      // Update the document state with fetched data
-      set({ 
-        documents: {
-          mpp_document: data.mpp_document ? {
-            ...data.mpp_document,
-            existingFile: data.mpp_document.latest_version?.file_url || null,
-            existingName: data.mpp_document.name || '',
-            existingDescription: data.mpp_document.description || '',
-            existingVersion: data.mpp_document.latest_version?.version_number || 'v1',
-            uploadedFiles: data.mpp_document.versions || []
-          } : null,
-          engineering_drawing_document: data.engineering_drawing_document ? {
-            ...data.engineering_drawing_document,
-            existingFile: data.engineering_drawing_document.latest_version?.file_url || null,
-            existingName: data.engineering_drawing_document.name || '',
-            existingDescription: data.engineering_drawing_document.description || '',
-            existingVersion: data.engineering_drawing_document.latest_version?.version_number || 'v1',
-            uploadedFiles: data.engineering_drawing_document.versions || []
-          } : null,
-          oarc_document: data.oarc_document,
-          ipid_document: data.ipid_document,
-          all_documents: data.all_documents || []
-        },
-        documentLoadingStates: {
-          mpp: false,
-          engineering: false
-        }
-      });
-
-      return data;
-    } catch (error) {
-      console.error('Error checking documents:', error);
-      set({ 
-        documents: {
-          mpp_document: null,
-          engineering_drawing_document: null,
-          oarc_document: null,
-          ipid_document: null,
-          all_documents: []
-        },
-        documentError: error.message,
-        documentLoadingStates: {
-          mpp: false,
-          engineering: false
-        }
-      });
-      throw error;
-    }
-  },
-
   // Add polling functions
   startTimelinePolling: () => {
     const interval = setInterval(async () => {
@@ -1085,6 +1098,190 @@ const useOrderStore = create((set, get) => ({
     if (interval) {
       clearInterval(interval);
       set({ timelinePollingInterval: null });
+    }
+  },
+
+  // Add this new function to the order store
+  uploadNewVersion: async (documentId, file, version) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('version_number', version);
+
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/document-management/documents/${documentId}/versions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload new version');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error uploading new version:', error);
+      throw error;
+    }
+  },
+
+  // Update the checkDocumentsByPartNumber function
+  checkDocumentsByPartNumber: async (partNumber) => {
+    // Show loading message first
+    const loadingKey = 'documentCheck';
+    message.loading({
+      content: '⌛ Checking documents...',
+      key: loadingKey,
+      duration: 0,
+      style: {
+        padding: '12px 20px',
+        borderRadius: '8px',
+        background: 'white',
+        boxShadow: '0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08)',
+        marginTop: '0',
+        position: 'fixed',
+        top: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'auto',
+        textAlign: 'center'
+      }
+    });
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      // Only call the documents endpoint
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+
+      const data = await response.json();
+      
+      // Check if any documents exist
+      const hasMpp = !!data.mpp_document;
+      const hasDrawing = !!data.engineering_drawing_document;
+
+      // Show result after loading
+      if (hasMpp || hasDrawing) {
+        message.success({
+          content: '✅ Documents exist for this part number',
+          key: loadingKey,
+          className: 'custom-message-notification',
+          style: {
+            marginTop: '0',
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'auto',
+            textAlign: 'center'
+          }
+        });
+      } else {
+        message.warning({
+          content: '⚠️ No documents found for this part number',
+          key: loadingKey,
+          className: 'custom-message-notification',
+          style: {
+            marginTop: '0',
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'auto',
+            textAlign: 'center'
+          }
+        });
+      }
+
+      // Update the documents state
+      set({ 
+        documents: {
+          mpp_document: data.mpp_document,
+          engineering_drawing_document: data.engineering_drawing_document,
+          oarc_document: data.oarc_document,
+          ipid_document: data.ipid_document,
+          all_documents: data.all_documents || []
+        }
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Error checking documents:', error);
+      message.error({
+        content: '❌ Failed to check documents',
+        key: loadingKey,
+        className: 'custom-message-notification',
+        style: {
+          marginTop: '0',
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'auto',
+          textAlign: 'center'
+        }
+      });
+      
+      set({ 
+        documents: {
+          mpp_document: null,
+          engineering_drawing_document: null,
+          oarc_document: null,
+          ipid_document: null,
+          all_documents: []
+        },
+        documentError: error.message
+      });
+      throw error;
+    }
+  },
+
+  // Add this function to your store
+  uploadDocumentVersion: async (documentId, formData) => {
+    try {
+      const response = await fetch(`http://172.18.7.85:9938/api/v1/document-management/documents/${documentId}/versions`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload document version');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error uploading document version:', error);
+      throw error;
+    }
+  },
+
+  // Add uploadDocumentVersion to your store
+  uploadDocumentVersion: async (documentId, formData) => {
+    try {
+      const result = await uploadDocumentVersion(documentId, formData);
+      return result;
+    } catch (error) {
+      throw error;
     }
   },
 }));

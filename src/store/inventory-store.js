@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { read, utils } from 'xlsx';
 import dayjs from 'dayjs';
 
-const BASE_URL = 'http://172.18.7.85:9938/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:6998/api/v1/api/inventory';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -19,10 +19,42 @@ const getAuthHeaders = () => {
   };
 };
 
+// Add these functions before the create function
+const addCalibration = async (calibrationData) => {
+  try {
+    const response = await axios.post('http://172.18.7.85:6998/api/v1/api/inventory/calibrations/', {
+      ...calibrationData,
+      created_by: 1
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error adding calibration:', error);
+    throw error;
+  }
+};
 
+const updateCalibration = async (id, calibrationData) => {
+  try {
+    const response = await axios.put(`http://172.18.7.85:6998/api/v1/api/inventory/calibrations/${id}`, {
+      ...calibrationData,
+      created_by: 1
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating calibration:', error);
+    throw error;
+  }
+};
 
-
-
+const getCalibrationByItemId = async (itemId) => {
+  try {
+    const response = await axios.get(`http://172.18.7.85:6998/api/v1/api/inventory/calibrations/?inventory_item_id=${itemId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching calibration:', error);
+    throw error;
+  }
+};
 
 const useInventoryStore = create((set, get) => ({
   categories: [],
@@ -401,48 +433,9 @@ const useInventoryStore = create((set, get) => ({
     }
   },
 
-  addCalibration: async (calibrationData) => {
-    set({ loading: true });
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/calibrations/`,
-        {
-          ...calibrationData,
-          created_by: 1 // You might want to get this from user context
-        }
-      );
-      set((state) => ({
-        calibrations: [...state.calibrations, response.data],
-        loading: false
-      }));
-      return response.data;
-    } catch (error) {
-      set({ error: error.message, loading: false });
-      message.error('Failed to add calibration');
-      throw error;
-    }
-  },
+  addCalibration: addCalibration,
 
-  updateCalibration: async (id, calibrationData) => {
-    set({ loading: true });
-    try {
-      const response = await axios.put(
-        `${BASE_URL}/calibrations/${id}`,
-        calibrationData
-      );
-      set((state) => ({
-        calibrations: state.calibrations.map(cal => 
-          cal.id === id ? response.data : cal
-        ),
-        loading: false
-      }));
-      return response.data;
-    } catch (error) {
-      set({ error: error.message, loading: false });
-      message.error('Failed to update calibration');
-      throw error;
-    }
-  },
+  updateCalibration: updateCalibration,
 
   deleteCalibration: async (id) => {
     set({ loading: true });
@@ -517,7 +510,7 @@ const useInventoryStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ loading: true });
     try {
-      const response = await axios.get('http://172.18.7.85:9938/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.85:6998/api/v1/planning/all_orders');
       set({ 
         allOrders: response.data || [],
         loading: false 
@@ -550,7 +543,7 @@ const useInventoryStore = create((set, get) => ({
 
       // Create axios instance with default headers
       const axiosInstance = axios.create({
-        baseURL: 'http://172.18.7.85:9938/api/v1',
+        baseURL: 'http://172.18.7.85:6998/api/v1',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -595,7 +588,7 @@ const useInventoryStore = create((set, get) => ({
   fetchOperationsByPartNumber: async (partNumber) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`http://172.18.7.85:9938/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await axios.get(`http://172.18.7.85:6998/api/v1/planning/search_order?part_number=${partNumber}`);
       const operations = response.data?.orders?.[0]?.operations || [];
       set({ 
         operations: operations,
@@ -931,7 +924,9 @@ const useInventoryStore = create((set, get) => ({
         console.error('Error submitting item:', error);
         message.error(`Error: ${error.response?.data?.detail || error.message}`);
     }
-  }
+  },
+
+  getCalibrationByItemId: getCalibrationByItemId
 }));
 
 // Add helper function for image compression

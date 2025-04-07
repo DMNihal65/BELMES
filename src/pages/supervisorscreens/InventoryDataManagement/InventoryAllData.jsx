@@ -74,6 +74,9 @@ const InventoryAllData = () => {
   const tableRef = useRef();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isAutoGenerateCode, setIsAutoGenerateCode] = useState(true);
+  const [isCalibrationModalVisible, setIsCalibrationModalVisible] = useState(false);
+  const [selectedItemForCalibration, setSelectedItemForCalibration] = useState(null);
+  const [calibrationForm] = Form.useForm();
 
   // Store hooks
   const { 
@@ -96,6 +99,9 @@ const InventoryAllData = () => {
     error,
     set,
     bulkUploadItems,
+    addCalibration,
+    updateCalibration,
+    getCalibrationByItemId,
   } = useInventoryStore();
 
   // Update the generateItemCode function
@@ -936,7 +942,68 @@ const InventoryAllData = () => {
     }
   };
 
-  // Table columns definition
+  // Modify showCalibrationModal to fetch existing calibration data
+  const showCalibrationModal = async (record) => {
+    try {
+      setSelectedItemForCalibration(record);
+      const calibrationData = await getCalibrationByItemId(record.id);
+      
+      if (calibrationData && calibrationData.length > 0) {
+        // If calibration exists, populate form with existing data
+        const existingCalibration = calibrationData[0];
+        calibrationForm.setFieldsValue({
+          id: existingCalibration.id,
+          inventory_item_id: record.id,
+          calibration_type: existingCalibration.calibration_type,
+          frequency_days: existingCalibration.frequency_days,
+          last_calibration: dayjs(existingCalibration.last_calibration),
+          next_calibration: dayjs(existingCalibration.next_calibration),
+          remarks: existingCalibration.remarks
+        });
+      } else {
+        // If no calibration exists, reset form with only inventory_item_id
+        calibrationForm.resetFields();
+        calibrationForm.setFieldsValue({
+          inventory_item_id: record.id
+        });
+      }
+      setIsCalibrationModalVisible(true);
+    } catch (error) {
+      console.error('Error fetching calibration data:', error);
+      message.error('Failed to fetch calibration data');
+    }
+  };
+
+  // Modify handleCalibrationSubmit to use store functions
+  const handleCalibrationSubmit = async (values) => {
+    try {
+      const formattedData = {
+        ...values,
+        last_calibration: values.last_calibration.toISOString(),
+        next_calibration: values.next_calibration.toISOString(),
+      };
+
+      let result;
+      if (values.id) {
+        // Update existing calibration
+        result = await updateCalibration(values.id, formattedData);
+        message.success('Calibration details updated successfully');
+      } else {
+        // Add new calibration
+        result = await addCalibration(formattedData);
+        message.success('Calibration details saved successfully');
+      }
+
+      setIsCalibrationModalVisible(false);
+      calibrationForm.resetFields();
+      setRefreshTrigger(prev => prev + 1);
+    } catch (error) {
+      console.error('Error saving calibration:', error);
+      message.error('Failed to save calibration details');
+    }
+  };
+
+  // Modify getColumns() to add Calibration column
   const getColumns = () => {
     if (!selectedCategory || selectedCategory.type === 'category') {
       return [];
@@ -1023,6 +1090,28 @@ const InventoryAllData = () => {
         });
       });
     }
+
+    // Add Calibration column before Actions
+    columns.push(
+      {
+        title: 'Calibration',
+        key: 'calibration',
+        fixed: 'right',
+        width: 100,
+        align: 'center',
+        render: (_, record) => (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            size="small"
+            onClick={() => showCalibrationModal(record)}
+            className="add-button bg-green-500"
+          >
+           <span className="button-text ">Calibration</span>
+          </Button>
+        ),
+      }
+    );
 
     // Add Total Quantity, Available Quantity, Status, and Actions at the end
     columns.push(
@@ -1694,6 +1783,99 @@ const InventoryAllData = () => {
     </div>
   );
 
+  // Add this before the return statement
+  const renderCalibrationModal = () => (
+    <Modal
+      title={`Calibration Details - ${selectedItemForCalibration?.dynamic_data["Instrument code"] || ''}`}
+      open={isCalibrationModalVisible}
+      onCancel={() => {
+        setIsCalibrationModalVisible(false);
+        calibrationForm.resetFields();
+      }}
+      footer={null}
+      width={600}
+    >
+      <Form
+        form={calibrationForm}
+        onFinish={handleCalibrationSubmit}
+        layout="vertical"
+      >
+        <Form.Item
+          name="inventory_item_id"
+          hidden
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="calibration_type"
+          label="Calibration Type"
+          rules={[{ required: true, message: 'Please enter calibration type' }]}
+        >
+          <Input placeholder="Enter calibration type" />
+        </Form.Item>
+
+        <Form.Item
+          name="frequency_days"
+          label="Frequency (Days)"
+          rules={[{ required: true, message: 'Please enter frequency in days' }]}
+        >
+          <InputNumber
+            min={1}
+            style={{ width: '100%' }}
+            placeholder="Enter frequency in days"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="last_calibration"
+          label="Last Calibration"
+          rules={[{ required: true, message: 'Please select last calibration date' }]}
+        >
+          <DatePicker
+            style={{ width: '100%' }}
+            format="YYYY-MM-DD"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="next_calibration"
+          label="Next Calibration"
+          rules={[{ required: true, message: 'Please select next calibration date' }]}
+        >
+          <DatePicker
+            style={{ width: '100%' }}
+            format="YYYY-MM-DD"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="remarks"
+          label="Remarks"
+        >
+          <Input.TextArea
+            rows={4}
+            placeholder="Enter remarks"
+          />
+        </Form.Item>
+
+        <Form.Item className="mb-0 text-right">
+          <Space>
+            <Button onClick={() => {
+              setIsCalibrationModalVisible(false);
+              calibrationForm.resetFields();
+            }}>
+              Cancel
+            </Button>
+            <Button type="primary" htmlType="submit">
+              Save
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+
   return (
     <div className="bg-white p-4 lg:p-6 xl:p-8 rounded-lg shadow min-h-screen">
       <div className="flex flex-col h-full">
@@ -1935,6 +2117,9 @@ const InventoryAllData = () => {
       >
         {renderModalContent()}
       </Modal>
+
+      {/* Add Calibration Modal */}
+      {renderCalibrationModal()}
     </div>
   );
 };

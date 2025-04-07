@@ -41,7 +41,7 @@ import axios from 'axios';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const BASE_URL = 'http://172.18.7.85:9938/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:6998/api/v1/api/inventory';
 
 function Calibration() {
   const [form] = Form.useForm();
@@ -368,7 +368,7 @@ function Calibration() {
               style={{ cursor: 'pointer', color: '#1890ff' }}
               onClick={() => handleInventoryItemClick(itemId)}
             >
-              {item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId}
+              {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId}
             </Tag>
           </Tooltip>
         );

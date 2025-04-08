@@ -7,9 +7,22 @@ const useDynamicStore = create((set) => ({
   scheduleData: null,
   loading: false,
   error: null,
+  pdcData: null,
 
   clearScheduleData: () => {
     set({ scheduleData: null, loading: false, error: null });
+  },
+
+  fetchPDCData: async () => {
+    try {
+      const response = await axios.get('http://172.18.7.85:6998/api/v1/rescheduling/part-production-pdc');
+      set({ pdcData: response.data });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching PDC data:', error);
+      set({ pdcData: null });
+      throw error;
+    }
   },
 
   fetchDynamicScheduleData: async () => {

@@ -120,11 +120,14 @@ const DynamicSchedulingGraph2 = () => {
   const [components, setComponents] = useState([]);
 
   // Get store values and functions
-  const { scheduleData, loading, error, fetchDynamicScheduleData } = useDynamicStore();
+  const { scheduleData, loading, error, fetchDynamicScheduleData, pdcData, fetchPDCData } = useDynamicStore();
 
   const fetchScheduleData = async () => {
     try {
-      const data = await fetchDynamicScheduleData();
+      const [data, pdcData] = await Promise.all([
+        fetchDynamicScheduleData(),
+        fetchPDCData()
+      ]);
       
       // Extract unique production orders and components from all operation types
       const uniqueProductionOrders = new Set();
@@ -328,6 +331,12 @@ const DynamicSchedulingGraph2 = () => {
     scheduleData.reschedule.forEach((reschedule, index) => {
       const machineName = machineMapping[reschedule.machine_id.toString()];
       if (machineName && filterOperation(reschedule, 'rescheduled')) {
+        // Find matching PDC data
+        const matchingPDC = pdcData?.find(
+          pdc => pdc.part_number === reschedule.part_number && 
+                 pdc.production_order === reschedule.production_order
+        );
+
         items.add({
           id: `rescheduled-${index}`,
           group: `${machineName}-rescheduled`,
@@ -346,7 +355,8 @@ const DynamicSchedulingGraph2 = () => {
               Raw Material: ${reschedule.raw_material_status}<br/>
               Operation #: ${reschedule.operation_number}<br/>
               Start: ${moment(reschedule.start_time).format('DD/MM/YYYY HH:mm')}<br/>
-              End: ${moment(reschedule.end_time).format('DD/MM/YYYY HH:mm')}
+              End: ${moment(reschedule.end_time).format('DD/MM/YYYY HH:mm')}<br/>
+              ${matchingPDC ? `PDC: ${moment(matchingPDC.pdc).format('DD/MM/YYYY HH:mm')}` : ''}
             </div>
           `
         });

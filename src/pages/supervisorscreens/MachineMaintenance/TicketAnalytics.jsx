@@ -1,8 +1,18 @@
-import React from 'react';
-import { Card, Row, Col, Statistic } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Card, Row, Col, Statistic, Modal, Alert } from 'antd';
 import ReactECharts from 'echarts-for-react';
 
 const TicketAnalytics = () => {
+  const [isModalVisible, setIsModalVisible] = useState(true);
+
+  useEffect(() => {
+    setIsModalVisible(true);
+  }, []);
+
+  const handleOk = () => {
+    setIsModalVisible(false);
+  };
+
   // Data for MTBF-MTTR line chart
   const monthlyData = {
     dates: ['Jan 23', 'Feb 23', 'Mar 23', 'Apr 23', 'May 23', 'Jun 23', 
@@ -216,6 +226,22 @@ Your organization aims for:
 
   return (
     <div className="p-4">
+      <Alert
+        message="Coming Soon"
+        description="This feature is currently under development and will be available soon."
+        type="info"
+        showIcon
+        style={{ marginBottom: '20px' }}
+      />
+      <Modal
+        title="Coming Soon"
+        open={isModalVisible}
+        onOk={handleOk}
+        onCancel={handleOk}
+        centered
+      >
+        <p>This feature is currently under development and will be available soon.</p>
+      </Modal>
       {/* Summary Statistics */}
       <Row gutter={[16, 16]}>
         <Col span={12}>

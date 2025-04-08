@@ -515,7 +515,7 @@ const useWebSocketStore = create((set, get) => ({
   fetchMppDetails: async (partNumber, operationNumber) => {
     try {
       const response = await fetch(
-        `http://172.18.7.88:1887/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
+        `http://172.18.7.155:8002/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
       );
 
       if (!response.ok) {

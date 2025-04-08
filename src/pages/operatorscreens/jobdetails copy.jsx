@@ -163,20 +163,15 @@ const JobDetails = () => {
         try {
           const machineData = JSON.parse(storedMachine);
           if (machineData?.id) {
-            // Initialize WebSocket
             initializeWebSocket(machineData.id);
             
-            // Fetch machine operations and job data
             console.log('Fetching machine operations for machine:', machineData.id);
             const result = await fetchMachineOperations(machineData.id);
             console.log('Machine operations result:', result);
             
-            if (result?.success) {
-              // Update job data
-              if (result.data?.jobData) {
-                setJobData(result.data.jobData);
-                setJobOrderData(result.data.orders?.[0] || null);
-              }
+            // Store the operations data directly
+            if (result?.operations) {
+              console.log('Setting machine operations:', result.operations);
             }
           }
         } catch (error) {

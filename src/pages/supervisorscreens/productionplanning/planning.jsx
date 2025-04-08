@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Upload, message,
   Typography, Tag, Tooltip, Form, Drawer, Descriptions,
-  Badge, Alert, Spin
+  Badge, Alert, Spin, Progress, Divider, Collapse, DatePicker, Pagination
 } from 'antd';
 import {
   UploadOutlined, FileTextOutlined, EditOutlined,
   SaveOutlined, PlusOutlined, ClockCircleOutlined,
   CalendarOutlined, BarChartOutlined,
-  ToolOutlined, DownloadOutlined, DeleteOutlined
+  ToolOutlined, DownloadOutlined, DeleteOutlined,
+  ScheduleOutlined, ReloadOutlined, EyeOutlined,
+  AppstoreOutlined, CheckOutlined
 } from '@ant-design/icons';
 import {
   Timer, AlertTriangle, CheckCircle2, 
@@ -19,6 +21,7 @@ import { Link } from 'react-router-dom';
 import JobOperationsTable from '../../../components/ProductionPlanning/JobOperationsTable';
 import OperationMPPDetails from '../../../components/ProductionPlanning/OperationMPPDetails';
 import ResourceUtilization from '../../../components/ProductionPlanning/ResourceUtilization';
+import CapacityPlanning from '../../../components/ProductionPlanning/CapacityPlanning';
 import { mockJobData, mockPartNumbers, mockMachines } from '../../../data/mockPlanningData';
 import usePlanningStore from '../../../store/planning-store';
 import { jsPDF } from "jspdf";
@@ -27,6 +30,7 @@ import dayjs from 'dayjs';
 import belLogo from '../../../assets/belUrl.png';
 import { QRCodeSVG } from 'qrcode.react';
 import * as QRCodeNode from 'qrcode';
+import { create } from 'zustand';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -38,6 +42,8 @@ const Planning = () => {
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [activeTab, setActiveTab] = useState('jobDetails');
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [programCurrentPage, setProgramCurrentPage] = useState(1);
   const { 
     fetchAllOrders, 
     searchOrders, 
@@ -56,16 +62,215 @@ const Planning = () => {
   const [isEditProgramModalVisible, setIsEditProgramModalVisible] = useState(false);
   const [selectedTool, setSelectedTool] = useState(null);
   const [selectedProgram, setSelectedProgram] = useState(null);
-  const [addToolForm, setAddToolForm] = useState(null);
-  const [editToolForm, setEditToolForm] = useState(null);
-  const [addProgramForm, setAddProgramForm] = useState(null);
-  const [editProgramForm, setEditProgramForm] = useState(null);
+  const [addToolForm] = Form.useForm();
+  const [editToolForm] = Form.useForm();
+  const [addProgramForm] = Form.useForm();
+  const [editProgramForm] = Form.useForm();
+  const [tools, setTools] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [pdcData, setPdcData] = useState(null);
+  // Add fetchPartProductionPDC from the planning store
+  const fetchPartProductionPDC = usePlanningStore((state) => state.fetchPartProductionPDC);
+
+  // Configuration for file upload component - customized for NC program files
+  const uploadProps = {
+    name: 'file',
+    multiple: false,
+    // Disable automatic upload - we'll handle the file in our form submit handlers
+    customRequest: ({ onSuccess }) => {
+      setTimeout(() => {
+        onSuccess("ok", null);
+      }, 0);
+    },
+    onChange(info) {
+      const { status } = info.file;
+      if (status === 'done') {
+        message.success(`${info.file.name} ready for upload.`);
+      } else if (status === 'error') {
+        message.error(`${info.file.name} file preparation failed.`);
+      }
+    },
+    beforeUpload: (file) => {
+      // Validate file types commonly used for CNC programs
+      const isValidFileType = file.type === 'application/octet-stream' || 
+                             file.type === 'text/plain' ||
+                             file.name.endsWith('.nc') ||
+                             file.name.endsWith('.prt') ||
+                             file.name.endsWith('.mpf') ||
+                             file.name.endsWith('.cnc');
+      
+      const isLessThan20MB = file.size / 1024 / 1024 < 20;
+      
+      if (!isValidFileType) {
+        message.error('Please upload a valid program file (.nc, .prt, .mpf, .cnc)');
+      }
+      
+      if (!isLessThan20MB) {
+        message.error('File must be smaller than 20MB!');
+      }
+      
+      return (isValidFileType && isLessThan20MB) || Upload.LIST_IGNORE;
+    },
+    showUploadList: true,
+  };
 
   // Fetch part numbers and active parts on component mount
   React.useEffect(() => {
     fetchAllOrders();
     fetchActiveParts();
+    // Clear PDC data when the component mounts
+    setPdcData(null);
+
+    // Load saved job and tools data from localStorage
+    const savedJob = localStorage.getItem('selectedJob');
+    if (savedJob) {
+      try {
+        const parsedJob = JSON.parse(savedJob);
+        setSelectedJob(parsedJob);
+        setSelectedOrderNumber(parsedJob?.production_order);
+        console.log('Restored job from localStorage:', parsedJob);
+        
+        // Only fetch PDC data for the restored job if needed
+        // We'll handle this in a separate useEffect below
+        
+        // After restoring the job, check for saved tools that match this job
+        const savedTools = localStorage.getItem('jobTools');
+        if (savedTools) {
+          try {
+            const parsedTools = JSON.parse(savedTools);
+            // Only use saved tools if they match the restored job
+            if (parsedTools.length > 0 && parsedTools[0].productionOrder === parsedJob.production_order) {
+              setTools(parsedTools);
+              console.log('Restored matching tools from localStorage:', parsedTools);
+            } else {
+              console.log('Saved tools do not match the restored job - initializing empty tools');
+              setTools([]);
+            }
+          } catch (error) {
+            console.error('Error parsing saved tools:', error);
+            setTools([]);
+          }
+        }
+
+        // Also restore saved programs from localStorage
+        const savedPrograms = localStorage.getItem('jobPrograms');
+        if (savedPrograms) {
+          try {
+            const parsedPrograms = JSON.parse(savedPrograms);
+            // Only use saved programs if they match the restored job
+            if (parsedPrograms.length > 0 && parsedPrograms[0].productionOrder === parsedJob.production_order) {
+              setPrograms(parsedPrograms);
+              console.log('Restored matching programs from localStorage:', parsedPrograms);
+            } else {
+              console.log('Saved programs do not match the restored job - initializing empty programs');
+              setPrograms([]);
+            }
+          } catch (error) {
+            console.error('Error parsing saved programs:', error);
+            setPrograms([]);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing saved job:', error);
+      }
+    }
   }, [fetchAllOrders, fetchActiveParts]);
+
+  // Add a new useEffect to fetch PDC data when selectedJob changes
+  // This ensures PDC data is only loaded for the current selection
+  useEffect(() => {
+    const fetchPdcForCurrentJob = async () => {
+      if (selectedJob) {
+        try {
+          // Fetch PDC data for the selected job
+          const pdcResponse = await fetchPartProductionPDC(
+            selectedJob.part_number,
+            selectedJob.production_order
+          );
+          console.log('PDC Response for current job:', pdcResponse);
+          
+          if (pdcResponse && Array.isArray(pdcResponse) && pdcResponse.length > 0) {
+            // Store the production_order with the PDC data
+            const pdcWithProductionOrder = {
+              ...pdcResponse[0],
+              production_order: pdcResponse[0].production_order || selectedJob.production_order,
+              part_number: pdcResponse[0].part_number || selectedJob.part_number
+            };
+            setPdcData(pdcWithProductionOrder);
+            console.log('PDC data fetched for current job:', pdcWithProductionOrder);
+          } else {
+            console.log('No PDC data available for this part/order');
+            setPdcData(null);
+          }
+        } catch (pdcError) {
+          console.error('Error fetching PDC data:', pdcError);
+          setPdcData(null);
+        }
+      } else {
+        // Clear PDC data if no job is selected
+        setPdcData(null);
+      }
+    };
+
+    fetchPdcForCurrentJob();
+  }, [selectedJob, fetchPartProductionPDC]); // Include fetchPartProductionPDC in the dependency array
+
+  // Save selectedJob to localStorage when it changes
+  useEffect(() => {
+    if (selectedJob) {
+      localStorage.setItem('selectedJob', JSON.stringify(selectedJob));
+    }
+  }, [selectedJob]);
+
+  // Save tools to localStorage when they change
+  useEffect(() => {
+    if (tools.length > 0) {
+      localStorage.setItem('jobTools', JSON.stringify(tools));
+    }
+  }, [tools]);
+
+  // Save programs to localStorage when they change
+  useEffect(() => {
+    if (programs.length > 0) {
+      localStorage.setItem('jobPrograms', JSON.stringify(programs));
+      console.log('Saved programs to localStorage:', programs);
+    }
+  }, [programs]);
+
+  // Use effect to set form values when selectedTool changes
+  useEffect(() => {
+    if (selectedTool && isEditToolModalVisible) {
+      editToolForm.setFieldsValue({
+        toolType: selectedTool.toolType,
+        toolDescription: selectedTool.toolDescription,
+        belPartNumber: selectedTool.belPartNumber
+      });
+    }
+  }, [selectedTool, isEditToolModalVisible, editToolForm]);
+
+  // Use effect to set form values when selectedProgram changes
+  useEffect(() => {
+    if (selectedProgram && isEditProgramModalVisible) {
+      editProgramForm.setFieldsValue({
+        programNo: selectedProgram.programNo,
+        description: selectedProgram.description,
+        version: selectedProgram.version
+      });
+    }
+  }, [selectedProgram, isEditProgramModalVisible, editProgramForm]);
+
+  // Add effect to update the edit form when selectedProgram changes
+  useEffect(() => {
+    if (selectedProgram && editProgramForm) {
+      editProgramForm.setFieldsValue({
+        program_name: selectedProgram.program_name || selectedProgram.description,
+        program_number: selectedProgram.program_number || selectedProgram.programNo,
+        version: selectedProgram.version || 'v1',
+        operation_id: selectedProgram.operation_id
+      });
+    }
+  }, [selectedProgram, editProgramForm]);
 
   const getJobStatus = (partNumber) => {
     const activePart = activeParts.find(part => part.part_number === partNumber);
@@ -88,6 +293,30 @@ const Planning = () => {
         try {
           await changePartStatus(partNumber, newStatus);
           message.success(`Part status successfully changed to ${newStatus}`);
+          
+          // Immediately fetch PDC data after status change
+          if (selectedJob) {
+            try {
+              const pdcResponse = await fetchPartProductionPDC(
+                selectedJob.part_number,
+                selectedJob.production_order
+              );
+              
+              if (pdcResponse && Array.isArray(pdcResponse) && pdcResponse.length > 0) {
+                const pdcWithProductionOrder = {
+                  ...pdcResponse[0],
+                  production_order: pdcResponse[0].production_order || selectedJob.production_order,
+                  part_number: pdcResponse[0].part_number || selectedJob.part_number
+                };
+                setPdcData(pdcWithProductionOrder);
+              } else {
+                setPdcData(null);
+              }
+            } catch (pdcError) {
+              console.error('Error fetching PDC data after status change:', pdcError);
+              setPdcData(null);
+            }
+          }
         } catch (error) {
           message.error('Failed to change part status');
         }
@@ -130,12 +359,98 @@ const Planning = () => {
   };
 
   const handleJobSelect = async (partNumber) => {
-    const results = await searchOrders(partNumber);
-    if (results.orders && results.orders.length > 0) {
-      const selectedJobData = results.orders[0];
-      setSelectedJob(selectedJobData);
-      setSelectedOrderNumber(selectedJobData?.orderNumber);
-      console.log('Selected Order Number:', selectedJobData?.orderNumber);
+    try {
+      setLoading(true);
+      console.log('Selected part number:', partNumber);
+      setSelectedOrderNumber(partNumber);
+      
+      if (!partNumber) {
+        setSelectedJob(null);
+        setTools([]);
+        setPrograms([]);
+        setLoading(false);
+        setPdcData(null); // Reset PDC data when no job is selected
+        return;
+      }
+
+      console.log('Selected partNumber:', partNumber);
+      
+      const fetchJobDetails = async (selectedPartNumber) => {
+        try {
+          const orderData = await searchOrders(selectedPartNumber);
+          if (orderData && orderData.orders && orderData.orders.length > 0) {
+            const jobData = orderData.orders[0];
+            console.log('Job details:', jobData);
+            setSelectedJob(jobData);
+            
+            // Save to localStorage for persistence
+            localStorage.setItem('selectedJob', JSON.stringify(jobData));
+            
+            // PDC data will be fetched by the useEffect hook when selectedJob changes
+            // No need to fetch it here
+            
+            // Fetch tools and programs
+            try {
+              const toolsData = await fetchToolsByOrderId(jobData.id);
+              console.log('Tools data:', toolsData);
+              
+              const enhancedToolsData = toolsData.map(tool => ({
+                ...tool,
+                productionOrder: jobData.production_order,
+                partNumber: jobData.part_number
+              }));
+              
+              setTools(enhancedToolsData);
+              localStorage.setItem('tools', JSON.stringify(enhancedToolsData));
+            } catch (toolsError) {
+              console.error('Error fetching tools:', toolsError);
+              // Fall back to localStorage if available
+              const savedTools = JSON.parse(localStorage.getItem('tools') || '[]');
+              setTools(savedTools);
+            }
+            
+            try {
+              const programsData = await fetchProgramsByOrderId(jobData.id);
+              console.log('Programs data:', programsData);
+              
+              const enhancedProgramsData = programsData.map(program => ({
+                ...program,
+                productionOrder: jobData.production_order,
+                partNumber: jobData.part_number,
+                operationNumber: program.operation_id, // Map operation_id to operationNumber for display
+                operationDescription: jobData.operations.find(op => op.id === program.operation_id)?.operation_description || 'Unknown'
+              }));
+              
+              setPrograms(enhancedProgramsData);
+              localStorage.setItem('programs', JSON.stringify(enhancedProgramsData));
+            } catch (programsError) {
+              console.error('Error fetching programs:', programsError);
+              // Fall back to localStorage if available
+              const savedPrograms = JSON.parse(localStorage.getItem('programs') || '[]');
+              setPrograms(savedPrograms);
+            }
+            
+            return jobData;
+          }
+          return null;
+        } catch (error) {
+          console.error('Error fetching job details:', error);
+          message.error('Failed to fetch job details');
+          return null;
+        }
+      };
+      
+      const jobDetails = await fetchJobDetails(partNumber);
+      
+      if (!jobDetails) {
+        message.error('No job details found for the selected part number');
+      }
+      
+    } catch (error) {
+      console.error('Error in handleJobSelect:', error);
+      message.error('Failed to fetch job details');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -158,6 +473,14 @@ const Planning = () => {
     if (select) {
       select.value = '';
     }
+    setSelectedJob(null);
+    setSelectedOrderNumber(null);
+    setTools([]);
+    setPrograms([]);
+    setPdcData(null);
+    localStorage.removeItem('selectedJob');
+    localStorage.removeItem('jobTools');
+    localStorage.removeItem('jobPrograms');
   };
 
   const handleShowPreview = () => {
@@ -851,12 +1174,434 @@ const Planning = () => {
     </Button>
   );
 
+  const handleAddTool = async (values) => {
+    try {
+      setLoading(true);
+      
+      // Find the selected operation to get its id
+      const selectedOperation = selectedJob?.operations?.find(
+        op => op.operation_number === parseInt(values.operationNumber, 10)
+      );
+      
+      if (!selectedOperation) {
+        throw new Error('Selected operation not found');
+      }
+      
+      console.log('Selected Operation:', selectedOperation);
+      
+      // Format the data for the API - using exactly the field names required
+      const toolData = {
+        // Required fields for the API with the exact field names expected
+        tool_name: values.tool_name,
+        tool_number: values.tool_number,
+        bel_partnumber: values.bel_partnumber,
+        description: values.description,
+        quantity: values.quantity || 1,
+        // Auto-populated fields - use the actual job ID and operation ID
+        order_id: selectedJob.id,
+        operation_id: selectedOperation.id
+      };
+      
+      // Log the data we're sending to help with debugging
+      console.log('Sending tool data to API with job ID and operation ID:', toolData);
+      
+      // Directly submit the tool data without showing the confirmation modal
+      submitToolData(toolData);
+      
+    } catch (error) {
+      console.error('Failed to add tool:', error);
+      message.error(`Failed to add tool: ${error.message}`);
+      setLoading(false);
+    }
+  };
+  
+  // Function to handle the actual API call
+  const submitToolData = async (toolData) => {
+    try {
+      // Call the API function
+      const { addOrderTool } = usePlanningStore.getState();
+      console.log('Calling addOrderTool with:', toolData);
+      
+      const response = await addOrderTool(toolData);
+      
+      console.log('API Response after adding tool:', response);
+      
+      // Find operation details for display in the table
+      const operation = selectedJob?.operations?.find(op => op.id === toolData.operation_id);
+      
+      // Add the new tool to the local state with data from response
+      const newTool = {
+        id: response?.id || (tools.length + 1),
+        tool_name: response?.tool_name || toolData.tool_name,
+        tool_number: response?.tool_number || toolData.tool_number,
+        bel_partnumber: response?.bel_partnumber || toolData.bel_partnumber,
+        description: response?.description || toolData.description,
+        quantity: response?.quantity || toolData.quantity,
+        order_id: response?.order_id || toolData.order_id,
+        operation_id: response?.operation_id || toolData.operation_id,
+        created_at: response?.created_at,
+        updated_at: response?.updated_at,
+        // Additional fields for table display
+        partNumber: selectedJob?.part_number,
+        productionOrder: selectedJob?.production_order,
+        operationNumber: operation?.operation_number || 'N/A',
+        operationDescription: operation?.operation_description || addToolForm.getFieldValue('operationDescription')
+      };
+      
+      const updatedTools = [...tools, newTool];
+      setTools(updatedTools);
+      // Save tools to localStorage
+      localStorage.setItem('jobTools', JSON.stringify(updatedTools));
+      
+      setIsAddToolModalVisible(false);
+      addToolForm.resetFields();
+      
+     
+      // Provide additional guidance for common errors
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network error')) {
+        errorMessage = `Network error: Could not connect to API server at http://172.18.7.89:4470. Please verify the server is running and accessible.`;
+      } else if (errorMessage.includes('CORS')) {
+        errorMessage = `CORS error: The API server at http://172.18.7.89:4470 does not allow cross-origin requests from this application. Contact your administrator.`;
+      } else if (errorMessage.includes('Validation errors')) {
+        errorMessage = `${errorMessage}. Please check the tool data format and try again.`;
+      } else if (errorMessage.includes('not found')) {
+        errorMessage = `${errorMessage}. Please verify that the job ID and operation ID are correct.`;
+      }
+      
+      // Show error message to user
+      Modal.error({
+        title: 'Failed to add tool',
+        content: errorMessage,
+        width: 600
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to handle the actual tool update API call
+  const submitToolUpdate = async (toolData) => {
+    try {
+      // Call the API function
+      const { updateOrderTool } = usePlanningStore.getState();
+      
+      console.log('Updating tool ID:', selectedTool.id);
+      console.log('Sending data to API:', toolData);
+      
+      // Make sure order_id and operation_id are included
+      if (!toolData.order_id || !toolData.operation_id) {
+        toolData.order_id = selectedTool.order_id;
+        toolData.operation_id = selectedTool.operation_id;
+      }
+      
+      // Call the API with the correct tool ID
+      const updatedTool = await updateOrderTool(selectedTool.id, toolData);
+      
+      console.log('API response for updated tool:', updatedTool);
+      
+      // Update the tool in the local state
+      const updatedTools = tools.map(tool => 
+        tool.id === selectedTool.id 
+          ? { 
+              ...tool,
+              tool_name: toolData.tool_name,
+              tool_number: toolData.tool_number,
+              bel_partnumber: toolData.bel_partnumber,
+              description: toolData.description,
+              quantity: toolData.quantity,
+              updated_at: new Date().toISOString()
+            }
+          : tool
+      );
+      
+      setTools(updatedTools);
+      // Save updated tools to localStorage
+      localStorage.setItem('jobTools', JSON.stringify(updatedTools));
+      
+      setIsEditToolModalVisible(false);
+      editToolForm.resetFields();
+      
+      // Show success modal with ONLY the requested fields
+      Modal.success({
+        title: 'Tool Updated Successfully',
+        width: 600,
+        content: (
+          <div>
+            <p>The tool has been updated with the following details:</p>
+            <div style={{ maxHeight: '400px', overflow: 'auto', marginTop: '16px', border: '1px solid #f0f0f0', padding: '16px', borderRadius: '4px' }}>
+              <pre>{JSON.stringify({
+                "tool_name": toolData.tool_name,
+                "tool_number": toolData.tool_number,
+                "bel_partnumber": toolData.bel_partnumber,
+                "description": toolData.description,
+                "quantity": toolData.quantity
+              }, null, 2)}</pre>
+            </div>
+          </div>
+        )
+      });
+    } catch (error) {
+      console.error('Failed to update tool:', error);
+      message.error(`Failed to update tool: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update handleAddProgram to ensure proper localStorage handling
+  const handleAddProgram = async (values) => {
+    console.log("Adding program with values:", values);
+    
+    // Find the selected operation
+    const operation = selectedJob?.operations?.find(op => op.id === values.operation_id);
+    
+    // Format the program data for the API
+    const programData = {
+      program_name: values.program_name,
+      program_number: values.program_number,
+      version: values.version || 'v1',
+      operation_id: parseInt(values.operation_id, 10),
+      order_id: parseInt(selectedJob.id, 10)
+    };
+    
+    // Handle file upload if a file was provided
+    if (values.file && values.file.fileList && values.file.fileList.length > 0) {
+      const fileInfo = values.file.fileList[0];
+      console.log("File to be uploaded:", fileInfo);
+    }
+    
+    console.log("Formatted program data to be sent to API:", programData);
+    
+    try {
+      // Get the addOrderProgram function from the store
+      const { addOrderProgram } = usePlanningStore.getState();
+      
+      // Call the API to add the program
+      const response = await addOrderProgram(programData);
+      console.log("API response for program creation:", response);
+      
+      if (response && response.id) {
+        // Create an enhanced program object with additional display fields
+        const newProgram = {
+          ...response,
+          productionOrder: selectedJob.production_order,
+          partNumber: selectedJob.part_number,
+          operationNumber: operation?.operation_number || 'N/A',
+          operationDescription: operation?.operation_description || 'N/A',
+          // Map API fields to UI fields
+          programNo: response.program_number,
+          description: response.program_name,
+          lastModified: response.update_date,
+          update_date: response.update_date,
+          version: response.version || 'v1',
+          key: response.id
+        };
+        
+        // Update state and localStorage with the new program
+        const updatedPrograms = [...programs, newProgram];
+        setPrograms(updatedPrograms);
+        
+        // Explicitly save programs to localStorage 
+        localStorage.setItem('jobPrograms', JSON.stringify(updatedPrograms));
+        console.log('Programs saved to localStorage after adding:', updatedPrograms);
+        
+        // Close the modal and reset form
+        setIsAddProgramModalVisible(false);
+        addProgramForm.resetFields();
+        
+        // Show success message
+        Modal.success({
+          title: 'Program Created Successfully',
+          content: (
+            <div>
+              <p>Program Name: {newProgram.program_name}</p>
+              <p>Program Number: {newProgram.program_number}</p>
+              <p>Version: {newProgram.version}</p>
+            </div>
+          )
+        });
+      } else {
+        throw new Error("Failed to create program: Invalid response from server");
+      }
+    } catch (error) {
+      console.error("Error creating program:", error);
+      message.error("Failed to create program: " + (error.message || "Unknown error"));
+    }
+  };
+
+  // Update handleEditProgram to ensure proper localStorage handling
+  const handleEditProgram = async (values) => {
+    console.log("Editing program with values:", values);
+    
+    // Format the program data for the API
+    const programData = {
+      program_name: values.program_name,
+      program_number: values.program_number,
+      version: values.version || 'v1',
+      operation_id: parseInt(values.operation_id, 10),
+      order_id: parseInt(selectedJob.id, 10)
+    };
+    
+    console.log("Formatted program data to be sent to API:", programData);
+
+    // Handle file upload if a file was provided
+    if (values.file && values.file.fileList && values.file.fileList.length > 0) {
+      const fileInfo = values.file.fileList[0];
+      console.log("File to be uploaded for program update:", fileInfo);
+    }
+    
+    try {
+      // Get the updateOrderProgram function from the store
+      const { updateOrderProgram } = usePlanningStore.getState();
+      
+      // Call the API to update the program - pass ID separately
+      const response = await updateOrderProgram(selectedProgram.id, programData);
+      console.log("API response for program update:", response);
+      
+      if (response) {
+        // Find the operation to get additional display fields
+        const operation = selectedJob?.operations?.find(op => op.id === values.operation_id);
+        
+        // Create an updated program object with additional display fields
+        const updatedProgram = {
+          ...selectedProgram,
+          ...response,
+          productionOrder: selectedJob.production_order,
+          partNumber: selectedJob.part_number,
+          operationNumber: operation?.operation_number || 'N/A',
+          operationDescription: operation?.operation_description || 'N/A',
+          // Map API fields to UI fields
+          programNo: response.program_number,
+          description: response.program_name,
+          lastModified: response.update_date,
+          update_date: response.update_date,
+          version: response.version || 'v1'
+        };
+        
+        // Update state with the updated program
+        const updatedPrograms = programs.map(prog => 
+          prog.id === selectedProgram.id ? updatedProgram : prog
+        );
+        setPrograms(updatedPrograms);
+        
+        // Explicitly save programs to localStorage
+        localStorage.setItem('jobPrograms', JSON.stringify(updatedPrograms));
+        console.log('Programs saved to localStorage after updating:', updatedPrograms);
+        
+        // Close the modal and reset form
+        setIsEditProgramModalVisible(false);
+        editProgramForm.resetFields();
+        
+        // Show success message
+        message.success("Program updated successfully");
+      } else {
+        throw new Error("Failed to update program: Invalid response from server");
+      }
+    } catch (error) {
+      console.error("Error updating program:", error);
+      message.error("Failed to update program: " + (error.message || "Unknown error"));
+    }
+  };
+
+  // Add a function to handle program deletion
+  const handleDeleteProgram = async (programId) => {
+    try {
+      setLoading(true);
+      
+      // Confirm deletion with the user
+      Modal.confirm({
+        title: 'Delete Program',
+        content: 'Are you sure you want to delete this program?',
+        okText: 'Yes',
+        okType: 'danger',
+        cancelText: 'No',
+        onOk: async () => {
+          try {
+            // Call the API to delete the program
+            const { deleteOrderProgram } = usePlanningStore.getState();
+            await deleteOrderProgram(programId);
+            
+            // Update the local state by filtering out the deleted program
+            const updatedPrograms = programs.filter(program => program.id !== programId);
+            setPrograms(updatedPrograms);
+            
+            // Update localStorage to reflect the deletion
+            localStorage.setItem('jobPrograms', JSON.stringify(updatedPrograms));
+            console.log('Programs saved to localStorage after deletion:', updatedPrograms);
+            
+            message.success('Program deleted successfully');
+          } catch (error) {
+            console.error('Error deleting program:', error);
+            message.error('Failed to delete program: ' + (error.message || 'Unknown error'));
+          } finally {
+            setLoading(false);
+          }
+        },
+        onCancel: () => {
+          setLoading(false);
+        }
+      });
+    } catch (error) {
+      console.error('Error in delete confirmation:', error);
+      setLoading(false);
+    }
+  };
+
+  // Add this new function above the return statement to render PDC information based on PDC data and status
+  const renderPdcInfo = (productionOrder) => {
+    const status = getJobStatus(productionOrder);
+    
+    // Verify that pdcData matches the current production order
+    const isPdcForCurrentJob = pdcData && 
+                              pdcData.production_order === productionOrder && 
+                              pdcData.part_number === selectedJob.part_number;
+    
+    // If PDC exists for this specific production order AND status is active: Show the PDC date/time
+    if (isPdcForCurrentJob && status === 'active') {
+      return (
+        <Tooltip title="Production Due Date">
+          <Tag color="blue" style={{ fontWeight: 'bold' }}>
+            {new Date(pdcData.pdc).toLocaleDateString()} {new Date(pdcData.pdc).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+          </Tag>
+        </Tooltip>
+      );
+    } 
+    // If PDC doesn't exist for this production order AND status is inactive: Show "Not yet scheduled"
+    else if (!isPdcForCurrentJob && status === 'inactive') {
+      return (
+        <Tag color="orange">Not yet scheduled</Tag>
+      );
+    } 
+    // If PDC exists for this production order but status is not active
+    else if (isPdcForCurrentJob && status !== 'active') {
+      return (
+        <Tooltip title="Production Due Date (Part not active)">
+          <Tag color="gray" style={{ fontWeight: 'bold' }}>
+            {new Date(pdcData.pdc).toLocaleDateString()} {new Date(pdcData.pdc).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+          </Tag>
+        </Tooltip>
+      );
+    }
+    // If status is active but no PDC data for this production order
+    else if (!isPdcForCurrentJob && status === 'active') {
+      return (
+        <Tag color="red">PDC not defined</Tag>
+      );
+    }
+    // For any other case (like unknown status)
+    else {
+      return (
+        <Tag color="orange">Not yet Scheduled</Tag>
+      );
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       {/* Job Selection Section with improved layout */}
       <Card className="shadow-sm">
         <Row gutter={24} align="middle">
-          <Col span={20}>
+          <Col span={selectedJob ? 20 : 24}>
             <Space size="large" className="w-full">
               <Form.Item label="Select Job/Production Order" className="mb-0" style={{ flex: 1 }}>
                 <Space className="w-full">
@@ -869,6 +1614,7 @@ const Planning = () => {
                     optionFilterProp="children"
                     style={{ width: '500px' }}
                     allowClear
+                    value={selectedJob?.production_order}
                   >
                     {partNumbers.map(item => (
                       <Option key={item.id} value={item.productionOrder}>
@@ -876,25 +1622,21 @@ const Planning = () => {
                       </Option>
                     ))}
                   </Select>
-                  {/* <Button onClick={handleReset}>Reset</Button> */}
                 </Space>
               </Form.Item>
-              <Upload 
-                accept=".pdf"
-                onChange={handleUpload}
-                customRequest={({ onSuccess }) => setTimeout(() => onSuccess("ok"), 0)}
-              >
-              </Upload>
             </Space>
           </Col>
-          <Col span={4} className="text-right">
-            <Space>
-              {selectedJob && renderDownloadButton()}
-            </Space>
-          </Col>
+          {selectedJob && (
+            <Col span={4} className="text-right">
+              <Space>
+                {renderDownloadButton()}
+              </Space>
+            </Col>
+          )}
         </Row>
       </Card>
 
+      {/* All other content conditionally rendered only when a job is selected */}
       {selectedJob && (
         <>
           {/* Job Details Section */}
@@ -902,10 +1644,6 @@ const Planning = () => {
             <Tabs 
               activeKey={activeTab} 
               onChange={setActiveTab}
-              tabBarExtraContent={
-                <Link to="/scheduling">
-                </Link>
-              }
             >
               <TabPane 
                 tab={
@@ -941,6 +1679,11 @@ const Planning = () => {
                     <Descriptions.Item label="End Date">
                       {selectedJob.project?.end_date || 'N/A'}
                     </Descriptions.Item>
+                    <Descriptions.Item 
+                      label={<span style={{ fontWeight: 'bold', color: '#1890ff' }}>PDC</span>}
+                    >
+                      {renderPdcInfo(selectedJob.production_order)}
+                    </Descriptions.Item>
                     <Descriptions.Item label="Production Order">
                       {selectedJob.production_order}
                     </Descriptions.Item>
@@ -952,9 +1695,6 @@ const Planning = () => {
                     </Descriptions.Item>
                     <Descriptions.Item label="Launched Quantity">
                       {selectedJob.launched_quantity}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Delivery Date">
-                      {selectedJob.project?.delivery_date || 'N/A'}
                     </Descriptions.Item>
                     <Descriptions.Item label="Total Operations">
                       {selectedJob.total_operations}
@@ -1027,146 +1767,255 @@ const Planning = () => {
                 key="toolsAndPrograms"
               >
                 <Card className="shadow-sm">
-                  <div className="space-y-8">
-                    {/* Tools Section */}
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <Title level={5} className="mb-0">Tools List</Title>
+                  {/* Add nested Tabs for Tools and Programs */}
+                  <Tabs defaultActiveKey="tools" type="card">
+                    <TabPane 
+                      tab={
+                        <span>
+                          <ToolOutlined />
+                          Tools List
+                        </span>
+                      } 
+                      key="tools"
+                    >
+                      <div className="mb-4 flex justify-end">
                         <Button 
                           type="primary" 
                           icon={<PlusOutlined />}
                           onClick={() => setIsAddToolModalVisible(true)}
+                          disabled={!selectedJob}
                         >
                           Add Tool
                         </Button>
                       </div>
-                      <Table
-                        size="small"
-                        columns={[
-                          { 
-                            title: 'Sl.No', 
-                            dataIndex: 'slNo', 
-                            key: 'slNo',
-                            width: '10%',
-                            render: (text, record, index) => index + 1
-                          },
-                          { 
-                            title: 'Tool Type', 
-                            dataIndex: 'toolType', 
-                            key: 'toolType',
-                            width: '20%'
-                          },
-                          { 
-                            title: 'Tool Description', 
-                            dataIndex: 'toolDescription', 
-                            key: 'toolDescription',
-                            width: '45%'
-                          },
-                          { 
-                            title: 'BEL Part Number', 
-                            dataIndex: 'belPartNumber', 
-                            key: 'belPartNumber',
-                            width: '15%'
-                          },
-                          {
-                            title: 'Action',
-                            key: 'action',
-                            width: '10%',
-                            render: (_, record) => (
-                              <Space>
-                                <Button 
-                                  type="link" 
-                                  icon={<EditOutlined />}
-                                  onClick={() => {
-                                    setSelectedTool(record);
-                                    setIsEditToolModalVisible(true);
-                                  }}
-                                />
-                                <Button 
-                                  type="link" 
-                                  danger 
-                                  icon={<DeleteOutlined />}
-                                  onClick={() => {
-                                    Modal.confirm({
-                                      title: 'Delete Tool',
-                                      content: 'Are you sure you want to delete this tool?',
-                                      okText: 'Yes',
-                                      okType: 'danger',
-                                      cancelText: 'No',
-                                      onOk: () => {
-                                        message.success('Tool deleted successfully');
-                                      },
-                                    });
-                                  }}
-                                />
-                              </Space>
-                            ),
-                          },
-                        ]}
-                        dataSource={[]}
-                        pagination={false}
-                      />
-                    </div>
 
-                    {/* Programs Section */}
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <Title level={5} className="mb-0">Programs List</Title>
+                      {loading ? (
+                        <div className="flex justify-center items-center py-8">
+                          <Spin size="large" />
+                          <span className="ml-2">Loading tools...</span>
+                        </div>
+                      ) : (
+                        <Table
+                          size="small"
+                          columns={[
+                            { 
+                              title: 'Sl.No', 
+                              key: 'serialNumber',
+                              width: '5%',
+                              render: (text, record, index) => {
+                                // Calculate continuous serial number across pages
+                                return ((currentPage - 1) * 6) + index + 1;
+                              }
+                            },
+                            { 
+                              title: 'Tool Name', 
+                              dataIndex: 'tool_name', 
+                              key: 'tool_name',
+                              width: '15%'
+                            },
+                            { 
+                              title: 'Tool Number', 
+                              dataIndex: 'tool_number', 
+                              key: 'tool_number',
+                              width: '15%'
+                            },
+                            { 
+                              title: 'BEL Part No', 
+                              dataIndex: 'bel_partnumber', 
+                              key: 'bel_partnumber',
+                              width: '10%'
+                            },
+                            { 
+                              title: 'Production Order', 
+                              dataIndex: 'productionOrder', 
+                              key: 'productionOrder',
+                              width: '12%'
+                            },
+                            { 
+                              title: 'Operation', 
+                              dataIndex: 'operationNumber', 
+                              key: 'operationNumber',
+                              width: '8%'
+                            },
+                            { 
+                              title: 'Description', 
+                              dataIndex: 'description', 
+                              key: 'description',
+                              width: '15%'
+                            },
+                            {
+                              title: 'Qty',
+                              dataIndex: 'quantity',
+                              key: 'quantity',
+                              width: '8%',
+                              render: (text) => text || 1
+                            },
+                           
+                            {
+                              title: 'Action',
+                              key: 'action',
+                              width: '15%',
+                              render: (_, record) => (
+                                <Space>
+                                  <Button 
+                                    type="link" 
+                                    icon={<EditOutlined />}
+                                    onClick={() => {
+                                      setSelectedTool(record);
+                                      editToolForm.setFieldsValue({
+                                        tool_name: record.tool_name,
+                                        tool_number: record.tool_number,
+                                        bel_partnumber: record.bel_partnumber,
+                                        description: record.description,
+                                        quantity: record.quantity || 1
+                                      });
+                                      setIsEditToolModalVisible(true);
+                                    }}
+                                  />
+                                  
+                                  
+                                </Space>
+                              ),
+                            },
+                          ]}
+                          dataSource={tools}
+                          pagination={{ 
+                            current: currentPage,
+                            pageSize: 6,
+                            showSizeChanger: false, 
+                            position: ['bottomCenter'],
+                            showTotal: (total) => `Total ${total} tools`,
+                            onChange: (page) => {
+                              setCurrentPage(page);
+                            }
+                          }}
+                        />
+                      )}
+                    </TabPane>
+
+                    <TabPane 
+                      tab={
+                        <span>
+                          <FileTextOutlined />
+                          Programs List
+                        </span>
+                      } 
+                      key="programs"
+                    >
+                      <div className="mb-4 flex justify-end">
                         <Button 
                           type="primary" 
                           icon={<PlusOutlined />}
                           onClick={() => setIsAddProgramModalVisible(true)}
+                          disabled={!selectedJob}
                         >
                           Add Program
                         </Button>
                       </div>
-                      <Table
-                        size="small"
-                        columns={[
-                          { title: 'Program No', dataIndex: 'programNo', key: 'programNo' },
-                          { title: 'Description', dataIndex: 'description', key: 'description' },
-                          { title: 'Version', dataIndex: 'version', key: 'version' },
-                          { title: 'Last Modified', dataIndex: 'lastModified', key: 'lastModified' },
-                          {
-                            title: 'Action',
-                            key: 'action',
-                            render: (_, record) => (
-                              <Space>
-                                <Button 
-                                  type="link" 
-                                  icon={<EditOutlined />}
-                                  onClick={() => {
-                                    setSelectedProgram(record);
-                                    setIsEditProgramModalVisible(true);
-                                  }}
-                                />
-                                <Button 
-                                  type="link" 
-                                  danger 
-                                  icon={<DeleteOutlined />}
-                                  onClick={() => {
-                                    Modal.confirm({
-                                      title: 'Delete Program',
-                                      content: 'Are you sure you want to delete this program?',
-                                      okText: 'Yes',
-                                      okType: 'danger',
-                                      cancelText: 'No',
-                                      onOk: () => {
-                                        // Handle delete
-                                        message.success('Program deleted successfully');
-                                      },
-                                    });
-                                  }}
-                                />
-                              </Space>
-                            ),
-                          },
-                        ]}
-                        dataSource={[]}
-                        pagination={false}
-                      />
-                    </div>
-                  </div>
+
+                      {loading ? (
+                        <div className="flex justify-center items-center py-8">
+                          <Spin size="large" />
+                          <span className="ml-2">Loading programs...</span>
+                        </div>
+                      ) : (
+                        <Table
+                          size="small"
+                          columns={[
+                            { 
+                              title: 'Sl.No', 
+                              key: 'serialNumber',
+                              width: '5%',
+                              render: (text, record, index) => {
+                                // Calculate continuous serial number across pages
+                                return ((programCurrentPage - 1) * 6) + index + 1;
+                              }
+                            },
+                            { 
+                              title: 'Program No', 
+                              dataIndex: 'program_number', 
+                              key: 'program_number',
+                              render: (text, record) => text || record.programNo || 'N/A'
+                            },
+                            { 
+                              title: 'Program Name', 
+                              dataIndex: 'program_name', 
+                              key: 'program_name',
+                              render: (text, record) => text || record.description || 'N/A'
+                            },
+                            { 
+                              title: 'Part Number', 
+                              dataIndex: 'partNumber', 
+                              key: 'partNumber' 
+                            },
+                            { 
+                              title: 'Production Order', 
+                              dataIndex: 'productionOrder', 
+                              key: 'productionOrder' 
+                            },
+                            { 
+                              title: 'Operation', 
+                              dataIndex: 'operationNumber', 
+                              key: 'operationNumber',
+                              render: (text, record) => text || 'N/A'
+                            },
+                            { 
+                              title: 'Version', 
+                              dataIndex: 'version', 
+                              key: 'version',
+                              render: (text) => text || 'v1'
+                            },
+                            { 
+                              title: 'Update Date', 
+                              dataIndex: 'update_date', 
+                              key: 'update_date',
+                              render: (text, record) => {
+                                // Check for update_date first, then lastModified, then updated_at
+                                const date = text || record.update_date || record.lastModified || record.updated_at;
+                                if (!date) return 'N/A';
+                                return typeof date === 'string' && date.includes('T') 
+                                  ? new Date(date).toLocaleDateString() 
+                                  : date;
+                              }
+                            },
+                            {
+                              title: 'Action',
+                              key: 'action',
+                              render: (_, record) => (
+                                <Space>
+                                  <Button 
+                                    type="link" 
+                                    icon={<EditOutlined />}
+                                    onClick={() => {
+                                      setSelectedProgram(record);
+                                      setIsEditProgramModalVisible(true);
+                                    }}
+                                  />
+                                  <Button
+                                    type="link"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    onClick={() => handleDeleteProgram(record.id)}
+                                  />
+                                </Space>
+                              ),
+                            },
+                          ]}
+                          dataSource={programs}
+                          pagination={{ 
+                            current: programCurrentPage,
+                            pageSize: 6,
+                            showSizeChanger: false, 
+                            position: ['bottomCenter'],
+                            showTotal: (total) => `Total ${total} programs`,
+                            onChange: (page) => {
+                              setProgramCurrentPage(page);
+                            }
+                          }}
+                        />
+                      )}
+                    </TabPane>
+                  </Tabs>
                 </Card>
 
                 {/* Add Tool Modal */}
@@ -1178,31 +2027,111 @@ const Planning = () => {
                     addToolForm.resetFields();
                   }}
                   footer={null}
+                  width={600}
                 >
                   <Form
                     form={addToolForm}
                     layout="vertical"
-                    onFinish={(values) => {
-                      console.log('Add tool values:', values);
-                      message.success('Tool added successfully');
-                      setIsAddToolModalVisible(false);
-                      addToolForm.resetFields();
-                    }}
+                    onFinish={handleAddTool}
                   >
+                    {/* Job Details Section */}
+                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <div className="mb-2">
+                            <label className="text-sm text-gray-600">Part Number</label>
+                            <div className="font-medium">{selectedJob?.part_number || 'N/A'}</div>
+                          </div>
+                        </Col>
+                        <Col span={12}>
+                          <div className="mb-2">
+                            <label className="text-sm text-gray-600">Production Order</label>
+                            <div className="font-medium">{selectedJob?.production_order || 'N/A'}</div>
+                          </div>
+                        </Col>
+                      </Row>
+                    </div>
+
                     <Form.Item
-                      name="toolName"
+                      name="operationNumber"
+                      label="Operation Number"
+                      rules={[{ required: true, message: 'Please select an operation' }]}
+                    >
+                      <Select 
+                        placeholder="Select operation"
+                        showSearch
+                        optionFilterProp="children"
+                        onChange={(value, option) => {
+                          // Find the operation description for the selected operation number
+                          const operation = selectedJob?.operations?.find(op => op.operation_number === value);
+                          if (operation) {
+                            // Update the operationDescription field
+                            addToolForm.setFieldsValue({
+                              operationDescription: operation.operation_description
+                            });
+                          }
+                        }}
+                      >
+                        {selectedJob?.operations
+                          ?.slice() // Create a copy to avoid mutating the original
+                          .sort((a, b) => parseInt(a.operation_number) - parseInt(b.operation_number)) // Sort by operation number
+                          .map(op => (
+                            <Option key={op.operation_number} value={op.operation_number}>
+                              {`${op.operation_number} - ${op.operation_description.substring(0, 30)}${op.operation_description.length > 30 ? '...' : ''}`}
+                            </Option>
+                          ))
+                        }
+                      </Select>
+                    </Form.Item>
+
+                    <Form.Item
+                      name="operationDescription"
+                      label="Operation Description"
+                    >
+                      <Input disabled />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="tool_name"
                       label="Tool Name"
                       rules={[{ required: true, message: 'Please enter Tool Name' }]}
                     >
-                      <Input />
+                      <Input placeholder="Enter tool name" />
                     </Form.Item>
+                    
                     <Form.Item
-                      name="version"
-                      label="Version"
-                      rules={[{ required: true, message: 'Please enter version' }]}
+                      name="tool_number"
+                      label="Tool Number"
+                      rules={[{ required: true, message: 'Please enter Tool Number' }]}
                     >
-                      <Input />
+                      <Input placeholder="Enter tool number" />
                     </Form.Item>
+                    
+                    <Form.Item
+                      name="bel_partnumber"
+                      label="BEL Part Number"
+                      rules={[{ required: true, message: 'Please enter BEL Part Number' }]}
+                    >
+                      <Input placeholder="Enter BEL part number" />
+                    </Form.Item>
+                    
+                    <Form.Item
+                      name="description"
+                      label="Description"
+                      rules={[{ required: true, message: 'Please enter Description' }]}
+                    >
+                      <Input.TextArea rows={3} placeholder="Enter tool description" />
+                    </Form.Item>
+                    
+                    <Form.Item
+                      name="quantity"
+                      label="Quantity"
+                      initialValue={1}
+                      rules={[{ required: true, message: 'Please enter Quantity' }]}
+                    >
+                      <Input type="number" min={1} placeholder="Enter quantity" />
+                    </Form.Item>
+                    
                     <Form.Item className="mb-0 text-right">
                       <Space>
                         <Button onClick={() => {
@@ -1211,7 +2140,7 @@ const Planning = () => {
                         }}>
                           Cancel
                         </Button>
-                        <Button type="primary" htmlType="submit">
+                        <Button type="primary" htmlType="submit" loading={loading}>
                           Add Tool
                         </Button>
                       </Space>
@@ -1228,32 +2157,108 @@ const Planning = () => {
                     editToolForm.resetFields();
                   }}
                   footer={null}
+                  width={600}
                 >
                   <Form
                     form={editToolForm}
                     layout="vertical"
                     initialValues={selectedTool}
-                    onFinish={(values) => {
-                      console.log('Edit tool values:', values);
-                      message.success('Tool updated successfully');
-                      setIsEditToolModalVisible(false);
-                      editToolForm.resetFields();
+                    onFinish={async (values) => {
+                      try {
+                        setLoading(true);
+                        
+                        // Format the data for the API using the exact field names required
+                        const toolData = {
+                          tool_name: values.tool_name,
+                          tool_number: values.tool_number,
+                          bel_partnumber: values.bel_partnumber,
+                          description: values.description,
+                          quantity: values.quantity || 1,
+                          // Auto-populated fields - use the correct IDs
+                          order_id: selectedTool.order_id,
+                          operation_id: selectedTool.operation_id
+                        };
+                        
+                        console.log('Selected tool for update:', selectedTool);
+                        console.log('Sending tool update data to API:', toolData);
+                        
+                        // Directly submit tool update without showing confirmation modal
+                        submitToolUpdate(toolData);
+                        
+                      } catch (error) {
+                        console.error('Failed to update tool:', error);
+                        message.error(`Failed to update tool: ${error.message}`);
+                        setLoading(false);
+                      }
                     }}
                   >
+                    {/* Job Details Section */}
+                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <div className="mb-2">
+                            <label className="text-sm text-gray-600">Part Number</label>
+                            <div className="font-medium">{selectedTool?.partNumber || 'N/A'}</div>
+                          </div>
+                        </Col>
+                        <Col span={12}>
+                          <div className="mb-2">
+                            <label className="text-sm text-gray-600">Production Order</label>
+                            <div className="font-medium">{selectedTool?.productionOrder || 'N/A'}</div>
+                          </div>
+                        </Col>
+                      </Row>
+                      <Row gutter={16}>
+                        <Col span={24}>
+                          <div className="mb-2">
+                            <label className="text-sm text-gray-600">Operation</label>
+                            <div className="font-medium">{selectedTool?.operationNumber} - {selectedTool?.operationDescription}</div>
+                          </div>
+                        </Col>
+                      </Row>
+                    </div>
+
                     <Form.Item
-                      name="toolName"
+                      name="tool_name"
                       label="Tool Name"
                       rules={[{ required: true, message: 'Please enter Tool Name' }]}
                     >
-                      <Input />
+                      <Input placeholder="Enter tool name" />
                     </Form.Item>
+                    
                     <Form.Item
-                      name="version"
-                      label="Version"
-                      rules={[{ required: true, message: 'Please enter version' }]}
+                      name="tool_number"
+                      label="Tool Number"
+                      rules={[{ required: true, message: 'Please enter Tool Number' }]}
                     >
-                      <Input />
+                      <Input placeholder="Enter tool number" />
                     </Form.Item>
+                    
+                    <Form.Item
+                      name="bel_partnumber"
+                      label="BEL Part Number"
+                      rules={[{ required: true, message: 'Please enter BEL Part Number' }]}
+                    >
+                      <Input placeholder="Enter BEL part number" />
+                    </Form.Item>
+                    
+                    <Form.Item
+                      name="description"
+                      label="Description"
+                      rules={[{ required: true, message: 'Please enter Description' }]}
+                    >
+                      <Input.TextArea rows={3} placeholder="Enter tool description" />
+                    </Form.Item>
+                    
+                    <Form.Item
+                      name="quantity"
+                      label="Quantity"
+                      initialValue={1}
+                      rules={[{ required: true, message: 'Please enter Quantity' }]}
+                    >
+                      <Input type="number" min={1} placeholder="Enter quantity" />
+                    </Form.Item>
+                    
                     <Form.Item className="mb-0 text-right">
                       <Space>
                         <Button onClick={() => {
@@ -1262,7 +2267,7 @@ const Planning = () => {
                         }}>
                           Cancel
                         </Button>
-                        <Button type="primary" htmlType="submit">
+                        <Button type="primary" htmlType="submit" loading={loading}>
                           Update Tool
                         </Button>
                       </Space>
@@ -1272,69 +2277,74 @@ const Planning = () => {
 
                 {/* Add Program Modal */}
                 <Modal
-                  title="Add New Program"
+                  title="Add Program"
                   open={isAddProgramModalVisible}
                   onCancel={() => {
                     setIsAddProgramModalVisible(false);
                     addProgramForm.resetFields();
                   }}
-                  footer={null}
-                >
-                  <Form
-                    form={addProgramForm}
-                    layout="vertical"
-                    onFinish={(values) => {
-                      console.log('Add program values:', values);
-                      message.success('Program added successfully');
+                  footer={[
+                    <Button key="cancel" onClick={() => {
                       setIsAddProgramModalVisible(false);
                       addProgramForm.resetFields();
-                    }}
-                  >
-                    <Form.Item
-                      name="programNo"
-                      label="Program Number"
-                      rules={[{ required: true, message: 'Please enter Program Number' }]}
+                    }}>
+                      Cancel
+                    </Button>,
+                    <Button
+                      key="submit"
+                      type="primary"
+                      loading={loading}
+                      onClick={() => {
+                        addProgramForm.validateFields()
+                          .then(values => {
+                            handleAddProgram(values);
+                          })
+                          .catch(info => {
+                            console.log('Validate Failed:', info);
+                          });
+                      }}
                     >
-                      <Input />
+                      Add
+                    </Button>,
+                  ]}
+                >
+                  <Form form={addProgramForm} layout="vertical">
+                    <Form.Item
+                      name="operation_id"
+                      label="Operation"
+                      rules={[{ required: true, message: 'Please select an operation' }]}
+                    >
+                      <Select placeholder="Select operation">
+                        {selectedJob?.operations?.map((operation) => (
+                          <Option key={operation.id} value={operation.id}>
+                            {operation.operation_number} - {operation.operation_description}
+                          </Option>
+                        ))}
+                      </Select>
                     </Form.Item>
                     <Form.Item
-                      name="description"
-                      label="Description"
-                      rules={[{ required: true, message: 'Please enter description' }]}
+                      name="program_name"
+                      label="Program Name"
+                      rules={[{ required: true, message: 'Please enter program name' }]}
                     >
-                      <Input.TextArea rows={3} />
+                      <Input placeholder="Enter program name" />
+                    </Form.Item>
+                    <Form.Item
+                      name="program_number"
+                      label="Program Number"
+                      rules={[{ required: true, message: 'Please enter program number' }]}
+                    >
+                      <Input placeholder="Enter program number" />
                     </Form.Item>
                     <Form.Item
                       name="version"
                       label="Version"
+                      initialValue="v1"
                       rules={[{ required: true, message: 'Please enter version' }]}
                     >
-                      <Input />
+                      <Input placeholder="Enter version (e.g., v1)" />
                     </Form.Item>
-                    <Form.Item
-                      name="programFile"
-                      label="Program File"
-                    >
-                      <Upload
-                        maxCount={1}
-                        beforeUpload={() => false}
-                      >
-                        <Button icon={<UploadOutlined />}>Select File</Button>
-                      </Upload>
-                    </Form.Item>
-                    <Form.Item className="mb-0 text-right">
-                      <Space>
-                        <Button onClick={() => {
-                          setIsAddProgramModalVisible(false);
-                          addProgramForm.resetFields();
-                        }}>
-                          Cancel
-                        </Button>
-                        <Button type="primary" htmlType="submit">
-                          Add Program
-                        </Button>
-                      </Space>
-                    </Form.Item>
+                    
                   </Form>
                 </Modal>
 
@@ -1346,63 +2356,82 @@ const Planning = () => {
                     setIsEditProgramModalVisible(false);
                     editProgramForm.resetFields();
                   }}
-                  footer={null}
-                >
-                  <Form
-                    form={editProgramForm}
-                    layout="vertical"
-                    initialValues={selectedProgram}
-                    onFinish={(values) => {
-                      console.log('Edit program values:', values);
-                      message.success('Program updated successfully');
+                  footer={[
+                    <Button key="cancel" onClick={() => {
                       setIsEditProgramModalVisible(false);
                       editProgramForm.resetFields();
+                    }}>
+                      Cancel
+                    </Button>,
+                    <Button
+                      key="submit"
+                      type="primary"
+                      loading={loading}
+                      onClick={() => {
+                        editProgramForm.validateFields()
+                          .then(values => {
+                            handleEditProgram(values);
+                          })
+                          .catch(info => {
+                            console.log('Validate Failed:', info);
+                          });
+                      }}
+                    >
+                      Update
+                    </Button>,
+                  ]}
+                >
+                  <Form 
+                    form={editProgramForm} 
+                    layout="vertical"
+                    initialValues={{
+                      program_name: selectedProgram?.program_name || selectedProgram?.description,
+                      program_number: selectedProgram?.program_number || selectedProgram?.programNo,
+                      version: selectedProgram?.version || 'v1',
+                      operation_id: selectedProgram?.operation_id
                     }}
                   >
                     <Form.Item
-                      name="programNo"
-                      label="Program Number"
-                      rules={[{ required: true, message: 'Please enter Program Number' }]}
+                      name="operation_id"
+                      label="Operation"
+                      rules={[{ required: true, message: 'Please select an operation' }]}
                     >
-                      <Input disabled />
+                      <Select placeholder="Select operation">
+                        {selectedJob?.operations?.map((operation) => (
+                          <Option key={operation.id} value={operation.id}>
+                            {operation.operation_number} - {operation.operation_description}
+                          </Option>
+                        ))}
+                      </Select>
                     </Form.Item>
                     <Form.Item
-                      name="description"
-                      label="Description"
-                      rules={[{ required: true, message: 'Please enter description' }]}
+                      name="program_name"
+                      label="Program Name"
+                      rules={[{ required: true, message: 'Please enter program name' }]}
                     >
-                      <Input.TextArea rows={3} />
+                      <Input placeholder="Enter program name" />
+                    </Form.Item>
+                    <Form.Item
+                      name="program_number"
+                      label="Program Number"
+                      rules={[{ required: true, message: 'Please enter program number' }]}
+                    >
+                      <Input placeholder="Enter program number" />
                     </Form.Item>
                     <Form.Item
                       name="version"
                       label="Version"
                       rules={[{ required: true, message: 'Please enter version' }]}
                     >
-                      <Input />
+                      <Input placeholder="Enter version (e.g., v1)" />
                     </Form.Item>
-                    <Form.Item
-                      name="programFile"
-                      label="Program File"
-                    >
-                      <Upload
-                        maxCount={1}
-                        beforeUpload={() => false}
-                      >
-                        <Button icon={<UploadOutlined />}>Update File</Button>
+                    <Form.Item name="file" label="Upload File (Optional)">
+                      <Upload {...uploadProps} maxCount={1}>
+                        <Button icon={<UploadOutlined />}>Click to Upload</Button>
+                        <div className="mt-2 text-xs text-gray-500">
+                          Support for .nc, .prt and other program files
+                        </div>
                       </Upload>
-                    </Form.Item>
-                    <Form.Item className="mb-0 text-right">
-                      <Space>
-                        <Button onClick={() => {
-                          setIsEditProgramModalVisible(false);
-                          editProgramForm.resetFields();
-                        }}>
-                          Cancel
-                        </Button>
-                        <Button type="primary" htmlType="submit">
-                          Update Program
-                        </Button>
-                      </Space>
                     </Form.Item>
                   </Form>
                 </Modal>
@@ -1411,7 +2440,7 @@ const Planning = () => {
               <TabPane 
                 tab={
                   <span>
-                    <BarChartOutlined />
+                    <AppstoreOutlined />
                     Configuration Matrix
                   </span>
                 }
@@ -1441,68 +2470,16 @@ const Planning = () => {
               <TabPane 
                 tab={
                   <span>
-                    <CalendarOutlined />
-                    Schedule Guide
+                    <BarChartOutlined />
+                    Capacity Planning
                   </span>
                 }
-                key="schedule"
+                key="capacityPlanning"
               >
-                <Card className="bg-gray-50">
-                  <Steps 
-                    direction="vertical" 
-                    current={1}
-                    className="max-w-3xl mx-auto"
-                  >
-                    <Steps.Step 
-                      title="Plan Operations" 
-                      description={
-                        <div className="text-sm text-gray-600 space-y-2">
-                          <p>1. Define all manufacturing operations in sequence</p>
-                          <p>2. Specify required tools and fixtures</p>
-                          <p>3. Set up operation parameters and instructions</p>
-                        </div>
-                      }
-                      icon={<ToolOutlined size={16} />}
-                    />
-                    <Steps.Step 
-                      title="Check Resources" 
-                      description={
-                        <div className="text-sm text-gray-600 space-y-2">
-                          <p>1. Review machine availability in Resources tab</p>
-                          <p>2. Verify tool and fixture availability</p>
-                          <p>3. Check operator skill requirements</p>
-                        </div>
-                      }
-                      icon={<Gauge size={16} />}
-                    />
-                    <Steps.Step 
-                      title="Schedule Operations" 
-                      description="Allocate time slots for each operation"
-                      icon={<Calendar size={16} />}
-                    />
-                    <Steps.Step 
-                      title="Assign Personnel" 
-                      description="Assign operators to scheduled operations"
-                      icon={<Users size={16} />}
-                    />
-                  </Steps>
-
-                  <Alert
-                    className="mt-6 max-w-3xl mx-auto"
-                    message="Scheduling Tips"
-                    description={
-                      <ul className="list-disc pl-4">
-                        <li>Consider machine maintenance schedules</li>
-                        <li>Account for setup and changeover times</li>
-                        <li>Plan for potential bottlenecks</li>
-                        <li>Leave buffer time for unexpected delays</li>
-                      </ul>
-                    }
-                    type="info"
-                    showIcon
-                  />
-                </Card>
+                <CapacityPlanning />
               </TabPane>
+
+          
             </Tabs>
           </Card>
 

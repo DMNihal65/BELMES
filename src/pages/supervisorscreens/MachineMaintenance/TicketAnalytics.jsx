@@ -14,7 +14,7 @@ const TicketAnalytics = () => {
   // Data for downtime categories bar chart
   const downtimeData = {
     machines: ['Machine A', 'Machine B', 'Machine C', 'Machine D'],
-    categories: ['Mechanical', 'Electrical', 'Software', 'Operational'],
+    categories: ['Mechanical', 'Electrical', 'Others', 'Operational'],
     values: [
       [4.2, 2.8, 1.5, 3.0],
       [3.5, 4.0, 2.0, 1.8],

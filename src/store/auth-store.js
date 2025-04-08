@@ -15,7 +15,7 @@ const useAuthStore = create(
       fetchRoles: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.85:6998/api/v1/auth/roles');
+          const response = await fetch('http://172.18.7.85:6298/api/v1/auth/roles');
           const data = await response.json();
           set({ roles: data, isLoading: false });
         } catch (error) {
@@ -26,7 +26,7 @@ const useAuthStore = create(
       fetchMachines: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.85:6998/api/v1/master-order/all-machines/');
+          const response = await fetch('http://172.18.7.85:6298/api/v1/master-order/all-machines/');
           const data = await response.json();
           // Extracting the "code" from each machine's work_center
           const machinesWithCode = data.map(machine => ({
@@ -47,7 +47,7 @@ const useAuthStore = create(
 
           if (credentials.role === 'operator') {
             // Use machine login endpoint for operators
-            response = await fetch('http://172.18.7.85:6998/api/v1/auth/machine-login', {
+            response = await fetch('http://172.18.7.85:6298/api/v1/auth/machine-login', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -96,7 +96,7 @@ const useAuthStore = create(
               client_secret: 'string'
             });
 
-            response = await fetch('http://172.18.7.85:6998/api/v1/auth/login', {
+            response = await fetch('http://172.18.7.85:6298/api/v1/auth/login', {
               method: 'POST',
               headers: {
                 'accept': 'application/json',
@@ -140,7 +140,7 @@ const useAuthStore = create(
       register: async (userData) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch('http://172.18.7.85:6998/api/v1/auth/register', {
+          const response = await fetch('http://172.18.7.85:6298/api/v1/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

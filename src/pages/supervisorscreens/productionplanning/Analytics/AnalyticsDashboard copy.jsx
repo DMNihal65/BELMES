@@ -261,7 +261,7 @@ const AnalyticsDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://172.18.7.85:6998/api/v1/component_status/');
+        const response = await fetch('http://172.18.7.85:6298/api/v1/component_status/');
         const result = await response.json();
         setData(result);
       } catch (error) {

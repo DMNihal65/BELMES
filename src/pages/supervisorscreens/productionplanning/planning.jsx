@@ -60,7 +60,6 @@ const Planning = () => {
   const [editToolForm, setEditToolForm] = useState(null);
   const [addProgramForm, setAddProgramForm] = useState(null);
   const [editProgramForm, setEditProgramForm] = useState(null);
-  const [tools, setTools] = useState([]);
 
   // Fetch part numbers and active parts on component mount
   React.useEffect(() => {
@@ -68,12 +67,12 @@ const Planning = () => {
     fetchActiveParts();
   }, [fetchAllOrders, fetchActiveParts]);
 
-  const getJobStatus = (productionOrder) => {
-    const activePart = activeParts.find(part => part.production_order === productionOrder);
+  const getJobStatus = (partNumber) => {
+    const activePart = activeParts.find(part => part.part_number === partNumber);
     return activePart ? activePart.status : 'unknown';
   };
 
-  const handleStatusChange = (productionOrder, currentStatus) => {
+  const handleStatusChange = (partNumber, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     const modalTitle = currentStatus === 'active' ? 'Deactivate Part' : 'Activate Part';
     const modalContent = currentStatus === 'active' 
@@ -87,7 +86,7 @@ const Planning = () => {
       cancelText: 'No',
       onOk: async () => {
         try {
-          await changePartStatus(productionOrder, newStatus);
+          await changePartStatus(partNumber, newStatus);
           message.success(`Part status successfully changed to ${newStatus}`);
         } catch (error) {
           message.error('Failed to change part status');
@@ -96,15 +95,15 @@ const Planning = () => {
     });
   };
 
-  const renderStatusButton = (productionOrder) => {
-    const status = getJobStatus(productionOrder);
+  const renderStatusButton = (partNumber) => {
+    const status = getJobStatus(partNumber);
     
     switch (status) {
       case 'active':
         return (
           <Button 
             className="bg-green-600 text-white hover:bg-green-700"
-            onClick={() => handleStatusChange(productionOrder, status)}
+            onClick={() => handleStatusChange(partNumber, status)}
           >
             <CalendarCheck className="w-5 h-5 mr-2" /> Active
           </Button>
@@ -113,7 +112,7 @@ const Planning = () => {
         return (
           <Button 
             className="bg-yellow-600 text-white hover:bg-yellow-700"
-            onClick={() => handleStatusChange(productionOrder, status)}
+            onClick={() => handleStatusChange(partNumber, status)}
           >
             <Hourglass className="w-5 h-5 mr-2" /> Inactive
           </Button>
@@ -122,7 +121,7 @@ const Planning = () => {
         return (
           <Button 
             className="bg-gray-600 text-white hover:bg-gray-700"
-            onClick={() => handleStatusChange(productionOrder, 'unknown')}
+            onClick={() => handleStatusChange(partNumber, 'unknown')}
           >
             <AlertTriangle className="w-5 h-5 mr-2" /> Unknown
           </Button>
@@ -852,19 +851,6 @@ const Planning = () => {
     </Button>
   );
 
-  const handleAddTool = (values) => {
-    const newTool = {
-      id: tools.length + 1,
-      toolType: values.toolType,
-      toolDescription: values.toolDescription,
-      belPartNumber: values.belPartNumber
-    };
-    setTools([...tools, newTool]);
-    setIsAddToolModalVisible(false);
-    addToolForm.resetFields();
-    message.success('Tool added successfully');
-  };
-
   return (
     <div className="space-y-6 p-6">
       {/* Job Selection Section with improved layout */}
@@ -932,9 +918,9 @@ const Planning = () => {
               >
                 <Card 
                   className={`shadow-sm mb-6 hover:shadow-md transition-shadow ${
-                    getJobStatus(selectedJob.production_order) === 'active' 
+                    getJobStatus(selectedJob.part_number) === 'active' 
                       ? 'bg-green-50' 
-                      : getJobStatus(selectedJob.production_order) === 'inactive'
+                      : getJobStatus(selectedJob.part_number) === 'inactive'
                       ? 'bg-yellow-50'
                       : 'bg-gray-50'
                   }`}
@@ -980,7 +966,7 @@ const Planning = () => {
                     </Descriptions.Item>
                     <Descriptions.Item label="Status">
                       <div className="flex items-center space-x-2">
-                        {renderStatusButton(selectedJob.production_order)}
+                        {renderStatusButton(selectedJob.part_number)}
                       </div>
                     </Descriptions.Item>
                   </Descriptions>
@@ -1059,8 +1045,8 @@ const Planning = () => {
                         columns={[
                           { 
                             title: 'Sl.No', 
-                            dataIndex: 'id', 
-                            key: 'id',
+                            dataIndex: 'slNo', 
+                            key: 'slNo',
                             width: '10%',
                             render: (text, record, index) => index + 1
                           },
@@ -1101,15 +1087,23 @@ const Planning = () => {
                                   danger 
                                   icon={<DeleteOutlined />}
                                   onClick={() => {
-                                    setTools(tools.filter(tool => tool.id !== record.id));
-                                    message.success('Tool deleted successfully');
+                                    Modal.confirm({
+                                      title: 'Delete Tool',
+                                      content: 'Are you sure you want to delete this tool?',
+                                      okText: 'Yes',
+                                      okType: 'danger',
+                                      cancelText: 'No',
+                                      onOk: () => {
+                                        message.success('Tool deleted successfully');
+                                      },
+                                    });
                                   }}
                                 />
                               </Space>
                             ),
                           },
                         ]}
-                        dataSource={tools}
+                        dataSource={[]}
                         pagination={false}
                       />
                     </div>
@@ -1188,28 +1182,26 @@ const Planning = () => {
                   <Form
                     form={addToolForm}
                     layout="vertical"
-                    onFinish={handleAddTool}
+                    onFinish={(values) => {
+                      console.log('Add tool values:', values);
+                      message.success('Tool added successfully');
+                      setIsAddToolModalVisible(false);
+                      addToolForm.resetFields();
+                    }}
                   >
                     <Form.Item
-                      name="toolType"
-                      label="Tool Type"
-                      rules={[{ required: true, message: 'Please enter Tool Type' }]}
+                      name="toolName"
+                      label="Tool Name"
+                      rules={[{ required: true, message: 'Please enter Tool Name' }]}
                     >
-                      <Input placeholder="Enter tool type" />
+                      <Input />
                     </Form.Item>
                     <Form.Item
-                      name="toolDescription"
-                      label="Tool Description"
-                      rules={[{ required: true, message: 'Please enter Tool Description' }]}
+                      name="version"
+                      label="Version"
+                      rules={[{ required: true, message: 'Please enter version' }]}
                     >
-                      <Input.TextArea rows={3} placeholder="Enter tool description" />
-                    </Form.Item>
-                    <Form.Item
-                      name="belPartNumber"
-                      label="BEL Part Number"
-                      rules={[{ required: true, message: 'Please enter BEL Part Number' }]}
-                    >
-                      <Input placeholder="Enter BEL part number" />
+                      <Input />
                     </Form.Item>
                     <Form.Item className="mb-0 text-right">
                       <Space>
@@ -1242,36 +1234,25 @@ const Planning = () => {
                     layout="vertical"
                     initialValues={selectedTool}
                     onFinish={(values) => {
-                      setTools(tools.map(tool => 
-                        tool.id === selectedTool.id 
-                          ? { ...tool, ...values }
-                          : tool
-                      ));
+                      console.log('Edit tool values:', values);
+                      message.success('Tool updated successfully');
                       setIsEditToolModalVisible(false);
                       editToolForm.resetFields();
-                      message.success('Tool updated successfully');
                     }}
                   >
                     <Form.Item
-                      name="toolType"
-                      label="Tool Type"
-                      rules={[{ required: true, message: 'Please enter Tool Type' }]}
+                      name="toolName"
+                      label="Tool Name"
+                      rules={[{ required: true, message: 'Please enter Tool Name' }]}
                     >
-                      <Input placeholder="Enter tool type" />
+                      <Input />
                     </Form.Item>
                     <Form.Item
-                      name="toolDescription"
-                      label="Tool Description"
-                      rules={[{ required: true, message: 'Please enter Tool Description' }]}
+                      name="version"
+                      label="Version"
+                      rules={[{ required: true, message: 'Please enter version' }]}
                     >
-                      <Input.TextArea rows={3} placeholder="Enter tool description" />
-                    </Form.Item>
-                    <Form.Item
-                      name="belPartNumber"
-                      label="BEL Part Number"
-                      rules={[{ required: true, message: 'Please enter BEL Part Number' }]}
-                    >
-                      <Input placeholder="Enter BEL part number" />
+                      <Input />
                     </Form.Item>
                     <Form.Item className="mb-0 text-right">
                       <Space>

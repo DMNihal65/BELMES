@@ -60,13 +60,7 @@ const Workcenter = () => {
 
   useEffect(() => {
     console.log('Workcenters updated:', workcenters);
-    // Sort the data by work_center_id before setting it
-    const sortedData = [...(workcenters || [])].sort((a, b) => {
-      const idA = String(a.work_center_id || '');
-      const idB = String(b.work_center_id || '');
-      return idA.localeCompare(idB, undefined, { numeric: true });
-    });
-    setData(sortedData);
+    setData(workcenters || []);
   }, [workcenters]);
 
   const isEditing = (record) => record.id === editingKey;
@@ -81,6 +75,7 @@ const Workcenter = () => {
       cnc_controller_series: record.cnc_controller_series,
       remarks: record.remarks,
       calibration_date: record.calibration_date ? dayjs(record.calibration_date) : null,
+      calibration_due_date: record.calibration_due_date ? dayjs(record.calibration_due_date) : null,
       last_maintenance_date: record.last_maintenance_date ? dayjs(record.last_maintenance_date) : null,
     });
     setEditingKey(record.id);
@@ -106,23 +101,16 @@ const Workcenter = () => {
         cnc_controller_series: row.cnc_controller_series?.trim() || '',
         remarks: row.remarks?.trim() || '',
         calibration_date: row.calibration_date?.format('YYYY-MM-DD') || null,
+        calibration_due_date: row.calibration_due_date?.format('YYYY-MM-DD') || null,
         last_maintenance_date: row.last_maintenance_date?.format('YYYY-MM-DD') || null
       };
 
       console.log('Updating machine with data:', updatedItem);
 
       await updateWorkcenter(updatedItem);
-      
-      // Update the data state directly instead of fetching
-      const newData = [...data];
-      const index = newData.findIndex(item => item.id === key);
-      if (index > -1) {
-        newData[index] = { ...newData[index], ...updatedItem };
-        setData(newData);
-      }
-      
       setEditingKey('');
       message.success('Machine updated successfully');
+      await fetchWorkcenters(); // Refresh the table data
     } catch (errInfo) {
       console.error('Save failed:', errInfo);
       message.error(errInfo.message || 'Failed to update machine');
@@ -174,21 +162,33 @@ const Workcenter = () => {
       title: 'Workcenter ID',
       dataIndex: 'work_center_id',
       width: 120,
-      render: (text) => text,
-      sorter: {
-        compare: (a, b) => {
-          // Convert to strings for comparison
-          const valueA = String(a.work_center_id || '');
-          const valueB = String(b.work_center_id || '');
-          return valueA.localeCompare(valueB);
-        },
-        multiple: 1
+      sorter: (a, b) => {
+        // Extract numeric values if possible
+        const numA = parseInt(String(a.work_center_id).replace(/\D/g, ''));
+        const numB = parseInt(String(b.work_center_id).replace(/\D/g, ''));
+        
+        // If both are valid numbers, compare numerically
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        
+        // Otherwise, compare as strings
+        return String(a.work_center_id || '').localeCompare(String(b.work_center_id || ''));
       },
+      sortDirections: ['ascend'],
+      defaultSortOrder: 'ascend',
+      sortOrder: 'ascend',
+      render: (text) => text,
       filters: [...new Set(data
         .map(item => item.work_center_id)
         .filter(Boolean)
       )]
-      .sort((a, b) => String(a).localeCompare(String(b)))
+      .sort((a, b) => {
+        if (!isNaN(a) && !isNaN(b)) {
+          return Number(a) - Number(b);
+        }
+        return String(a).localeCompare(String(b));
+      })
       .map(id => ({ text: String(id), value: id })),
       filterMode: 'menu',
       filterSearch: true,
@@ -197,8 +197,7 @@ const Workcenter = () => {
         return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
       },
       className: 'filter-column',
-      showSorterTooltip: { title: 'Click to sort' },
-      filtered: true
+      showSorterTooltip: { title: 'Click to sort' }
     },
     {
       title: 'Workcenter Code',
@@ -366,6 +365,28 @@ const Workcenter = () => {
         if (!a.calibration_date) return -1;
         if (!b.calibration_date) return 1;
         return dayjs(a.calibration_date).unix() - dayjs(b.calibration_date).unix();
+      },
+    },
+    {
+      title: 'Calibration Due Date',
+      dataIndex: 'calibration_due_date',
+      width: 150,
+      editable: true,
+      render: (text, record) => isEditing(record) ? (
+        <Form.Item name="calibration_due_date" style={{ margin: 0 }}>
+          <DatePicker />
+        </Form.Item>
+      ) : text ? dayjs(text).format('YYYY-MM-DD') : '-',
+      filterSearch: true,
+      filters: [...new Set(data.map(item => item.calibration_due_date ? dayjs(item.calibration_due_date).format('YYYY-MM-DD') : null))]
+        .filter(Boolean)
+        .map(date => ({ text: date, value: date })),
+      onFilter: (value, record) => record.calibration_due_date ? dayjs(record.calibration_due_date).format('YYYY-MM-DD') === value : false,
+      sorter: (a, b) => {
+        if (!a.calibration_due_date && !b.calibration_due_date) return 0;
+        if (!a.calibration_due_date) return -1;
+        if (!b.calibration_due_date) return 1;
+        return dayjs(a.calibration_due_date).unix() - dayjs(b.calibration_due_date).unix();
       },
     },
     {
@@ -569,6 +590,7 @@ const Workcenter = () => {
           cnc_controller_series: values.cnc_controller_series?.trim() || '',
           remarks: values.remarks?.trim() || '',
           calibration_date: values.calibration_date?.format('YYYY-MM-DD') || null,
+          calibration_due_date: values.calibration_due_date?.format('YYYY-MM-DD') || null,
           last_maintenance_date: values.last_maintenance_date?.format('YYYY-MM-DD') || null
         };
 
@@ -686,7 +708,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.85:7708/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.155:8002/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1105,6 +1127,15 @@ const Workcenter = () => {
               <Form.Item
                 name="calibration_date"
                 label="Calibration Date"
+                rules={[{ required: true, message: 'Please select Calibration Date' }]}
+              >
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+
+              <Form.Item
+                name="calibration_due_date"
+                label="Calibration Due Date"
+                rules={[{ required: true, message: 'Please select Calibration Due Date' }]}
               >
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
@@ -1253,7 +1284,8 @@ const Workcenter = () => {
                         }}
                         dataSource={data.map((item, index) => ({
                           ...item,
-                          key: item.id || `${item.work_center_id}_${index}`,
+                          key: `${item.work_center_id}_${index}`,
+                          sequential_id: index + 1,
                         }))}
                         columns={mergedColumns}
                         rowClassName={(record) => 
@@ -1285,7 +1317,21 @@ const Workcenter = () => {
                         bordered
                         className="ant-table-striped"
                         size="middle"
-                        rowKey={(record) => record.id || `${record.work_center_id}_${record.sequential_id}`}
+                        rowKey={(record) => `${record.work_center_id}_${record.sequential_id}`}
+                        defaultSortField="work_center_id"
+                        defaultSortOrder="ascend"
+                        onChange={(pagination, filters, sorter) => {
+                          handleTableChange(pagination, filters, sorter);
+                          // Ensure work_center_id stays sorted in ascending order
+                          if (!sorter.field) {
+                            const sortedData = [...data].sort((a, b) => {
+                              const valueA = String(a.work_center_id || '');
+                              const valueB = String(b.work_center_id || '');
+                              return valueA.localeCompare(valueB);
+                            });
+                            setData(sortedData);
+                          }
+                        }}
                       />
                     </Form>
                   </div>
@@ -1434,8 +1480,10 @@ const EditableCell = ({
   children,
   ...restProps
 }) => {
-  const inputNode = dataIndex === 'calibration_date' || dataIndex === 'last_maintenance_date' ? (
-    <DatePicker />
+  const inputNode = dataIndex === 'calibration_date' || 
+                   dataIndex === 'calibration_due_date' || 
+                   dataIndex === 'last_maintenance_date' ? (
+    <DatePicker style={{ width: '100%' }} />
   ) : (
     <Input />
   );
@@ -1446,6 +1494,9 @@ const EditableCell = ({
         <Form.Item
           name={dataIndex}
           style={{ margin: 0 }}
+          valuePropName={dataIndex === 'calibration_date' || 
+                        dataIndex === 'calibration_due_date' || 
+                        dataIndex === 'last_maintenance_date' ? 'value' : undefined}
         >
           {inputNode}
         </Form.Item>

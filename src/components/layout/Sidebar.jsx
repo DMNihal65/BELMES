@@ -114,10 +114,10 @@ function Sidebar() {
           key: '/supervisor/production-monitoring/production-vs-actual',
           label: 'Production vs Actual',
         },
-        {
-          key: '/supervisor/production-monitoring/order-analysis',
-          label: 'Order Analysis',
-        },
+        // {
+        //   key: '/supervisor/production-monitoring/order-analysis',
+        //   label: 'Order Analysis',
+        // },
         {
           key: '/supervisor/production-monitoring/oee-overview',
           label: 'OEE Overview',

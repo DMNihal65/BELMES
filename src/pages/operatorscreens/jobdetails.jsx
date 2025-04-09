@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Card, Button, Input, Layout, Modal, Tabs,
   Row, Col, Statistic, Badge, Space, Progress, Avatar,
-  Tooltip, Divider, Alert, message, Tag, Table, Empty, DatePicker
+  Tooltip, Divider, Alert, message, Tag, Table, Empty, DatePicker, Spin
 } from 'antd';
 import { 
   ClockCircleOutlined, UserOutlined, BellOutlined,
@@ -25,9 +25,8 @@ import moment from 'moment';
 import MachineIssueModal from './MachineIssueModal';
 import useAuthStore from '../../store/auth-store';
 import useWebSocketStore from '../../store/websocket-store';
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import DocumentsList from '../operatorscreens/JobDetails/DocumentsList';
-import DowntimeTicketModal from './DowntimeTicketModal';
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
@@ -138,7 +137,6 @@ const JobDetails = () => {
   const [jobOrderData, setJobOrderData] = useState(null);
   const [isLoadingJobData, setIsLoadingJobData] = useState(false);
 
-  const [showDowntimeModal, setShowDowntimeModal] = useState(false);
   // Add WebSocket store
   const { 
     machineStatus, 
@@ -148,7 +146,9 @@ const JobDetails = () => {
     getIdleTime,
     error: wsError,
     fetchMachineOperations,
-    maintenanceLoading
+    maintenanceLoading,
+    machineOperations,
+    isLoadingMachineOperations
   } = useWebSocketStore();
   const { currentMachine } = useAuthStore();
 
@@ -158,7 +158,6 @@ const JobDetails = () => {
   // Initialize WebSocket when component mounts
   useEffect(() => {
     const initializeData = async () => {
-      // Get machine data from localStorage
       const storedMachine = localStorage.getItem('currentMachine');
       if (storedMachine) {
         try {
@@ -168,18 +167,15 @@ const JobDetails = () => {
             initializeWebSocket(machineData.id);
             
             // Fetch machine operations and job data
+            console.log('Fetching machine operations for machine:', machineData.id);
             const result = await fetchMachineOperations(machineData.id);
+            console.log('Machine operations result:', result);
             
             if (result?.success) {
               // Update job data
               if (result.data?.jobData) {
                 setJobData(result.data.jobData);
                 setJobOrderData(result.data.orders?.[0] || null);
-              }
-              
-              // If we have part number, fetch documents
-              if (result.data?.jobData?.part_number) {
-                await fetchDocuments(result.data.jobData.part_number);
               }
             }
           }
@@ -194,7 +190,7 @@ const JobDetails = () => {
     return () => {
       closeWebSocket();
     };
-  }, []); // Empty dependency array for initial load
+  }, []);
 
   // Update machine status from WebSocket
   useEffect(() => {
@@ -312,6 +308,23 @@ const JobDetails = () => {
       }
     }
   }, [jobData]);
+
+  // Add this useEffect near your other useEffects
+  useEffect(() => {
+    if (currentMachine?.id) {
+      fetchMachineOperations(currentMachine.id);
+    }
+  }, [currentMachine?.id, fetchMachineOperations]);
+
+  // Add console log to debug
+  useEffect(() => {
+    console.log('Machine Operations:', machineOperations);
+  }, [machineOperations]);
+
+  // Add effect to monitor machineOperations changes
+  useEffect(() => {
+    console.log('Machine Operations updated:', machineOperations);
+  }, [machineOperations]);
 
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
@@ -434,7 +447,7 @@ const JobDetails = () => {
   useEffect(() => {
     if (machineStatus?.last_updated) {
       const updateTimer = setInterval(() => {
-        setLastUpdateTime(formatDistanceToNow(parseISO(machineStatus.last_updated), { addSuffix: true }));
+        setLastUpdateTime(formatDistanceToNow(machineStatus.last_updated, { addSuffix: true }));
       }, 60000);
 
       return () => clearInterval(updateTimer);
@@ -563,7 +576,7 @@ const JobDetails = () => {
                       <div className="text-xs text-gray-500">Last Updated</div>
                       <div className="font-medium text-xs">
                         {machineStatus?.last_updated 
-                          ? formatDistanceToNow(parseISO(machineStatus.last_updated), { addSuffix: true })
+                          ? formatDistanceToNow(machineStatus.last_updated, { addSuffix: true })
                           : 'N/A'
                         }
                       </div>
@@ -617,7 +630,7 @@ const JobDetails = () => {
                   onClick={() => setShowIssueModal(true)}
                   className="w-full"
                 >
-                  Raise Issue
+                  Raise Ticket
                 </Button>
 
                 {/* WebSocket Error Display */}
@@ -626,24 +639,6 @@ const JobDetails = () => {
                     Connection Error: {wsError}
                   </div>
                 )}
-
-                {/* Add Downtime Ticket Button */}
-                <Button
-                  type="primary"
-                  icon={<Clock3 className="w-4 h-4" />}
-                  onClick={() => setShowDowntimeModal(true)}
-                  className="w-full mt-2 bg-orange-500 hover:bg-orange-600"
-                >
-                  Downtime Ticket
-                </Button>
-
-                {/* Add this near your other modals */}
-                <DowntimeTicketModal
-                  visible={showDowntimeModal}
-                  onClose={() => setShowDowntimeModal(false)}
-                  machineId={currentMachine?.id}
-                  partNumber={jobData?.part_number}
-                />
               </div>
             </div>
 
@@ -757,6 +752,64 @@ const JobDetails = () => {
                         <Tag color="blue">Total Ops: {jobOrderData.project_details?.total_operations || 'N/A'}</Tag>
                       </div>
                       <div className="text-sm font-medium">{jobOrderData.project_details?.project_name || 'N/A'}</div>
+                    </div>
+
+                    {/* Operation Details */}
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs text-gray-500">Current Operation</div>
+                        {machineOperations?.inprogress?.length > 0 && (
+                          <Tag color="processing">In Progress</Tag>
+                        )}
+                      </div>
+
+                      {isLoadingMachineOperations ? (
+                        <div className="flex justify-center py-2">
+                          <Spin size="small" />
+                          <span className="ml-2 text-sm text-gray-500">Loading...</span>
+                        </div>
+                      ) : machineOperations?.inprogress?.length > 0 ? (
+                        <div className="space-y-2">
+                          <div>
+                            <div className="text-xs text-gray-500">Operation Number</div>
+                            <div className="text-sm font-medium">
+                              {`OP ${machineOperations.inprogress[0].operation_number}`}
+                            </div>
+                          </div>
+                          <Divider className="my-2" />
+                          <div>
+                            <div className="text-xs text-gray-500">Description</div>
+                            <Tooltip title={machineOperations.inprogress[0].description}>
+                              <div className="text-sm font-medium truncate">
+                                {machineOperations.inprogress[0].description}
+                              </div>
+                            </Tooltip>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-gray-100">
+                            <div className="text-xs text-gray-500">Schedule Info</div>
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                              <div>
+                                <div className="text-xs text-gray-400">Start</div>
+                                <div className="text-xs font-medium">
+                                  {moment(machineOperations.inprogress[0].planned_start_time)
+                                    .format('DD MMM YYYY')}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-400">End</div>
+                                <div className="text-xs font-medium">
+                                  {moment(machineOperations.inprogress[0].planned_end_time)
+                                    .format('DD MMM YYYY')}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400 italic">
+                          No operation in progress
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : (

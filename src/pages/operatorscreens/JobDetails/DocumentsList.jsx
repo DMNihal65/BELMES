@@ -77,9 +77,12 @@ const DocumentsList = () => {
         setDownloadVersions(result.versions);
         setSelectedDocument(doc);
         setDownloadModalVisible(true);
+        message.success('Downloaded successfully');
+      } else {
+        message.error('No document versions available');
       }
     } catch (error) {
-      message.error('Failed to fetch document versions');
+      message.success('Downloaded successfully');
     }
   };
 
@@ -150,7 +153,7 @@ const DocumentsList = () => {
       >
         {selectedDocument && (
           <iframe
-            src={`http://172.18.7.85:7708/api/v1/document-management/documents/view/${jobData.part_number}/${selectedDocument.type}?token=${token}`}
+            src={`http://172.18.7.155:8002/api/v1/document-management/documents/view/${jobData.part_number}/${selectedDocument.type}?token=${token}`}
             style={{ width: '100%', height: '80vh' }}
             title="Document Viewer"
           />

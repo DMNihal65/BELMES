@@ -23,7 +23,7 @@ const usePlanningStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.85:7708/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.155:8002/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -60,7 +60,7 @@ const usePlanningStore = create((set) => ({
   searchOrders: async (productionOrder) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/planning/search_order2?production_order=${productionOrder}`);
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/planning/search_order2?production_order=${productionOrder}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -121,7 +121,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Fetching MPP for production order:', productionOrder); // Debug log
 
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/documents/mpp/${productionOrder}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/documents/mpp/${productionOrder}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -189,7 +189,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.85:7708/api/v1/mpp', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -248,7 +248,7 @@ const usePlanningStore = create((set) => ({
   // Add new function to fetch active parts
   fetchActiveParts: async () => {
     try {
-      const response = await fetch('http://172.18.7.85:7708/api/v1/scheduling/active-parts');
+      const response = await fetch('http://172.18.7.155:8002/api/v1/scheduling/active-parts');
       const data = await response.json();
       
       if (!response.ok) {
@@ -268,7 +268,7 @@ const usePlanningStore = create((set) => ({
   changePartStatus: async (partNumber, newStatus) => {
     try {
       // Ensure we're using the exact same URL format as the working endpoint
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/scheduling/set-part-status/${partNumber}?status=${newStatus}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -298,7 +298,7 @@ const usePlanningStore = create((set) => ({
   // Add this new function to fetch machine details
   fetchMachineDetails: async (machineId) => {
     try {
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/master-order/machines/${machineId}`);
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/master-order/machines/${machineId}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -315,7 +315,7 @@ const usePlanningStore = create((set) => ({
   // Add the updateMachine function to the store
   updateMachine: async (machineId, updatedData) => {
     try {
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/master-order/machines/${machineId}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/master-order/machines/${machineId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -339,7 +339,7 @@ const usePlanningStore = create((set) => ({
   // Function to update operation details
   updateOperationDetails: async (partNumber, operationNumber, updateData) => {
     try {
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -379,7 +379,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending machine update data:', formattedData);
 
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -411,7 +411,7 @@ const usePlanningStore = create((set) => ({
       }
 
       // First try to get MPP documents using production order
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/documents/mpp/${productionOrder}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/documents/mpp/${productionOrder}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -433,7 +433,7 @@ const usePlanningStore = create((set) => ({
   // Function to fetch MPP by identifier (production order and operation)
   fetchMppByIdentifier: async (productionOrder, operationNumber) => {
     try {
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/mpp/by-identifier?operation_number=${operationNumber}&production_order=${productionOrder}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/mpp/by-identifier?operation_number=${operationNumber}&production_order=${productionOrder}`, {
         headers: {
           'accept': 'application/json'
         }
@@ -476,7 +476,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending formatted MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.85:7708/api/v1/mpp', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/mpp', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -511,7 +511,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/documents/${versionId}/download`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/documents/${versionId}/download`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -543,7 +543,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -578,7 +578,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/document-management/documents/${documentId}/download-latest`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/document-management/documents/${documentId}/download-latest`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -620,7 +620,7 @@ const usePlanningStore = create((set) => ({
       console.log('Checking MPP document for part number:', partNumber);
       
       // 1. First check if MPP document exists
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -640,7 +640,7 @@ const usePlanningStore = create((set) => ({
         
         // Download the document
         const downloadResponse = await fetch(
-          `http://172.18.7.85:7708/api/v1/document-management/documents/${documentsData.mpp_document.latest_version.id}/download-latest`, {
+          `http://172.18.7.155:8002/api/v1/document-management/documents/${documentsData.mpp_document.latest_version.id}/download-latest`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'accept': '*/*'
@@ -662,7 +662,7 @@ const usePlanningStore = create((set) => ({
       // 2. If no document exists, check for MPP data using the correct endpoint
       console.log('Checking MPP data for part:', partNumber, 'operation:', operation.operation_number);
       const mppResponse = await fetch(
-        `http://172.18.7.85:7708/api/v1/mpp/by-part/${partNumber}/${operation.operation_number}`, {
+        `http://172.18.7.155:8002/api/v1/mpp/by-part/${partNumber}/${operation.operation_number}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -686,7 +686,7 @@ const usePlanningStore = create((set) => ({
   // Update the createOrFetchMPP function
   createOrFetchMPP: async (partNumber, operationNumber) => {
     try {
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -727,7 +727,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending update MPP data:', formattedData);
 
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -759,7 +759,7 @@ const usePlanningStore = create((set) => ({
     try {
       console.log('Creating operation with data:', operationData);
       
-      const response = await fetch('http://172.18.7.85:7708/api/v1/planning/operations', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/planning/operations', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -768,51 +768,75 @@ const usePlanningStore = create((set) => ({
         body: JSON.stringify(operationData)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error Response:', errorData);
-        throw new Error(errorData.detail || 'Failed to create operation');
+      // Parse error response even before checking if request was successful
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        data = {};
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errorDetail = data?.detail || 'Failed to create operation';
+        console.error('API Error Response:', data);
+        // Throw error with the specific error message from the API
+        throw new Error(errorDetail);
+      }
 
       // Fetch machines for the work center
-      const workCenterMachines = await fetch(`http://172.18.7.85:7708/api/v1/planning/work-center-machines/${operationData.work_center_code}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
-        }
-      }).then(res => res.json());
-
-      // If we have machines, assign the first one as default
-      if (workCenterMachines && workCenterMachines.length > 0) {
-        const defaultMachine = workCenterMachines[0];
-        
-        // Update the operation with the default machine
-        await fetch(`http://172.18.7.85:7708/api/v1/planning/operations/${partNumber}/${operationData.operation_number}`, {
-          method: 'PUT',
+      let workCenterMachines = [];
+      try {
+        const machinesResponse = await fetch(`http://172.18.7.155:8002/api/v1/planning/work-center-machines/${operationData.work_center_code}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...operationData,
-            machine_id: defaultMachine.id
-          })
+            'accept': 'application/json'
+          }
         });
-
-        // Return the operation with the machine information
-        return {
-          ...data,
-          primary_machine: {
-            id: defaultMachine.id,
-            name: defaultMachine.make
-          },
-          work_center_machines: workCenterMachines
-        };
+        
+        if (machinesResponse.ok) {
+          workCenterMachines = await machinesResponse.json();
+        } else {
+          console.warn('Could not fetch work center machines');
+        }
+      } catch (machineError) {
+        console.error('Error fetching work center machines:', machineError);
+        // Continue with the process even if machines can't be fetched
       }
 
-      return data;
+      // If we have machines, try to assign the first one as default
+      let defaultMachine = null;
+      if (workCenterMachines && workCenterMachines.length > 0) {
+        defaultMachine = workCenterMachines[0];
+        
+        try {
+          // Update the operation with the default machine
+          await fetch(`http://172.18.7.155:8002/api/v1/planning/operations/${partNumber}/${operationData.operation_number}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...operationData,
+              machine_id: defaultMachine.id
+            })
+          });
+        } catch (updateError) {
+          console.error('Error assigning default machine:', updateError);
+          // Continue even if machine assignment fails
+        }
+      }
+
+      // Return the operation with the machine information
+      return {
+        ...data,
+        primary_machine: defaultMachine ? {
+          id: defaultMachine.id,
+          name: defaultMachine.make
+        } : null,
+        work_center_machines: workCenterMachines
+      };
     } catch (error) {
       console.error('Error creating operation:', error);
       throw error;
@@ -822,7 +846,7 @@ const usePlanningStore = create((set) => ({
   // Add this to your store
   fetchWorkCenters: async () => {
     try {
-      const response = await fetch('http://172.18.7.85:7708/api/v1/planning/work_centers', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/planning/work_centers', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -919,7 +943,7 @@ const usePlanningStore = create((set) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/scheduling/machine-utilization?month=${month}&year=${year}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/scheduling/machine-utilization?month=${month}&year=${year}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -951,7 +975,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Fetching machine utilization for date range: ${formattedStartDate} to ${formattedEndDate}`);
       
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/scheduling/machine-utilization/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/scheduling/machine-utilization/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -988,7 +1012,7 @@ const usePlanningStore = create((set) => ({
       // Log the data we're sending to help with debugging
       console.log('Sending formatted tool data to API:', formattedToolData);
       
-      const response = await fetch('http://172.18.7.85:7708/api/v1/toolsprograms/ordertools/', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/toolsprograms/ordertools/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1052,7 +1076,7 @@ const usePlanningStore = create((set) => ({
       console.log(`Updating tool ${toolId} with data:`, formattedToolData);
       
       // Making sure the URL has the correct format
-      const apiUrl = `http://172.18.7.85:7708/api/v1/toolsprograms/ordertools/${toolId}/`;
+      const apiUrl = `http://172.18.7.155:8002/api/v1/toolsprograms/ordertools/${toolId}/`;
       console.log(`Sending PUT request to: ${apiUrl}`);
       
       const response = await fetch(apiUrl, {
@@ -1117,7 +1141,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Deleting tool with ID: ${toolId}`);
       
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/toolsprograms/ordertools/${toolId}/`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/toolsprograms/ordertools/${toolId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1153,7 +1177,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Fetching tools for order ID: ${orderId}`);
       
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/toolsprograms/ordertools/?order_id=${orderId}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/toolsprograms/ordertools/?order_id=${orderId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1229,7 +1253,7 @@ const usePlanningStore = create((set) => ({
       // Log the data we're sending to help with debugging
       console.log('Sending formatted program data to API:', formattedProgramData);
       
-      const response = await fetch('http://172.18.7.85:7708/api/v1/toolsprograms/programs/', {
+      const response = await fetch('http://172.18.7.155:8002/api/v1/toolsprograms/programs/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1283,7 +1307,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Fetching programs for order ID: ${orderId}`);
       
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/toolsprograms/programs/?order_id=${orderId}`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/toolsprograms/programs/?order_id=${orderId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1358,7 +1382,7 @@ const usePlanningStore = create((set) => ({
       // Log the data we're sending
       console.log(`Updating program ${programId} with data:`, formattedProgramData);
       
-      const apiUrl = `http://172.18.7.85:7708/api/v1/toolsprograms/programs/${programId}/`;
+      const apiUrl = `http://172.18.7.155:8002/api/v1/toolsprograms/programs/${programId}/`;
       console.log(`Sending PUT request to: ${apiUrl}`);
       
       const response = await fetch(apiUrl, {
@@ -1422,7 +1446,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Deleting program with ID: ${programId}`);
       
-      const response = await fetch(`http://172.18.7.85:7708/api/v1/toolsprograms/programs/${programId}/`, {
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/toolsprograms/programs/${programId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1459,7 +1483,7 @@ const usePlanningStore = create((set) => ({
       console.log(`Fetching PDC data for part number: ${partNumber} and production order: ${productionOrder}`);
       
       // Construct the URL with query parameters
-      const url = new URL('http://172.18.7.85:7708/api/v1/rescheduling/part-production-pdc');
+      const url = new URL('http://172.18.7.155:8002/api/v1/rescheduling/part-production-pdc');
       if (partNumber) url.searchParams.append('part_number', partNumber);
       if (productionOrder) url.searchParams.append('production_order', productionOrder);
       
@@ -1499,6 +1523,74 @@ const usePlanningStore = create((set) => ({
       console.error('Error fetching PDC data:', error);
       set({ isLoading: false, error: error.message });
       return [];
+    }
+  },
+
+  // Add this new function to get the latest operation number
+  getLatestOperationNumber: async (partNumber) => {
+    try {
+      console.log(`Fetching latest operation number for part: ${partNumber}`);
+      
+      // First attempt to get the latest operation number from the API
+      const response = await fetch(`http://172.18.7.155:8002/api/v1/planning/operations/latest/${partNumber}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      // Parse the response data
+      let data;
+      try {
+        data = await response.json();
+        console.log('Latest operation number response:', data);
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        data = {};
+      }
+
+      if (!response.ok) {
+        // If the error is "Part number not found", just start from 0
+        if (data.detail && data.detail.includes("not found")) {
+          console.log('Part number not found in operations, starting at 0');
+          return 0;
+        }
+        throw new Error(data.detail || 'Failed to fetch latest operation number');
+      }
+
+      return data.latest_operation_number || 0;
+    } catch (error) {
+      console.error('Error fetching latest operation number:', error);
+      
+      // If the API call fails, try to get the latest operation number from searchOrders
+      try {
+        console.log('Trying to get operations from searchOrders as fallback');
+        const { searchOrders } = usePlanningStore.getState();
+        const searchResults = await searchOrders(partNumber);
+        
+        if (searchResults?.orders && searchResults.orders.length > 0) {
+          const operations = searchResults.orders[0].operations || [];
+          
+          // Find the highest operation number
+          if (operations.length > 0) {
+            const operationNumbers = operations.map(op => 
+              parseInt(op.operation_number, 10)
+            ).filter(num => !isNaN(num));
+            
+            if (operationNumbers.length > 0) {
+              const maxOperationNumber = Math.max(...operationNumbers);
+              console.log(`Found max operation number from searchOrders: ${maxOperationNumber}`);
+              return maxOperationNumber;
+            }
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Error in fallback operation number lookup:', fallbackError);
+      }
+      
+      // If all else fails, start from a conservative default (e.g., 0)
+      console.warn('Could not determine latest operation number. Starting from 0');
+      return 0;
     }
   },
 

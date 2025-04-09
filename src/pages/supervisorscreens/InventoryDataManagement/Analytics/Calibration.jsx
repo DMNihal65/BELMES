@@ -33,7 +33,9 @@ import {
   SyncOutlined,
   ToolOutlined,
   ExclamationCircleOutlined,
-  CloseOutlined
+  CloseOutlined,
+  SearchOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import useInventoryStore from '../../../../store/inventory-store';
 import moment from 'moment';
@@ -58,6 +60,7 @@ function Calibration() {
   const [dateRange, setDateRange] = useState([null, null]);
   const [historyDateRange, setHistoryDateRange] = useState([null, null]);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState(null);
+  const [searchText, setSearchText] = useState('');
 
   const {
     calibrations,
@@ -633,6 +636,10 @@ function Calibration() {
     }
   ];
 
+  const handleSearch = (value) => {
+    setSearchText(value);
+  };
+
   const getFilteredCalibrations = () => {
     if (!calibrations) return [];
     
@@ -697,6 +704,27 @@ function Calibration() {
           cat.items?.some(item => item.id === cal.inventory_item_id)
         );
         return category?.id === selectedCategory;
+      });
+    }
+
+    // Apply master search filter
+    if (searchText) {
+      const searchLower = searchText.toLowerCase();
+      filtered = filtered.filter(cal => {
+        // Get the inventory item details for searching
+        const item = inventoryItems.find(item => item.id === cal.inventory_item_id);
+        const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+        
+        // Search across all relevant fields
+        return (
+          (cal.calibration_type?.toLowerCase().includes(searchLower)) ||
+          (cal.remarks?.toLowerCase().includes(searchLower)) ||
+          (item?.dynamic_data["Instrument code"]?.toLowerCase().includes(searchLower)) ||
+          (subcategory?.name?.toLowerCase().includes(searchLower)) ||
+          (moment(cal.last_calibration).format('DD MMM YYYY').toLowerCase().includes(searchLower)) ||
+          (moment(cal.next_calibration).format('DD MMM YYYY').toLowerCase().includes(searchLower)) ||
+          (cal.frequency_days?.toString().includes(searchLower))
+        );
       });
     }
     
@@ -901,42 +929,55 @@ function Calibration() {
         <div className="stats-container">
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={12} lg={6}>
-              <Card className="stat-card">
-                <Statistic
-                  title="Total Equipment"
-                  value={stats.total}
-                  prefix={<ToolOutlined />}
-                />
+              <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden">
+                <div className="flex items-center p-1">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 mr-2">
+                    <ToolOutlined className="text-lg" />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-title">Total Equipment</div>
+                    <div className="stat-value">{stats.total}</div>
+                  </div>
+                </div>
               </Card>
             </Col>
             <Col xs={24} sm={12} md={12} lg={6}>
-              <Card className="stat-card">
-                <Statistic
-                  title="Up to Date"
-                  value={stats.upToDate}
-                  valueStyle={{ color: '#52c41a' }}
-                  prefix={<CheckCircleOutlined />}
-                />
+              <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden">
+                <div className="flex items-center p-1">
+                  <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-500 mr-2">
+                    <CheckCircleOutlined className="text-lg" />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-title">Up to Date</div>
+                    <div className="stat-value">{stats.upToDate}</div>
+                  </div>
+                </div>
               </Card>
             </Col>
             <Col xs={24} sm={12} md={12} lg={6}>
-              <Card className="stat-card">
-                <Statistic
-                  title="Due Soon"
-                  value={stats.dueSoon}
-                  valueStyle={{ color: '#faad14' }}
-                  prefix={<WarningOutlined />}
-                />
+              <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden">
+                <div className="flex items-center p-1">
+                  <div className="w-8 h-8 rounded-lg bg-yellow-50 flex items-center justify-center text-yellow-500 mr-2">
+                    <WarningOutlined className="text-lg" />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-title">Due Soon</div>
+                    <div className="stat-value">{stats.dueSoon}</div>
+                  </div>
+                </div>
               </Card>
             </Col>
             <Col xs={24} sm={12} md={12} lg={6}>
-              <Card className="stat-card">
-                <Statistic
-                  title="Overdue"
-                  value={stats.overdue}
-                  valueStyle={{ color: '#ff4d4f' }}
-                  prefix={<ExclamationCircleOutlined />}
-                />
+              <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden">
+                <div className="flex items-center p-1">
+                  <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500 mr-2">
+                    <ExclamationCircleOutlined className="text-lg" />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-title">Overdue</div>
+                    <div className="stat-value">{stats.overdue}</div>
+                  </div>
+                </div>
               </Card>
             </Col>
           </Row>
@@ -957,55 +998,84 @@ function Calibration() {
         >
           <Tabs.TabPane tab="Current Calibrations" key="current">
             <div className="filter-section">
-              <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
-                <Card>
-                  <Row gutter={[16, 16]} align="middle">
-                    
-                    <Col xs={24} sm={24} md={8}>
+              <Card className="filter-card">
+                <Row gutter={[16, 16]} align="middle">
+                  <Col xs={24} sm={24} md={8}>
+                    <div className="date-filter">
                       <DatePicker.RangePicker
                         style={{ width: '100%' }}
                         onChange={(dates) => setDateRange(dates)}
                         format="YYYY-MM-DD"
                         allowClear
+                        className="custom-date-picker"
                       />
-                    </Col>
-                    <Col xs={24} sm={24} md={16}>
-                      <div className="filter-buttons">
-                        <Space size={[8, 8]} wrap={false} style={{ display: 'flex', flexWrap: 'nowrap', overflowX: 'auto' }}>
-                          <Button
-                            type={selectedStatus === 'all' ? 'primary' : 'default'}
-                            onClick={() => filterCalibrations('all')}
-                          >
-                            All
-                          </Button>
-                          {/* <Button
-                            type={selectedStatus === 'up_to_date' ? 'primary' : 'default'}
-                            icon={<CheckCircleOutlined />}
-                            onClick={() => filterCalibrations('up_to_date')}
-                          >
-                            Up to Date
-                          </Button> */}
-                          <Button
-                            type={selectedStatus === 'due_soon' ? 'primary' : 'default'}
-                            icon={<WarningOutlined />}
-                            onClick={() => filterCalibrations('due_soon')}
-                          >
-                            Due Soon ({upcomingCalibrations.length})
-                          </Button>
-                          <Button
-                            type={selectedStatus === 'overdue' ? 'primary' : 'default'}
-                            danger={selectedStatus === 'overdue'}
-                            icon={<ExclamationCircleOutlined />}
-                            onClick={() => filterCalibrations('overdue')}
-                          >
-                            Overdue ({getOverdueCount()})
-                          </Button>
-                        </Space>
-                      </div>
-                    </Col>
-                  </Row>
-                </Card>
-              </Space>
+                    </div>
+                  </Col>
+                  <Col xs={24} sm={24} md={8}>
+                    <div className="search-filter">
+                      <Space style={{ width: '100%' }}>
+                        <Input
+                          placeholder="Search across all columns data"
+                          allowClear
+                          value={searchText}
+                          onChange={(e) => setSearchText(e.target.value)}
+                          className="search-input"
+                          prefix={<SearchOutlined className="search-icon" />}
+                        />
+                        <Button 
+                          type="primary" 
+                          icon={<SearchOutlined />}
+                          onClick={() => handleSearch(searchText)}
+                          className="search-button"
+                        >
+                          Search
+                        </Button>
+                        <Button 
+                          type="default" 
+                          icon={<ReloadOutlined />}
+                          onClick={() => {
+                            setSearchText('');
+                            handleSearch('');
+                          }}
+                          className="reset-button"
+                        >
+                          Reset
+                        </Button>
+                      </Space>
+                    </div>
+                  </Col>
+                  <Col xs={24} sm={24} md={8}>
+                    <div className="status-filter">
+                      <Space size={[8, 8]} wrap={false} style={{ display: 'flex', flexWrap: 'nowrap', overflowX: 'auto' }}>
+                        <Button
+                          type={selectedStatus === 'all' ? 'primary' : 'default'}
+                          onClick={() => filterCalibrations('all')}
+                          className="status-button"
+                        >
+                          All
+                        </Button>
+                        <Button
+                          type={selectedStatus === 'due_soon' ? 'primary' : 'default'}
+                          icon={<WarningOutlined />}
+                          onClick={() => filterCalibrations('due_soon')}
+                          className="status-button"
+                        >
+                          Due Soon ({upcomingCalibrations.length})
+                        </Button>
+                        <Button
+                          type={selectedStatus === 'overdue' ? 'primary' : 'default'}
+                          danger={selectedStatus === 'overdue'}
+                          icon={<ExclamationCircleOutlined />}
+                          onClick={() => filterCalibrations('overdue')}
+                          className="status-button"
+                        >
+                          Overdue ({getOverdueCount()})
+                        </Button>
+                      </Space>
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
             </div>
 
             <div className="table-container">
@@ -1344,7 +1414,83 @@ function Calibration() {
         .stat-card {
           height: 100%;
           border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          transition: all 0.3s ease;
+          overflow: hidden;
+          position: relative;
+          background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+          min-height: 100px;
+        }
+
+        .stat-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-content {
+          display: flex;
+          align-items: center;
+          padding: 16px;
+          height: 100%;
+        }
+
+        .stat-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-right: 12px;
+          font-size: 20px;
+        }
+
+        .stat-title {
+          font-size: 18px;
+          color: #666;
+          margin-bottom: 2px;
+        }
+
+        .stat-value {
+          font-size: 20px;
+          font-weight: 600;
+          color: #262626;
+        }
+
+        .total-equipment .stat-icon {
+          background: rgba(24, 144, 255, 0.1);
+          color: #1890ff;
+        }
+
+        .up-to-date .stat-icon {
+          background: rgba(82, 196, 26, 0.1);
+          color: #52c41a;
+        }
+
+        .due-soon .stat-icon {
+          background: rgba(250, 173, 20, 0.1);
+          color: #faad14;
+        }
+
+        .overdue .stat-icon {
+          background: rgba(255, 77, 79, 0.1);
+          color: #ff4d4f;
+        }
+
+        @media (max-width: 768px) {
+          .stat-content {
+            padding: 12px;
+          }
+
+          .stat-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 18px;
+          }
+
+          .stat-value {
+            font-size: 18px;
+          }
         }
 
         .filter-container {
@@ -1570,6 +1716,83 @@ function Calibration() {
           
           .filter-section .ant-picker {
             width: 100%;
+          }
+        }
+
+        .filter-card {
+          background: #ffffff;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          border: 1px solid #f0f0f0;
+          margin-bottom: 4px;
+        }
+
+        .filter-card .ant-card-body {
+          padding: 8px;
+        }
+
+        .date-filter, .search-filter, .status-filter {
+          background: #fafafa;
+          padding: 12px;
+          border-radius: 8px;
+          border: 1px solid #f0f0f0;
+        }
+
+        .search-input {
+          border-radius: 6px;
+          border: 1px solid #d9d9d9;
+          transition: all 0.3s;
+        }
+
+        .search-input:hover, .search-input:focus {
+          border-color: #1890ff;
+          box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+        }
+
+        .search-icon {
+          color: #bfbfbf;
+        }
+
+        .search-button {
+          border-radius: 6px;
+          background: #1890ff;
+          border-color: #1890ff;
+          box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
+        }
+
+        .reset-button {
+          border-radius: 6px;
+          border: 1px solid #d9d9d9;
+        }
+
+        .status-button {
+          border-radius: 6px;
+          transition: all 0.3s;
+        }
+
+        .status-button:hover {
+          transform: translateY(-1px);
+        }
+
+        .custom-date-picker {
+          border-radius: 6px;
+        }
+
+        .custom-date-picker .ant-picker-input > input {
+          border-radius: 6px;
+        }
+
+        @media (max-width: 768px) {
+          .filter-card .ant-card-body {
+            padding: 16px;
+          }
+
+          .date-filter, .search-filter, .status-filter {
+            padding: 8px;
+          }
+
+          .search-button, .reset-button {
+            padding: 4px 8px;
           }
         }
       `}</style>

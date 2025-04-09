@@ -6,6 +6,7 @@ const useAuthStore = create(
     (set) => ({
       token: null,
       user: null,
+      user_id: null,
       roles: [],
       machines: [],
       currentMachine: null,
@@ -15,7 +16,7 @@ const useAuthStore = create(
       fetchRoles: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.85:6258/api/v1/auth/roles');
+          const response = await fetch('http://172.18.7.85:7708/api/v1/auth/roles');
           const data = await response.json();
           set({ roles: data, isLoading: false });
         } catch (error) {
@@ -26,7 +27,7 @@ const useAuthStore = create(
       fetchMachines: async () => {
         set({ isLoading: true });
         try {
-          const response = await fetch('http://172.18.7.85:6258/api/v1/master-order/all-machines/');
+          const response = await fetch('http://172.18.7.85:7708/api/v1/master-order/all-machines/');
           const data = await response.json();
           // Extracting the "code" from each machine's work_center
           const machinesWithCode = data.map(machine => ({
@@ -47,7 +48,7 @@ const useAuthStore = create(
 
           if (credentials.role === 'operator') {
             // Use machine login endpoint for operators
-            response = await fetch('http://172.18.7.85:6258/api/v1/auth/machine-login', {
+            response = await fetch('http://172.18.7.85:7708/api/v1/auth/machine-login', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -75,6 +76,7 @@ const useAuthStore = create(
             set({ 
               token: data.access_token,
               user: userData,
+              user_id: data.user_id,
               currentMachine: data.machine, // Store the machine details
               isLoading: false,
               error: null
@@ -82,6 +84,7 @@ const useAuthStore = create(
 
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('user_id', data.user_id);
             localStorage.setItem('currentMachine', JSON.stringify(data.machine));
 
             return { ...data, user: userData };
@@ -96,7 +99,7 @@ const useAuthStore = create(
               client_secret: 'string'
             });
 
-            response = await fetch('http://172.18.7.85:6258/api/v1/auth/login', {
+            response = await fetch('http://172.18.7.85:7708/api/v1/auth/login', {
               method: 'POST',
               headers: {
                 'accept': 'application/json',
@@ -119,19 +122,22 @@ const useAuthStore = create(
             set({ 
               token: data.access_token,
               user: userData,
+              user_id: data.user_id,
               isLoading: false,
               error: null
             });
 
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('user_id', data.user_id);
 
             return { ...data, user: userData };
           }
         } catch (error) {
-          set({ error: error.message, isLoading: false, token: null, user: null, currentMachine: null });
+          set({ error: error.message, isLoading: false, token: null, user: null, currentMachine: null, user_id: null });
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          localStorage.removeItem('user_id');
           localStorage.removeItem('currentMachine');
           throw error;
         }
@@ -140,7 +146,7 @@ const useAuthStore = create(
       register: async (userData) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch('http://172.18.7.85:6258/api/v1/auth/register', {
+          const response = await fetch('http://172.18.7.85:7708/api/v1/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -166,9 +172,10 @@ const useAuthStore = create(
       },
 
       logout: () => {
-        set({ token: null, user: null, currentMachine: null });
+        set({ token: null, user: null, currentMachine: null, user_id: null });
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('user_id');
         localStorage.removeItem('currentMachine');
       },
 
@@ -180,7 +187,7 @@ const useAuthStore = create(
     
     {
       name: 'auth-storage',
-      partialize: (state) => ({ token: state.token, user: state.user }),
+      partialize: (state) => ({ token: state.token, user: state.user, user_id: state.user_id }),
     }
   )
 );

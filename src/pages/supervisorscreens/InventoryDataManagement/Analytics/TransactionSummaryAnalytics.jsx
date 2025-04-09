@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Table, Statistic, Spin, Input, Select, DatePicker, Space, Button } from 'antd';
 import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import useInventoryStore from '../../../../store/inventory-store';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
@@ -30,36 +30,20 @@ const BAR_COLORS = {
 };
 
 const TransactionSummaryAnalytics = () => {
-  const [loading, setLoading] = useState(true);
-  const [requestsByStatus, setRequestsByStatus] = useState([]);
-  const [transactionSummary, setTransactionSummary] = useState([]);
-  const [transactionMetrics, setTransactionMetrics] = useState(null);
-  const [transactionHistory, setTransactionHistory] = useState({ transactions: [] });
   const [searchText, setSearchText] = useState('');
   const [filteredInfo, setFilteredInfo] = useState({});
   const [sortedInfo, setSortedInfo] = useState({});
   const [dateRange, setDateRange] = useState(null);
 
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      const [requestsRes, summaryRes, metricsRes, historyRes] = await Promise.all([
-        axios.get('http://172.18.7.85:6258/api/v1/api/inventory/analytics/requests-by-status'),
-        axios.get('http://172.18.7.85:6258/api/v1/api/inventory/analytics/transaction-summary'),
-        axios.get('http://172.18.7.85:6258/api/v1/api/inventory/analytics/transaction-metrics'),
-        axios.get('http://172.18.7.85:6258/api/v1/api/inventory/analytics/transaction-history?limit=100&offset=0')
-      ]);
-
-      setRequestsByStatus(requestsRes.data);
-      setTransactionSummary(summaryRes.data);
-      setTransactionMetrics(metricsRes.data);
-      setTransactionHistory(historyRes.data);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    loading,
+    requestsByStatus,
+    transactionSummary,
+    transactionMetrics,
+    transactionHistory,
+    fetchAnalytics,
+    searchTransactionHistory
+  } = useInventoryStore();
 
   useEffect(() => {
     fetchAnalytics();
@@ -67,6 +51,7 @@ const TransactionSummaryAnalytics = () => {
 
   const handleSearch = (value) => {
     setSearchText(value);
+    searchTransactionHistory(value, dateRange);
   };
 
   const handleChange = (pagination, filters, sorter) => {
@@ -80,6 +65,11 @@ const TransactionSummaryAnalytics = () => {
     setSortedInfo({});
     setDateRange(null);
     fetchAnalytics();
+  };
+
+  const handleDateRangeChange = (dates) => {
+    setDateRange(dates);
+    searchTransactionHistory(searchText, dates);
   };
 
   const getColumnSearchProps = (dataIndex, title) => ({
@@ -433,7 +423,7 @@ const TransactionSummaryAnalytics = () => {
           />
           <RangePicker
             value={dateRange}
-            onChange={(dates) => setDateRange(dates)}
+            onChange={handleDateRangeChange}
             style={{ width: 300 }}
           />
           <Button icon={<ReloadOutlined />} onClick={handleReset}>

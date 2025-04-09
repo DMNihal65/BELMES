@@ -41,7 +41,6 @@ import axios from 'axios';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const BASE_URL = 'http://172.18.7.85:6258/api/v1/api/inventory';
 
 function Calibration() {
   const [form] = Form.useForm();
@@ -55,7 +54,6 @@ function Calibration() {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [upcomingCalibrations, setUpcomingCalibrations] = useState([]);
   const [daysFilter, setDaysFilter] = useState(7);
   const [dateRange, setDateRange] = useState([null, null]);
   const [historyDateRange, setHistoryDateRange] = useState([null, null]);
@@ -74,28 +72,10 @@ function Calibration() {
     deleteCalibration,
     addCalibrationHistory,
     fetchItems,
-    fetchAllSubcategories
+    fetchAllSubcategories,
+    fetchUpcomingCalibrations,
+    upcomingCalibrations
   } = useInventoryStore();
-
-  const fetchUpcomingCalibrations = async (days = 7) => {
-    try {
-      console.log('Fetching upcoming calibrations for days:', days); // Debug log
-      const response = await axios.get(`${BASE_URL}/analytics/upcoming-calibrations?days=${days}`);
-      console.log('Upcoming calibrations response:', response.data); // Debug log
-      
-      // Remove duplicates based on item_id and next_calibration
-      const uniqueCalibrations = response.data.filter((cal, index, self) =>
-        index === self.findIndex((c) => (
-          c.item_id === cal.item_id && c.next_calibration === cal.next_calibration
-        ))
-      );
-      setUpcomingCalibrations(uniqueCalibrations);
-    } catch (error) {
-      console.error('Error fetching upcoming calibrations:', error);
-      message.error(`Failed to fetch upcoming calibrations: ${error.message}`);
-      setUpcomingCalibrations([]); // Set empty array on error
-    }
-  };
 
   const filterCalibrations = async (status) => {
     setSelectedStatus(status);

@@ -50,6 +50,7 @@ import {
   MenuOutlined
 } from '@ant-design/icons';
 import useInventoryStore from '../../../store/inventory-store';
+import useAuthStore from '../../../store/auth-store';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import { read, utils, write } from 'xlsx';
@@ -103,6 +104,9 @@ const InventoryAllData = () => {
     updateCalibration,
     getCalibrationByItemId,
   } = useInventoryStore();
+
+  // Auth store
+  const { user_id } = useAuthStore();
 
   // Update the generateItemCode function
   const generateItemCode = () => {
@@ -647,7 +651,7 @@ const InventoryAllData = () => {
           : await addCategory({
               name: values.name,
               description: values.description,
-              created_by: 1
+              created_by: user_id
             });
       } else if (modalType === 'subcategory') {
         const dynamicFields = {};
@@ -675,7 +679,7 @@ const InventoryAllData = () => {
               description: values.description,
               category_id: rightClickedNode.data.id,
               dynamic_fields: dynamicFields,
-              created_by: 1
+              created_by: user_id
             });
       }
 
@@ -683,7 +687,6 @@ const InventoryAllData = () => {
         setIsModalVisible(false);
         form.resetFields();
         message.success(`${modalType} ${rightClickedNode?.data?.id ? 'updated' : 'added'} successfully`);
-        // Trigger immediate refresh
         setRefreshTrigger(prev => prev + 1);
       }
     } catch (error) {
@@ -706,7 +709,7 @@ const InventoryAllData = () => {
       }
 
       // Generate a new item code using UUID
-      const newItemCode = generateItemCode(); // Use the new unique item code
+      const newItemCode = generateItemCode();
 
       const formattedDynamicData = {};
       if (values.dynamic_data) {
@@ -736,13 +739,13 @@ const InventoryAllData = () => {
       }
 
       const itemData = {
-        item_code: newItemCode, // Use the new unique item code
+        item_code: newItemCode,
         dynamic_data: formattedDynamicData,
         quantity: Number(values.quantity) || 0,
         available_quantity: Number(values.available_quantity) || 0,
         status: values.status || 'Active',
         subcategory_id: selectedSubcategory.id,
-        created_by: 1
+        created_by: user_id
       };
 
       console.log('Submitting item data:', itemData);
@@ -758,7 +761,6 @@ const InventoryAllData = () => {
         message.success(`Item ${values.id ? 'updated' : 'added'} successfully`);
         setIsModalVisible(false);
         form.resetFields();
-        // Trigger immediate refresh
         setRefreshTrigger(prev => prev + 1);
       }
     } catch (error) {

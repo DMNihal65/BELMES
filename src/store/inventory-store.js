@@ -5,8 +5,9 @@ import { message } from 'antd';
 import { v4 as uuidv4 } from 'uuid';
 import { read, utils } from 'xlsx';
 import dayjs from 'dayjs';
+import useAuthStore from './auth-store';
 
-const BASE_URL = 'http://172.18.7.85:6258/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:7708/api/v1/api/inventory';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -14,18 +15,23 @@ const getAuthHeaders = () => {
   return {
     headers: {
       'Authorization': `Bearer ${token}`,
-      
       'Content-Type': 'application/json'
     }
   };
 };
 
+// Helper function to get user_id
+const getUserId = () => {
+  const { user_id } = useAuthStore.getState();
+  return user_id;
+};
+
 // Add these functions before the create function
 const addCalibration = async (calibrationData) => {
   try {
-    const response = await axios.post('http://172.18.7.85:6258/api/v1/api/inventory/calibrations/', {
+    const response = await axios.post('http://172.18.7.85:7708/api/v1/api/inventory/calibrations/', {
       ...calibrationData,
-      created_by: 1
+      created_by: getUserId()
     });
     return response.data;
   } catch (error) {
@@ -36,9 +42,9 @@ const addCalibration = async (calibrationData) => {
 
 const updateCalibration = async (id, calibrationData) => {
   try {
-    const response = await axios.put(`http://172.18.7.85:6258/api/v1/api/inventory/calibrations/${id}`, {
+    const response = await axios.put(`http://172.18.7.85:7708/api/v1/api/inventory/calibrations/${id}`, {
       ...calibrationData,
-      created_by: 1
+      created_by: getUserId()
     });
     return response.data;
   } catch (error) {
@@ -49,7 +55,7 @@ const updateCalibration = async (id, calibrationData) => {
 
 const getCalibrationByItemId = async (itemId) => {
   try {
-    const response = await axios.get(`http://172.18.7.85:6258/api/v1/api/inventory/calibrations/?inventory_item_id=${itemId}`);
+    const response = await axios.get(`http://172.18.7.85:7708/api/v1/api/inventory/calibrations/?inventory_item_id=${itemId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching calibration:', error);
@@ -63,6 +69,11 @@ const useInventoryStore = create((set, get) => ({
   items: [],
   calibrations: [],
   calibrationHistory: [],
+  upcomingCalibrations: [],
+  requestsByStatus: [],
+  transactionSummary: [],
+  transactionMetrics: null,
+  transactionHistory: { transactions: [] },
   selectedCategory: null,
   selectedSubcategory: null,
   loading: false,
@@ -105,7 +116,7 @@ const useInventoryStore = create((set, get) => ({
       const response = await axios.post(`${BASE_URL}/categories/`, {
         name: categoryData.name,
         description: categoryData.description,
-        created_by: categoryData.created_by
+        created_by: getUserId()
       });
       set(state => ({
         categories: [...state.categories, response.data],
@@ -208,7 +219,7 @@ const useInventoryStore = create((set, get) => ({
         description: subcategoryData.description,
         dynamic_fields: subcategoryData.dynamic_fields,
         category_id: subcategoryData.category_id,
-        created_by: subcategoryData.created_by
+        created_by: getUserId()
       });
       set(state => ({
         subcategories: [...state.subcategories, response.data],
@@ -309,32 +320,15 @@ const useInventoryStore = create((set, get) => ({
   addItem: async (itemData) => {
     set({ loading: true });
     try {
-      // Process dynamic data to handle image fields
-      const processedDynamicData = {};
-      if (itemData.dynamic_data) {
-        for (const [key, value] of Object.entries(itemData.dynamic_data)) {
-          // If it's a base64 image, compress it before sending
-          if (value && typeof value === 'string' && value.startsWith('data:image')) {
-            processedDynamicData[key] = await compressImage(value);
-          } else {
-            processedDynamicData[key] = value;
-          }
-        }
-      }
-
-      const response = await axios.post(
-        `${BASE_URL}/items`, 
-        {
-          item_code: itemData.item_code,
-          dynamic_data: processedDynamicData,
-          quantity: parseInt(itemData.quantity),
-          available_quantity: parseInt(itemData.available_quantity),
-          status: itemData.status,
-          subcategory_id: parseInt(itemData.subcategory_id),
-          created_by: 1
-        }
-      );
-      
+      const response = await axios.post(`${BASE_URL}/items`, {
+        item_code: itemData.item_code,
+        dynamic_data: itemData.dynamic_data,
+        quantity: parseInt(itemData.quantity),
+        available_quantity: parseInt(itemData.available_quantity),
+        status: itemData.status,
+        subcategory_id: parseInt(itemData.subcategory_id),
+        created_by: getUserId()
+      });
       set(state => ({
         items: [...state.items, response.data],
       }));
@@ -511,7 +505,7 @@ const useInventoryStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ loading: true });
     try {
-      const response = await axios.get('http://172.18.7.85:6258/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.85:7708/api/v1/planning/all_orders');
       set({ 
         allOrders: response.data || [],
         loading: false 
@@ -544,7 +538,7 @@ const useInventoryStore = create((set, get) => ({
 
       // Create axios instance with default headers
       const axiosInstance = axios.create({
-        baseURL: 'http://172.18.7.85:6258/api/v1',
+        baseURL: 'http://172.18.7.85:7708/api/v1',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -589,7 +583,7 @@ const useInventoryStore = create((set, get) => ({
   fetchOperationsByPartNumber: async (partNumber) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`http://172.18.7.85:6258/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await axios.get(`http://172.18.7.85:7708/api/v1/planning/search_order?part_number=${partNumber}`);
       const operations = response.data?.orders?.[0]?.operations || [];
       set({ 
         operations: operations,
@@ -753,9 +747,9 @@ const useInventoryStore = create((set, get) => ({
     set({ loading: true });
     try {
       const response = await axios.post(
-        `${BASE_URL}/items/bulk/`,  // Updated endpoint
+        `${BASE_URL}/items/bulk/`,
         {
-          created_by: 1,
+          created_by: getUserId(),
           subcategory_id: subcategoryId,
           items: items
         },
@@ -768,7 +762,6 @@ const useInventoryStore = create((set, get) => ({
 
       if (response.data) {
         message.success('Excel data imported successfully');
-        // Refresh items after bulk upload
         await get().fetchItems();
         return response.data;
       }
@@ -905,7 +898,7 @@ const useInventoryStore = create((set, get) => ({
             available_quantity: Number(values.available_quantity) || 0,
             status: values.status || 'Active',
             subcategory_id: selectedSubcategory.id,
-            created_by: 1
+            created_by: getUserId()
         };
 
         let result;
@@ -927,7 +920,77 @@ const useInventoryStore = create((set, get) => ({
     }
   },
 
-  getCalibrationByItemId: getCalibrationByItemId
+  getCalibrationByItemId: getCalibrationByItemId,
+
+  // Add this new function
+  fetchUpcomingCalibrations: async (days = 7) => {
+    set({ loading: true });
+    try {
+      console.log('Fetching upcoming calibrations for days:', days); // Debug log
+      const response = await axios.get(`${BASE_URL}/analytics/upcoming-calibrations?days=${days}`);
+      console.log('Upcoming calibrations response:', response.data); // Debug log
+      
+      // Remove duplicates based on item_id and next_calibration
+      const uniqueCalibrations = response.data.filter((cal, index, self) =>
+        index === self.findIndex((c) => (
+          c.item_id === cal.item_id && c.next_calibration === cal.next_calibration
+        ))
+      );
+      
+      set({ upcomingCalibrations: uniqueCalibrations, loading: false });
+      return uniqueCalibrations;
+    } catch (error) {
+      console.error('Error fetching upcoming calibrations:', error);
+      message.error(`Failed to fetch upcoming calibrations: ${error.message}`);
+      set({ upcomingCalibrations: [], loading: false });
+      return [];
+    }
+  },
+
+  // Add analytics functions
+  fetchAnalytics: async () => {
+    set({ loading: true });
+    try {
+      const [requestsRes, summaryRes, metricsRes, historyRes] = await Promise.all([
+        axios.get(`${BASE_URL}/analytics/requests-by-status`),
+        axios.get(`${BASE_URL}/analytics/transaction-summary`),
+        axios.get(`${BASE_URL}/analytics/transaction-metrics`),
+        axios.get(`${BASE_URL}/analytics/transaction-history?limit=100&offset=0`)
+      ]);
+
+      set({
+        requestsByStatus: requestsRes.data,
+        transactionSummary: summaryRes.data,
+        transactionMetrics: metricsRes.data,
+        transactionHistory: historyRes.data,
+        loading: false
+      });
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      set({ error: error.message, loading: false });
+    }
+  },
+
+  // Add transaction history search function
+  searchTransactionHistory: async (searchText, dateRange) => {
+    try {
+      let url = `${BASE_URL}/analytics/transaction-history?limit=100&offset=0`;
+      
+      if (searchText) {
+        url += `&search=${encodeURIComponent(searchText)}`;
+      }
+      
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        url += `&start_date=${dateRange[0].toISOString()}&end_date=${dateRange[1].toISOString()}`;
+      }
+
+      const response = await axios.get(url);
+      set({ transactionHistory: response.data });
+    } catch (error) {
+      console.error('Error searching transaction history:', error);
+      set({ error: error.message });
+    }
+  },
 }));
 
 // Add helper function for image compression

@@ -38,11 +38,12 @@ function Sidebar() {
     //   icon: <AlertTriangle size={20} />,
     //   label: 'Alert Screen',
     // },
-    {
-      key: '/operator/maintenance',
-      icon: <Wrench size={20} />,
-      label: 'Maintenance',
-    },
+    // {
+    //   key: '/operator/maintenance',
+    //   icon: <Wrench size={20} />,
+    //   label: 'Maintenance',
+    // },
+    
     {
       key: '/operator/inspection',
       icon: <CheckSquare size={20} />,
@@ -81,11 +82,11 @@ function Sidebar() {
         },
       ]
     },
-    // {
-    //   key: '/supervisor/maintenance',
-    //   icon: <Wrench size={20} />,
-    //   label: 'Maintenance',
-    // },
+    {
+      key: '/supervisor/maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Maintenance',
+    },
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,

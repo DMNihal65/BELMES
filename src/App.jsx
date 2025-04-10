@@ -42,7 +42,7 @@ import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
 const App = () => {
   return (
     <ConfigProvider>
-      <BrowserRouter>
+      <BrowserRouter basename='/belmes'> {/*This must be there when in the deployment mode, and in the development mode not required remove the basename in the production mode  */}
         <Routes>
           <Route path="/login" element={<Login />} />
           

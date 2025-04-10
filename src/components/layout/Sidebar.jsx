@@ -81,11 +81,11 @@ function Sidebar() {
         },
       ]
     },
-    {
-      key: '/supervisor/maintenance',
-      icon: <Wrench size={20} />,
-      label: 'Maintenance',
-    },
+    // {
+    //   key: '/supervisor/maintenance',
+    //   icon: <Wrench size={20} />,
+    //   label: 'Maintenance',
+    // },
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,

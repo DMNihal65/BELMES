@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/belmes/',
+  // base: '/belmes/', //run the application normally comment, deployment uncomment
   plugins: [react()],
   server: {
     proxy: {

@@ -576,52 +576,28 @@ const InventoryAllData = () => {
       return [];
     }
 
-    const columns = [
-      {
-        title: 'Item Code',
-        dataIndex: 'item_code',
-        key: 'item_code',
-        width: 150,
-        editable: true,
-      },
-      {
-        title: 'Quantity',
-        dataIndex: 'quantity',
-        key: 'quantity',
-        width: 100,
-        editable: true,
-      },
-      {
-        title: 'Available Quantity',
-        dataIndex: 'available_quantity',
-        key: 'available_quantity',
-        width: 150,
-        editable: true,
-      },
-      {
-        title: 'Status',
-        dataIndex: 'status',
-        key: 'status',
-        width: 100,
-        editable: true,
-        render: (status) => (
-          <Tag color={status === 'Active' ? 'green' : 'red'}>
-            {status}
-          </Tag>
-        ),
-      }
-    ];
+    const columns = [];
 
     // Get the subcategory to access its dynamic fields
     const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
     if (subcategory?.dynamic_fields) {
-      Object.entries(subcategory.dynamic_fields).forEach(([fieldName, fieldConfig]) => {
+      // Get dynamic fields and sort by order
+      const orderedDynamicFields = Object.entries(subcategory.dynamic_fields)
+        .map(([fieldName, config]) => ({
+          fieldName,
+          config,
+          order: config.order || 0
+        }))
+        .sort((a, b) => a.order - b.order); // Sort by order
+
+      // Add dynamic fields to columns in order
+      orderedDynamicFields.forEach(({ fieldName, config }) => {
         columns.push({
           title: (
-            <Tooltip title={`Type: ${fieldConfig.type}${fieldConfig.unit ? `, Unit: ${fieldConfig.unit}` : ''}`}>
+            <Tooltip title={`Type: ${config.type}${config.unit ? `, Unit: ${config.unit}` : ''}`}>
               <Space>
                 {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
-                {/* {fieldConfig.required && <Tag color="red">Required</Tag>} */}
+                {/* {config.required && <Tag color="red">Required</Tag>} */}
               </Space>
             </Tooltip>
           ),
@@ -629,15 +605,15 @@ const InventoryAllData = () => {
           key: fieldName,
           width: 150,
           editable: true,
-          fieldConfig: fieldConfig,
+          fieldConfig: config,
           render: (value) => {
-            if (fieldConfig.type === 'boolean') {
+            if (config.type === 'boolean') {
               return value ? 'Yes' : 'No';
             }
-            if (fieldConfig.unit) {
-              return `${value} ${fieldConfig.unit}`;
+            if (config.unit) {
+              return `${value} ${config.unit}`;
             }
-            if (fieldConfig.type === 'date' && value) {
+            if (config.type === 'date' && value) {
               return dayjs(value).format('YYYY-MM-DD');
             }
             return value;
@@ -1066,6 +1042,7 @@ const InventoryAllData = () => {
                   title={renderTableTitle}
                   rowKey="id"
                   pagination={{
+                    pageSize: 5, 
                     onChange: cancel,
                   }}
                 />

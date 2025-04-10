@@ -67,6 +67,7 @@ const InventoryAllData = () => {
   const [editingKey, setEditingKey] = useState('');
   const [isRequestModalVisible, setIsRequestModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Store hooks
   const { 
@@ -432,6 +433,13 @@ const InventoryAllData = () => {
             ? `${selectedCategory.type === 'category' ? 'Category' : 'Subcategory'} Items` 
             : 'All Items'}
         </Text>
+        <Input.Search
+          placeholder="Search items..."
+          allowClear
+          onSearch={handleSearch}
+          onChange={(e) => handleSearch(e.target.value)}
+          className="min-w-[200px] max-w-[300px] flex-1 xl:flex-none"
+        />
       </Space>
       <Space>
         {/* <Button
@@ -460,14 +468,25 @@ const InventoryAllData = () => {
     </Space>
   );
 
-  // Get table data based on selection
+  // Update the handleSearch function
+  const handleSearch = (value) => {
+    setSearchTerm(value);
+  };
+
+  // Modify the getTableData function to filter based on the search term
   const getTableData = () => {
     if (!selectedCategory || selectedCategory.type === 'category') {
       return [];
     }
-    
+
     // Only show items for selected subcategory
-    return items.filter(item => item.subcategory_id === selectedCategory.id);
+    return items.filter(item => {
+      return item.subcategory_id === selectedCategory.id && 
+             (item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) || 
+              Object.values(item.dynamic_data).some(val => 
+                String(val).toLowerCase().includes(searchTerm.toLowerCase())
+              ));
+    });
   };
 
   const isEditing = (record) => record.id === editingKey;

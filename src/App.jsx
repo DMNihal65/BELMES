@@ -39,10 +39,14 @@ import InspectionReport from './pages/supervisorscreens/QualityManagement/Inspec
 import QualityInspectionDetails from './pages/supervisorscreens/QualityManagement/QualityInspectionDetails';
 import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
 
+
+
+
 const App = () => {
   return (
     <ConfigProvider>
-      <BrowserRouter basename='/belmes'> {/*This must be there when in the deployment mode, and in the development mode not required remove the basename in the production mode  */}
+      {/* <BrowserRouter basename='/belmes'> This must be there when in the deployment mode, and in the development mode not required remove the basename in the production mode  */}
+      <BrowserRouter> 
         <Routes>
           <Route path="/login" element={<Login />} />
           

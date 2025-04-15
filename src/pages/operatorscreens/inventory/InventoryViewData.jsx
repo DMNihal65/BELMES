@@ -10,42 +10,24 @@ import {
   Space, 
   Tooltip, 
   Tag,
-  Dropdown,
-  Menu,
   Typography,
   Divider,
-  Badge,
   message,
   Select,
-  Popconfirm,
   Breadcrumb,
-  Upload,
   Switch,
   InputNumber,
   DatePicker
 } from 'antd';
 import { 
   PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined,
-  SettingOutlined,
   FolderOutlined,
-  FolderOpenOutlined,
-  FileOutlined,
-  MoreOutlined,
-  ImportOutlined,
-  ExportOutlined,
   AppstoreAddOutlined,
-  CopyOutlined,
-  EyeOutlined,
   MinusCircleOutlined,
-  DownloadOutlined,
-  UploadOutlined,
   CompressOutlined,
   FileExcelOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  InfoCircleOutlined
 } from '@ant-design/icons';
 import useInventoryStore from '../../../store/inventory-store';
 import dayjs from 'dayjs';
@@ -54,7 +36,7 @@ import RequestItemModal from '../../../components/inventory/RequestItemModal';
 
 const { Title, Text } = Typography;
 
-const InventoryAllData = () => {
+const InventoryViewData = () => {
   // State management
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -83,11 +65,8 @@ const InventoryAllData = () => {
     updateCategory,
     updateSubcategory,
     updateItem,
-    deleteCategory,
-    deleteSubcategory,
-    deleteItem,
     isLoading,
-    error,
+
   } = useInventoryStore();
 
   useEffect(() => {
@@ -149,129 +128,13 @@ const InventoryAllData = () => {
     setExpandedKeys(categories.map(cat => `category-${cat.id}`));
   };
 
-  // Handlers
-  const handleExportExcel = async () => {
-    if (!selectedCategory || selectedCategory.type !== 'subcategory') {
-      message.warning('Please select a subcategory first');
-      return;
-    }
-
-    try {
-      // Get items for the selected subcategory
-      const subcategoryItems = getTableData();
-      
-      const response = await axios({
-        url: 'http://172.18.7.88:6970/api/v1/api/inventory/items/bulk/',
-        method: 'POST',
-        responseType: 'blob',
-        headers: {
-          'Content-Type': 'application/json',
-          'accept': 'application/json'
-        },
-        data: {
-          created_by: 1,
-          items: subcategoryItems.map(item => ({
-            item_code: item.item_code,
-            quantity: item.quantity,
-            available_quantity: item.available_quantity,
-            status: item.status,
-            dynamic_data: item.dynamic_data || {}
-          })),
-          subcategory_id: selectedCategory.id
-        }
-      });
-
-      // Create a blob from the response data
-      const blob = new Blob([response.data], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
-      
-      // Get subcategory name for the file name
-      const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
-      const fileName = `${subcategory?.name || 'inventory'}_items.xlsx`;
-      
-      // Create a link element and trigger download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      message.success('Excel file downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading Excel:', error);
-      message.error('Failed to download Excel file: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  const handleDownloadTemplate = () => {
-    window.open('http://172.18.7.88:6970/api/v1/api/inventory/items/bulk/', '_blank');
-  };
-
-  const handleExcelUpload = (file) => {
-    if (!selectedCategory || selectedCategory.type !== 'subcategory') {
-      message.warning('Please select a subcategory first');
-      return false;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('created_by', 1);
-    formData.append('subcategory_id', selectedCategory.id);
-
-    axios.post('http://172.18.7.88:6970/api/v1/api/inventory/items/bulk/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-    .then(response => {
-      message.success('Excel file uploaded successfully');
-      // Refresh the items list
-      fetchItems(selectedCategory.id);
-    })
-    .catch(error => {
-      console.error('Error uploading Excel:', error);
-      message.error('Failed to upload Excel file: ' + (error.response?.data?.detail || error.message));
-    });
-
-    return false;
-  };
+  
 
   const handleCollapseAll = () => {
     setExpandedKeys([]);
   };
 
-  const handleEdit = (record) => {
-    setModalType(record.category_id ? 'subcategory' : 'category');
-    setRightClickedNode({ data: record });
-    form.setFieldsValue(record);
-    setIsModalVisible(true);
-  };
-
-  const handleDelete = async (record) => {
-    try {
-      let result;
-      if (record.category_id) {
-        // This is a subcategory
-        result = await deleteSubcategory(record.id);
-      } else {
-        // This is a category
-        result = await deleteCategory(record.id);
-      }
-      
-      if (result) {
-        message.success(`${record.category_id ? 'Subcategory' : 'Category'} deleted successfully`);
-        // Refresh both categories and subcategories
-        await fetchCategories();
-        await fetchAllSubcategories();
-      }
-    } catch (error) {
-      message.error(`Error: ${error.message}`);
-    }
-  };
+  
 
   // Add category/subcategory form handler
   const handleFormSubmit = async (values) => {
@@ -406,23 +269,7 @@ const InventoryAllData = () => {
     }
   };
 
-  // Update the Add Item button click handler
-  const handleAddItemClick = () => {
-    if (selectedCategory?.type === 'subcategory') {
-      setModalType('item');
-      setRightClickedNode(null);
-      form.resetFields();
-      form.setFieldsValue({
-        status: 'Active',
-        quantity: 0,
-        available_quantity: 0,
-        subcategory_id: selectedCategory.id
-      });
-      setIsModalVisible(true);
-    } else {
-      message.warning('Please select a subcategory to add an item');
-    }
-  };
+
 
   // Update the table title section
   const renderTableTitle = () => (
@@ -440,30 +287,6 @@ const InventoryAllData = () => {
           onChange={(e) => handleSearch(e.target.value)}
           className="min-w-[200px] max-w-[300px] flex-1 xl:flex-none"
         />
-      </Space>
-      <Space>
-        {/* <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAddItemClick}
-        >
-          Add Item
-        </Button>
-        {selectedCategory?.type === 'subcategory' && (
-          <Upload
-            beforeUpload={handleExcelUpload}
-            showUploadList={false}
-            accept=".xlsx,.xls"
-          >
-            <Button icon={<UploadOutlined />}>Import</Button>
-          </Upload>
-        )}
-        <Button 
-          icon={<DownloadOutlined />}
-          onClick={handleExportExcel}
-        >
-          Export
-        </Button> */}
       </Space>
     </Space>
   );
@@ -544,50 +367,13 @@ const InventoryAllData = () => {
     );
   };
 
-  const edit = (record) => {
-    const formattedDynamicData = {};
-    if (record.dynamic_data) {
-      Object.entries(record.dynamic_data).forEach(([key, value]) => {
-        const fieldConfig = subcategories.find(sub => sub.id === record.subcategory_id)?.dynamic_fields[key];
-        if (fieldConfig?.type === 'date' && value) {
-          formattedDynamicData[key] = dayjs(value);
-        } else {
-          formattedDynamicData[key] = value;
-        }
-      });
-    }
-
-    form.setFieldsValue({
-      ...record,
-      ...formattedDynamicData
-    });
-    setEditingKey(record.id);
-  };
+  
 
   const cancel = () => {
     setEditingKey('');
   };
 
-  const save = async (record) => {
-    try {
-      const row = await form.validateFields();
-      const newData = { ...record, ...row };
-      
-      await updateItem(record.id, {
-        item_code: newData.item_code,
-        quantity: parseInt(newData.quantity),
-        available_quantity: parseInt(newData.available_quantity),
-        status: newData.status,
-        subcategory_id: record.subcategory_id,
-        dynamic_data: newData.dynamic_data
-      });
-
-      setEditingKey('');
-      await fetchItems(selectedCategory.id);
-    } catch (errInfo) {
-      console.log('Validate Failed:', errInfo);
-    }
-  };
+  
 
   // Table columns definition
   const getColumns = () => {
@@ -616,7 +402,6 @@ const InventoryAllData = () => {
             <Tooltip title={`Type: ${config.type}${config.unit ? `, Unit: ${config.unit}` : ''}`}>
               <Space>
                 {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
-                {/* {config.required && <Tag color="red">Required</Tag>} */}
               </Space>
             </Tooltip>
           ),
@@ -625,6 +410,65 @@ const InventoryAllData = () => {
           width: 150,
           editable: true,
           fieldConfig: config,
+          filters: [...new Set(items.map(item => item.dynamic_data[fieldName]))].map(value => ({ text: value, value })),
+          onFilter: (value, record) => record.dynamic_data[fieldName] === value,
+          sorter: (a, b) => {
+            const aValue = a.dynamic_data[fieldName];
+            const bValue = b.dynamic_data[fieldName];
+            if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return aValue - bValue;
+            }
+            return aValue.toString().localeCompare(bValue.toString());
+          },
+          filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
+            <div style={{ padding: 8 }}>
+              <Input
+                placeholder={`Search ${fieldName}`}
+                value={selectedKeys[0]}
+                onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+                onPressEnter={() => {
+                  confirm();
+                  handleSearch(selectedKeys[0]); // Optional: Call your search function
+                }}
+                style={{ marginBottom: 8, display: 'block' }}
+              />
+              <Select
+                mode="multiple"
+                style={{ width: '100%' }}
+                placeholder="Select options"
+                onChange={(value) => {
+                  setSelectedKeys(value.length ? value : []);
+                  confirm();
+                }}
+                allowClear
+              >
+                {items.map(item => (
+                  <Select.Option key={item.id} value={item.name}>
+                    {item.name}
+                  </Select.Option>
+                ))}
+              </Select>
+              <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    confirm();
+                    handleSearch(selectedKeys[0]); // Confirm the selection
+                  }}
+                >
+                  OK
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSelectedKeys([]);
+                    clearFilters();
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          ),
           render: (value) => {
             if (config.type === 'boolean') {
               return value ? 'Yes' : 'No';
@@ -651,6 +495,7 @@ const InventoryAllData = () => {
         <Space>
           <Button
             type="primary"
+            icon={<PlusOutlined />}
             size="small"
             onClick={() => {
               setSelectedItem(record);
@@ -901,79 +746,76 @@ const InventoryAllData = () => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
-      <Title level={4}>Inventory Master Data</Title>
-      <Divider />
-      
-      
-      
-      <div className="flex gap-6" style={{ minHeight: 'calc(100vh - 250px)' }}>
-        {/* Collapsible Category Tree */}
-        <div 
-          className={`transition-all duration-300 flex-shrink-0`}
-          style={{ 
-            width: isSidebarCollapsed ? '80px' : '300px',
-            minWidth: isSidebarCollapsed ? '80px' : '300px'
-          }}
-        >
-          <Card 
-            className="h-full"
-            title={
-              <div className="flex items-center justify-between">
-                {!isSidebarCollapsed && <span>Categories</span>}
-                <Button
-                  type="text"
-                  icon={isSidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="!flex items-center justify-center"
-                />
-              </div>
-            }
-            bodyStyle={{ padding: isSidebarCollapsed ? '12px 8px' : '24px' }}
+    <div className="bg-white p-4 lg:p-6 xl:p-8 rounded-lg shadow min-h-screen">
+      <div className="flex flex-col h-full">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+          <Title level={4} className="m-0">Inventory Master Data</Title>
+          <Space wrap className="self-start lg:self-auto">
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setModalType('category');
+                setRightClickedNode(null);
+                setIsModalVisible(true);
+              }}
+            >
+              Add Category
+            </Button>
+          </Space>
+        </div>
+
+        <Divider className="my-2" />
+        
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 xl:gap-8 flex-1" style={{ minHeight: 0 }}>
+          {/* Collapsible Category Tree */}
+          <div 
+            className="transition-all duration-300 flex-shrink-0 w-full lg:w-auto"
+            style={{ 
+              width: isSidebarCollapsed ? '80px' : '300px',
+              minWidth: isSidebarCollapsed ? '80px' : '300px'
+            }}
           >
-            {isSidebarCollapsed ? (
-              <div className="flex flex-col gap-2">
-                {categories.map(category => (
-                  <Tooltip 
-                    key={category.id} 
-                    title={category.name}
-                    placement="right"
-                  >
-                    <Button
-                      type="text"
-                      icon={<FolderOutlined />}
-                      onClick={() => {
-                        setSelectedCategory({ type: 'category', id: category.id });
-                        setBreadcrumbItems([
-                          { title: 'Inventory' },
-                          { title: category.name }
-                        ]);
-                      }}
-                      className="w-full !flex items-center justify-center"
-                    />
-                  </Tooltip>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <Space className="mb-2">
-                  <Tooltip title="Expand All">
-                    <Button 
-                      type="text" 
-                      size="small"
-                      icon={<AppstoreAddOutlined />}
-                      onClick={handleExpandAll}
-                    />
-                  </Tooltip>
-                  <Tooltip title="Collapse All">
-                    <Button 
-                      type="text" 
-                      size="small"
-                      icon={<CompressOutlined />}
-                      onClick={handleCollapseAll}
-                    />
-                  </Tooltip>
-                </Space>
+            <Card 
+              className="h-full"
+              bodyStyle={{ 
+                padding: isSidebarCollapsed ? '12px 8px' : '16px',
+                height: '100%',
+                overflowY: 'auto'
+              }}
+              title={
+                <div className="flex items-center justify-between">
+                  {!isSidebarCollapsed && <span>Categories</span>}
+                  <Button
+                    type="text"
+                    icon={isSidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    className="!flex items-center justify-center"
+                  />
+                </div>
+              }
+            >
+              {isSidebarCollapsed ? (
+                <div className="flex flex-col gap-2">
+                  {categories.map(category => (
+                    <Tooltip 
+                      key={category.id} 
+                      title={category.name}
+                      placement="right"
+                    >
+                      <Button
+                        type="text"
+                        icon={<AppstoreAddOutlined />}
+                        onClick={() => {
+                          setSelectedCategory({ type: 'category', id: category.id });
+                          setBreadcrumbItems([{ title: 'Inventory' }, { title: category.name }]);
+                        }}
+                        className="w-full !flex items-center justify-center"
+                      />
+                    </Tooltip>
+                  ))}
+                </div>
+              ) : (
                 <Tree
                   treeData={getTreeData()}
                   showLine={{ showLeafIcon: false }}
@@ -1006,68 +848,52 @@ const InventoryAllData = () => {
                   expandedKeys={expandedKeys}
                   onExpand={setExpandedKeys}
                 />
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 min-w-0">
-          <div className="mb-4">
-            <Breadcrumb items={breadcrumbItems} />
-            {selectedCategory && (
-              <div className="mt-2">
-                <Title level={5}>
-                  {selectedCategory.type === 'category' 
-                    ? categories.find(c => c.id === selectedCategory.id)?.name
-                    : subcategories.find(s => s.id === selectedCategory.id)?.name}
-                </Title>
-                <Text type="secondary">
-                  {selectedCategory.type === 'category'
-                    ? categories.find(c => c.id === selectedCategory.id)?.description
-                    : subcategories.find(s => s.id === selectedCategory.id)?.description}
-                </Text>
-              </div>
-            )}
+              )}
+            </Card>
           </div>
-          
-          <Card>
-            {!selectedCategory ? (
-              <div className="text-center py-12">
-                <Title level={4} type="secondary">Please select a category from the left sidebar</Title>
-                <Text type="secondary">Select a category or subcategory to view its items</Text>
-              </div>
-            ) : selectedCategory.type === 'category' ? (
-              <div className="text-center py-12">
-                <Title level={4} type="secondary">Please select a subcategory</Title>
-                <Text type="secondary">Select a subcategory from {categories.find(c => c.id === selectedCategory.id)?.name} to view its items</Text>
-              </div>
-            ) : (
-              <Form form={form} component={false}>
-                <Table
-                  components={{
-                    body: {
-                      cell: EditableCell,
-                    },
-                  }}
-                  columns={mergedColumns}
-                  dataSource={getTableData()}
-                  scroll={{ x: 'max-content' }}
-                  size="middle"
-                  rowSelection={{
-                    type: 'checkbox',
-                  }}
-                  loading={isLoading}
-                  title={renderTableTitle}
-                  rowKey="id"
-                  pagination={{
-                    pageSize: 5, 
-                    onChange: cancel,
-                  }}
-                />
-              </Form>
-            )}
-          </Card>
+
+          {/* Main Content */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            <Card className="flex-1" bodyStyle={{ height: '100%', padding: '16px', overflow: 'auto' }}>
+              {!selectedCategory ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Title level={4} type="secondary">Please select a category from the left sidebar</Title>
+                    <Text type="secondary">Select a category or subcategory to view its items</Text>
+                  </div>
+                </div>
+              ) : (
+                <Form form={form} component={false} className="h-full">
+                  <div className="mb-4">
+                    <Breadcrumb items={breadcrumbItems} />
+                  </div>
+                  <Table
+                    components={{
+                      body: {
+                        cell: EditableCell,
+                      },
+                    }}
+                    columns={mergedColumns}
+                    dataSource={getTableData()}
+                    scroll={{ x: 'max-content' }}
+                    size="middle"
+                    loading={isLoading}
+                    title={renderTableTitle}
+                    rowKey="id"
+                    pagination={{
+                      onChange: cancel,
+                      pageSize: 5,
+                      showSizeChanger: true,
+                      showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                      position: ['bottomRight'],
+                      className: 'px-4'
+                    }}
+                    className="border border-gray-200 rounded"
+                  />
+                </Form>
+              )}
+            </Card>
+          </div>
         </div>
       </div>
 
@@ -1100,4 +926,4 @@ const InventoryAllData = () => {
   );
 };
 
-export default InventoryAllData; 
+export default InventoryViewData; 

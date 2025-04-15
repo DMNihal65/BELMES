@@ -6,7 +6,7 @@ import { LoadingOutlined } from '@ant-design/icons';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.155:8002',
+  BASE_URL: 'http://172.18.7.85:7798',
   QUALITY_URL: 'http://172.18.7.93:9999',
   PLANNING_URL: 'http://172.18.7.85:9671',
   endpoints: {
@@ -144,7 +144,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.155:8002/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.85:7798/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -229,7 +229,7 @@ const useOrderStore = create((set, get) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.155:8002/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.85:7798/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -494,7 +494,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.155:8002/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.85:7798/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -846,7 +846,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.18.7.155:8002/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.18.7.85:7798/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -903,7 +903,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.155:8002/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.18.7.85:7798/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -1108,7 +1108,7 @@ const useOrderStore = create((set, get) => ({
       formData.append('file', file);
       formData.append('version_number', version);
 
-      const response = await fetch(`http://172.18.7.155:8002/api/v1/document-management/documents/${documentId}/versions`, {
+      const response = await fetch(`http://172.18.7.85:7798/api/v1/document-management/documents/${documentId}/versions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -1160,7 +1160,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.18.7.155:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.85:7798/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

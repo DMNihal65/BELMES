@@ -226,7 +226,22 @@ Your organization aims for:
 
   return (
     <div className="p-4">
-    
+      <Alert
+        message="Coming Soon"
+        description="This feature is currently under development and will be available soon."
+        type="info"
+        showIcon
+        style={{ marginBottom: '20px' }}
+      />
+      <Modal
+        title="Coming Soon"
+        open={isModalVisible}
+        onOk={handleOk}
+        onCancel={handleOk}
+        centered
+      >
+        <p>This feature is currently under development and will be available soon.</p>
+      </Modal>
       {/* Summary Statistics */}
       <Row gutter={[16, 16]}>
         <Col span={12}>
@@ -254,6 +269,18 @@ Your organization aims for:
           </Card>
         </Col>
       </Row>
+
+    {/* Downtime Bar Chart */}
+    <Row className="mt-4">
+        <Col span={24}>
+          <Card>
+            <ReactECharts 
+              option={barChartOption} 
+              style={{ height: '500px' }}
+            />
+          </Card>
+        </Col>
+      </Row>
       
       {/* MTBF-MTTR Line Chart */}
       <Row className="mt-4">
@@ -262,18 +289,6 @@ Your organization aims for:
             <ReactECharts 
               option={lineChartOption} 
               style={{ height: '400px' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-          {/* Downtime Bar Chart */}
-    <Row className="mt-4">
-        <Col span={24}>
-          <Card>
-            <ReactECharts 
-              option={barChartOption} 
-              style={{ height: '500px' }}
             />
           </Card>
         </Col>

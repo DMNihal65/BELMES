@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import dayjs from 'dayjs';
 import axios from 'axios';
 
-const BASE_URL = 'http://172.18.7.85:7798';
+const BASE_URL = 'http://172.18.7.85:7068';
 
 // Helper function to find min/max dates
 const findDateRange = (items) => {

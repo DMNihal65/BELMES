@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.85:7798/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.85:7798/api/v1/operator';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.85:7068/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.85:7068/api/v1/operator';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -291,6 +291,57 @@ const useMachineMaintenanceStore = create((set, get) => ({
     fetchMachineNotifications();
     fetchComponentNotifications();
   },
+
+   // New function to fetch downtimes
+   fetchDowntimes: async () => {
+    set({ loading: true, error: null });
+    try {
+      const response = await axios.get(`${SUPERVISOR_BASE_URL}/downtimes`);
+      set({ loading: false });
+      return response.data; // Return the fetched downtimes
+    } catch (error) {
+      set({ 
+        error: error.response?.data?.detail || error.message, 
+        loading: false 
+      });
+      throw error;
+    }
+  },
+
+// Acknowledge downtime
+acknowledgeDowntime: async (id) => {
+  set({ loading: true, error: null });
+  try {
+    const response = await axios.put(`${SUPERVISOR_BASE_URL}/supervisor/downtimes/${id}/acknowledge`);
+    set({ loading: false });
+    return response.data; // Return the acknowledged downtime
+  } catch (error) {
+    set({ 
+      error: error.response?.data?.detail || error.message, 
+      loading: false 
+    });
+    throw error;
+  }
+},
+
+// Close downtime
+closeDowntime: async (id) => {
+  set({ loading: true, error: null });
+  try {
+    const response = await axios.put(`${SUPERVISOR_BASE_URL}/supervisor/downtimes/${id}/close`, {
+      action_taken: "close"
+    });
+    set({ loading: false });
+    return response.data; // Return the closed downtime
+  } catch (error) {
+    set({ 
+      error: error.response?.data?.detail || error.message, 
+      loading: false 
+    });
+    throw error;
+  }
+},
+  
 }));
 
 export default useMachineMaintenanceStore;

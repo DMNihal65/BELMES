@@ -39,7 +39,7 @@ function DataManagement() {
 
   useEffect(() => {
     if (isModalVisible) {
-      axios.get('http://172.18.7.85:7798/api/v1/api/inventory/categories/')
+      axios.get('http://172.18.7.85:7068/api/v1/api/inventory/categories/')
         .then(response => {
           const options = response.data.map(category => ({
             value: category.name,

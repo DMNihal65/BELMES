@@ -17,9 +17,9 @@ const Tickets = () => {
 
     getData(); // Initial fetch
 
-    // const intervalId = setInterval(() => {
-    //   getData(); // Fetch downtimes every 2 seconds
-    // }, 5000);
+    const intervalId = setInterval(() => {
+      getData(); // Fetch downtimes every 2 seconds
+    }, 5000);
 
     return () => clearInterval(intervalId); // Cleanup on unmount
   }, [fetchDowntimes]);

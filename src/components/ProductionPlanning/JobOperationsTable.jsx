@@ -58,10 +58,63 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   const [addOperationForm] = Form.useForm();
   const [workCenters, setWorkCenters] = useState([]);
   const [ipidStatusMap, setIpidStatusMap] = useState({});
+  const [isIpidStatusLoading, setIsIpidStatusLoading] = useState(true);
 
   useEffect(() => {
-    setOperations(initialOperations || []);
-  }, [initialOperations]);
+    if (initialOperations && initialOperations.length > 0) {
+      // Ensure all operations have work_center correctly set
+      const formattedOperations = initialOperations.map(op => ({
+        ...op,
+        // Ensure work_center is set from work_center_code if not already present
+        work_center: op.work_center || op.work_center_code || '',
+        // Make sure primary_machine structure is consistent
+        primary_machine: op.primary_machine ? {
+          id: op.primary_machine.id || op.machine_id,
+          name: op.primary_machine.name || op.primary_machine.make || 'Not Assigned'
+        } : op.machine_id ? {
+          id: op.machine_id, 
+          name: 'Machine ' + op.machine_id
+        } : null
+      }));
+      
+      // Sort operations by operation number when initially loading
+      const sortedOperations = [...formattedOperations].sort((a, b) => {
+        const aNum = parseInt(a.operation_number, 10) || 0;
+        const bNum = parseInt(b.operation_number, 10) || 0;
+        return aNum - bNum;
+      });
+      setOperations(sortedOperations);
+    } else {
+      // Try to load from localStorage if initialOperations is empty
+      try {
+        const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
+        const cachedOperations = localStorage.getItem(storageKey);
+        if (cachedOperations) {
+          const parsedOperations = JSON.parse(cachedOperations);
+          
+          // Ensure all operations loaded from localStorage have work_center properly set
+          const formattedOperations = parsedOperations.map(op => ({
+            ...op,
+            work_center: op.work_center || op.work_center_code || '',
+            primary_machine: op.primary_machine || null
+          }));
+          
+          console.log('Loaded operations from localStorage:', formattedOperations);
+          setOperations(formattedOperations);
+        } else {
+          setOperations([]);
+        }
+      } catch (error) {
+        console.error('Error loading operations from localStorage:', error);
+        setOperations([]);
+      }
+    }
+    
+    // Refresh operations data from server when component mounts
+    if (partNumber && (productionOrder || orderNumber)) {
+      refreshOperationsFromServer();
+    }
+  }, [initialOperations, partNumber, productionOrder, orderNumber]);
 
   useEffect(() => {
     setSelectedOrderNumber(orderNumber);
@@ -82,25 +135,79 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     fetchWorkCentersList();
   }, []);
 
-  // Add useEffect to check IPID status for all operations when component mounts
+  // Modify the useEffect that checks IPID status to ensure it runs on mount and sets loading state
   useEffect(() => {
     const fetchIpidStatus = async () => {
-      if (!initialOperations || !productionOrder) return;
-
-      const statusMap = {};
-      for (const operation of initialOperations) {
-        try {
-          const hasIpid = await checkIpidStatus(productionOrder, operation.operation_number);
-          statusMap[operation.operation_number] = hasIpid;
-        } catch (error) {
-          console.error('Error checking IPID status:', error);
-        }
+      if (!operations || operations.length === 0) {
+        setIsIpidStatusLoading(false);
+        return;
       }
-      setIpidStatusMap(statusMap);
+      
+      // Make sure we have a production order number to check against
+      const currentProductionOrder = productionOrder || orderNumber;
+      if (!currentProductionOrder) {
+        console.warn('No production order available for IPID status check');
+        setIsIpidStatusLoading(false);
+        return;
+      }
+
+      console.log(`Checking IPID status for ${operations.length} operations in order ${currentProductionOrder}`);
+      
+      setIsIpidStatusLoading(true);
+      const statusMap = {};
+      
+      try {
+        // Process all operations in parallel for faster loading
+        const statusPromises = operations.map(async (operation) => {
+          try {
+            // Always check against the server for the latest status
+            const hasIpid = await checkIpidStatus(currentProductionOrder, operation.operation_number);
+            console.log(`IPID status for operation ${operation.operation_number}: ${hasIpid}`);
+            return { opNumber: operation.operation_number, hasIpid };
+          } catch (error) {
+            console.error(`Error checking IPID status for operation ${operation.operation_number}:`, error);
+            return { opNumber: operation.operation_number, hasIpid: false };
+          }
+        });
+        
+        // Wait for all status checks to complete
+        const results = await Promise.all(statusPromises);
+        
+        // Convert results to status map
+        results.forEach(result => {
+          statusMap[result.opNumber] = result.hasIpid;
+        });
+      } catch (error) {
+        console.error('Error checking IPID statuses:', error);
+      } finally {
+        // Set the status map in state
+        setIpidStatusMap(statusMap);
+        console.log('Updated IPID status map:', statusMap);
+        setIsIpidStatusLoading(false);
+      }
     };
 
+    // Run this effect whenever operations change or when the component mounts
     fetchIpidStatus();
-  }, [initialOperations, productionOrder, checkIpidStatus]);
+  }, [operations, productionOrder, orderNumber, checkIpidStatus]);
+
+  // Sort the operations by operation_number
+  useEffect(() => {
+    if (operations && operations.length > 0) {
+      // Sort operations by operation number in ascending order
+      const sortedOperations = [...operations].sort((a, b) => {
+        const aNum = parseInt(a.operation_number, 10) || 0;
+        const bNum = parseInt(b.operation_number, 10) || 0;
+        return aNum - bNum;
+      });
+      
+      // Only update if the order has changed
+      if (JSON.stringify(sortedOperations.map(op => op.id)) !== 
+          JSON.stringify(operations.map(op => op.id))) {
+        setOperations(sortedOperations);
+      }
+    }
+  }, [operations.length]);
 
   const isEditing = (record) => record.key === editingKey;
 
@@ -136,8 +243,8 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       const updatedOperation = await updateOperationDetails(partNumber, record.operation_number, updateData);
       
       // Update the local state immediately
-      setOperations(prevOperations => 
-        prevOperations.map(op => {
+      setOperations(prevOperations => {
+        const updatedOperations = prevOperations.map(op => {
           if (op.key === key) {
             return {
               ...op,
@@ -152,8 +259,21 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
             };
           }
           return op;
-        })
-      );
+        });
+        
+        // Store updated operations in localStorage
+        try {
+          const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
+          localStorage.setItem(storageKey, JSON.stringify(updatedOperations));
+        } catch (storageError) {
+          console.error('Error updating operations in localStorage:', storageError);
+        }
+        
+        return updatedOperations;
+      });
+      
+      // Also refresh from server to ensure latest data
+      await refreshOperationsFromServer();
       
       setEditingKey('');
       message.success('Operation updated successfully');
@@ -167,7 +287,8 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     try {
       const { 
         createOperation, 
-        searchOrders
+        searchOrders,
+        getLatestOperationNumber
       } = usePlanningStore.getState();
       
       // Get the current order details to get the order_id
@@ -178,15 +299,32 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         throw new Error('Order details not found');
       }
 
-      // Calculate the next operation number
-      const nextOperationNumber = operations.length > 0 
-        ? Math.max(...operations.map(op => parseInt(op.operation_number))) + 10 
-        : 10;
+      // First determine what the next operation number should be
+      // Check existing operations in the table to find the highest number
+      let highestOpNumber = 0;
+      if (operations && operations.length > 0) {
+        const opNumbers = operations.map(op => parseInt(op.operation_number, 10))
+                                  .filter(num => !isNaN(num));
+        if (opNumbers.length > 0) {
+          highestOpNumber = Math.max(...opNumbers);
+          console.log(`Highest operation number in current table: ${highestOpNumber}`);
+        }
+      }
+
+      // Also check the API for the latest operation number
+      const latestApiOpNumber = await getLatestOperationNumber(partNumber);
+      console.log(`Latest operation number from API: ${latestApiOpNumber}`);
+
+      // Use the higher of the two values
+      const baseOpNumber = Math.max(highestOpNumber, latestApiOpNumber);
+      let nextOperationNumber = baseOpNumber + 10;
+      
+      console.log(`Using next operation number: ${nextOperationNumber}`);
 
       // Create operation data with the order_id from the API response
       const operationData = {
         part_number: partNumber,
-        operation_number: parseInt(nextOperationNumber),
+        operation_number: nextOperationNumber,
         operation_description: values.operation_description,
         setup_time: parseFloat(values.setup_time),
         ideal_cycle_time: parseFloat(values.ideal_cycle_time),
@@ -194,8 +332,37 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         order_id: order.id
       };
 
-      // Create the operation - this will also assign a default machine
-      const newOperation = await createOperation(partNumber, operationData);
+      // Try to create the operation - with retry logic for handling conflicts
+      let maxRetries = 5;
+      let operationCreated = false;
+      let newOperation = null;
+
+      while (!operationCreated && maxRetries > 0) {
+        try {
+          console.log(`Attempting to create operation with number: ${nextOperationNumber}`);
+          // Update the operation number for each attempt
+          operationData.operation_number = nextOperationNumber;
+          
+          // Create the operation - this will also assign a default machine
+          newOperation = await createOperation(partNumber, operationData);
+          operationCreated = true;
+          message.success(`Operation ${nextOperationNumber} created successfully`);
+        } catch (createError) {
+          // If the error indicates a duplicate operation number
+          if (createError.message && createError.message.includes('already exists')) {
+            console.log(`Operation number ${nextOperationNumber} already exists. Incrementing...`);
+            nextOperationNumber += 10;
+            maxRetries--;
+          } else {
+            // If it's a different error, just throw it
+            throw createError;
+          }
+        }
+      }
+
+      if (!operationCreated) {
+        throw new Error(`Could not find an available operation number after ${5 - maxRetries} attempts`);
+      }
 
       // Add the new operation to the local state immediately with machine info
       const newOperationWithDetails = {
@@ -206,28 +373,110 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         operation_description: values.operation_description,
         setup_time: parseFloat(values.setup_time),
         ideal_cycle_time: parseFloat(values.ideal_cycle_time),
+        // Ensure work_center is set from work_center_code
         work_center: values.work_center_code,
+        work_center_code: values.work_center_code,
         work_center_machines: newOperation.work_center_machines || [],
         primary_machine: {
           id: newOperation.primary_machine?.id,
-          name: newOperation.primary_machine?.name || newOperation.work_center_machines?.[0]?.make
+          name: newOperation.primary_machine?.name || newOperation.work_center_machines?.[0]?.make || ''
         }
       };
 
       // Update the operations state with the new operation
       setOperations(prevOperations => {
-        const updatedOperations = [...prevOperations, newOperationWithDetails]
-          .sort((a, b) => parseInt(a.operation_number) - parseInt(b.operation_number));
-        return updatedOperations;
+        // Add the new operation to the array
+        const updatedOperations = [...prevOperations, newOperationWithDetails];
+        
+        // Sort the operations by operation_number to ensure they appear in sequence
+        const sortedOperations = updatedOperations.sort((a, b) => {
+          const aNum = parseInt(a.operation_number, 10) || 0;
+          const bNum = parseInt(b.operation_number, 10) || 0;
+          return aNum - bNum;
+        });
+
+        // Store in localStorage as a backup
+        try {
+          const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
+          localStorage.setItem(storageKey, JSON.stringify(sortedOperations));
+          console.log('Operations cached in localStorage');
+        } catch (storageError) {
+          console.error('Error caching operations:', storageError);
+        }
+        
+        return sortedOperations;
       });
 
-      message.success('Operation created successfully');
+      // Refresh operations data from server to ensure it's in sync
+      await refreshOperationsFromServer();
+
       setIsAddModalVisible(false);
       addOperationForm.resetFields();
 
     } catch (error) {
       console.error('Error adding operation:', error);
       message.error(error.message || 'Failed to create operation');
+    }
+  };
+
+  // Add this function to refresh operations data from server
+  const refreshOperationsFromServer = async () => {
+    try {
+      console.log('Refreshing operations data from server');
+      const { searchOrders } = usePlanningStore.getState();
+      const searchTerm = productionOrder || orderNumber || partNumber;
+      
+      if (!searchTerm) {
+        console.warn('No search term available for refreshing operations');
+        return;
+      }
+      
+      const results = await searchOrders(searchTerm);
+      
+      if (results?.orders && results.orders.length > 0) {
+        const serverOperations = results.orders[0].operations || [];
+        
+        if (serverOperations.length > 0) {
+          // Transform server operations to match our format
+          const formattedOperations = serverOperations.map(op => ({
+            ...op,
+            key: op.id.toString(),
+            production_order: results.orders[0].production_order,
+            // Make sure work_center is set from work_center_code
+            work_center: op.work_center_code || op.work_center || '',
+            // Also ensure primary_machine is properly structured
+            primary_machine: op.primary_machine ? {
+              id: op.primary_machine.id || op.machine_id,
+              name: op.primary_machine.name || op.primary_machine.make || 'Not Assigned'
+            } : op.machine_id ? {
+              id: op.machine_id,
+              name: 'Machine ' + op.machine_id
+            } : null
+          }));
+          
+          console.log('Formatted operations from server:', formattedOperations);
+          
+          // Sort operations by operation number
+          const sortedOperations = formattedOperations.sort((a, b) => {
+            const aNum = parseInt(a.operation_number, 10) || 0;
+            const bNum = parseInt(b.operation_number, 10) || 0;
+            return aNum - bNum;
+          });
+          
+          console.log('Updated operations from server:', sortedOperations);
+          setOperations(sortedOperations);
+          
+          // Also update localStorage
+          try {
+            const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
+            localStorage.setItem(storageKey, JSON.stringify(sortedOperations));
+          } catch (storageError) {
+            console.error('Error caching refreshed operations:', storageError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing operations from server:', error);
     }
   };
 
@@ -277,7 +526,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     setIsModalVisible(false);
   };
 
-  // Update the handleIpidUpload function
+  // Modify the handleIpidUpload function to persistently save status after upload
   const handleIpidUpload = async (values) => {
     try {
       const file = values.file?.fileList[0]?.originFileObj;
@@ -311,19 +560,66 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       if (response.success) {
         // Update the status map for this operation
-        setIpidStatusMap(prev => ({
-          ...prev,
-          [selectedOperation.operation_number]: true
-        }));
+        setIpidStatusMap(prev => {
+          const updated = {
+            ...prev,
+            [selectedOperation.operation_number]: true
+          };
+          
+          // Also store in localStorage to persist through refreshes
+          try {
+            localStorage.setItem(
+              `ipid_status_${currentProductionOrder}`,
+              JSON.stringify(updated)
+            );
+          } catch (err) {
+            console.error('Error saving IPID status to localStorage:', err);
+          }
+          
+          return updated;
+        });
+        
         message.success('IPID document uploaded successfully');
         setIsIpidModalVisible(false);
         ipidForm.resetFields();
+        
+        // Refresh status to ensure it's up to date
+        const updatedStatus = await checkIpidStatus(
+          currentProductionOrder,
+          selectedOperation.operation_number
+        );
+        
+        console.log(`Updated IPID status after upload for operation ${selectedOperation.operation_number}: ${updatedStatus}`);
       }
     } catch (error) {
       console.error('Error uploading IPID:', error);
       message.error(error.message || 'Failed to upload IPID document');
     }
   };
+
+  // Add an additional useEffect to load IPID status from localStorage as a fallback
+  useEffect(() => {
+    const loadIpidStatusFromLocalStorage = () => {
+      const currentProductionOrder = productionOrder || orderNumber;
+      if (!currentProductionOrder) return;
+      
+      try {
+        const savedStatus = localStorage.getItem(`ipid_status_${currentProductionOrder}`);
+        if (savedStatus) {
+          const parsedStatus = JSON.parse(savedStatus);
+          console.log('Loaded IPID status from localStorage:', parsedStatus);
+          setIpidStatusMap(prevMap => ({
+            ...prevMap,
+            ...parsedStatus
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading IPID status from localStorage:', error);
+      }
+    };
+    
+    loadIpidStatusFromLocalStorage();
+  }, [productionOrder, orderNumber]);
 
   // Function to fetch machines when work center changes
   const handleWorkCenterChange = async (workCenterCode) => {
@@ -443,8 +739,8 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       );
 
       // Update local state immediately with make
-      setOperations(prevOperations =>
-        prevOperations.map(op => {
+      setOperations(prevOperations => {
+        const updatedOperations = prevOperations.map(op => {
           if (op.operation_number === selectedOperationForMachine.operation_number) {
             const selectedMachine = selectedOperationForMachine.work_center_machines?.find(m => m.id === machineId);
             return {
@@ -457,14 +753,24 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
             };
           }
           return op;
-        })
-      );
+        });
+        
+        // Store operations in localStorage
+        try {
+          const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
+          localStorage.setItem(storageKey, JSON.stringify(updatedOperations));
+        } catch (storageError) {
+          console.error('Error updating operations in localStorage:', storageError);
+        }
+        
+        return updatedOperations;
+      });
 
       setIsMachineLinkModalVisible(false);
       message.success('Machine updated successfully');
 
-      // Optionally refresh data to ensure sync with server
-      await refreshData();
+      // Refresh data to ensure sync with server
+      await refreshOperationsFromServer();
     } catch (error) {
       console.error('Error updating machine:', error);
       message.error('Failed to update machine');
@@ -518,14 +824,13 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       editable: false,
       sorter: (a, b) => {
         // Convert to numbers before comparing to ensure proper numeric sorting
-        const aNum = parseInt(a.operation_number, 10);
-        const bNum = parseInt(b.operation_number, 10);
+        const aNum = parseInt(a.operation_number, 10) || 0;
+        const bNum = parseInt(b.operation_number, 10) || 0;
         return aNum - bNum;
       },
       sortDirections: ['ascend'],
       defaultSortOrder: 'ascend',
-      sortOrder: 'ascend',
-      showSorterTooltip: false
+      render: (text) => <span style={{ fontWeight: 'bold' }}>{text}</span>,
     },
     {
       title: 'Operation Description',
@@ -578,6 +883,11 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       dataIndex: 'work_center',
       width: 150,
       editable: false,
+      render: (text, record) => {
+        // Use work_center if available, otherwise fall back to work_center_code
+        const centerValue = text || record.work_center_code || 'Not Assigned';
+        return <span>{centerValue}</span>;
+      }
     },
     {
       title: 'Machine',
@@ -587,7 +897,25 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       render: (text, record) => {
         const machine = record.primary_machine;
         const workCenterMachines = record.work_center_machines || [];
-        return machine ? workCenterMachines.find(m => m.id === machine.id)?.make || machine.name : 'Not Assigned';
+        
+        // Try to get machine name with multiple fallback options
+        if (machine && machine.name) {
+          return machine.name;
+        } else if (machine && machine.id) {
+          // Try to find the machine in work_center_machines by id
+          const matchedMachine = workCenterMachines.find(m => m.id === machine.id);
+          if (matchedMachine) {
+            return matchedMachine.make || `Machine ${machine.id}`;
+          }
+          return `Machine ${machine.id}`;
+        } else if (record.machine_id) {
+          const matchedMachine = workCenterMachines.find(m => m.id === record.machine_id);
+          if (matchedMachine) {
+            return matchedMachine.make || `Machine ${record.machine_id}`;
+          }
+          return `Machine ${record.machine_id}`;
+        }
+        return 'Not Assigned';
       }
     },
     {
@@ -598,6 +926,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       render: (_, record) => {
         const editable = isEditing(record);
         const hasIpid = ipidStatusMap[record.operation_number];
+        
         return (
           <Space>
             {/* View MPP Details button */}
@@ -609,16 +938,31 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
               />
             </Tooltip>
 
-            {/* IPID Upload button */}
-            <Tooltip title={hasIpid ? 'IPID already uploaded' : 'Upload IPID File'}>
+            {/* IPID Upload button with loading state */}
+            <Tooltip title={isIpidStatusLoading ? 'Checking IPID status...' : 
+                              hasIpid ? 'IPID already uploaded' : 'Upload IPID File'}>
               <Button 
                 type="link" 
                 icon={<UploadOutlined />} 
                 onClick={() => {
+                  if (isIpidStatusLoading) {
+                    message.info('Please wait while we check IPID status');
+                    return;
+                  }
+                  if (hasIpid) {
+                    message.info('IPID has already been uploaded for this operation');
+                    return;
+                  }
                   setSelectedOperation(record);
                   setIsIpidModalVisible(true);
                 }}
-                disabled={hasIpid}
+                style={{ 
+                  color: hasIpid ? '#52c41a' : undefined,
+                  cursor: hasIpid || isIpidStatusLoading ? 'not-allowed' : 'pointer',
+                  opacity: hasIpid || isIpidStatusLoading ? 0.7 : 1,
+                }}
+                disabled={hasIpid || isIpidStatusLoading}
+                loading={isIpidStatusLoading}
               />
             </Tooltip>
 
@@ -694,22 +1038,24 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     <Form form={form}>
       {headerSection}
       <Table 
-  components={{
-    body: {
-      cell: EditableCell,
-    },
-  }}
-  columns={mergedColumns} 
-  dataSource={operations}
-  scroll={{ x: 1200 }}
-  pagination={{
-    pageSize: 10,
-    total: operations.length,
-    showSizeChanger: false
-  }}
-  size="middle"
-  rowKey="id"
-        defaultSortOrder={['operation_number', 'ascend']}
+        components={{
+          body: {
+            cell: EditableCell,
+          },
+        }}
+        columns={mergedColumns} 
+        dataSource={operations}
+        scroll={{ x: 1200 }}
+        pagination={{
+          pageSize: 10,
+          total: operations.length,
+          showSizeChanger: false
+        }}
+        size="middle"
+        rowKey="id"
+        sortDirections={['ascend']}
+        defaultSortOrder="ascend"
+        sortField="operation_number"
       />
 
       {/* Add Operation Modal */}
@@ -791,62 +1137,76 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         footer={null}
         width={500}
       >
-        <Form
-          form={ipidForm}
-          layout="vertical"
-          onFinish={handleIpidUpload}
-        >
-          <Form.Item
-            name="documentName"
-            label="Document Name"
-            rules={[{ required: true, message: 'Please enter document name' }]}
+        {/* Check if IPID already exists for the selected operation */}
+        {selectedOperation && ipidStatusMap[selectedOperation.operation_number] ? (
+          <div className="text-center p-4">
+            <div style={{ fontSize: '64px', color: '#52c41a', marginBottom: '16px' }}>
+              <UploadOutlined />
+            </div>
+            <h3>IPID Already Uploaded</h3>
+            <p>An IPID document has already been uploaded for this operation.</p>
+            <Button type="primary" onClick={() => setIsIpidModalVisible(false)}>
+              Close
+            </Button>
+          </div>
+        ) : (
+          <Form
+            form={ipidForm}
+            layout="vertical"
+            onFinish={handleIpidUpload}
           >
-            <Input placeholder="Enter document name" />
-          </Form.Item>
-
-          <Form.Item
-            name="description"
-            label="Description"
-            rules={[{ required: true, message: 'Please enter description' }]}
-          >
-            <Input.TextArea rows={4} placeholder="Enter document description" />
-          </Form.Item>
-
-          <Form.Item
-            name="file"
-            label="IPID Document"
-            rules={[{ required: true, message: 'Please select a file' }]}
-          >
-            <Upload.Dragger
-              name="file"
-              maxCount={1}
-              beforeUpload={() => false}
-              accept=".pdf,.doc,.docx"
+            <Form.Item
+              name="documentName"
+              label="Document Name"
+              rules={[{ required: true, message: 'Please enter document name' }]}
             >
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined />
-              </p>
-              <p className="ant-upload-text">Click or drag file to this area to upload</p>
-              <p className="ant-upload-hint">
-                Support for PDF, DOC, DOCX files
-              </p>
-            </Upload.Dragger>
-          </Form.Item>
+              <Input placeholder="Enter document name" />
+            </Form.Item>
 
-          <Form.Item className="mb-0 text-right">
-            <Space>
-              <Button onClick={() => {
-                setIsIpidModalVisible(false);
-                ipidForm.resetFields();
-              }}>
-                Cancel
-              </Button>
-              <Button type="primary" htmlType="submit">
-                Upload
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+            <Form.Item
+              name="description"
+              label="Description"
+              rules={[{ required: true, message: 'Please enter description' }]}
+            >
+              <Input.TextArea rows={4} placeholder="Enter document description" />
+            </Form.Item>
+
+            <Form.Item
+              name="file"
+              label="IPID Document"
+              rules={[{ required: true, message: 'Please select a file' }]}
+            >
+              <Upload.Dragger
+                name="file"
+                maxCount={1}
+                beforeUpload={() => false}
+                accept=".pdf,.doc,.docx"
+              >
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">Click or drag file to this area to upload</p>
+                <p className="ant-upload-hint">
+                  Support for PDF, DOC, DOCX files
+                </p>
+              </Upload.Dragger>
+            </Form.Item>
+
+            <Form.Item className="mb-0 text-right">
+              <Space>
+                <Button onClick={() => {
+                  setIsIpidModalVisible(false);
+                  ipidForm.resetFields();
+                }}>
+                  Cancel
+                </Button>
+                <Button type="primary" htmlType="submit">
+                  Upload
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        )}
       </Modal>
 
       {/* Add Machine Linking Modal */}

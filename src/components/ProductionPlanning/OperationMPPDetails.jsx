@@ -27,7 +27,7 @@ const defaultInstructions = [
 
 const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
   const [form] = Form.useForm();
-  const { fetchMPPDetails, saveMPPDetails, mppDetails, isLoading, clearMPPDetails } = usePlanningStore();
+  const { createOrFetchMPP, createNewMpp, updateMpp } = usePlanningStore();
   const [workInstructions, setWorkInstructions] = useState(defaultInstructions);
   const [editableCardTitles, setEditableCardTitles] = useState({
     fixture: 'Fixture & IPID Details',
@@ -36,118 +36,106 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
     images: 'Operation Images'
   });
   const [fileList, setFileList] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    return () => {
-      form.resetFields();
-      setWorkInstructions(defaultInstructions);
-      clearMPPDetails();
+    const initializeMPP = async () => {
+      try {
+        setLoading(true);
+        
+        if (operation.existingMppData) {
+          const mppData = operation.existingMppData;
+          form.setFieldsValue({
+            fixture_number: mppData.fixture_number || '',
+            ipid_number: mppData.ipid_number || '',
+            datum_x: mppData.datum_x || '',
+            datum_y: mppData.datum_y || '',
+            datum_z: mppData.datum_z || '',
+          });
+
+          if (mppData.work_instructions?.sections) {
+            setWorkInstructions(mppData.work_instructions.sections.map(section => ({
+              id: section.sequence,
+              title: section.title,
+              content: section.instructions
+            })));
+          }
+        } else {
+          const mppData = await createOrFetchMPP(partNumber, operation.operation_number);
+          
+          if (mppData) {
+            form.setFieldsValue({
+              fixture_number: mppData.fixture_number || '',
+              ipid_number: mppData.ipid_number || '',
+              datum_x: mppData.datum_x || '',
+              datum_y: mppData.datum_y || '',
+              datum_z: mppData.datum_z || '',
+            });
+
+            if (mppData.work_instructions?.sections) {
+              setWorkInstructions(mppData.work_instructions.sections.map(section => ({
+                id: section.sequence,
+                title: section.title,
+                content: section.instructions
+              })));
+            }
+          } else {
+            form.resetFields();
+            setWorkInstructions(defaultInstructions);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing MPP:', error);
+        message.error('Failed to initialize MPP details');
+      } finally {
+        setLoading(false);
+      }
     };
-  }, [form, clearMPPDetails]);
 
-  useEffect(() => {
     if (partNumber && operation?.operation_number) {
-      form.resetFields();
-      setWorkInstructions(defaultInstructions);
-      fetchMPPDetails(partNumber, operation.operation_number);
+      initializeMPP();
     }
-  }, [partNumber, operation, fetchMPPDetails, form]);
+  }, [partNumber, operation, form, createOrFetchMPP]);
 
-  useEffect(() => {
-    if (mppDetails) {
-      const formValues = {
-        fixture_number: mppDetails.fixture_number || '',
-        ipid_number: mppDetails.ipid_number || '',
-        datum_x: mppDetails.datum_x || '',
-        datum_y: mppDetails.datum_y || '',
-        datum_z: mppDetails.datum_z || '',
-      };
-
-      form.setFieldsValue(formValues);
-
-      if (mppDetails.work_instructions?.sections) {
-        setWorkInstructions(mppDetails.work_instructions.sections.map((section, index) => ({
-          id: index + 1,
-          title: section.title || '',
-          content: section.instructions || ''
-        })));
-      } else {
-        setWorkInstructions(defaultInstructions);
-      }
-
-      if (mppDetails.images) {
-        setFileList(mppDetails.images.map((img, index) => ({
-          uid: index,
-          name: img.name,
-          status: 'done',
-          url: img.url
-        })));
-      }
-    } else {
-      form.resetFields();
-      setWorkInstructions(defaultInstructions);
-    }
-  }, [mppDetails, form]);
-
-  const handleSave = async () => {
+  const handleSubmit = async (values) => {
     try {
-      const values = await form.validateFields();
+      setLoading(true);
       
-      if (!values.fixture_number || !values.ipid_number) {
-        message.error('Fixture number and IPID number are required');
-        return;
-      }
-
       const mppData = {
-        order_id: operation?.order_id,
-        operation_id: operation?.id,
-        document_id: null,
-        fixture_number: values.fixture_number,
-        ipid_number: values.ipid_number,
-        datum_x: values.datum_x || '',
-        datum_y: values.datum_y || '',
-        datum_z: values.datum_z || '',
+        part_number: partNumber,
+        operation_number: Number(operation.operation_number),
+        fixture_number: values.fixture_number?.trim() || '',
+        ipid_number: values.ipid_number?.trim() || '',
+        datum_x: values.datum_x?.trim() || '',
+        datum_y: values.datum_y?.trim() || '',
+        datum_z: values.datum_z?.trim() || '',
         work_instructions: {
           sections: workInstructions
             .filter(instruction => instruction.title || instruction.content)
             .map((instruction, index) => ({
-              title: instruction.title || '',
-              instructions: instruction.content || '',
-              sequence: index + 1
+              title: instruction.title?.trim() || '',
+              instructions: instruction.content?.trim() || '',
+              sequence: index
             }))
-        },
-        part_number: partNumber,
-        operation_number: Number(operation?.operation_number),
-        images: fileList.map(file => file.url)
+        }
       };
 
-      console.log('Sending data:', mppData);
-      
-      const savedData = await saveMPPDetails(mppData);
-      
-      if (savedData) {
-        message.success('MPP details saved successfully');
-        if (onSave) {
-          onSave(savedData);
-        }
+      console.log('Submitting MPP data:', mppData);
+
+      if (operation.existingMppData) {
+        await updateMpp(partNumber, operation.operation_number, mppData);
+        message.success('MPP details updated successfully');
+      } else {
+        await createNewMpp(mppData);
+        message.success('MPP details created successfully');
       }
+
+      onSave?.();
     } catch (error) {
-      let errorMessage = 'Failed to save MPP details';
-      
-      try {
-        const errorDetail = typeof error === 'string' ? error : error.message;
-        if (errorDetail.includes('{')) {
-          const parsedError = JSON.parse(errorDetail);
-          errorMessage = parsedError.detail || JSON.stringify(parsedError);
-        } else {
-          errorMessage = errorDetail;
-        }
-      } catch (e) {
-        errorMessage = error.message || String(error);
-      }
-      
-      message.error(errorMessage);
-      console.error('Save error details:', error);
+      console.error('Error saving MPP:', error);
+      message.error(error.message || 'Failed to save MPP details');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -162,7 +150,7 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
     setFileList(newFileList);
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
         <Spin size="large" />
@@ -174,7 +162,11 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <Title level={4} editable>Operation Details - Operation Number: {operation?.operation_number}</Title>
       
-      <Form form={form} layout="vertical">
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleSubmit}
+      >
         {/* Fixture & IPID Details */}
         <Card 
           title={
@@ -344,13 +336,16 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
 
         {/* Save Changes Button */}
         <div className="flex justify-end mt-6">
-          <Button 
-            type="primary" 
-            onClick={handleSave}
-            loading={isLoading}
-          >
-            Save Changes
-          </Button>
+          <Form.Item className="mb-0">
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              loading={loading}
+              block
+            >
+              Save Changes
+            </Button>
+          </Form.Item>
         </div>
       </Form>
     </div>

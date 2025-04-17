@@ -2,23 +2,18 @@ import axios from 'axios';
 
 class QualityStore {
   getAuthHeaders() {
-    // Get token from localStorage
     const token = localStorage.getItem('token');
     
-    // Log token for debugging (remove in production)
-    console.log('Current token:', token);
-
     if (!token) {
-      throw new Error('No authentication token found');
+      console.warn('No authentication token found');
+      throw new Error('Authentication token is missing');
     }
-
-    // Remove 'Bearer ' if it's already included in the stored token
-    const cleanToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
 
     return {
       headers: {
-        'Authorization': cleanToken,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
       }
     };
   }
@@ -26,7 +21,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.85:7068/api/v1/planning/all_orders',
+        'http://172.18.7.93:9999/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -39,11 +34,7 @@ class QualityStore {
         order_id: order.id
       }));
     } catch (error) {
-      if (error.response?.status === 401) {
-        console.error('Authentication failed. Please log in again.');
-        localStorage.removeItem('token');
-      }
-      console.error('Error fetching orders:', error);
+      this.handleAuthError(error);
       throw error;
     }
   }
@@ -52,7 +43,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.85:7068/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.93:9999/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -92,39 +83,52 @@ class QualityStore {
 
   async fetchInspectionDetails(orderId) {
     try {
-      console.log(`Attempting to fetch inspection details for Order ID: ${orderId}`);
+      console.log(`Fetching inspection details for Order ID: ${orderId}`);
       
-      const response = await axios.get(
-        `http://172.18.7.85:7068/quality/master-boc/ipids/${orderId}`,
-        this.getAuthHeaders()
-      );
+      const config = {
+        method: 'get',
+        url: `http://172.18.7.93:9999/api/v1/quality/master-boc/ipids/${orderId}`,
+        ...this.getAuthHeaders()
+      };
+
+      console.log('Request config:', config);
+      const response = await axios(config);
       
-      console.log('Successfully fetched inspection details:', response.data);
-      
+      console.log('API Response:', response.data);
+
       return {
-        ...response.data,
-        order_id: orderId,
-        operation_groups: response.data.operation_groups || [],
+        order_id: response.data.order_id,
+        production_order: response.data.production_order,
+        part_number: response.data.part_number,
         operations: response.data.operations || [],
-        production_order: response.data.production_order || '',
-        part_number: response.data.part_number || ''
+        operation_groups: response.data.operation_groups?.map(group => ({
+          key: `${group.op_no}-${group.details?.zone}`,
+          op_no: group.op_no,
+          ipid: group.ipid,
+          details: group.details,
+          zone: group.details?.zone,
+          dimension_type: group.details?.dimension_type,
+          nominal: group.details?.nominal,
+          uppertol: group.details?.uppertol,
+          lowertol: group.details?.lowertol,
+          measured_instrument: group.details?.measured_instrument
+        })) || [],
+        hasData: true,
+        status: 'success'
       };
       
     } catch (error) {
-      console.log('Error details:', error.response || error);
+      this.handleAuthError(error);
       
       return {
+        status: 'error',
+        message: error.response?.status === 404 
+          ? 'No inspection details found' 
+          : 'Error fetching inspection details',
+        hasData: false,
         order_id: orderId,
         operation_groups: [],
-        operations: [],
-        production_order: '',
-        part_number: '',
-        details: [],
-        status: 'not_found',
-        error: error.response?.status === 404 ? 'NOT_FOUND' : 'ERROR',
-        message: error.response?.status === 404 
-          ? 'No inspection details found for this Order ID'
-          : 'Error fetching inspection details'
+        operations: []
       };
     }
   }
@@ -132,7 +136,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://172.18.7.85:7068/api/v1/quality/run',
+        'http://172.18.7.93:9999/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;
@@ -145,6 +149,53 @@ class QualityStore {
       throw error;
     }
   }
+
+  async fetchBalloonedDrawing(drawingId, operationId) {
+    try {
+      const response = await axios.get(
+        `http://172.18.7.93:9999/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
+        {
+          ...this.getAuthHeaders(),
+          responseType: 'blob' // Important: set responseType to blob for PDF data
+        }
+      );
+      
+      // Create a blob URL from the response data
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      
+      return {
+        url: url,
+        fileName: `drawing_${drawingId}_${operationId}.pdf`
+      };
+    } catch (error) {
+      console.error('Error fetching ballooned drawing:', error);
+      throw error;
+    }
+  }
+
+  handleAuthError(error) {
+    if (error.response?.status === 401) {
+      console.error('Authentication failed. Please log in again.');
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Authentication failed. Please log in again.');
+    }
+    console.error('API Error:', error);
+  }
 }
 
 export const qualityStore = new QualityStore();
+
+
+
+
+
+
+
+
+
+
+
+
+

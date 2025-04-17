@@ -1,12 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Statistic, Modal, Alert } from 'antd';
 import ReactECharts from 'echarts-for-react';
+import axios from 'axios';
 
 const TicketAnalytics = () => {
   const [isModalVisible, setIsModalVisible] = useState(true);
+  const [mttr, setMttr] = useState(0);
+  const [mtbf, setMtbf] = useState(0);
+  const [totalFailures, setTotalFailures] = useState(0);
+  const [monthlyData, setMonthlyData] = useState({
+    dates: [],
+    mtbf: [],
+    mttr: []
+  });
 
   useEffect(() => {
-    setIsModalVisible(true);
+    const fetchData = async () => {
+      try {
+        const response = await axios.get('http://172.16.0.203:8002/api/v1/maintainance/metrics/machine-performance');
+        const data = response.data;
+
+        // Update MTTR, MTBF, and total failures with rounded values
+        setMttr(Math.round(data.mttr_shop));
+        setMtbf(Math.round(data.mtbf_shop));
+        setTotalFailures(data.total_failures); // Assuming total_failures is an integer
+
+        // Assuming you want to keep the monthly data structure
+        setMonthlyData({
+          dates: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+          mtbf: Array(12).fill(Math.round(data.mtbf_shop)), // Round off for monthly data
+          mttr: Array(12).fill(Math.round(data.mttr_shop))  // Round off for monthly data
+        });
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const handleOk = () => {
@@ -14,14 +44,6 @@ const TicketAnalytics = () => {
   };
 
   // Data for MTBF-MTTR line chart
-  const monthlyData = {
-    dates: ['Jan 23', 'Feb 23', 'Mar 23', 'Apr 23', 'May 23', 'Jun 23', 
-            'Jul 23', 'Aug 23', 'Sep 23', 'Oct 23', 'Nov 23', 'Dec 23'],
-    mtbf: [200, 250, 220, 230, 240, 235, 400, 450, 4026, 350, 280, 150],
-    mttr: [150, 180, 160, 170, 165, 175, 200, 350, 654, 200, 190, 140]
-  };
-
-  // Data for downtime categories bar chart
   const downtimeData = {
     machines: ['Machine A', 'Machine B', 'Machine C', 'Machine D'],
     categories: ['Mechanical', 'Electrical', 'Others', 'Operational'],
@@ -51,10 +73,7 @@ ${params[0].axisValue}
 ----------------------------------------
 ${params[0].seriesName}: ${params[0].value}h
 ${params[1].seriesName}: ${params[1].value}h
-----------------------------------------
-Your organization aims for:
-• Asset MTBF greater than 200h
-• Asset MTTR less than 35h`;
+`;
       },
       textStyle: {
         fontSize: 14
@@ -132,125 +151,24 @@ Your organization aims for:
     ]
   };
 
-  const barChartOption = {
-    title: {
-      text: 'Machine Downtime by Category',
-      left: 'center',
-      top: 20,
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 'bold'
-      }
-    },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow'
-      },
-      formatter: function(params) {
-        let tooltip = `${params[0].axisValue}\n`;
-        tooltip += '----------------------------------------\n';
-        
-        // Add each category's value on a new line
-        params.forEach(param => {
-          if (param.value > 0) { // Only show categories with values
-            tooltip += `${param.seriesName}: ${param.value}h\n`;
-          }
-        });
-        
-        // Calculate and add total
-        const total = params.reduce((sum, param) => sum + (param.value || 0), 0);
-        tooltip += '----------------------------------------\n';
-        tooltip += `Total Downtime: ${total.toFixed(1)}h`;
-        
-        return tooltip;
-      },
-      textStyle: {
-        fontSize: 14
-      },
-      padding: [10, 15],
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      borderColor: '#ccc',
-      borderWidth: 1,
-      extraCssText: 'white-space: pre-line; line-height: 1.5'
-    },
-    legend: {
-      data: downtimeData.categories,
-      top: 60,
-      textStyle: {
-        fontSize: 12
-      }
-    },
-    grid: {
-      left: '5%',
-      right: '5%',
-      bottom: '15%',
-      top: '25%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: downtimeData.machines,
-      name: 'Machines',
-      nameLocation: 'middle',
-      nameGap: 45,
-      axisLabel: {
-        rotate: 0,
-        fontSize: 12,
-        interval: 0
-      },
-      axisTick: {
-        alignWithLabel: true
-      }
-    },
-    yAxis: {
-      type: 'value',
-      name: 'Duration (hours)',
-      nameLocation: 'middle',
-      nameGap: 50,
-      axisLabel: {
-        fontSize: 12
-      }
-    },
-    series: downtimeData.categories.map((category, index) => ({
-      name: category,
-      type: 'bar',
-      stack: 'total',
-      emphasis: {
-        focus: 'series'
-      },
-      barWidth: '60%',
-      data: downtimeData.values.map(machine => machine[index])
-    }))
-  };
-
   return (
     <div className="p-4">
     
       {/* Summary Statistics */}
       <Row gutter={[16, 16]}>
-        <Col span={12}>
+        <Col span={8}>
           <Card title="Mean Time To Repair (MTTR)">
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <Statistic title="Average MTTR" value="2.5" suffix="hours" />
-              </Col>
-              <Col span={12}>
-                <Statistic title="MTTR This Month" value="1.8" suffix="hours" />
-              </Col>
-            </Row>
+            <Statistic title="Average MTTR" value={mttr} suffix="hours" />
           </Card>
         </Col>
-        <Col span={12}>
+        <Col span={8}>
           <Card title="Mean Time Between Failures (MTBF)">
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <Statistic title="Average MTBF" value="168" suffix="hours" />
-              </Col>
-              <Col span={12}>
-                <Statistic title="MTBF This Month" value="192" suffix="hours" />
-              </Col>
-            </Row>
+            <Statistic title="Average MTBF" value={mtbf} suffix="hours" />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card title="Total Failures">
+            <Statistic title="Total Failures" value={totalFailures} />
           </Card>
         </Col>
       </Row>
@@ -267,17 +185,6 @@ Your organization aims for:
         </Col>
       </Row>
 
-          {/* Downtime Bar Chart */}
-    <Row className="mt-4">
-        <Col span={24}>
-          <Card>
-            <ReactECharts 
-              option={barChartOption} 
-              style={{ height: '500px' }}
-            />
-          </Card>
-        </Col>
-      </Row>
     </div>
   );
 };

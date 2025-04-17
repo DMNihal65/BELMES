@@ -1,4 +1,4 @@
-import { Image, Menu } from 'antd';
+import { Image, Menu, Badge } from 'antd';
 import {
   BarChart2,
   FileText,
@@ -20,12 +20,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
 import belLogo from '../../assets/cmti.png';
 import useAuthStore from '../../store/auth-store';
+import useNotificationStore from '../../store/notification';
 
 function Sidebar() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const isCollapsed = useStore((state) => state.isSidebarCollapsed);
+  const { unreadCount } = useNotificationStore();
 
   const operatorMenuItems = [
     {
@@ -38,12 +40,11 @@ function Sidebar() {
     //   icon: <AlertTriangle size={20} />,
     //   label: 'Alert Screen',
     // },
-    // {
-    //   key: '/operator/maintenance',
-    //   icon: <Wrench size={20} />,
-    //   label: 'Maintenance',
-    // },
-    
+    {
+      key: '/operator/maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Maintenance',
+    },
     {
       key: '/operator/inspection',
       icon: <CheckSquare size={20} />,
@@ -178,11 +179,25 @@ function Sidebar() {
       icon: <BarChart2 size={20} />,
       label: 'Energy Monitoring',
     },
+    // {
+    //   key: '/supervisor/energy-monitoring-bel',
+    //   icon: <BarChart2 size={20} />,
+    //   label: 'Energy Monitoring BEL',
+    // },
     {
       key: '/supervisor/documents',
 
       icon: <Files size={20} />,
       label: 'Document Management',
+    },
+    {
+      key: '/supervisor/notifications',
+      icon: unreadCount > 0 ? (
+        <Badge count={unreadCount} size="small" offset={[5, 0]}>
+          <Bell size={20} />
+        </Badge>
+      ) : <Bell size={20} />,
+      label: 'Notifications',
     },
     {
       key: '/supervisor/logs',

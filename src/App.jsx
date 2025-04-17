@@ -27,6 +27,8 @@ import MaintenanceDashboard from './pages/operatorscreens/maintanance/Maintenanc
 import InspectionResult from './pages/operatorscreens/Inspection/InspectionResult';
 import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
 import MachineDetails from './pages/supervisorscreens/EnergyMonitoring/MachineDetails';
+import Notifications from './pages/supervisorscreens/Notifications';
+import MaintenanceNotifications from './pages/supervisorscreens/MachineMaintenance/Notifications';
 
 import Machines from './pages/supervisorscreens/EnergyMonitoring/Machines';
 
@@ -39,14 +41,12 @@ import InspectionReport from './pages/supervisorscreens/QualityManagement/Inspec
 import QualityInspectionDetails from './pages/supervisorscreens/QualityManagement/QualityInspectionDetails';
 import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
 
-
-
-
 const App = () => {
+
+  console.log("Deployed on 09-04-2025")
   return (
     <ConfigProvider>
-      {/* <BrowserRouter basename='/belmes'> This must be there when in the deployment mode, and in the development mode not required remove the basename in the production mode  */}
-      <BrowserRouter> 
+      <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           
@@ -82,6 +82,7 @@ const App = () => {
 
             <Route path="quality-management/inspection-report" element={<InspectionReport />} />
             <Route path="logs" element={<LogsDashboard />} />
+            <Route path="notifications" element={<Notifications />} />
           </Route>
 
           {/* Operator Routes */}
@@ -98,6 +99,7 @@ const App = () => {
             <Route path="help" element={<HelpAndSupport />} />
           </Route>
 
+          {/* Shared Routes */}
           <Route path="/machine-details/:machineId" element={<MachineDetails />} />
           <Route path="/machines" element={<Machines />} />
           <Route path="/machine/:machineId" element={<MachineOverlay />} />

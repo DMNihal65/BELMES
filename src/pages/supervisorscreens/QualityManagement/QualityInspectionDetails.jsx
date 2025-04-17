@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Card, 
   Table, 
@@ -15,9 +15,10 @@ import {
   Alert,
   message,
   Badge,
-  Tabs
+  Tabs,
+  Empty
 } from 'antd';
-import { EyeOutlined, FileSearchOutlined, FileTextOutlined, FilePdfOutlined, AppstoreOutlined, LoadingOutlined } from '@ant-design/icons';
+import { EyeOutlined, FileSearchOutlined, FileTextOutlined, FilePdfOutlined, AppstoreOutlined, LoadingOutlined, DownloadOutlined } from '@ant-design/icons';
 import moment from 'moment';
 import InspectionReport from './InspectionReport';
 import { qualityStore } from '../../../store/quality-store';
@@ -37,6 +38,10 @@ const QualityInspectionDetails = ({
   const [isQmsModalVisible, setIsQmsModalVisible] = useState(false);
   const [operationMeasurements, setOperationMeasurements] = useState(null);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [drawingData, setDrawingData] = useState(null);
+  const [loadingDrawing, setLoadingDrawing] = useState(false);
+  const [measuredData, setMeasuredData] = useState(null);
+  const [isMeasuredDataModalVisible, setIsMeasuredDataModalVisible] = useState(false);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
 
@@ -47,20 +52,48 @@ const QualityInspectionDetails = ({
     return inspectionDetails.operation_groups[0]?.ipid;
   };
 
+  // Function to handle drawing download and display
+  const handleDrawingDownload = async (productionOrder, operationNo) => {
+    try {
+      setLoadingDrawing(true);
+      const drawingId = '10582891'; // Your drawing ID
+      const operationId = '10'; // Your operation ID
+      const data = await qualityStore.fetchBalloonedDrawing(drawingId, operationId);
+      setDrawingData(data);
+    } catch (error) {
+      message.error('Failed to load drawing');
+      console.error('Error loading drawing:', error);
+    } finally {
+      setLoadingDrawing(false);
+    }
+  };
+
+  // Update handleOperationClick to include drawing download
   const handleOperationClick = async (op) => {
     setSelectedOperation(op);
     
-    // Check if the operation has measurements in operation_groups
     const operationData = inspectionDetails?.operation_groups?.filter(
       group => group.op_no === op && group.details
     );
 
     if (operationData && operationData.length > 0) {
-      // Operation has measurements, show measurements modal
       setOperationMeasurements(operationData);
       setIsModalVisible(true);
+      
+      // Fetch and show drawing
+      try {
+        setLoadingDrawing(true);
+        const data = await qualityStore.fetchBalloonedDrawing(
+          inspectionDetails.production_order, 
+          op
+        );
+        setDrawingData(data);
+      } catch (error) {
+        message.error('Failed to load drawing');
+      } finally {
+        setLoadingDrawing(false);
+      }
     } else {
-      // Operation has no measurements, show QMS modal
       setIsQmsModalVisible(true);
     }
   };
@@ -297,58 +330,168 @@ const QualityInspectionDetails = ({
     if (!data) return null;
 
     return (
-      <div className="border-b pb-4 mb-4">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Left Column */}
-          <div>
-            <div className="mb-2 flex">
-              <Text strong className="w-24">IPID No.:</Text>
-              <Text>{data.ipid}</Text>
-            </div>
-            <div className="mb-2 flex">
-              <Text strong className="w-24">Part No.:</Text>
-              <Text>{inspectionDetails.part_number}</Text>
-            </div>
-            <div className="mb-2 flex">
-              <Text strong className="w-24">Date:</Text>
-              <Text>{moment().format('DD-MM-YYYY')}</Text>
-            </div>
-            <div className="mb-2 flex">
-              <Text strong className="w-24">Time:</Text>
-              <Text>{moment().format('HH:mm A')}</Text>
-            </div>
-          </div>
-
-          {/* Right Column */}
-          <div>
-            <div className="mb-2 flex">
-              <Text strong className="w-32">Order No. - Batch No.:</Text>
-              <Text>{inspectionDetails.production_order}</Text>
-            </div>
-            <div className="mb-2 flex">
-              <Text strong className="w-32">Operation No.:</Text>
-              <Text>{data.operation_number}</Text>
-            </div>
-            <div className="mb-2 flex">
-              <Text strong className="w-32">Sheet No.:</Text>
-              <Text>1</Text>
-            </div>
-          </div>
+      <div className="flex justify-between items-center border-b pb-4 mb-4">
+        <div className="flex-1">
+          <Text strong className="mr-4">IPID No.: {data.ipid}</Text>
+          <Text strong className="mr-4">Part No.: {inspectionDetails.part_number}</Text>
+          <Text strong className="mr-4">Date: {moment().format('DD-MM-YYYY')}</Text>
+          <Text strong className="mr-4">Time: {moment().format('HH:mm A')}</Text>
         </div>
-
-        {/* Info Section */}
-        <div className="mt-4">
-          <Text strong className="block mb-2">Info:</Text>
-          <ul className="list-disc pl-5 text-sm">
-            <li>Entry to be made in all the fields highlighted in yellow</li>
-            <li>In Case of 3D PDF drawing or Drawing with '10 off' less dimensions, Drg. Zone is not Mandatory</li>
-            <li>Additional observations can be noted in the designated area at the bottom of the page</li>
-            <li>Text of OK measurement values turn to green colour & Not OK values turn to Red colour</li>
-          </ul>
+        <div className="flex items-center">
+         
         </div>
       </div>
     );
   };
+
+  // Function to handle viewing measured data
+  const handleViewMeasuredData = async () => {
+    if (!inspectionDetails?.order_id) return;
+
+    try {
+      const response = await qualityStore.fetchInspectionByOrderId(inspectionDetails.order_id); // Pass the order_id instead of operation number
+      setMeasuredData(response[0]); // Set the fetched data to state
+      setIsMeasuredDataModalVisible(true); // Open the measured data modal
+    } catch (error) {
+      message.error('Failed to load measured data');
+      console.error('Error loading measured data:', error);
+    }
+  };
+
+  // Function to render the measured data modal
+  const renderMeasuredDataModal = () => (
+    <Modal
+      title="Measured Data"
+      visible={isMeasuredDataModalVisible}
+      onCancel={() => setIsMeasuredDataModalVisible(false)}
+      footer={null}
+      width={800}
+      className="measured-data-modal"
+    >
+      {measuredData ? (
+        <Table
+          columns={[
+            { title: 'Operation Number', dataIndex: 'operation_number', key: 'operation_number' },
+            { title: 'Nominal Value', dataIndex: 'nominal_value', key: 'nominal_value' },
+            { title: 'Upper Tol', dataIndex: 'uppertol', key: 'uppertol' },
+            { title: 'Lower Tol', dataIndex: 'lowertol', key: 'lowertol' },
+            { title: 'Zone', dataIndex: 'zone', key: 'zone' },
+            { title: 'Dimension Type', dataIndex: 'dimension_type', key: 'dimension_type' },
+            { title: 'Measured Instrument', dataIndex: 'measured_instrument', key: 'measured_instrument' },
+            { title: 'Measured 1', dataIndex: 'measured_1', key: 'measured_1' },
+            { title: 'Measured 2', dataIndex: 'measured_2', key: 'measured_2' },
+            { title: 'Measured 3', dataIndex: 'measured_3', key: 'measured_3' },
+            { title: 'Measured Mean', dataIndex: 'measured_mean', key: 'measured_mean' },
+          ]}
+          dataSource={measuredData.inspection_data} // Assuming inspection_data contains the relevant data
+          pagination={false}
+          size="small"
+        />
+      ) : (
+        <Empty description="No measured data available" />
+      )}
+    </Modal>
+  );
+
+  // Update the renderModalContent function to include measured data
+  const renderModalContent = () => (
+    <div className="flex gap-6">
+      {/* Left side - Measurements */}
+      <div className="flex-1 min-w-[45%]">
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          {/* Add header with buttons */}
+          <div className="flex justify-between items-center mb-4">
+            <Typography.Title level={5} className="mb-0">
+              Measurement Details
+            </Typography.Title>
+            <Space>
+              <Button
+                type="primary"
+                icon={<FileSearchOutlined />}
+                onClick={handleViewMeasuredData} // Call the new function
+              >
+                View Measured Data
+              </Button>
+            </Space>
+          </div>
+          <Divider className="my-3" />
+          {renderModalHeader()}
+          <div className="mt-4">
+            {renderOperationDetails()}
+          </div>
+        </div>
+      </div>
+
+      {/* Right side - Drawing */}
+      <div className="flex-1 min-w-[55%]">
+        <div className="bg-white rounded-lg shadow-sm h-[calc(100vh-240px)] flex flex-col">
+          {/* Drawing Header */}
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex justify-between items-center">
+              <Typography.Title level={5} className="mb-0">
+                Drawing View
+              </Typography.Title>
+              {drawingData && (
+                <Button
+                  type="default"
+                  icon={<DownloadOutlined />}
+                  size="middle"
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = drawingData.url;
+                    link.download = drawingData.fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                >
+                  Download Drawing
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Drawing Content */}
+          <div className="flex-1 p-4">
+            {loadingDrawing ? (
+              <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <Spin size="large" />
+                  <div className="mt-4 text-gray-500">Loading drawing...</div>
+                </div>
+              </div>
+            ) : drawingData ? (
+              <div className="h-full rounded-lg overflow-hidden border border-gray-200">
+                <iframe
+                  src={drawingData.url}
+                  type="application/pdf"
+                  className="w-full h-full"
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: 'none'
+                  }}
+                  title="Drawing View"
+                />
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={
+                    <span className="text-gray-500">
+                      No drawing available
+                    </span>
+                  }
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  );
 
   const renderQmsModal = () => (
     <Modal
@@ -373,6 +516,15 @@ const QualityInspectionDetails = ({
     </Modal>
   );
 
+  // Clean up blob URLs when modal closes or component unmounts
+  useEffect(() => {
+    return () => {
+      if (drawingData?.url) {
+        URL.revokeObjectURL(drawingData.url);
+      }
+    };
+  }, [drawingData]);
+
   // Add these styles to your CSS
   const styles = `
     @keyframes progress {
@@ -396,6 +548,135 @@ const QualityInspectionDetails = ({
     .qms-loading-modal .ant-modal-body {
       padding: 24px;
     }
+
+    .measurements-modal .ant-modal-content {
+      padding: 0;
+    }
+
+    .measurements-modal .ant-modal-body {
+      padding: 24px;
+      max-height: 80vh;
+      overflow: auto;
+    }
+
+    .measurements-modal .ant-modal-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    object, iframe {
+      border: none;
+      background: #fff;
+    }
+
+    /* Add smooth transition for the drawing */
+    object, iframe {
+      transition: all 0.3s ease;
+    }
+
+    .measurements-modal .ant-alert {
+      margin-bottom: 16px;
+    }
+
+    .measurements-modal .ant-btn {
+      margin-top: 8px;
+    }
+
+    iframe {
+      border: none;
+      background: white;
+    }
+
+    .measurements-modal .ant-modal-body {
+      padding: 24px;
+      max-height: 90vh;
+      overflow: auto;
+    }
+
+    .measurements-modal .ant-modal-content {
+      padding: 0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .measurements-modal .ant-modal-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #f0f0f0;
+      background: #ffffff;
+    }
+
+    .measurements-modal .ant-modal-body {
+      padding: 24px;
+      background: #f8fafc;
+    }
+
+    .measurements-modal .ant-modal-close {
+      top: 16px;
+    }
+
+    .measurements-modal .ant-table {
+      background: white;
+      border-radius: 8px;
+    }
+
+    .measurements-modal .ant-table-thead > tr > th {
+      background: #f8fafc;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .measurements-modal iframe {
+      border: none;
+      background: white;
+      border-radius: 4px;
+    }
+
+    .measurements-modal .ant-spin {
+      color: #1890ff;
+    }
+
+    .measurements-modal .ant-btn {
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .measurements-modal .ant-empty {
+      color: #6b7280;
+    }
+
+    .measurements-modal .ant-btn-primary {
+      background: #1890ff;
+      border-color: #1890ff;
+      color: white;
+    }
+
+    .measurements-modal .ant-btn-primary:hover {
+      background: #40a9ff;
+      border-color: #40a9ff;
+    }
+
+    .measurements-modal .ant-divider {
+      margin: 16px 0;
+      border-color: #e5e7eb;
+    }
+
+    .measurements-modal .ant-space {
+      display: flex;
+      gap: 8px;
+    }
+
+    .measured-data-modal .ant-modal-content {
+      border-radius: 8px;
+    }
+
+    .measured-data-modal .ant-modal-header {
+      background-color: #f0f2f5;
+    }
+
+    .measured-data-modal .ant-table {
+      border-radius: 8px;
+    }
   `;
 
   return (
@@ -412,17 +693,29 @@ const QualityInspectionDetails = ({
         {/* QMS Launch Modal */}
         {renderQmsModal()}
 
-        {/* Existing Measurements Modal */}
+        {/* Updated Measurements Modal with Drawing Download */}
         <Modal
-          title={`Operation ${selectedOperation} Measurements`}
+          title={
+            <div className="flex items-center gap-3">
+              <FileTextOutlined className="text-blue-500" />
+              <span>Operation {selectedOperation} Details</span>
+            </div>
+          }
           visible={isModalVisible}
-          onCancel={() => setIsModalVisible(false)}
-          width={1000}
+          onCancel={() => {
+            setIsModalVisible(false);
+            setDrawingData(null);
+          }}
+          width={1600}
           footer={null}
+          className="measurements-modal"
+          style={{ top: 20 }}
         >
-          {renderModalHeader()}
-          {renderOperationDetails()}
+          {renderModalContent()}
         </Modal>
+
+        {/* Measured Data Modal */}
+        {renderMeasuredDataModal()}
       </div>
     </>
   );
@@ -487,3 +780,6 @@ const styles = `
 `;
 
 export default QualityInspectionDetails;
+
+
+

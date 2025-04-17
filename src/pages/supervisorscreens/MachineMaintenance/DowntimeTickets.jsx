@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'; // Import useEffect and useState
 import { Table, Button, Space } from 'antd';
 import useMachineMaintenanceStore from '../../../store/maintenance'; // Import the store
+import { Row, Col } from 'antd'; 
 
-const Tickets = () => {
+const DowntimeTickets = () => {
   const [data, setData] = useState([]); // State to hold the fetched data
   const fetchDowntimes = useMachineMaintenanceStore((state) => state.fetchDowntimes); // Fetch function from the store
   const acknowledgeDowntime = useMachineMaintenanceStore((state) => state.acknowledgeDowntime); // Acknowledge function
@@ -141,12 +142,14 @@ const Tickets = () => {
   return (
     <div className="p-4">
       <Table 
-        columns={columns} 
-        dataSource={data} // Use the fetched data
-        rowKey="id"
-      />
+            columns={columns} 
+            dataSource={data} // Use the fetched data
+            rowKey="id"
+            pagination={{ pageSize: 10 }} // Optional: Add pagination for better UX
+            scroll={{ x: true }} // Enable horizontal scrolling for smaller screens
+          />
     </div>
   );
 };
 
-export default Tickets;
+export default DowntimeTickets;

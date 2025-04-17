@@ -3,7 +3,7 @@ import { Tabs, Badge } from 'antd';
 import MachineMaintenance from './MachineMaintenance';
 import Notifications from './Notifications';
 import useMachineMaintenanceStore from '../../../store/maintenance';
-import Tickets from './Tickets';
+import DowntimeTickets from './DowntimeTickets';
 import TicketAnalytics from './TicketAnalytics';
 
 const { TabPane } = Tabs;
@@ -32,13 +32,20 @@ export default function MaintenanceDashboard() {
         >
           <Notifications />
         </TabPane>
-        <TabPane tab="Tickets" key="3">
+        <TabPane tab="KPIs" key="3">
           <Tabs defaultActiveKey="1" className='bg-white p-4'>
-            <TabPane tab="Tickets" key="1">
+            {/* <TabPane tab="Tickets" key="1">
               <Tickets />
-            </TabPane>
-            <TabPane tab="Analytics" key="2">
+            </TabPane> */}
+            <TabPane tab="Analytics" key="1">
               <TicketAnalytics />
+            </TabPane>
+          </Tabs>
+        </TabPane>
+        <TabPane tab="Downtime Tickets" key="4">
+          <Tabs defaultActiveKey="1" className='bg-white p-4'>
+            <TabPane tab="Downtime Tickets" key="1">
+              <DowntimeTickets />
             </TabPane>
           </Tabs>
         </TabPane>

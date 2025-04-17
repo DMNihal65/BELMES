@@ -127,7 +127,7 @@ const MachineIssueModal = ({
             return;
           }
           
-          const userId = requested_by; // Get the user ID
+          const userId = useAuthStore.getState().user_id; // Get the user ID
           if (!userId) {
             toast.error('User ID is not available');
             return; // Prevent submission if user ID is not available
@@ -396,16 +396,6 @@ const MachineIssueModal = ({
 };
 
 export default MachineIssueModal; 
-
-
-
-
-
-
-
-
-
-
 
 
 

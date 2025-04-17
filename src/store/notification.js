@@ -53,7 +53,7 @@ const useNotificationStore = create((set, get) => ({
       const socket = new WebSocket(API_ENDPOINTS.machineWs);
       
       socket.onopen = () => {
-        console.log('Machine WebSocket connected');
+        // console.log('Machine WebSocket connected');
         set({ 
           machineSocket: socket, 
           isMachineSocketConnected: true,
@@ -64,7 +64,7 @@ const useNotificationStore = create((set, get) => ({
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('Machine notification received:', data);
+          // console.log('Machine notification received:', data);
           
           // Handle different message types
           switch (data.type) {
@@ -146,7 +146,7 @@ const useNotificationStore = create((set, get) => ({
               break;
               
             default:
-              console.log('Unknown machine notification type:', data.type);
+              // console.log('Unknown machine notification type:', data.type);
           }
         } catch (error) {
           console.error('Error parsing machine notification:', error);
@@ -154,7 +154,7 @@ const useNotificationStore = create((set, get) => ({
       };
       
       socket.onclose = (event) => {
-        console.log('Machine WebSocket disconnected');
+        // console.log('Machine WebSocket disconnected');
         set({ isMachineSocketConnected: false });
       };
       
@@ -183,7 +183,7 @@ const useNotificationStore = create((set, get) => ({
       const socket = new WebSocket(API_ENDPOINTS.materialWs);
       
       socket.onopen = () => {
-        console.log('Material WebSocket connected');
+        // console.log('Material WebSocket connected');
         set({ 
           materialSocket: socket, 
           isMaterialSocketConnected: true,
@@ -194,7 +194,7 @@ const useNotificationStore = create((set, get) => ({
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('Material notification received:', data);
+          // console.log('Material notification received:', data);
           
           // Handle different message types
           switch (data.type) {
@@ -275,7 +275,7 @@ const useNotificationStore = create((set, get) => ({
               break;
               
             default:
-              console.log('Unknown material notification type:', data.type);
+              // console.log('Unknown material notification type:', data.type);
           }
         } catch (error) {
           console.error('Error parsing material notification:', error);
@@ -283,7 +283,7 @@ const useNotificationStore = create((set, get) => ({
       };
       
       socket.onclose = (event) => {
-        console.log('Material WebSocket disconnected');
+        // console.log('Material WebSocket disconnected');
         set({ isMaterialSocketConnected: false });
       };
       
@@ -324,7 +324,7 @@ const useNotificationStore = create((set, get) => ({
   // Fetch notifications from both APIs
   fetchNotifications: async (showErrorMessage = false) => {
     try {
-      console.log('🔄 Starting to fetch notifications...');
+      // console.log('🔄 Starting to fetch notifications...');
       
       const [
         machineResponse, 
@@ -363,7 +363,7 @@ const useNotificationStore = create((set, get) => ({
       // Process regular machine notifications
       if (machineResponse.ok) {
         const machineData = await machineResponse.json();
-        console.log('🔧 Machine Response:', machineData);
+        // console.log('🔧 Machine Response:', machineData);
         
         const machineNotifications = (machineData.notifications || [])
           .map(notification => ({
@@ -371,17 +371,17 @@ const useNotificationStore = create((set, get) => ({
             notificationType: 'machine',
             is_acknowledged: notification.is_acknowledged || true
           }));
-        console.log('🔧 Processed Machine Notifications:', {
-          total: machineData.total_notifications,
-          processed: machineNotifications.length
-        });
+        // console.log('🔧 Processed Machine Notifications:', {
+        //   total: machineData.total_notifications,
+        //   processed: machineNotifications.length
+        // });
         allNotifications = [...allNotifications, ...machineNotifications];
       }
 
       // Process regular material notifications
       if (materialResponse.ok) {
         const materialData = await materialResponse.json();
-        console.log('📦 Material Response:', materialData);
+        // console.log('📦 Material Response:', materialData);
         
         const materialNotifications = (materialData.notifications || [])
           .map(notification => ({
@@ -389,17 +389,17 @@ const useNotificationStore = create((set, get) => ({
             notificationType: 'material',
             is_acknowledged: notification.is_acknowledged || true
           }));
-        console.log('📦 Processed Material Notifications:', {
-          total: materialData.total_notifications,
-          processed: materialNotifications.length
-        });
+        // console.log('📦 Processed Material Notifications:', {
+        //   total: materialData.total_notifications,
+        //   processed: materialNotifications.length
+        // });
         allNotifications = [...allNotifications, ...materialNotifications];
       }
 
       // Process unacknowledged machine notifications
       if (machineUnackResponse.ok) {
         const unackMachineData = await machineUnackResponse.json();
-        console.log('🚨 Unacknowledged Machine Response:', unackMachineData);
+        // console.log('🚨 Unacknowledged Machine Response:', unackMachineData);
         
         const unackMachineNotifications = (unackMachineData.notifications || [])
           .map(notification => ({
@@ -407,17 +407,17 @@ const useNotificationStore = create((set, get) => ({
             notificationType: 'machine',
             is_acknowledged: false
           }));
-        console.log('🚨 Processed Unack Machine:', {
-          total: unackMachineData.total_notifications,
-          processed: unackMachineNotifications.length
-        });
+        // console.log('🚨 Processed Unack Machine:', {
+        //   total: unackMachineData.total_notifications,
+        //   processed: unackMachineNotifications.length
+        // });
         allNotifications = [...allNotifications, ...unackMachineNotifications];
       }
 
       // Process unacknowledged material notifications
       if (materialUnackResponse.ok) {
         const unackMaterialData = await materialUnackResponse.json();
-        console.log('🚨 Unacknowledged Material Response:', unackMaterialData);
+        // console.log('🚨 Unacknowledged Material Response:', unackMaterialData);
         
         const unackMaterialNotifications = (unackMaterialData.notifications || [])
           .map(notification => ({
@@ -425,10 +425,10 @@ const useNotificationStore = create((set, get) => ({
             notificationType: 'material',
             is_acknowledged: false
           }));
-        console.log('🚨 Processed Unack Material:', {
-          total: unackMaterialData.total_notifications,
-          processed: unackMaterialNotifications.length
-        });
+        // console.log('🚨 Processed Unack Material:', {
+        //   total: unackMaterialData.total_notifications,
+        //   processed: unackMaterialNotifications.length
+        // });
         allNotifications = [...allNotifications, ...unackMaterialNotifications];
       }
 
@@ -445,12 +445,12 @@ const useNotificationStore = create((set, get) => ({
         (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
       );
 
-      console.log('📊 Final Notifications:', {
-        total: sortedNotifications.length,
-        machine: sortedNotifications.filter(n => n.notificationType === 'machine').length,
-        material: sortedNotifications.filter(n => n.notificationType === 'material').length,
-        unacknowledged: sortedNotifications.filter(n => !n.is_acknowledged).length
-      });
+      // console.log('📊 Final Notifications:', {
+      //   total: sortedNotifications.length,
+      //   machine: sortedNotifications.filter(n => n.notificationType === 'machine').length,
+      //   material: sortedNotifications.filter(n => n.notificationType === 'material').length,
+      //   unacknowledged: sortedNotifications.filter(n => !n.is_acknowledged).length
+      // });
 
       // Update store
       set({ 
@@ -534,7 +534,7 @@ const useNotificationStore = create((set, get) => ({
         }
       });
       
-      console.log('Machine API Status:', response.status);
+      // console.log('Machine API Status:', response.status);
       const data = await response.text();
       
       try {
@@ -558,7 +558,7 @@ const useNotificationStore = create((set, get) => ({
         }
       });
       
-      console.log('Material API Status:', response.status);
+      // console.log('Material API Status:', response.status);
       const data = await response.text();
       
       try {

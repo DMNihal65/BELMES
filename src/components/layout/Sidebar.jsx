@@ -40,11 +40,11 @@ function Sidebar() {
     //   icon: <AlertTriangle size={20} />,
     //   label: 'Alert Screen',
     // },
-    {
-      key: '/operator/maintenance',
-      icon: <Wrench size={20} />,
-      label: 'Maintenance',
-    },
+    // {
+    //   key: '/operator/maintenance',
+    //   icon: <Wrench size={20} />,
+    //   label: 'Maintenance',
+    // },
     {
       key: '/operator/inspection',
       icon: <CheckSquare size={20} />,

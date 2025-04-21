@@ -341,7 +341,35 @@ closeDowntime: async (id, actionTaken) => {
     throw error;
   }
 },
+
+// Fetch machine performance metrics
+fetchMachinePerformanceMetrics: async () => {
+  set({ loading: true, error: null });
+  try {
+    const response = await axios.get(`${SUPERVISOR_BASE_URL}/metrics/machine-performance`);
+    set({ loading: false });
+    return response.data;
+  } catch (error) {
+    set({ 
+      error: error.response?.data?.detail || error.message, 
+      loading: false 
+    });
+    throw error;
+  }
+},
   
 }));
 
 export default useMachineMaintenanceStore;
+
+
+
+
+
+
+
+
+
+
+
+

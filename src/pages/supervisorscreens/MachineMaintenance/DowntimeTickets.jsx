@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from 'react'; // Import useEffect and useState
-import { Table, Button, Space, Modal, Input, message } from 'antd';
+import { Table, Button, Space, Modal, Input, message, DatePicker } from 'antd';
 import useMachineMaintenanceStore from '../../../store/maintenance'; // Import the store
 import { Row, Col } from 'antd'; 
+import { SearchOutlined } from '@ant-design/icons';
+import moment from 'moment';
+
+const { RangePicker } = DatePicker;
 
 const DowntimeTickets = () => {
   const [data, setData] = useState([]); // State to hold the fetched data
+  const [searchText, setSearchText] = useState('');
+  const [filteredData, setFilteredData] = useState([]);
+  const [dateRange, setDateRange] = useState(null);
   const fetchDowntimes = useMachineMaintenanceStore((state) => state.fetchDowntimes); // Fetch function from the store
   const acknowledgeDowntime = useMachineMaintenanceStore((state) => state.acknowledgeDowntime); // Acknowledge function
   const closeDowntime = useMachineMaintenanceStore((state) => state.closeDowntime); // Close function
@@ -16,6 +23,7 @@ const DowntimeTickets = () => {
     const getData = async () => {
       const downtimes = await fetchDowntimes(); // Fetch downtimes
       setData(downtimes); // Set the fetched data to state
+      applyFilters(downtimes, searchText, dateRange);
     };
 
     getData(); // Initial fetch
@@ -26,6 +34,45 @@ const DowntimeTickets = () => {
 
     return () => clearInterval(intervalId); // Cleanup on unmount
   }, [fetchDowntimes]);
+
+  // Function to apply both search and date filters
+  const applyFilters = (dataToFilter, searchValue, dates) => {
+    let filtered = [...dataToFilter];
+
+    // Apply text search filter
+    if (searchValue) {
+      const searchVal = searchValue.toLowerCase();
+      filtered = filtered.filter(item => {
+        return Object.keys(item).some(key => {
+          const itemValue = item[key];
+          if (itemValue === null || itemValue === undefined) return false;
+          return String(itemValue).toLowerCase().includes(searchVal);
+        });
+      });
+    }
+
+    // Apply date range filter
+    if (dates && dates[0] && dates[1]) {
+      filtered = filtered.filter(item => {
+        const openDate = moment(item.open_dt);
+        return openDate.isBetween(dates[0], dates[1], 'day', '[]');
+      });
+    }
+
+    setFilteredData(filtered);
+  };
+
+  // Handle search functionality
+  const handleSearch = (value) => {
+    setSearchText(value);
+    applyFilters(data, value, dateRange);
+  };
+
+  // Handle date range change
+  const handleDateRangeChange = (dates) => {
+    setDateRange(dates);
+    applyFilters(data, searchText, dates);
+  };
 
   const handleAcknowledge = async (ticketId) => {
     try {
@@ -168,13 +215,33 @@ const DowntimeTickets = () => {
   ];
 
   return (
-    <div className="p-4">
+    <div className="p-4 shadow-lg rounded-xl">
+      <Row className="mb-4" gutter={16}>
+        <Col span={8}>
+          <Input
+            placeholder="Search in all columns..."
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={(e) => handleSearch(e.target.value)}
+            allowClear
+          />
+        </Col>
+        <Col span={8}>
+          <RangePicker
+            onChange={handleDateRangeChange}
+            placeholder={['Start Date', 'End Date']}
+            format="YYYY-MM-DD"
+            allowClear
+          />
+        </Col>
+      </Row>
+      
       <Table 
         columns={columns} 
-        dataSource={data} // Use the fetched data
+        dataSource={filteredData} // Use filtered data instead of data
         rowKey="id"
-        pagination={{ pageSize: 10 }} // Optional: Add pagination for better UX
-        scroll={{ x: true }} // Enable horizontal scrolling for smaller screens
+        pagination={{ pageSize: 5 }}
+        scroll={{ x: true }}
       />
       
       <Modal

@@ -1,63 +1,79 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Modal, Alert } from 'antd';
+import { Card, Row, Col, Statistic, Modal, Alert, Table } from 'antd';
 import ReactECharts from 'echarts-for-react';
-import axios from 'axios';
+import useMachineMaintenanceStore from '../../../store/maintenance';
 
 const TicketAnalytics = () => {
   const [isModalVisible, setIsModalVisible] = useState(true);
   const [mttr, setMttr] = useState(0);
   const [mtbf, setMtbf] = useState(0);
   const [totalFailures, setTotalFailures] = useState(0);
-  const [monthlyData, setMonthlyData] = useState({
-    dates: [],
+  const [tableData, setTableData] = useState([]);
+  const [machineData, setMachineData] = useState({
+    machines: [],
     mtbf: [],
     mttr: []
   });
 
+  const fetchMachinePerformanceMetrics = useMachineMaintenanceStore(state => state.fetchMachinePerformanceMetrics);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('http://172.18.7.85:8078/api/v1/maintainance/metrics/machine-performance');
-        const data = response.data;
+        const data = await fetchMachinePerformanceMetrics();
+        
+        // Set shop-level metrics with 2 decimal places instead of rounding
+        setMttr(Number(data.mttr_shop.toFixed(2)));
+        setMtbf(Number(data.mtbf_shop.toFixed(2)));
+        setTotalFailures(data.total_failures);
 
-        // Update MTTR, MTBF, and total failures with rounded values
-        setMttr(Math.round(data.mttr_shop));
-        setMtbf(Math.round(data.mtbf_shop));
-        setTotalFailures(data.total_failures); // Assuming total_failures is an integer
+        // Process machine-specific data
+        const machines = [];
+        const mttrValues = [];
+        const mtbfValues = [];
+        const tableRows = [];
 
-        // Assuming you want to keep the monthly data structure
-        setMonthlyData({
-          dates: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-          mtbf: Array(12).fill(Math.round(data.mtbf_shop)), // Round off for monthly data
-          mttr: Array(12).fill(Math.round(data.mttr_shop))  // Round off for monthly data
+        // Process machine-specific data
+        Object.entries(data.machines).forEach(([machineId, metrics]) => {
+          machines.push(metrics.machine_name);
+          mttrValues.push(Number(metrics.mttr.toFixed(2)));
+          mtbfValues.push(Number(metrics.mtbf.toFixed(2)));
+          
+          // Add data for table with 2 decimal places
+          tableRows.push({
+            key: machineId,
+            machine: metrics.machine_name,
+            failures: metrics.total_failures,
+            mttr: Number(metrics.mttr.toFixed(2)),
+            mtbf: Number(metrics.mtbf.toFixed(2))
+          });
         });
+
+        // Update machine-specific data for the chart
+        setMachineData({
+          machines: machines,
+          mtbf: mtbfValues,
+          mttr: mttrValues
+        });
+
+        // Set table data
+        setTableData(tableRows);
+
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
 
     fetchData();
-  }, []);
+  }, [fetchMachinePerformanceMetrics]);
 
   const handleOk = () => {
     setIsModalVisible(false);
   };
 
-  // Data for MTBF-MTTR line chart
-  const downtimeData = {
-    machines: ['Machine A', 'Machine B', 'Machine C', 'Machine D'],
-    categories: ['Mechanical', 'Electrical', 'Others', 'Operational'],
-    values: [
-      [4.2, 2.8, 1.5, 3.0],
-      [3.5, 4.0, 2.0, 1.8],
-      [2.8, 3.2, 2.5, 2.0],
-      [5.0, 2.5, 1.8, 2.2],
-    ]
-  };
-
   const lineChartOption = {
     title: {
-      text: 'MTBF, MTTR',
+      text: 'Machine-wise MTBF and MTTR Analysis',
       left: 'left',
       top: 10,
       textStyle: {
@@ -69,20 +85,28 @@ const TicketAnalytics = () => {
       trigger: 'axis',
       formatter: function(params) {
         return `
-${params[0].axisValue}
-----------------------------------------
-${params[0].seriesName}: ${params[0].value}h
-${params[1].seriesName}: ${params[1].value}h
-`;
+          <div style="font-weight: bold; color: #1f1f1f; margin-bottom: 8px;">
+            Machine Name: ${params[0].axisValue}
+          </div>
+          <div style="border-top: 1px solid #eee; margin: 5px 0;"></div>
+          <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+            <span style="color: #1890ff;">⬤ ${params[0].seriesName}:</span>
+            <span style="font-weight: bold; color: #1890ff;">${params[0].value}h</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+            <span style="color: #666666;">⬤ ${params[1].seriesName}:</span>
+            <span style="font-weight: bold;">${params[1].value}h</span>
+          </div>`;
       },
       textStyle: {
-        fontSize: 14
+        fontSize: 13,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial'
       },
-      padding: [10, 15],
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      borderColor: '#ccc',
+      padding: [12, 16],
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      borderColor: '#eee',
       borderWidth: 1,
-      extraCssText: 'white-space: pre-line; line-height: 1.5'
+      extraCssText: 'box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); border-radius: 4px;'
     },
     legend: {
       data: ['MTBF', 'MTTR'],
@@ -98,10 +122,12 @@ ${params[1].seriesName}: ${params[1].value}h
     },
     xAxis: {
       type: 'category',
-      data: monthlyData.dates,
-      boundaryGap: false,
+      data: machineData.machines,
+      boundaryGap: true,
       axisLabel: {
-        fontSize: 12
+        fontSize: 12,
+        interval: 0,
+        rotate: 45
       }
     },
     yAxis: {
@@ -123,7 +149,7 @@ ${params[1].seriesName}: ${params[1].value}h
       {
         name: 'MTBF',
         type: 'line',
-        data: monthlyData.mtbf,
+        data: machineData.mtbf,
         symbol: 'circle',
         symbolSize: 8,
         lineStyle: {
@@ -137,7 +163,7 @@ ${params[1].seriesName}: ${params[1].value}h
       {
         name: 'MTTR',
         type: 'line',
-        data: monthlyData.mttr,
+        data: machineData.mttr,
         symbol: 'circle',
         symbolSize: 8,
         lineStyle: {
@@ -153,35 +179,108 @@ ${params[1].seriesName}: ${params[1].value}h
 
   return (
     <div className="p-4">
-    
       {/* Summary Statistics */}
       <Row gutter={[16, 16]}>
-        <Col span={8}>
+      <Col span={8}>
+        <div className="shadow-lg rounded-xl">
           <Card title="Mean Time To Repair (MTTR)">
-            <Statistic title="Average MTTR" value={mttr} suffix="hours" />
+            <Statistic title="Shop Average MTTR" value={mttr} suffix="hours" />
           </Card>
-        </Col>
-        <Col span={8}>
+        </div>
+      </Col>
+      <Col span={8}>
+        <div className="shadow-lg rounded-xl">
           <Card title="Mean Time Between Failures (MTBF)">
-            <Statistic title="Average MTBF" value={mtbf} suffix="hours" />
+            <Statistic title="Shop Average MTBF" value={mtbf} suffix="hours" />
           </Card>
-        </Col>
-        <Col span={8}>
+        </div>
+      </Col>
+      <Col span={8}>
+        <div className="shadow-lg rounded-xl">
           <Card title="Total Failures">
             <Statistic title="Total Failures" value={totalFailures} />
           </Card>
-        </Col>
-      </Row>
+        </div>
+      </Col>
+    </Row>
+
       
       {/* MTBF-MTTR Line Chart */}
       <Row className="mt-4">
         <Col span={24}>
-          <Card>
-            <ReactECharts 
-              option={lineChartOption} 
-              style={{ height: '400px' }}
-            />
-          </Card>
+          <div className="shadow-lg rounded-xl">
+            <Card>
+              <ReactECharts 
+                option={lineChartOption} 
+                style={{ height: '400px' }}
+              />
+            </Card>
+          </div>
+        </Col>
+      </Row>
+
+      {/* Machine Performance Table */}
+      <Row className="mt-4">
+        <Col span={24}>
+          <div className="shadow-lg rounded-xl">
+            <Card title="Machine Performance Metrics">
+              <Table
+                dataSource={tableData}
+                columns={[
+                  {
+                    title: 'Machine',
+                    dataIndex: 'machine',
+                    key: 'machine',
+                    sorter: (a, b) => a.machine.localeCompare(b.machine),
+                    filterSearch: true,
+                    filters: [...new Set(tableData.map(item => item.machine))].map(machine => ({
+                      text: machine,
+                      value: machine,
+                    })),
+                    onFilter: (value, record) => record.machine === value,
+                  },
+                  {
+                    title: 'No of Failures',
+                    dataIndex: 'failures',
+                    key: 'failures',
+                    sorter: (a, b) => a.failures - b.failures,
+                    filters: [...new Set(tableData.map(item => item.failures))].map(failures => ({
+                      text: failures.toString(),
+                      value: failures,
+                    })),
+                    onFilter: (value, record) => record.failures === value,
+                  },
+                  {
+                    title: 'MTTR (hours)',
+                    dataIndex: 'mttr',
+                    key: 'mttr',
+                    sorter: (a, b) => a.mttr - b.mttr,
+                    filterSearch: true,
+                    filters: [...new Set(tableData.map(item => item.mttr))].map(mttr => ({
+                      text: mttr.toFixed(2),
+                      value: mttr,
+                    })),
+                    onFilter: (value, record) => record.mttr === value,
+                    render: (text) => text.toFixed(2)
+                  },
+                  {
+                    title: 'MTBF (hours)',
+                    dataIndex: 'mtbf',
+                    key: 'mtbf',
+                    sorter: (a, b) => a.mtbf - b.mtbf,
+                    filterSearch: true,
+                    filters: [...new Set(tableData.map(item => item.mtbf))].map(mtbf => ({
+                      text: mtbf.toFixed(2),
+                      value: mtbf,
+                    })),
+                    onFilter: (value, record) => record.mtbf === value,
+                    render: (text) => text.toFixed(2)
+                  }
+                ]}
+                pagination={false}
+              />
+            </Card>
+          </div>
         </Col>
       </Row>
 
@@ -190,3 +289,17 @@ ${params[1].seriesName}: ${params[1].value}h
 };
 
 export default TicketAnalytics; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

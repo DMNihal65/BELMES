@@ -17,7 +17,7 @@ const TicketAnalytics = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('http://172.18.7.85:8068/api/v1/maintainance/metrics/machine-performance');
+        const response = await axios.get('http://172.18.7.85:8078/api/v1/maintainance/metrics/machine-performance');
         const data = response.data;
 
         // Update MTTR, MTBF, and total failures with rounded values

@@ -3,20 +3,20 @@ import { message } from 'antd';
 import { LogOut, Menu as MenuIcon, Search, User, Bell, Wrench, Package } from 'lucide-react';
 
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.18.7.89:7000/api/v1';
+const API_BASE_URL = 'http://172.18.7.85:8078/api/v1';
 const API_ENDPOINTS = {
   // GET endpoints for supervisor
-  machineNotifications: 'http://172.18.7.89:7000/api/v1/maintainance/supervisor/machine-notifications/',
+  machineNotifications: 'http://172.18.7.85:8078/api/v1/maintainance/supervisor/machine-notifications/',
   materialNotifications: `${API_BASE_URL}/maintainance/supervisor/raw-material-notifications`,
   // POST endpoints for operator updates
   machineUpdate: `${API_BASE_URL}/maintainance/operator/machine-update`,
   materialUpdate: `${API_BASE_URL}/maintainance/operator/raw-material-update`,
   // WebSocket endpoints remain the same
-  machineWs: `ws://172.18.7.89:7000/api/v1/notification/ws/machine-notifications`,
-  materialWs: `ws://172.18.7.89:7000/api/v1/notification/ws/material-notifications`,
+  machineWs: `ws://172.18.7.85:8078/api/v1/notification/ws/machine-notifications`,
+  materialWs: `ws://172.18.7.85:8078/api/v1/notification/ws/material-notifications`,
   // Add these new endpoints
-  machineUnacknowledged: 'http://172.18.7.89:7000/api/v1/notification/machine-notifications/unacknowledged',
-  materialUnacknowledged: 'http://172.18.7.89:7000/api/v1/notification/material-notifications/unacknowledged'
+  machineUnacknowledged: 'http://172.18.7.85:8078/api/v1/notification/machine-notifications/unacknowledged',
+  materialUnacknowledged: 'http://172.18.7.85:8078/api/v1/notification/material-notifications/unacknowledged'
 };
 
 const useNotificationStore = create((set, get) => ({

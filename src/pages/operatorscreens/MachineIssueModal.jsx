@@ -14,23 +14,48 @@ const MachineIssueModal = ({
   visible, 
   onClose
 }) => {
-  // Separate forms for each tab
+  // Forms
   const [breakdownForm] = Form.useForm();
   const [machineForm] = Form.useForm();
   const [componentForm] = Form.useForm();
   
-  // Active tab state
+  // States
   const [activeTab, setActiveTab] = useState('breakdown');
   const [breakdownCategory, setBreakdownCategory] = useState('availability');
 
-  const { 
-    submitMachineIssue, 
-    submitComponentIssue,
-    submitBreakdownIssue, // Ensure this is included
-    machineStatus,
-    maintenanceLoading,
-    jobData
-  } = useWebSocketStore();
+  // Get store values
+  const { submitMachineIssue, submitComponentIssue, submitBreakdownIssue, machineStatus, maintenanceLoading, jobData } = useWebSocketStore();
+  
+  // Get user ID from localStorage as fallback
+  const getUserId = () => {
+    // First try from auth store
+    const storeUserId = useAuthStore.getState().user_id;
+    if (storeUserId) return storeUserId;
+
+    // Then try from localStorage
+    const localUserId = localStorage.getItem('user_id');
+    if (localUserId) return localUserId;
+
+    return null;
+  };
+
+  // Reset forms when modal opens/closes
+  useEffect(() => {
+    if (visible) {
+      breakdownForm.resetFields();
+      machineForm.resetFields();
+      componentForm.resetFields();
+      setActiveTab('breakdown');
+      setBreakdownCategory('availability');
+
+      // Check if user is logged in when modal opens
+      const userId = getUserId();
+      if (!userId) {
+        toast.error('Please log in to submit issues');
+        onClose();
+      }
+    }
+  }, [visible, breakdownForm, machineForm, componentForm]);
 
   // Breakdown reasons based on category
   const breakdownReasons = {
@@ -58,32 +83,12 @@ const MachineIssueModal = ({
     ]
   };
 
-  // Reset forms when modal opens/closes
-  useEffect(() => {
-    if (visible) {
-      // Reset all forms
-      breakdownForm.resetFields();
-      machineForm.resetFields();
-      componentForm.resetFields();
-      // Reset to default tab
-      setActiveTab('breakdown');
-      setBreakdownCategory('availability');
-    }
-  }, [visible, breakdownForm, machineForm, componentForm]);
-
-  // Handle tab change
-  const handleTabChange = (key) => {
-    setActiveTab(key);
-  };
-
   // Get current part number from jobData
   const getCurrentPartNumber = () => {
-    // First try to get from jobData
     if (jobData?.part_number) {
       return jobData.part_number;
     }
     
-    // Fallback to localStorage
     try {
       const storedJobData = localStorage.getItem('jobData');
       if (storedJobData) {
@@ -96,55 +101,54 @@ const MachineIssueModal = ({
     return null;
   };
 
-  // Updated submit handler
+  // Handle submit
   const handleSubmit = async (type) => {
     try {
+      // Check user ID before proceeding
+      const currentUserId = getUserId();
+      if (!currentUserId) {
+        toast.error('User ID not available. Please try logging in again.');
+        onClose();
+        return;
+      }
+
       let values;
       switch (type) {
         case 'breakdown':
           values = await breakdownForm.validateFields();
           const breakdownResult = await submitBreakdownIssue(values);
-          if (breakdownResult.success) {
+          if (breakdownResult?.success) {
             toast.success('Breakdown issue submitted successfully');
             onClose();
           } else {
-            toast.error(breakdownResult.error, {
-              position: "top-right",
-              autoClose: 8000,
-              hideProgressBar: false,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-            });
-            return;
+            toast.error(breakdownResult?.error || 'Failed to submit breakdown issue');
           }
           break;
+
         case 'machine':
           values = await machineForm.validateFields();
-          const machineId = machineStatus?.machine_id; // Get machine ID from the store
+          const machineId = machineStatus?.machine_id;
+          
           if (!machineId) {
             toast.error('No machine ID available');
             return;
           }
-          
-          const userId = requested_by; // Get the user ID
-          if (!userId) {
-            toast.error('User ID is not available');
-            return; // Prevent submission if user ID is not available
-          }
 
-          const result = await submitMachineIssue(machineId, {
-            description: values.description,
-            is_on: values.machineStatus === 'ON', // Convert status to boolean
-            created_by: userId // Set the user ID
-          });
-          if (result.success) {
+          const machinePayload = {
+            description: values.description || '',
+            is_on: values.machineStatus === 'ON',
+            created_by: currentUserId.toString()
+          };
+
+          const result = await submitMachineIssue(machineId, machinePayload);
+          if (result?.success) {
             toast.success('Machine issue submitted successfully');
             onClose();
           } else {
-            toast.error(result.error || 'Failed to submit machine issue');
+            toast.error(result?.error || 'Failed to submit machine issue');
           }
           break;
+
         case 'component':
           values = await componentForm.validateFields();
           const partNumber = getCurrentPartNumber();
@@ -152,16 +156,28 @@ const MachineIssueModal = ({
             toast.error('No part number available');
             return;
           }
+
+          // Get user ID using the existing getUserId function
+          const componentUserId = getUserId();
+          if (!componentUserId) {
+            toast.error('User ID is not available. Please log in again.');
+            return;
+          }
+
           const componentResult = await submitComponentIssue(partNumber, {
-            description: values.description,
-            componentStatus: values.componentStatus
+            description: values.description || '',
+            componentStatus: values.componentStatus,
+            created_by: componentUserId.toString()
           });
-          if (componentResult.success) {
+          if (componentResult?.success) {
             toast.success('Component issue submitted successfully');
             onClose();
           } else {
-            toast.error(componentResult.error || 'Failed to submit component issue');
+            toast.error(componentResult?.error || 'Failed to submit component issue');
           }
+          break;
+
+        default:
           break;
       }
     } catch (error) {
@@ -170,8 +186,10 @@ const MachineIssueModal = ({
     }
   };
 
-  // Get current part number for display
-  const currentPartNumber = getCurrentPartNumber();
+  // Handle tab change
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+  };
 
   return (
     <>
@@ -212,9 +230,9 @@ const MachineIssueModal = ({
                   name="breakdownCategory" 
                   label="Issue Category"
                   className="mb-6"
+                  initialValue={breakdownCategory}
                 >
                   <Radio.Group 
-                    value={breakdownCategory} 
                     onChange={(e) => setBreakdownCategory(e.target.value)}
                     className="grid grid-cols-3 gap-4"
                   >
@@ -236,13 +254,11 @@ const MachineIssueModal = ({
                   rules={[{ required: true, message: 'Please select or enter a reason' }]}
                 >
                   <Select
-                    showSearch
-                    placeholder="Select a reason or enter custom"
-                    allowClear
                     mode="tags"
+                    placeholder="Select a reason or enter custom"
                     className="w-full"
                   >
-                    {breakdownReasons[breakdownCategory].map(reason => (
+                    {breakdownReasons[breakdownCategory]?.map(reason => (
                       <Option key={reason} value={reason}>
                         {reason}
                       </Option>
@@ -344,7 +360,7 @@ const MachineIssueModal = ({
               </Form.Item>
               
               <div className="mb-4 text-xs text-gray-500">
-                Using part number: {currentPartNumber || 'No part number available'}
+                Using part number: {getCurrentPartNumber() || 'No part number available'}
               </div>
 
               <Form.Item
@@ -379,23 +395,35 @@ const MachineIssueModal = ({
           </div>
         )}
       </Modal>
-      <ToastContainer
-        position="top-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
+      <ToastContainer />
     </>
   );
 };
 
 export default MachineIssueModal; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

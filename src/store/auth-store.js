@@ -57,7 +57,8 @@ const useAuthStore = create(
                 machine_id: credentials.machineId,
                 machine_password: credentials.machinePassword,
                 username: credentials.username,
-                password: credentials.password
+                password: credentials.password,
+                
               }),
             });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'; // Import useEffect and useState
-import { Table, Button, Space } from 'antd';
+import { Table, Button, Space, Modal, Input, message } from 'antd';
 import useMachineMaintenanceStore from '../../../store/maintenance'; // Import the store
 import { Row, Col } from 'antd'; 
 
@@ -8,7 +8,9 @@ const DowntimeTickets = () => {
   const fetchDowntimes = useMachineMaintenanceStore((state) => state.fetchDowntimes); // Fetch function from the store
   const acknowledgeDowntime = useMachineMaintenanceStore((state) => state.acknowledgeDowntime); // Acknowledge function
   const closeDowntime = useMachineMaintenanceStore((state) => state.closeDowntime); // Close function
-  const [visibleButtons, setVisibleButtons] = useState({}); // State to track button visibility
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [actionTaken, setActionTaken] = useState('');
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
 
   useEffect(() => {
     const getData = async () => {
@@ -25,45 +27,75 @@ const DowntimeTickets = () => {
     return () => clearInterval(intervalId); // Cleanup on unmount
   }, [fetchDowntimes]);
 
-  const handleButtonToggle = (ticketId) => {
-    setVisibleButtons((prev) => ({
-      ...prev,
-      [ticketId]: !prev[ticketId], // Toggle visibility for the specific ticket
-    }));
+  const handleAcknowledge = async (ticketId) => {
+    try {
+      await acknowledgeDowntime(ticketId);
+      message.success('Ticket acknowledged successfully');
+      const downtimes = await fetchDowntimes();
+      setData(downtimes);
+    } catch (error) {
+      message.error('Error acknowledging ticket');
+      console.error('Error acknowledging ticket:', error);
+    }
+  };
+
+  const showCloseModal = (ticketId) => {
+    setSelectedTicketId(ticketId);
+    setIsModalVisible(true);
+  };
+
+  const handleCloseModalOk = async () => {
+    if (!actionTaken.trim()) {
+      message.warning('Please enter action taken');
+      return;
+    }
+
+    try {
+      await closeDowntime(selectedTicketId, actionTaken);
+      message.success('Ticket closed successfully');
+      const downtimes = await fetchDowntimes();
+      setData(downtimes);
+      setIsModalVisible(false);
+      setActionTaken('');
+      setSelectedTicketId(null);
+    } catch (error) {
+      message.error('Error closing ticket');
+      console.error('Error closing ticket:', error);
+    }
+  };
+
+  const handleCloseModalCancel = () => {
+    setIsModalVisible(false);
+    setActionTaken('');
+    setSelectedTicketId(null);
   };
 
   const renderActionButtons = (record) => {
-    const isVisible = visibleButtons[record.id]; // Check visibility for the current ticket
-    return (
-      <Space>
-        {record.status === 'open' ? (
-          <>
-            <Button 
-              type="primary" 
-              onClick={() => { 
-                handleAcknowledge(record.id); 
-                handleButtonToggle(record.id); 
-              }}
-              style={{ display: isVisible ? 'none' : 'inline-block' }} // Hide if acknowledged
-            >
-              Acknowledge
-            </Button>
-            <Button 
-              type="primary" 
-              onClick={() => { 
-                handleClose(record.id); 
-                handleButtonToggle(record.id); 
-              }}
-              style={{ display: isVisible ? 'inline-block' : 'none' }} // Show if acknowledged
-            >
-              Close
-            </Button>
-          </>
-        ) : (
-          <span>No actions available</span>
-        )}
-      </Space>
-    );
+    if (record.status === 'closed') {
+      return <span>No actions available</span>;
+    }
+
+    if (record.status === 'open') {
+      return (
+        <Button 
+          type="primary" 
+          onClick={() => handleAcknowledge(record.id)}
+        >
+          Acknowledge
+        </Button>
+      );
+    }
+
+    if (record.status === 'in_progress') {
+      return (
+        <Button 
+          type="primary" 
+          onClick={() => showCloseModal(record.id)}
+        >
+          Close
+        </Button>
+      );
+    }
   };
 
   const columns = [
@@ -78,20 +110,31 @@ const DowntimeTickets = () => {
       key: 'machine_id',
     },
     {
+      title: 'Category',
+      dataIndex: 'category',
+      key: 'category',
+    },
+    {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
     },
     {
+      title: 'Priority',
+      dataIndex: 'priority',
+      key: 'priority',
+    },
+    {
       title: 'Reported By',
       dataIndex: 'reported_by',
       key: 'reported_by',
+      render: (value) => value || '-',
     },
     {
       title: 'Open Date',
       dataIndex: 'open_dt',
       key: 'open_dt',
-      render: (date) => new Date(date).toLocaleString(),
+      render: (date) => date ? new Date(date).toLocaleString() : '-',
     },
     {
       title: 'In Progress Date',
@@ -106,48 +149,47 @@ const DowntimeTickets = () => {
       render: (date) => date ? new Date(date).toLocaleString() : '-',
     },
     {
+      title: 'Action Taken',
+      dataIndex: 'action_taken',
+      key: 'action_taken',
+      render: (value) => value || '-',
+    },
+    {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      render: (status) => status.replace('_', ' ').toUpperCase(),
     },
     {
       title: 'Action',
       key: 'action',
-      render: (_, record) => renderActionButtons(record), // Use the new render function
+      render: (_, record) => renderActionButtons(record),
     },
   ];
-
-  const handleAcknowledge = async (ticketId) => {
-    try {
-      await acknowledgeDowntime(ticketId); // Acknowledge the downtime
-      console.log('Acknowledged ticket:', ticketId);
-      const downtimes = await fetchDowntimes(); // Refetch downtimes
-      setData(downtimes); // Update the state with the new data
-    } catch (error) {
-      console.error('Error acknowledging ticket:', error);
-    }
-  };
-
-  const handleClose = async (ticketId) => {
-    try {
-      await closeDowntime(ticketId); // Close the downtime
-      console.log('Closed ticket:', ticketId);
-      const downtimes = await fetchDowntimes(); // Refetch downtimes
-      setData(downtimes); // Update the state with the new data
-    } catch (error) {
-      console.error('Error closing ticket:', error);
-    }
-  };
 
   return (
     <div className="p-4">
       <Table 
-            columns={columns} 
-            dataSource={data} // Use the fetched data
-            rowKey="id"
-            pagination={{ pageSize: 10 }} // Optional: Add pagination for better UX
-            scroll={{ x: true }} // Enable horizontal scrolling for smaller screens
-          />
+        columns={columns} 
+        dataSource={data} // Use the fetched data
+        rowKey="id"
+        pagination={{ pageSize: 10 }} // Optional: Add pagination for better UX
+        scroll={{ x: true }} // Enable horizontal scrolling for smaller screens
+      />
+      
+      <Modal
+        title="Close Ticket"
+        visible={isModalVisible}
+        onOk={handleCloseModalOk}
+        onCancel={handleCloseModalCancel}
+      >
+        <Input.TextArea
+          placeholder="Enter action taken"
+          value={actionTaken}
+          onChange={(e) => setActionTaken(e.target.value)}
+          rows={4}
+        />
+      </Modal>
     </div>
   );
 };

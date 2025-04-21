@@ -363,30 +363,37 @@ const useWebSocketStore = create((set, get) => ({
   submitMachineIssue: async (machineId, payload) => {
     try {
       set({ maintenanceLoading: true });
-      // console.log(`Submitting machine issue for machine ID: ${machineId}`, payload);
-      
+
+      // Validate required fields
+      if (!payload.created_by) {
+        throw new Error('User ID is required');
+      }
+
+      if (!machineId) {
+        throw new Error('Machine ID is required');
+      }
+
       const response = await fetch(
-        `http://172.18.7.85:8078/api/v1/maintainance/operator/machine-update/${machineId}`, // Moved URL here
+        `http://172.18.7.85:8078/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            description: payload.description,
-            is_on: payload.machineStatus === 'ON'
+            description: payload.description || '',
+            is_on: Boolean(payload.is_on),
+            created_by: payload.created_by
           })
         }
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to submit machine issue: ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to submit machine issue');
       }
 
       const data = await response.json();
-      // console.log('Machine issue submission response:', data);
-      
       return {
         success: true,
         data,
@@ -396,7 +403,7 @@ const useWebSocketStore = create((set, get) => ({
       console.error('Error submitting machine issue:', error);
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to update machine status',
         message: 'Failed to update machine status'
       };
     } finally {
@@ -413,13 +420,21 @@ const useWebSocketStore = create((set, get) => ({
         message: 'Failed to update component status: No part number available'
       };
     }
+
+    // Validate user ID
+    if (!payload.created_by) {
+      return {
+        success: false,
+        error: 'User ID is required',
+        message: 'Please log in to submit component issues'
+      };
+    }
     
     try {
       set({ maintenanceLoading: true });
-      // console.log(`Submitting component issue for part number: ${partNumber}`, payload);
       
       const response = await fetch(
-        `http://172.18.7.85:8078/api/v1/maintainance/operator/raw-material-update/${partNumber}`, // Moved URL here
+        `http://172.18.7.85:8078/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -427,7 +442,8 @@ const useWebSocketStore = create((set, get) => ({
           },
           body: JSON.stringify({
             description: payload.description,
-            is_available: payload.componentStatus === 'available'
+            is_available: payload.componentStatus === 'available',
+            created_by: payload.created_by
           })
         }
       );
@@ -438,11 +454,19 @@ const useWebSocketStore = create((set, get) => ({
       }
 
       const data = await response.json();
-      // console.log('Component issue submission response:', data);
       
       return {
         success: true,
-        data,
+        data: {
+          id: data.id,
+          childPartNumber: data.child_part_number,
+          description: data.description,
+          quantity: data.quantity,
+          unitName: data.unit_name,
+          statusName: data.status_name,
+          availableFrom: data.available_from,
+          orders: data.orders
+        },
         message: 'Component status updated successfully'
       };
     } catch (error) {
@@ -593,6 +617,24 @@ const useWebSocketStore = create((set, get) => ({
 }));
 
 export default useWebSocketStore; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

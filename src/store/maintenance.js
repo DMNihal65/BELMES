@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.85:8068/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.85:8068/api/v1/operator';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.85:8078/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.85:8078/api/v1/operator';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -314,7 +314,7 @@ acknowledgeDowntime: async (id) => {
   try {
     const response = await axios.put(`${SUPERVISOR_BASE_URL}/supervisor/downtimes/${id}/acknowledge`);
     set({ loading: false });
-    return response.data; // Return the acknowledged downtime
+    return response.data;
   } catch (error) {
     set({ 
       error: error.response?.data?.detail || error.message, 
@@ -325,14 +325,14 @@ acknowledgeDowntime: async (id) => {
 },
 
 // Close downtime
-closeDowntime: async (id) => {
+closeDowntime: async (id, actionTaken) => {
   set({ loading: true, error: null });
   try {
     const response = await axios.put(`${SUPERVISOR_BASE_URL}/supervisor/downtimes/${id}/close`, {
-      action_taken: "close"
+      action_taken: actionTaken
     });
     set({ loading: false });
-    return response.data; // Return the closed downtime
+    return response.data;
   } catch (error) {
     set({ 
       error: error.response?.data?.detail || error.message, 

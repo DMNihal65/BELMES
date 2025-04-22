@@ -1,586 +1,623 @@
 import { create } from 'zustand';
 import { message } from 'antd';
-import { LogOut, Menu as MenuIcon, Search, User, Bell, Wrench, Package } from 'lucide-react';
+import { Wrench, Package } from 'lucide-react';
 
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.18.7.85:8078/api/v1';
+const API_BASE_URL = 'http://172.16.0.203:8002/api/v1';
 const API_ENDPOINTS = {
-  // GET endpoints for supervisor
-  machineNotifications: 'http://172.18.7.85:8078/api/v1/maintainance/supervisor/machine-notifications/',
+  // GET endpoints for notifications
+  machineNotifications: `${API_BASE_URL}/maintainance/supervisor/machine-notifications/`,
   materialNotifications: `${API_BASE_URL}/maintainance/supervisor/raw-material-notifications`,
-  // POST endpoints for operator updates
-  machineUpdate: `${API_BASE_URL}/maintainance/operator/machine-update`,
-  materialUpdate: `${API_BASE_URL}/maintainance/operator/raw-material-update`,
-  // WebSocket endpoints remain the same
-  machineWs: `ws://172.18.7.85:8078/api/v1/notification/ws/machine-notifications`,
-  materialWs: `ws://172.18.7.85:8078/api/v1/notification/ws/material-notifications`,
-  // Add these new endpoints
-  machineUnacknowledged: 'http://172.18.7.85:8078/api/v1/notification/machine-notifications/unacknowledged',
-  materialUnacknowledged: 'http://172.18.7.85:8078/api/v1/notification/material-notifications/unacknowledged'
+  machineUnacknowledged: `${API_BASE_URL}/notification/machine-notifications/unacknowledged`,
+  materialUnacknowledged: `${API_BASE_URL}/notification/material-notifications/unacknowledged`,
+  
+  // POST endpoints for acknowledgments
+  machineAcknowledge: `${API_BASE_URL}/notification/machine-notification/acknowledge`,
+  materialAcknowledge: `${API_BASE_URL}/notification/material-notification/acknowledge`,
+  
+  // WebSocket endpoints
+  machineWs: `ws://${API_BASE_URL.replace('http://', '')}/notification/ws/machine-notifications`,
+  materialWs: `ws://${API_BASE_URL.replace('http://', '')}/notification/ws/material-notifications`,
+};
+
+/**
+ * Helper function to generate a consistent unique ID for a notification
+ * @param {Object} notification - The notification object
+ * @returns {string} A unique ID for the notification
+ */
+const generateNotificationId = (notification) => {
+  const type = notification.notificationType;
+  
+  if (type === 'machine') {
+    // For machine notifications, use machine_id + timestamp
+    return `machine-${notification.id || notification.machine_id}-${notification.updated_at}`;
+  } else if (type === 'material') {
+    // For material notifications, use part_number + timestamp
+    return `material-${notification.id || notification.part_number}-${notification.updated_at}`;
+  }
+  
+  // Fallback
+  return `notification-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+};
+
+/**
+ * Helper function to standardize notification object format
+ * @param {Object} notification - Raw notification data from API
+ * @param {string} type - Either 'machine' or 'material'
+ * @returns {Object} Standardized notification object
+ */
+const standardizeNotification = (notification, type) => {
+  const baseNotification = {
+    ...notification,
+    notificationType: type,
+    is_acknowledged: notification.is_acknowledged || false,
+    // Using a consistent approach to handle IDs
+    _uniqueId: notification._uniqueId || generateNotificationId({ ...notification, notificationType: type }),
+  };
+  
+  return baseNotification;
 };
 
 const useNotificationStore = create((set, get) => ({
+  // State
   notifications: [],
   unreadCount: 0,
+  isInitialized: false,
+  isLoading: false,
+  error: null,
   machineSocket: null,
   materialSocket: null,
   isMachineSocketConnected: false,
   isMaterialSocketConnected: false,
-  machineRetryCount: 0,
-  materialRetryCount: 0,
+  
+  // Initialize the store and connect to WebSockets
+  initialize: () => {
+    if (get().isInitialized) return;
+    
+    console.log('Initializing notification store...');
+    get().connectWebSockets();
+    get().fetchNotifications(false);
+    
+    set({ isInitialized: true });
+  },
   
   // Connect to WebSockets
   connectWebSockets: () => {
-    // Connect to both WebSocket endpoints
     get().connectMachineWebSocket();
     get().connectMaterialWebSocket();
-    
-    // Fetch initial notifications from both endpoints
-    // Pass false to prevent showing error messages on initial load
-    get().fetchNotifications(false);
   },
   
   // Connect to Machine WebSocket
   connectMachineWebSocket: () => {
-    const token = localStorage.getItem('token');
-    
-    // Close existing connection if any
-    if (get().machineSocket) {
-      get().machineSocket.close();
-    }
-    
     try {
+      // Close existing connection if any
+      const existingSocket = get().machineSocket;
+      if (existingSocket && existingSocket.readyState !== WebSocket.CLOSED) {
+        existingSocket.close();
+      }
+      
       const socket = new WebSocket(API_ENDPOINTS.machineWs);
       
       socket.onopen = () => {
-        // console.log('Machine WebSocket connected');
-        set({ 
-          machineSocket: socket, 
-          isMachineSocketConnected: true,
-          machineRetryCount: 0
-        });
+        console.log('Machine WebSocket connected');
+        set({ machineSocket: socket, isMachineSocketConnected: true });
       };
       
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          // console.log('Machine notification received:', data);
+          console.log('Machine WebSocket message:', data);
           
-          // Handle different message types
           switch (data.type) {
             case 'initial_notifications':
               if (data.notifications && Array.isArray(data.notifications)) {
-                // Handle initial notifications list - add source type to each notification
-                const machineNotifications = data.notifications.map(notification => ({
-                  ...notification,
-                  notificationType: 'machine'
-                }));
+                // Process initial notifications from WebSocket
+                const machineNotifications = data.notifications.map(n => 
+                  standardizeNotification(n, 'machine')
+                );
                 
-                // Merge with existing notifications
-                set((state) => {
-                  // Filter out machine notifications from current list
-                  const currentMaterialNotifications = state.notifications.filter(
-                    n => n.notificationType === 'material'
-                  );
-                  
-                  // Combine and sort by updated_at descending
-                  const allNotifications = [...machineNotifications, ...currentMaterialNotifications]
-                    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-                  
-                  // Count unread
-                  const unreadCount = allNotifications.filter(n => !n.is_acknowledged).length;
-                  
-                  return { 
-                    notifications: allNotifications,
-                    unreadCount
-                  };
-                });
+                // Update the store
+                get().updateNotifications(machineNotifications, 'machine');
               }
               break;
               
             case 'new_notification':
               if (data.notification) {
-                // Add type to the notification
-                const machineNotification = {
-                  ...data.notification,
-                  notificationType: 'machine'
-                };
+                // Process new notification
+                const newNotification = standardizeNotification(data.notification, 'machine');
                 
-                // Add new notification to the list
-                set((state) => ({
-                  notifications: [machineNotification, ...state.notifications]
-                    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)),
-                  unreadCount: state.unreadCount + 1
-                }));
+                // Add to store
+                get().addNotification(newNotification);
                 
-                // Show toast notification
-                showMachineNotification(machineNotification);
+                // Show toast
+                showMachineNotification(newNotification);
               }
               break;
               
             case 'notification_acknowledged':
               if (data.notification_id) {
-                // Update acknowledged notification
-                set((state) => {
-                  const updatedNotifications = state.notifications.map(notification => {
-                    // Find the notification by machine_id and updated_at (since there's no explicit id in the sample)
-                    if (notification.notificationType === 'machine' && 
-                        notification.machine_id === data.notification.machine_id && 
-                        notification.updated_at === data.notification.updated_at) {
-                      return { 
-                        ...notification, 
-                        is_acknowledged: true,
-                        acknowledged_by: data.acknowledged_by,
-                        acknowledged_at: data.acknowledged_at
-                      };
-                    }
-                    return notification;
-                  });
-                  
-                  // Recalculate unread count
-                  const unreadCount = updatedNotifications.filter(n => !n.is_acknowledged).length;
-                  
-                  return { notifications: updatedNotifications, unreadCount };
-                });
+                // Process acknowledgment
+                get().updateNotificationAcknowledgment(
+                  data.notification_id, 
+                  'machine',
+                  data.acknowledged_by,
+                  data.acknowledged_at
+                );
               }
               break;
               
             default:
-              // console.log('Unknown machine notification type:', data.type);
+              console.log('Unknown machine notification type:', data.type);
           }
         } catch (error) {
-          console.error('Error parsing machine notification:', error);
+          console.error('Error processing machine WebSocket message:', error);
         }
       };
       
-      socket.onclose = (event) => {
-        // console.log('Machine WebSocket disconnected');
+      socket.onclose = () => {
+        console.log('Machine WebSocket disconnected');
         set({ isMachineSocketConnected: false });
+        
+        // Auto-reconnect after delay
+        setTimeout(() => {
+          if (!get().machineSocket || get().machineSocket.readyState === WebSocket.CLOSED) {
+            console.log('Attempting to reconnect machine WebSocket...');
+            get().connectMachineWebSocket();
+          }
+        }, 5000);
       };
       
       socket.onerror = (error) => {
-        // Just log the error, don't take any action here
-        // The onclose handler will handle reconnection
         console.error('Machine WebSocket error:', error);
       };
       
       set({ machineSocket: socket });
     } catch (error) {
-      console.error('Error creating machine WebSocket:', error);
+      console.error('Error setting up machine WebSocket:', error);
     }
   },
   
   // Connect to Material WebSocket
   connectMaterialWebSocket: () => {
-    const token = localStorage.getItem('token');
-    
-    // Close existing connection if any
-    if (get().materialSocket) {
-      get().materialSocket.close();
-    }
-    
     try {
+      // Close existing connection if any
+      const existingSocket = get().materialSocket;
+      if (existingSocket && existingSocket.readyState !== WebSocket.CLOSED) {
+        existingSocket.close();
+      }
+      
       const socket = new WebSocket(API_ENDPOINTS.materialWs);
       
       socket.onopen = () => {
-        // console.log('Material WebSocket connected');
-        set({ 
-          materialSocket: socket, 
-          isMaterialSocketConnected: true,
-          materialRetryCount: 0
-        });
+        console.log('Material WebSocket connected');
+        set({ materialSocket: socket, isMaterialSocketConnected: true });
       };
       
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          // console.log('Material notification received:', data);
+          console.log('Material WebSocket message:', data);
           
-          // Handle different message types
           switch (data.type) {
             case 'initial_notifications':
               if (data.notifications && Array.isArray(data.notifications)) {
-                // Handle initial notifications list - add source type to each notification
-                const materialNotifications = data.notifications.map(notification => ({
-                  ...notification,
-                  notificationType: 'material'
-                }));
+                // Process initial notifications
+                const materialNotifications = data.notifications.map(n => 
+                  standardizeNotification(n, 'material')
+                );
                 
-                // Merge with existing notifications
-                set((state) => {
-                  // Filter out material notifications from current list
-                  const currentMachineNotifications = state.notifications.filter(
-                    n => n.notificationType === 'machine'
-                  );
-                  
-                  // Combine and sort by updated_at descending
-                  const allNotifications = [...materialNotifications, ...currentMachineNotifications]
-                    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-                  
-                  // Count unread
-                  const unreadCount = allNotifications.filter(n => !n.is_acknowledged).length;
-                  
-                  return { 
-                    notifications: allNotifications,
-                    unreadCount
-                  };
-                });
+                // Update the store
+                get().updateNotifications(materialNotifications, 'material');
               }
               break;
               
             case 'new_notification':
               if (data.notification) {
-                // Add type to the notification
-                const materialNotification = {
-                  ...data.notification,
-                  notificationType: 'material'
-                };
+                // Process new notification
+                const newNotification = standardizeNotification(data.notification, 'material');
                 
-                // Add new notification to the list
-                set((state) => ({
-                  notifications: [materialNotification, ...state.notifications]
-                    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)),
-                  unreadCount: state.unreadCount + 1
-                }));
+                // Add to store
+                get().addNotification(newNotification);
                 
-                // Show toast notification
-                showMaterialNotification(materialNotification);
+                // Show toast
+                showMaterialNotification(newNotification);
               }
               break;
               
             case 'notification_acknowledged':
               if (data.notification_id) {
-                // Update acknowledged notification
-                set((state) => {
-                  const updatedNotifications = state.notifications.map(notification => {
-                    // Find the notification by id for material notifications
-                    if (notification.notificationType === 'material' && 
-                        notification.id === data.notification_id) {
-                      return { 
-                        ...notification, 
-                        is_acknowledged: true,
-                        acknowledged_by: data.acknowledged_by,
-                        acknowledged_at: data.acknowledged_at
-                      };
-                    }
-                    return notification;
-                  });
-                  
-                  // Recalculate unread count
-                  const unreadCount = updatedNotifications.filter(n => !n.is_acknowledged).length;
-                  
-                  return { notifications: updatedNotifications, unreadCount };
-                });
+                // Process acknowledgment
+                get().updateNotificationAcknowledgment(
+                  data.notification_id, 
+                  'material',
+                  data.acknowledged_by,
+                  data.acknowledged_at
+                );
               }
               break;
               
             default:
-              // console.log('Unknown material notification type:', data.type);
+              console.log('Unknown material notification type:', data.type);
           }
         } catch (error) {
-          console.error('Error parsing material notification:', error);
+          console.error('Error processing material WebSocket message:', error);
         }
       };
       
-      socket.onclose = (event) => {
-        // console.log('Material WebSocket disconnected');
+      socket.onclose = () => {
+        console.log('Material WebSocket disconnected');
         set({ isMaterialSocketConnected: false });
+        
+        // Auto-reconnect after delay
+        setTimeout(() => {
+          if (!get().materialSocket || get().materialSocket.readyState === WebSocket.CLOSED) {
+            console.log('Attempting to reconnect material WebSocket...');
+            get().connectMaterialWebSocket();
+          }
+        }, 5000);
       };
       
       socket.onerror = (error) => {
-        // Just log the error, don't take any action here
-        // The onclose handler will handle reconnection
         console.error('Material WebSocket error:', error);
       };
       
       set({ materialSocket: socket });
     } catch (error) {
-      console.error('Error creating material WebSocket:', error);
+      console.error('Error setting up material WebSocket:', error);
     }
   },
   
   // Disconnect WebSockets
   disconnectWebSockets: () => {
-    // Disconnect machine socket
-    const { machineSocket } = get();
-    if (machineSocket) {
-      machineSocket.close();
+    try {
+      const machineSocket = get().machineSocket;
+      if (machineSocket) {
+        machineSocket.close();
+      }
+      
+      const materialSocket = get().materialSocket;
+      if (materialSocket) {
+        materialSocket.close();
+      }
+      
+      set({ 
+        machineSocket: null, 
+        materialSocket: null,
+        isMachineSocketConnected: false,
+        isMaterialSocketConnected: false
+      });
+      
+      console.log('WebSockets disconnected');
+    } catch (error) {
+      console.error('Error disconnecting WebSockets:', error);
     }
-    
-    // Disconnect material socket
-    const { materialSocket } = get();
-    if (materialSocket) {
-      materialSocket.close();
-    }
-    
-    set({ 
-      machineSocket: null, 
-      materialSocket: null,
-      isMachineSocketConnected: false,
-      isMaterialSocketConnected: false
-    });
   },
   
-  // Fetch notifications from both APIs
-  fetchNotifications: async (showErrorMessage = false) => {
+  // Fetch notifications from the API
+  fetchNotifications: async (showErrorMessages = false) => {
     try {
-      // console.log('🔄 Starting to fetch notifications...');
+      set({ isLoading: true, error: null });
+      console.log('🔄 Fetching notifications...');
       
+      // Fetch from all endpoints in parallel
       const [
         machineResponse, 
-        materialResponse,
+        materialResponse, 
         machineUnackResponse, 
         materialUnackResponse
       ] = await Promise.all([
         fetch(API_ENDPOINTS.machineNotifications, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         }),
         fetch(API_ENDPOINTS.materialNotifications, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         }),
         fetch(API_ENDPOINTS.machineUnacknowledged, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         }),
         fetch(API_ENDPOINTS.materialUnacknowledged, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
       ]);
-
+      
+      // Process machine notifications
       let allNotifications = [];
-
-      // Process regular machine notifications
+      
       if (machineResponse.ok) {
         const machineData = await machineResponse.json();
-        // console.log('🔧 Machine Response:', machineData);
-        
-        const machineNotifications = (machineData.notifications || [])
-          .map(notification => ({
-            ...notification,
-            notificationType: 'machine',
-            is_acknowledged: notification.is_acknowledged || true
-          }));
-        // console.log('🔧 Processed Machine Notifications:', {
-        //   total: machineData.total_notifications,
-        //   processed: machineNotifications.length
-        // });
+        const machineNotifications = (machineData.notifications || []).map(n => 
+          standardizeNotification({ ...n, is_acknowledged: true }, 'machine')
+        );
         allNotifications = [...allNotifications, ...machineNotifications];
+      } else if (showErrorMessages) {
+        console.error('Failed to fetch machine notifications:', machineResponse.statusText);
       }
-
-      // Process regular material notifications
+      
+      // Process material notifications
       if (materialResponse.ok) {
         const materialData = await materialResponse.json();
-        // console.log('📦 Material Response:', materialData);
-        
-        const materialNotifications = (materialData.notifications || [])
-          .map(notification => ({
-            ...notification,
-            notificationType: 'material',
-            is_acknowledged: notification.is_acknowledged || true
-          }));
-        // console.log('📦 Processed Material Notifications:', {
-        //   total: materialData.total_notifications,
-        //   processed: materialNotifications.length
-        // });
+        const materialNotifications = (materialData.notifications || []).map(n => 
+          standardizeNotification({ ...n, is_acknowledged: true }, 'material')
+        );
         allNotifications = [...allNotifications, ...materialNotifications];
+      } else if (showErrorMessages) {
+        console.error('Failed to fetch material notifications:', materialResponse.statusText);
       }
-
+      
       // Process unacknowledged machine notifications
       if (machineUnackResponse.ok) {
         const unackMachineData = await machineUnackResponse.json();
-        // console.log('🚨 Unacknowledged Machine Response:', unackMachineData);
-        
-        const unackMachineNotifications = (unackMachineData.notifications || [])
-          .map(notification => ({
-            ...notification,
-            notificationType: 'machine',
-            is_acknowledged: false
-          }));
-        // console.log('🚨 Processed Unack Machine:', {
-        //   total: unackMachineData.total_notifications,
-        //   processed: unackMachineNotifications.length
-        // });
+        const unackMachineNotifications = (unackMachineData.notifications || []).map(n => 
+          standardizeNotification({ ...n, is_acknowledged: false }, 'machine')
+        );
         allNotifications = [...allNotifications, ...unackMachineNotifications];
+      } else if (showErrorMessages) {
+        console.error('Failed to fetch unacknowledged machine notifications:', machineUnackResponse.statusText);
       }
-
+      
       // Process unacknowledged material notifications
       if (materialUnackResponse.ok) {
         const unackMaterialData = await materialUnackResponse.json();
-        // console.log('🚨 Unacknowledged Material Response:', unackMaterialData);
-        
-        const unackMaterialNotifications = (unackMaterialData.notifications || [])
-          .map(notification => ({
-            ...notification,
-            notificationType: 'material',
-            is_acknowledged: false
-          }));
-        // console.log('🚨 Processed Unack Material:', {
-        //   total: unackMaterialData.total_notifications,
-        //   processed: unackMaterialNotifications.length
-        // });
+        const unackMaterialNotifications = (unackMaterialData.notifications || []).map(n => 
+          standardizeNotification({ ...n, is_acknowledged: false }, 'material')
+        );
         allNotifications = [...allNotifications, ...unackMaterialNotifications];
+      } else if (showErrorMessages) {
+        console.error('Failed to fetch unacknowledged material notifications:', materialUnackResponse.statusText);
       }
-
-      // Remove duplicates
-      const uniqueNotifications = [...new Map(
-        allNotifications.map(item => [
-          `${item.notificationType}-${item.id || item.machine_id || item.part_number}-${item.updated_at}`,
-          item
-        ])
-      ).values()];
-
-      // Sort by date
-      const sortedNotifications = uniqueNotifications.sort(
-        (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
-      );
-
-      // console.log('📊 Final Notifications:', {
-      //   total: sortedNotifications.length,
-      //   machine: sortedNotifications.filter(n => n.notificationType === 'machine').length,
-      //   material: sortedNotifications.filter(n => n.notificationType === 'material').length,
-      //   unacknowledged: sortedNotifications.filter(n => !n.is_acknowledged).length
-      // });
-
-      // Update store
-      set({ 
-        notifications: sortedNotifications,
-        unreadCount: sortedNotifications.filter(n => !n.is_acknowledged).length,
-        machineCount: sortedNotifications.filter(n => n.notificationType === 'machine').length,
-        materialCount: sortedNotifications.filter(n => n.notificationType === 'material').length
-      });
-
+      
+      // Replace the entire notifications collection
+      get().setNotifications(allNotifications);
+      
+      set({ isLoading: false });
+      return true;
     } catch (error) {
-      console.error('❌ Error in fetchNotifications:', error);
-      if (showErrorMessage) {
+      console.error('❌ Error fetching notifications:', error);
+      
+      set({ 
+        isLoading: false, 
+        error: 'Failed to fetch notifications'
+      });
+      
+      if (showErrorMessages) {
         message.error('Failed to fetch notifications. Please try again.');
       }
+      
+      return false;
     }
   },
   
-  // Mark all notifications as read
-  markAllAsRead: () => {
-    set((state) => {
-      const updatedNotifications = state.notifications.map(notification => ({
-        ...notification,
-        is_acknowledged: true,
-        acknowledged_by: "current_user", // Replace with actual user name
-        acknowledged_at: new Date().toISOString()
-      }));
-      
-      return { notifications: updatedNotifications, unreadCount: 0 };
+  // Set the entire notifications collection
+  setNotifications: (notifications) => {
+    // Create a Map to efficiently merge and deduplicate notifications
+    const notificationMap = new Map();
+    
+    // First, add existing notifications to the map
+    get().notifications.forEach(notification => {
+      notificationMap.set(notification._uniqueId, notification);
     });
     
-    // Here you could also send a request to the backend to mark all as read
+    // Then, merge in the new notifications, overwriting duplicates
+    notifications.forEach(notification => {
+      notificationMap.set(notification._uniqueId, notification);
+    });
+    
+    // Convert back to array and sort by date
+    const mergedNotifications = Array.from(notificationMap.values()).sort(
+      (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
+    );
+    
+    // Update the store
+    const unreadCount = mergedNotifications.filter(n => !n.is_acknowledged).length;
+    
+    set({ 
+      notifications: mergedNotifications,
+      unreadCount
+    });
+    
+    console.log(`📊 Notifications updated: ${mergedNotifications.length} total, ${unreadCount} unread`);
   },
   
-  // Mark a specific notification as read
-  markAsRead: (notification) => {
-    set((state) => {
-      const updatedNotifications = state.notifications.map(item => {
-        if (notification.notificationType === 'machine' && item.notificationType === 'machine') {
-          if (item.machine_id === notification.machine_id && item.updated_at === notification.updated_at) {
-            return { 
-              ...item, 
-              is_acknowledged: true,
-              acknowledged_by: "current_user",
-              acknowledged_at: new Date().toISOString()
-            };
-          }
-        } else if (notification.notificationType === 'material' && item.notificationType === 'material') {
-          if (item.id === notification.id) {
-            return { 
-              ...item, 
-              is_acknowledged: true,
-              acknowledged_by: "current_user",
-              acknowledged_at: new Date().toISOString()
-            };
-          }
-        }
-        return item;
-      });
+  // Add a new notification
+  addNotification: (notification) => {
+    set(state => {
+      // Standardize the notification
+      const standardizedNotification = standardizeNotification(
+        notification, 
+        notification.notificationType
+      );
+      
+      // Check if this notification already exists
+      const existingIndex = state.notifications.findIndex(
+        n => n._uniqueId === standardizedNotification._uniqueId
+      );
+      
+      let updatedNotifications;
+      
+      if (existingIndex >= 0) {
+        // Update existing notification
+        updatedNotifications = [...state.notifications];
+        updatedNotifications[existingIndex] = standardizedNotification;
+      } else {
+        // Add new notification
+        updatedNotifications = [standardizedNotification, ...state.notifications];
+      }
+      
+      // Sort by date
+      updatedNotifications.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      
+      // Calculate unread count
+      const unreadCount = updatedNotifications.filter(n => !n.is_acknowledged).length;
       
       return { 
         notifications: updatedNotifications,
-        unreadCount: updatedNotifications.filter(n => !n.is_acknowledged).length
+        unreadCount
       };
     });
-    
-    // Here you could also send a request to the backend to mark this notification as read
   },
   
-  // Clear all notifications
+  // Update notifications of a specific type
+  updateNotifications: (notifications, type) => {
+    if (!Array.isArray(notifications) || notifications.length === 0) return;
+    
+    set(state => {
+      // Remove existing notifications of this type
+      const otherTypeNotifications = state.notifications.filter(
+        n => n.notificationType !== type
+      );
+      
+      // Standardize all new notifications
+      const standardizedNotifications = notifications.map(n => 
+        standardizeNotification(n, type)
+      );
+      
+      // Combine and sort
+      const updatedNotifications = [...otherTypeNotifications, ...standardizedNotifications]
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      
+      // Calculate unread count
+      const unreadCount = updatedNotifications.filter(n => !n.is_acknowledged).length;
+      
+      return { 
+        notifications: updatedNotifications,
+        unreadCount
+      };
+    });
+  },
+  
+  // Update a notification's acknowledgment status
+  updateNotificationAcknowledgment: (notificationId, type, acknowledgedBy, acknowledgedAt) => {
+    set(state => {
+      const updatedNotifications = state.notifications.map(notification => {
+        // Match by ID and type
+        const matchesId = () => {
+          if (type === 'machine' && notification.notificationType === 'machine') {
+            return notification.id === notificationId || notification.machine_id === notificationId;
+          } else if (type === 'material' && notification.notificationType === 'material') {
+            return notification.id === notificationId;
+          }
+          return false;
+        };
+        
+        if (matchesId()) {
+          return {
+            ...notification,
+            is_acknowledged: true,
+            acknowledged_by: acknowledgedBy || notification.acknowledged_by || 'System',
+            acknowledged_at: acknowledgedAt || new Date().toISOString()
+          };
+        }
+        
+        return notification;
+      });
+      
+      // Calculate unread count
+      const unreadCount = updatedNotifications.filter(n => !n.is_acknowledged).length;
+      
+      return { 
+        notifications: updatedNotifications,
+        unreadCount
+      };
+    });
+  },
+  
+  // Mark a notification as read/acknowledged
+  markAsRead: async (notification) => {
+    if (!notification) return false;
+    
+    try {
+      // Get username for acknowledgment
+      const username = localStorage.getItem('username') || 'unknown-user';
+      
+      // Determine which endpoint to use
+      const endpoint = notification.notificationType === 'machine'
+        ? API_ENDPOINTS.machineAcknowledge
+        : API_ENDPOINTS.materialAcknowledge;
+      
+      // Determine notification ID to use
+      const notificationId = notification.notificationType === 'machine'
+        ? (notification.id || notification.machine_id)
+        : notification.id;
+      
+      // Send request to backend
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          notification_id: notificationId,
+          user_id: username
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to acknowledge notification: ${response.statusText}`);
+      }
+      
+      // Optimistically update UI
+      get().updateNotificationAcknowledgment(
+        notificationId,
+        notification.notificationType,
+        username,
+        new Date().toISOString()
+      );
+      
+      return true;
+    } catch (error) {
+      console.error('Error acknowledging notification:', error);
+      message.error('Failed to acknowledge notification');
+      return false;
+    }
+  },
+  
+  // Mark all unacknowledged notifications as read
+  markAllAsRead: async () => {
+    const unacknowledgedNotifications = get().notifications.filter(n => !n.is_acknowledged);
+    
+    if (unacknowledgedNotifications.length === 0) return true;
+    
+    try {
+      let success = true;
+      
+      // Process in batches to avoid overwhelming the server
+      for (const notification of unacknowledgedNotifications) {
+        try {
+          await get().markAsRead(notification);
+        } catch (error) {
+          console.error('Error in markAllAsRead for notification:', notification, error);
+          success = false;
+          // Continue with other notifications even if one fails
+        }
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('Error in markAllAsRead:', error);
+      message.error('Some notifications could not be acknowledged');
+      return false;
+    }
+  },
+  
+  // Clear all notifications (for testing/debugging)
   clearNotifications: () => {
     set({ notifications: [], unreadCount: 0 });
-  },
-  
-  // Test machine endpoint - for diagnostic purposes
-  testMachineEndpoint: async () => {
-    try {
-      const response = await fetch(API_ENDPOINTS.machineNotifications, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      // console.log('Machine API Status:', response.status);
-      const data = await response.text();
-      
-      try {
-        return JSON.parse(data);
-      } catch (e) {
-        return data;
-      }
-    } catch (error) {
-      console.error('Error testing machine endpoint:', error);
-      throw error;
-    }
-  },
-  
-  // Test material endpoint - for diagnostic purposes
-  testMaterialEndpoint: async () => {
-    try {
-      const response = await fetch(API_ENDPOINTS.materialNotifications, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      // console.log('Material API Status:', response.status);
-      const data = await response.text();
-      
-      try {
-        return JSON.parse(data);
-      } catch (e) {
-        return data;
-      }
-    } catch (error) {
-      console.error('Error testing material endpoint:', error);
-      throw error;
-    }
   }
 }));
 
-// Helper function to show machine notification
+// Helper function to show machine notification toast
 const showMachineNotification = (notification) => {
-  const key = `notification-machine-${Date.now()}`;
+  const key = `machine-${notification.id || notification.machine_id}-${Date.now()}`;
   
   message.info({
     key,
     content: `Machine Update: ${notification.status_name} - ${notification.description || 'No description'} (${notification.machine_make} #${notification.machine_id})`,
-    duration: 10, // 10 seconds
+    duration: 10,
     style: {
       borderLeft: '4px solid #1890ff',
       padding: '12px',
@@ -589,14 +626,14 @@ const showMachineNotification = (notification) => {
   });
 };
 
-// Helper function to show material notification
+// Helper function to show material notification toast
 const showMaterialNotification = (notification) => {
-  const key = `notification-material-${Date.now()}`;
+  const key = `material-${notification.id || notification.part_number}-${Date.now()}`;
   
   message.info({
     key,
     content: `Material Update: ${notification.status_name} - ${notification.description || 'No description'} (Part #${notification.part_number})`,
-    duration: 10, // 10 seconds
+    duration: 10,
     style: {
       borderLeft: '4px solid #52c41a',
       padding: '12px',

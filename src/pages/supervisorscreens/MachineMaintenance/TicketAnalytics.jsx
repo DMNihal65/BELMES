@@ -183,7 +183,7 @@ const TicketAnalytics = () => {
       <Row gutter={[16, 16]}>
       <Col span={8}>
         <div className="shadow-lg rounded-xl">
-          <Card title="Mean Time To Repair (MTTR)">
+          <Card title="Mean Time To Repair (MTTR)" >
             <Statistic title="Shop Average MTTR" value={mttr} suffix="hours" />
           </Card>
         </div>

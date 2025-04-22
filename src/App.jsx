@@ -40,6 +40,7 @@ import InspectionReport from './pages/supervisorscreens/QualityManagement/Inspec
 
 import QualityInspectionDetails from './pages/supervisorscreens/QualityManagement/QualityInspectionDetails';
 import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
+import PokaYokeDashboard from './pages/supervisorscreens/PokaYoke/PokaYokeDashboard';
 
 const App = () => {
 
@@ -82,6 +83,7 @@ const App = () => {
 
             <Route path="quality-management/inspection-report" element={<InspectionReport />} />
             <Route path="logs" element={<LogsDashboard />} />
+            <Route path="pokayoke" element={<PokaYokeDashboard />} />
             <Route path="notifications" element={<Notifications />} />
           </Route>
 

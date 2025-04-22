@@ -128,6 +128,10 @@ function Sidebar() {
           key: '/supervisor/production-monitoring/analytics',
           label: 'Analytics',
         },
+        {
+          key: '/supervisor/pokayoke',
+          label: 'PokaYoke Checklists',
+        },
       ],
     },
     // {

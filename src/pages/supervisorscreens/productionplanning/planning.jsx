@@ -65,7 +65,10 @@ const Planning = () => {
     fetchProgramsByOrderId,
     addOrderProgram,
     updateOrderProgram,
-    deleteOrderProgram
+    deleteOrderProgram,
+    fetchPartProductionPDC,
+    fetchEngineeringDrawings,
+    downloadDocument
   } = usePlanningStore();
   const [isPreviewModalVisible, setIsPreviewModalVisible] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -83,9 +86,10 @@ const Planning = () => {
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pdcData, setPdcData] = useState(null);
-  // Add fetchPartProductionPDC from the planning store
-  const fetchPartProductionPDC = usePlanningStore((state) => state.fetchPartProductionPDC);
-
+  // Add new state for engineering drawings
+  const [engineeringDrawings, setEngineeringDrawings] = useState([]);
+  const [drawingsLoading, setDrawingsLoading] = useState(false);
+  
   // Configuration for file upload component - customized for NC program files
   const uploadProps = {
     name: 'file',
@@ -360,6 +364,27 @@ const Planning = () => {
 
     fetchPrograms();
   }, [selectedJob?.id, activeTab, fetchProgramsByOrderId]);
+
+  // Add effect to fetch engineering drawings when a job is selected
+  useEffect(() => {
+    const fetchDrawings = async () => {
+      if (selectedJob?.part_number && activeTab === 'configMatrix') {
+        try {
+          setDrawingsLoading(true);
+          const drawingsData = await fetchEngineeringDrawings(selectedJob.part_number);
+          console.log('Fetched engineering drawings:', drawingsData);
+          setEngineeringDrawings(drawingsData.items || []);
+        } catch (error) {
+          console.error('Error fetching engineering drawings:', error);
+          message.error('Failed to fetch engineering drawings');
+        } finally {
+          setDrawingsLoading(false);
+        }
+      }
+    };
+
+    fetchDrawings();
+  }, [selectedJob?.part_number, activeTab, fetchEngineeringDrawings]);
 
   const getJobStatus = (partNumber) => {
     const activePart = activeParts.find(part => part.part_number === partNumber);
@@ -1473,6 +1498,16 @@ const Planning = () => {
     }
   };
 
+  // Handle viewing/downloading a drawing
+  const handleViewDrawing = async (documentId) => {
+    try {
+      await downloadDocument(documentId);
+    } catch (error) {
+      console.error('Error viewing drawing:', error);
+      message.error('Failed to view drawing');
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       {/* Job Selection Section with improved layout */}
@@ -2279,111 +2314,213 @@ const Planning = () => {
                             <FileTextOutlined className="text-blue-500 text-xl mr-2" />
                             <Text strong className="text-lg">Program Configuration Matrix</Text>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {/* CNC Program Details */}
-                            <Card 
-                              title={
-                                <div className="flex items-center">
-                                  <ToolOutlined className="text-blue-500 mr-2" />
-                                  <span>CNC Program Details</span>
-                                </div>
-                              }
-                              className="shadow-md hover:shadow-lg transition-shadow duration-300"
-                              headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                              bodyStyle={{ padding: '12px' }}
-                            >
-                              <Table
-                                size="small"
-                                bordered
-                                pagination={false}
-                                scroll={{ y: 240 }}
-                                columns={[
-                                  {
-                                    title: 'Program Name',
-                                    dataIndex: 'program_name',
-                                    key: 'program_name',
-                                    width: '70%',
-                                    ellipsis: true
-                                  },
-                                  {
-                                    title: 'Version',
-                                    dataIndex: 'version',
-                                    key: 'version',
-                                    width: '30%',
-                                    align: 'center'
-                                  }
-                                ]}
-                                dataSource={programs.map(program => ({
-                                  key: program.id,
-                                  program_name: program.program_name || program.description,
-                                  version: program.version || 'v1'
-                                }))}
-                                style={{ maxHeight: '300px' }}
-                              />
-                            </Card>
+                          
+                          <div className="flex flex-col md:flex-row gap-6">
+                            {/* Left column with program details - with scrollable container */}
+                            <div className="w-full md:w-1/2 md:max-h-[600px] md:overflow-y-auto pr-2">
+                              {/* CNC Program Details */}
+                              <Card 
+                                title={
+                                  <div className="flex items-center">
+                                    <ToolOutlined className="text-blue-500 mr-2" />
+                                    <span>CNC Program Details</span>
+                                  </div>
+                                }
+                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
+                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
+                                bodyStyle={{ padding: '12px' }}
+                              >
+                                <Table
+                                  size="small"
+                                  bordered
+                                  pagination={{ pageSize: 5, size: 'small' }}
+                                  columns={[
+                                    {
+                                      title: 'Program Name',
+                                      dataIndex: 'program_name',
+                                      key: 'program_name',
+                                      width: '50%',
+                                      ellipsis: true
+                                    },
+                                    {
+                                      title: 'Program Number',
+                                      dataIndex: 'program_number',
+                                      key: 'program_number',
+                                      width: '25%',
+                                      align: 'center'
+                                    },
+                                    {
+                                      title: 'Version',
+                                      dataIndex: 'version',
+                                      key: 'version',
+                                      width: '25%',
+                                      align: 'center'
+                                    }
+                                  ]}
+                                  dataSource={programs.map(program => ({
+                                    key: program.id,
+                                    program_name: program.program_name || program.description,
+                                    program_number: program.program_number || program.programNo,
+                                    version: program.version || 'v1'
+                                  }))}
+                                />
+                              </Card>
 
-                            {/* CMM Program Details */}
-                            <Card 
-                              title={
-                                <div className="flex items-center">
-                                  <RobotOutlined className="text-blue-500 mr-2" />
-                                  <span>CMM Program Details</span>
+                              {/* CMM Program Details */}
+                              <Card 
+                                title={
+                                  <div className="flex items-center">
+                                    <RobotOutlined className="text-blue-500 mr-2" />
+                                    <span>CMM Program Details</span>
+                                  </div>
+                                }
+                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
+                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
+                                bodyStyle={{ padding: '12px' }}
+                              >
+                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
+                                  <RobotOutlined className="text-blue-400 text-4xl mb-2" />
+                                  <Text strong className="text-base mb-1">Coming Soon</Text>
+                                  <Text type="secondary" className="text-center text-xs">
+                                    CMM Program Management
+                                  </Text>
                                 </div>
-                              }
-                              className="shadow-md hover:shadow-lg transition-shadow duration-300"
-                              headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                              bodyStyle={{ padding: '12px' }}
-                            >
-                              <div className="flex flex-col items-center justify-center h-[240px] bg-gray-50 rounded-lg">
-                                <RobotOutlined className="text-blue-400 text-5xl mb-4" />
-                                <Text strong className="text-lg mb-2">Coming Soon</Text>
-                                <Text type="secondary" className="text-center">
-                                  CMM Program Management
-                                </Text>
-                              </div>
-                            </Card>
+                              </Card>
 
-                            {/* VMS Program Details */}
-                            <Card 
-                              title={
-                                <div className="flex items-center">
-                                  <ExperimentOutlined className="text-blue-500 mr-2" />
-                                  <span>VMS Program Details</span>
+                              {/* VMS Program Details */}
+                              <Card 
+                                title={
+                                  <div className="flex items-center">
+                                    <ExperimentOutlined className="text-blue-500 mr-2" />
+                                    <span>VMS Program Details</span>
+                                  </div>
+                                }
+                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
+                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
+                                bodyStyle={{ padding: '12px' }}
+                              >
+                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
+                                  <ExperimentOutlined className="text-blue-400 text-4xl mb-2" />
+                                  <Text strong className="text-base mb-1">Coming Soon</Text>
+                                  <Text type="secondary" className="text-center text-xs">
+                                    Vision Measurement System
+                                  </Text>
                                 </div>
-                              }
-                              className="shadow-md hover:shadow-lg transition-shadow duration-300"
-                              headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                              bodyStyle={{ padding: '12px' }}
-                            >
-                              <div className="flex flex-col items-center justify-center h-[240px] bg-gray-50 rounded-lg">
-                                <ExperimentOutlined className="text-blue-400 text-5xl mb-4" />
-                                <Text strong className="text-lg mb-2">Coming Soon</Text>
-                                <Text type="secondary" className="text-center">
-                                  Vision Measurement System
-                                </Text>
-                              </div>
-                            </Card>
+                              </Card>
 
-                            {/* Manual/Visual Inspection Plan Details */}
-                            <Card 
-                              title={
-                                <div className="flex items-center">
-                                  <FileSearchOutlined className="text-blue-500 mr-2" />
-                                  <span>Manual/Visual Inspection</span>
+                              {/* Manual/Visual Inspection Plan Details */}
+                              <Card 
+                                title={
+                                  <div className="flex items-center">
+                                    <FileSearchOutlined className="text-blue-500 mr-2" />
+                                    <span>Manual/Visual Inspection</span>
+                                  </div>
+                                }
+                                className="shadow-md hover:shadow-lg transition-shadow duration-300"
+                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
+                                bodyStyle={{ padding: '12px' }}
+                              >
+                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
+                                  <FileSearchOutlined className="text-blue-400 text-4xl mb-2" />
+                                  <Text strong className="text-base mb-1">Coming Soon</Text>
+                                  <Text type="secondary" className="text-center text-xs">
+                                    Inspection Plan Management
+                                  </Text>
                                 </div>
-                              }
-                              className="shadow-md hover:shadow-lg transition-shadow duration-300"
-                              headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                              bodyStyle={{ padding: '12px' }}
-                            >
-                              <div className="flex flex-col items-center justify-center h-[240px] bg-gray-50 rounded-lg">
-                                <FileSearchOutlined className="text-blue-400 text-5xl mb-4" />
-                                <Text strong className="text-lg mb-2">Coming Soon</Text>
-                                <Text type="secondary" className="text-center">
-                                  Inspection Plan Management
-                                </Text>
-                              </div>
-                            </Card>
+                              </Card>
+                            </div>
+                            
+                            {/* Right column with Engineering Drawings - with fixed height and scrolling */}
+                            <div className="w-full md:w-1/2 md:h-[600px]">
+                              <Card 
+                                title={
+                                  <div className="flex items-center">
+                                    <FileTextOutlined className="text-green-500 mr-2" />
+                                    <span>Engineering Drawings</span>
+                                  </div>
+                                }
+                                className="shadow-md hover:shadow-lg transition-shadow duration-300 h-full"
+                                headStyle={{ background: '#f0fff0', borderBottom: '2px solid #52c41a' }}
+                                bodyStyle={{ 
+                                  padding: '12px', 
+                                  height: 'calc(100% - 56px)', 
+                                  overflow: 'hidden',
+                                  display: 'flex',
+                                  flexDirection: 'column'
+                                }}
+                                loading={drawingsLoading}
+                              >
+                                {engineeringDrawings.length > 0 ? (
+                                  <Table
+                                    size="small"
+                                    bordered
+                                    pagination={{ 
+                                      pageSize: 10, 
+                                      size: 'small',
+                                      position: ['bottomCenter'],
+                                      showTotal: (total) => `Total ${total} drawings` 
+                                    }}
+                                    scroll={{ y: 500 }}
+                                    columns={[
+                                      {
+                                        title: 'Name',
+                                        dataIndex: 'name',
+                                        key: 'name',
+                                        width: '50%',
+                                        ellipsis: true,
+                                        render: (text) => (
+                                          <Tooltip title={text}>
+                                            <span>{text}</span>
+                                          </Tooltip>
+                                        )
+                                      },
+                                      {
+                                        title: 'Version',
+                                        dataIndex: 'version',
+                                        key: 'version',
+                                        width: '15%',
+                                        align: 'center'
+                                      },
+                                      {
+                                        title: 'Date',
+                                        dataIndex: 'created_at',
+                                        key: 'created_at',
+                                        width: '20%',
+                                        render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
+                                      },
+                                      {
+                                        title: 'Action',
+                                        key: 'action',
+                                        width: '15%',
+                                        align: 'center',
+                                        render: (_, record) => (
+                                          <Button 
+                                            type="link" 
+                                            icon={<EyeOutlined />} 
+                                            onClick={() => handleViewDrawing(record.id)}
+                                          />
+                                        )
+                                      }
+                                    ]}
+                                    dataSource={engineeringDrawings.map(drawing => ({
+                                      key: drawing.id,
+                                      id: drawing.id,
+                                      name: drawing.name,
+                                      version: drawing.latest_version?.version_number || 'v1',
+                                      created_at: drawing.latest_version?.created_at || drawing.created_at
+                                    }))}
+                                  />
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg">
+                                    <FileTextOutlined className="text-green-400 text-5xl mb-4" />
+                                    <Text strong className="text-lg mb-2">No Drawings Available</Text>
+                                    <Text type="secondary" className="text-center">
+                                      No engineering drawings found for this part
+                                    </Text>
+                                  </div>
+                                )}
+                              </Card>
+                            </div>
                           </div>
                         </div>
 

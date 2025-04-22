@@ -28,7 +28,8 @@ import {
   Breadcrumb,
   Statistic,
   Alert,
-  Skeleton
+  Skeleton,
+  InputNumber
 } from 'antd';
 import {
   FolderOutlined,
@@ -73,7 +74,12 @@ import {
   UsergroupAddOutlined,
   ClockCircleOutlined,
   FolderOpenOutlined,
-  DatabaseOutlined
+  DatabaseOutlined,
+  ToolOutlined,
+  BellOutlined,
+  CheckCircleOutlined,
+  SyncOutlined,
+  UploadOutlined as UploadIcon
 } from '@ant-design/icons';
 import useDocumentStore from '../../store/document-store';
 import ReactDOM from 'react-dom';
@@ -81,6 +87,7 @@ import useAuthStore from '../../store/auth-store';
 import * as pdfjsLib from 'pdfjs-dist';
 // Import the worker directly from the dist folder
 import 'pdfjs-dist/build/pdf.worker.entry';
+import useNotificationStore from '../../store/notification';
 
 // Set up the PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -651,6 +658,10 @@ const DocumentManagement = () => {
     searchByProductionOrder,
     allOrders,
     fetchAllOrders,
+    uploadMachineDocument,
+    fetchMachines, // Add this
+    machines, // Add this
+    isLoadingMachines // Add this
   } = useDocumentStore();
   const [contextMenu, setContextMenu] = useState({
     visible: false,
@@ -724,9 +735,19 @@ const DocumentManagement = () => {
   // Update state to handle multiple selections
   const [selectedVersions, setSelectedVersions] = useState([]);
 
+  // Add new state for machine document upload
+  const [isMachineUploadVisible, setIsMachineUploadVisible] = useState(false);
+  const [machineUploadForm] = Form.useForm();
+  const [uploadLoading, setUploadLoading] = useState(false);
+
   // Update useEffect to use store's fetchAllOrders
   useEffect(() => {
     fetchAllOrders();
+  }, []);
+
+  // Add useEffect to fetch machines
+  useEffect(() => {
+    fetchMachines();
   }, []);
 
   // Update the handleCreateDocType function
@@ -1480,7 +1501,7 @@ const DocumentManagement = () => {
 
   // Update the search input in renderSearchSection
   const renderSearchSection = () => (
-    <Row gutter={16} align="middle" justify="space-between">
+    <Row gutter={[16, 16]} align="middle" style={{ marginBottom: '16px' }}>
       <Col flex="auto">
         <Input.Group compact>
           <Select
@@ -1618,6 +1639,13 @@ const DocumentManagement = () => {
       </Col>
       <Col>
         <Space>
+          <Button
+            type="primary"
+            icon={<UploadIcon size={16} />}
+            onClick={() => setIsMachineUploadVisible(true)}
+          >
+            Upload Machine Document
+          </Button>
           <Radio.Group 
             value={viewMode} 
             onChange={e => setViewMode(e.target.value)}
@@ -2285,6 +2313,138 @@ const DocumentManagement = () => {
     }
   `;
 
+  // Handle machine document upload
+  const handleMachineDocumentUpload = async (values) => {
+    if (!selectedFile) {
+      message.error('Please select a file to upload');
+      return;
+    }
+
+    setUploadLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('machine_id', values.machine_id);
+      formData.append('document_name', values.document_name);
+      formData.append('document_type', values.document_type);
+      formData.append('description', values.description || '');
+      formData.append('version_number', values.version_number || '1.0');
+
+      await uploadMachineDocument(formData);
+      message.success('Machine document uploaded successfully');
+      setIsMachineUploadVisible(false);
+      machineUploadForm.resetFields();
+      setSelectedFile(null);
+      
+      // Refresh the current folder's documents if we're in a folder
+      if (currentFolderContext.folderId) {
+        await fetchFolderDocuments(currentFolderContext.folderId);
+      }
+    } catch (error) {
+      message.error('Failed to upload machine document: ' + error.message);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  // Render machine document upload modal
+  const renderMachineUploadModal = () => (
+    <Modal
+      title="Upload Machine Document"
+      open={isMachineUploadVisible}
+      onCancel={() => {
+        setIsMachineUploadVisible(false);
+        machineUploadForm.resetFields();
+        setSelectedFile(null);
+      }}
+      footer={null}
+      destroyOnClose
+    >
+      <Form
+        form={machineUploadForm}
+        layout="vertical"
+        onFinish={handleMachineDocumentUpload}
+        initialValues={{ version_number: '1.0' }}
+      >
+        <Form.Item
+          label="File"
+          required
+          tooltip="Select the document file to upload"
+        >
+          <Upload
+            beforeUpload={(file) => {
+              setSelectedFile(file);
+              return false;
+            }}
+            onRemove={() => setSelectedFile(null)}
+            maxCount={1}
+          >
+            <Button icon={<UploadIcon size={16} />}>Select File</Button>
+          </Upload>
+        </Form.Item>
+
+        <Form.Item
+          name="machine_id"
+          label="Machine"
+          rules={[{ required: true, message: 'Please select a machine' }]}
+        >
+          <Select
+            loading={isLoadingMachines}
+            placeholder="Select a machine"
+            showSearch
+            optionFilterProp="children"
+            filterOption={(input, option) =>
+              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+            }
+          >
+            {machines.map(machine => (
+              <Select.Option key={machine.id} value={machine.id}>
+                {machine.make} - {machine.work_center.description} ({machine.work_center.code})
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="document_name"
+          label="Document Name"
+          rules={[{ required: true, message: 'Please enter the document name' }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="document_type"
+          label="Document Type"
+          rules={[{ required: true, message: 'Please enter the document type' }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="description"
+          label="Description"
+        >
+          <Input.TextArea rows={4} />
+        </Form.Item>
+
+        <Form.Item
+          name="version_number"
+          label="Version Number"
+          rules={[{ required: true, message: 'Please enter the version number' }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item>
+          <Button type="primary" htmlType="submit" loading={uploadLoading} block>
+            Upload Document
+          </Button>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="bg-white rounded-lg shadow-sm mb-4 p-4">
@@ -2357,6 +2517,8 @@ const DocumentManagement = () => {
       {renderDownloadVersionModal()}
 
       {documentTypeModals}
+
+      {renderMachineUploadModal()}
     </div>
   );
 };

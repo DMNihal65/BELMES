@@ -1,4 +1,4 @@
-import { Avatar, Button, Dropdown, Input, Layout, Space, Badge, List, Typography, Empty, Tabs, Tag } from 'antd';
+import { Avatar, Button, Dropdown, Input, Layout, Space, Badge, List, Typography, Empty, Tabs, Tag, Spin } from 'antd';
 import { LogOut, Menu as MenuIcon, Search, User, Bell, Wrench, Package } from 'lucide-react';
 import useAuthStore from '../../store/auth-store';
 import useStore from '../../store/useStore';
@@ -16,20 +16,23 @@ function Header() {
   const { toggleSidebar } = useStore();
   const navigate = useNavigate();
   const [activeTabKey, setActiveTabKey] = useState('all');
+  const [acknowledging, setAcknowledging] = useState(false);
+  const [processingNotificationId, setProcessingNotificationId] = useState(null);
+  
   const { 
     notifications, 
     unreadCount, 
-    connectWebSockets, 
+    isLoading,
+    initialize,
     disconnectWebSockets,
     fetchNotifications,
     markAllAsRead,
     markAsRead
   } = useNotificationStore();
 
-  // Connect to WebSockets when component mounts and disconnect when unmounts
+  // Initialize notifications when component mounts
   useEffect(() => {
-    // Fetch initial notifications and connect to WebSockets
-    connectWebSockets();
+    initialize();
     
     // Cleanup when component unmounts
     return () => {
@@ -37,19 +40,48 @@ function Header() {
     };
   }, []);
 
+  // Handle logout
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
-  const handleNotificationClick = () => {
-    markAllAsRead();
+  
+  // Handle acknowledging a single notification
+  const handleAcknowledge = async (notification, e) => {
+    if (acknowledging) return;
+    
+    e?.stopPropagation();
+    setAcknowledging(true);
+    setProcessingNotificationId(notification._uniqueId);
+    
+    try {
+      await markAsRead(notification);
+    } finally {
+      setAcknowledging(false);
+      setProcessingNotificationId(null);
+    }
+  };
+  
+  // Handle mark all as read
+  const handleMarkAllAsRead = async () => {
+    setAcknowledging(true);
+    try {
+      await markAllAsRead();
+    } finally {
+      setAcknowledging(false);
+    }
+  };
+  
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    await fetchNotifications(true);
   };
 
-  // Filter notifications by type and limit to top 5 for display in dropdown
+  // Filter notifications by type
   const machineNotifications = notifications.filter(n => n.notificationType === 'machine');
   const materialNotifications = notifications.filter(n => n.notificationType === 'material');
   
+  // Get filtered notifications based on active tab
   let filteredNotifications = activeTabKey === 'all' 
     ? notifications 
     : activeTabKey === 'machine' 
@@ -63,6 +95,7 @@ function Header() {
   const unreadMachineCount = machineNotifications.filter(n => !n.is_acknowledged).length;
   const unreadMaterialCount = materialNotifications.filter(n => !n.is_acknowledged).length;
 
+  // Profile menu items
   const profileMenuItems = [
     {
       key: 'role',
@@ -79,7 +112,7 @@ function Header() {
       type: 'divider',
     },
     {
-      key: 'lozgout',
+      key: 'logout',
       icon: <LogOut size={16} />,
       label: 'Logout',
       onClick: handleLogout,
@@ -89,8 +122,8 @@ function Header() {
   // Notification dropdown content
   const notificationContent = (
     <div style={{ 
-      width: '440px', 
-      maxHeight: '600px', 
+      width: '360px', 
+      maxHeight: '500px', 
       overflow: 'hidden', 
       display: 'flex',
       flexDirection: 'column',
@@ -98,209 +131,164 @@ function Header() {
       borderRadius: '8px',
       background: '#fff'
     }}>
+      {/* Header */}
       <div style={{ 
-        padding: '16px', 
+        padding: '12px', 
         borderBottom: '1px solid #f0f0f0', 
         display: 'flex', 
         justifyContent: 'space-between',
-        alignItems: 'center',
-        background: '#fafafa'
+        alignItems: 'center'
       }}>
         <div>
-          <Text strong style={{ fontSize: '16px' }}>Notifications</Text>
-          <Text type="secondary" style={{ fontSize: '12px', marginLeft: '8px' }}>
-            {unreadCount > 0 ? `${unreadCount} unread` : 'All read'}
-          </Text>
+          <Text strong>Notifications</Text>
+          {unreadCount > 0 && (
+            <Badge count={unreadCount} size="small" style={{ marginLeft: '8px' }} />
+          )}
         </div>
-        {notifications.length > 0 && (
-          <Text 
-            type="link" 
-            onClick={markAllAsRead} 
-            style={{ cursor: 'pointer', fontSize: '13px' }}
-          >
-            Mark all as read
-          </Text>
-        )}
+        
+        <Space>
+          {isLoading ? (
+            <Spin size="small" />
+          ) : (
+            <Button 
+              type="text" 
+              size="small"
+              icon={<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>}
+              onClick={handleRefresh}
+              style={{ marginRight: '8px' }}
+            />
+          )}
+          
+          {unreadCount > 0 && (
+            <Button 
+              type="link" 
+              size="small"
+              loading={acknowledging}
+              onClick={handleMarkAllAsRead}
+              style={{ padding: '0' }}
+            >
+              Mark all as read
+            </Button>
+          )}
+        </Space>
       </div>
       
+      {/* Tabs */}
       <Tabs 
         activeKey={activeTabKey} 
         onChange={setActiveTabKey}
-        style={{ padding: '0 12px', marginTop: '8px' }}
+        style={{ padding: '0 8px', marginTop: '4px' }}
         size="small"
       >
-        <TabPane 
-          tab={
-            <span>
-              All
-              {unreadCount > 0 && (
-                <Badge 
-                  count={unreadCount} 
-                  size="small" 
-                  style={{ marginLeft: '4px', fontSize: '10px' }} 
-                />
-              )}
-            </span>
-          } 
-          key="all" 
-        />
-        <TabPane 
-          tab={
-            <span>
-              <Wrench size={14} style={{ marginRight: '4px' }} />
-              Machines
-              {unreadMachineCount > 0 && (
-                <Badge 
-                  count={unreadMachineCount} 
-                  size="small" 
-                  style={{ marginLeft: '4px', fontSize: '10px' }} 
-                />
-              )}
-            </span>
-          } 
-          key="machine" 
-        />
-        <TabPane 
-          tab={
-            <span>
-              <Package size={14} style={{ marginRight: '4px' }} />
-              Materials
-              {unreadMaterialCount > 0 && (
-                <Badge 
-                  count={unreadMaterialCount} 
-                  size="small" 
-                  style={{ marginLeft: '4px', fontSize: '10px' }} 
-                />
-              )}
-            </span>
-          } 
-          key="material" 
-        />
+        <TabPane tab="All" key="all" />
+        <TabPane tab={
+          <span>
+            Machine
+            {unreadMachineCount > 0 && (
+              <Badge count={unreadMachineCount} size="small" style={{ marginLeft: '4px' }} />
+            )}
+          </span>
+        } key="machine" />
+        <TabPane tab={
+          <span>
+            Material
+            {unreadMaterialCount > 0 && (
+              <Badge count={unreadMaterialCount} size="small" style={{ marginLeft: '4px' }} />
+            )}
+          </span>
+        } key="material" />
       </Tabs>
       
+      {/* Notification List */}
       <div style={{ 
         overflowY: 'auto', 
-        maxHeight: '500px',
+        maxHeight: '350px',
         flex: 1
       }}>
-        {filteredNotifications.length > 0 ? (
-          <>
-            <List
-              dataSource={limitedNotifications}
-              renderItem={(item) => (
-                <List.Item 
-                  style={{ 
-                    padding: '16px', 
-                    cursor: 'pointer',
-                    borderLeft: !item.is_acknowledged ? '3px solid #1890ff' : '3px solid transparent',
-                    background: !item.is_acknowledged ? 'rgba(24, 144, 255, 0.05)' : 'transparent',
-                    transition: 'all 0.3s ease',
-                    marginBottom: '1px',
-                    borderBottom: '1px solid #f5f5f5',
-                    position: 'relative'
-                  }}
-                  onClick={() => markAsRead(item)}
-                >
-                  {/* Type indicator tag */}
-                  <Tag 
-                    color={item.notificationType === 'machine' ? 'blue' : 'green'}
-                    style={{ 
-                      position: 'absolute', 
-                      top: '12px', 
-                      right: '12px',
-                      fontSize: '10px',
-                      padding: '0 4px'
-                    }}
-                  >
-                    {item.notificationType === 'machine' ? 'MACHINE' : 'MATERIAL'}
-                  </Tag>
+        {isLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+            <Spin />
+          </div>
+        ) : filteredNotifications.length > 0 ? (
+          <List
+            dataSource={limitedNotifications}
+            renderItem={(item) => (
+              <List.Item 
+                style={{ 
+                  padding: '8px 12px', 
+                  cursor: 'pointer',
+                  borderLeft: !item.is_acknowledged ? '3px solid #1890ff' : '3px solid transparent',
+                  background: !item.is_acknowledged ? 'rgba(24, 144, 255, 0.05)' : 'transparent'
+                }}
+                onClick={() => handleAcknowledge(item)}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', width: '100%' }}>
+                  {/* Icon based on type */}
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    width: '30px',
+                    height: '30px',
+                    background: item.notificationType === 'machine' ? '#e6f7ff' : '#f6ffed',
+                    borderRadius: '50%',
+                    flexShrink: 0
+                  }}>
+                    {item.notificationType === 'machine' 
+                      ? <Wrench size={14} color="#1890ff" /> 
+                      : <Package size={14} color="#52c41a" />
+                    }
+                  </div>
                   
-                  <div style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginRight: '50px' }}>
-                      {/* Notification icon */}
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'center', 
-                        alignItems: 'center',
-                        width: '30px',
-                        height: '30px',
-                        background: item.notificationType === 'machine' ? '#e6f7ff' : '#f6ffed',
-                        borderRadius: '50%',
-                        marginTop: '2px'
-                      }}>
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Title */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Text strong style={{ fontSize: '13px' }}>
                         {item.notificationType === 'machine' 
-                          ? <Wrench size={14} color="#1890ff" /> 
-                          : <Package size={14} color="#52c41a" />
+                          ? `Machine ${item.machine_make || ''} #${item.machine_id || ''}`
+                          : `Material #${item.part_number || ''}`
                         }
-                      </div>
-                      
-                      <div style={{ flex: 1 }}>
-                        {/* Title based on notification type */}
-                        <Text 
-                          strong={!item.is_acknowledged} 
-                          style={{ 
-                            fontSize: '14px', 
-                            color: !item.is_acknowledged ? (item.notificationType === 'machine' ? '#1890ff' : '#52c41a') : 'inherit',
-                            display: 'block'
-                          }}
-                        >
-                          {item.notificationType === 'machine' 
-                            ? `Machine ${item.machine_make} #${item.machine_id}`
-                            : `Material Part #${item.part_number}`
-                          }
-                        </Text>
-                        
-                        {/* Status badge */}
-                        <Badge 
-                          color={getStatusColor(item.status_name, item.notificationType)} 
-                          text={item.status_name} 
-                          style={{ marginTop: '4px' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Description box */}
-                    <div style={{ 
-                      marginTop: '12px', 
-                      padding: '10px 12px',
-                      background: '#fafafa', 
-                      borderRadius: '4px',
-                      border: '1px solid #f0f0f0'
-                    }}>
-                      <Text style={{ fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                        {item.description || 'No description provided'}
                       </Text>
+                      <Tag color={getStatusColor(item.status_name, item.notificationType)} style={{ margin: 0 }}>
+                        {item.status_name || 'UNKNOWN'}
+                      </Tag>
                     </div>
-
-                    {/* Footer with metadata */}
+                    
+                    {/* Description - truncated */}
+                    <Text type="secondary" style={{ 
+                      fontSize: '12px', 
+                      display: 'block',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      marginTop: '4px'
+                    }}>
+                      {item.description || 'No description'}
+                    </Text>
+                    
+                    {/* Footer */}
                     <div style={{ 
-                      marginTop: '8px', 
+                      marginTop: '6px', 
                       display: 'flex', 
                       justifyContent: 'space-between',
-                      alignItems: 'flex-end'
+                      alignItems: 'center'
                     }}>
-                      <div>
-                        <Text type="secondary" style={{ fontSize: '12px', color: '#999', display: 'block' }}>
-                          Created by: {item.created_by || 'System'}
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: '12px', color: '#999' }}>
-                          {formatDate(item.updated_at)}
-                        </Text>
-                      </div>
-                      {item.is_acknowledged ? (
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                          Acknowledged by: {item.acknowledged_by || 'System'}
-                        </Text>
-                      ) : (
+                      <Text type="secondary" style={{ fontSize: '11px' }}>
+                        {formatDate(item.updated_at)}
+                      </Text>
+                      
+                      {!item.is_acknowledged && (
                         <Button 
                           type="primary" 
                           size="small" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markAsRead(item);
-                          }}
-                          style={{
-                            borderRadius: '16px',
+                          onClick={(e) => handleAcknowledge(item, e)}
+                          loading={acknowledging && processingNotificationId === item._uniqueId}
+                          style={{ 
+                            height: '22px', 
+                            padding: '0 8px', 
+                            fontSize: '11px',
+                            borderRadius: '4px',
                             background: item.notificationType === 'machine' ? '#1890ff' : '#52c41a'
                           }}
                         >
@@ -309,42 +297,34 @@ function Header() {
                       )}
                     </div>
                   </div>
-                </List.Item>
-              )}
-            />
-            {filteredNotifications.length > 5 && (
-              <div style={{ padding: '8px 16px', textAlign: 'center', borderTop: '1px dashed #f0f0f0' }}>
-                <Text type="secondary" style={{ fontSize: '13px' }}>
-                  {filteredNotifications.length - 5} more notification{filteredNotifications.length - 5 !== 1 ? 's' : ''}
-                </Text>
-              </div>
+                </div>
+              </List.Item>
             )}
-          </>
+          />
         ) : (
           <Empty 
             image={Empty.PRESENTED_IMAGE_SIMPLE} 
-            description="No notifications yet" 
-            style={{ padding: '48px 16px' }} 
+            description="No notifications" 
+            style={{ padding: '30px 0' }} 
           />
         )}
       </div>
       
-      {notifications.length > 0 && (
+      {/* Footer */}
+      {filteredNotifications.length > 0 && (
         <div style={{ 
-          padding: '12px 16px', 
+          padding: '8px 12px', 
           borderTop: '1px solid #f0f0f0', 
-          textAlign: 'center',
-          background: '#fafafa'
+          textAlign: 'center'
         }}>
           <Button 
-            type="primary" 
+            type="link" 
             onClick={() => {
-              console.log('Navigating to notifications page');
               navigate('/supervisor/notifications');
               // Close dropdown after clicking
               document.body.click();
             }}
-            style={{ borderRadius: '4px', width: '100%' }}
+            style={{ padding: '0' }}
           >
             View All Notifications
           </Button>
@@ -355,9 +335,11 @@ function Header() {
 
   // Helper function to get color based on status and type
   const getStatusColor = (status, type) => {
+    if (!status) return 'default';
+    
     // For machine statuses
     if (type === 'machine') {
-      switch (status?.toUpperCase()) {
+      switch (status.toUpperCase()) {
         case 'ON':
           return 'green';
         case 'OFF':
@@ -374,7 +356,7 @@ function Header() {
     } 
     // For material statuses
     else {
-      switch (status?.toUpperCase()) {
+      switch (status.toUpperCase()) {
         case 'AVAILABLE':
           return 'green';
         case 'LOW STOCK':
@@ -449,9 +431,6 @@ function Header() {
           overlay={notificationContent} 
           placement="bottomRight" 
           trigger={['click']}
-          onVisibleChange={(visible) => {
-            // Don't mark all as read automatically when opening
-          }}
         >
           <Badge count={unreadCount} size="small" style={{ fontSize: '10px' }}>
             <Button

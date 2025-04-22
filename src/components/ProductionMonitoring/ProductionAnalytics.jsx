@@ -745,17 +745,8 @@ function ProductionAnalytics() {
               <>
                 <div className="flex flex-wrap gap-4 mb-4 items-center">
                   <div className="flex items-center gap-2">
-                    <span>View:</span>
-                    <Radio.Group 
-                      value={timelineView} 
-                      onChange={(e) => setTimelineView(e.target.value)}
-                      optionType="button"
-                      buttonStyle="solid"
-                    >
-                      <Radio.Button value="timeline">Timeline</Radio.Button>
-                      <Radio.Button value="percentage">Percentage</Radio.Button>
-                      <Radio.Button value="hours">Hours</Radio.Button>
-                    </Radio.Group>
+                    
+                    
                   </div>
                   
                   <div className="flex items-center gap-2">

@@ -1,11 +1,12 @@
 import React, { useState, Suspense,useEffect  } from 'react';
-import { Card, Row, Col, Statistic, Tabs, Progress, Badge, Collapse, Tag, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Tabs, Progress, Badge, Collapse, Tag, Empty, Alert } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, ClockCircleOutlined, CheckCircleOutlined, ToolOutlined, DashboardOutlined, CodeSandboxOutlined, BarcodeOutlined, BarChartOutlined, MonitorOutlined, FileTextOutlined, ProjectOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, Grid, Box, Environment, PerspectiveCamera,useGLTF  } from '@react-three/drei';
 import * as THREE from 'three';
 import { Steps } from 'antd';
+import useDashboardStore from '../../store/dashboard';
 
 // Enhanced machine data with more detailed positioning
 const machineData = [
@@ -303,7 +304,6 @@ const machineData = [
 // Machine Model Component
 const MachineModel = ({ position, rotation, status, onClick, isSelected, scale = 1, ...props }) => {
   const { scene } = useGLTF('/machine.glb');
-  const [hovered, setHovered] = useState(false);
   
   const clonedScene = React.useMemo(() => {
     const clone = scene.clone();
@@ -317,7 +317,7 @@ const MachineModel = ({ position, rotation, status, onClick, isSelected, scale =
   }, [scene]);
 
   useFrame(() => {
-    if (status === 'running' && clonedScene) {
+    if (status === 'PRODUCTION' && clonedScene) {
       clonedScene.traverse((child) => {
         if (child.name.includes('rotor') || child.name.includes('spindle')) {
           child.rotation.y += 0.01;
@@ -326,20 +326,44 @@ const MachineModel = ({ position, rotation, status, onClick, isSelected, scale =
     }
   });
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'ON':
+        return new THREE.Color(0xffa500); // Orange for ON
+      case 'PRODUCTION':
+        return new THREE.Color(0x00ff00); // Green for PRODUCTION
+      case 'OFF':
+        return new THREE.Color(0x808080); // Grey for OFF
+      default:
+        return new THREE.Color(0x808080); // Grey for unknown status
+    }
+  };
+
   useEffect(() => {
     clonedScene.traverse((child) => {
       if (child.isMesh) {
         child.material = child.material.clone();
+        
+        // Set the machine body color based on status
+        if (!child.name.includes('status_light')) {
+          const statusColor = getStatusColor(status);
+          child.material.color = statusColor;
+          // Add slight metallic and glossy effect
+          child.material.metalness = 0.6;
+          child.material.roughness = 0.4;
+        }
+        
+        // Handle status light separately
         if (child.name.includes('status_light')) {
           switch (status) {
-            case 'running':
-              child.material.emissive.setHex(0x00ff00);
+            case 'ON':
+              child.material.emissive.setHex(0xffa500); // Orange for ON
               break;
-            case 'idle':
-              child.material.emissive.setHex(0xffa500);
+            case 'PRODUCTION':
+              child.material.emissive.setHex(0x00ff00); // Green for PRODUCTION
               break;
-            case 'down':
-              child.material.emissive.setHex(0xff0000);
+            case 'OFF':
+              child.material.emissive.setHex(0x808080); // Grey for OFF
               break;
           }
         }
@@ -347,13 +371,24 @@ const MachineModel = ({ position, rotation, status, onClick, isSelected, scale =
     });
   }, [status, clonedScene]);
 
+  const getStatusBadgeColor = (status) => {
+    switch (status) {
+      case 'ON':
+        return 'warning'; // Yellow/Orange for ON
+      case 'PRODUCTION':
+        return 'success'; // Green for PRODUCTION
+      case 'OFF':
+        return 'default'; // Grey for OFF (changed from 'error' to 'default')
+      default:
+        return 'default';
+    }
+  };
+
   return (
     <group 
       position={position} 
       rotation={rotation}
       onClick={onClick}
-      onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
     >
       <primitive 
         object={clonedScene} 
@@ -361,22 +396,22 @@ const MachineModel = ({ position, rotation, status, onClick, isSelected, scale =
         castShadow 
         receiveShadow
       />
-      {(hovered || isSelected) && (
-        <Html position={[0, 5, 0]}>
-          <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-lg border border-gray-200 w-48">
-            <div className="text-lg font-bold mb-2">{props.name}</div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>Status: 
-                <Badge 
-                  status={status === 'running' ? 'success' : status === 'idle' ? 'warning' : 'error'}
-                  text={status.toUpperCase()}
-                />
-              </div>
-              <div>OEE: <span className="font-semibold">{props.oee}%</span></div>
-            </div>
+      {/* Always show machine name and status */}
+      <Html position={[0, 5, 0]}>
+        <div className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-200 w-48 text-center transform -translate-x-1/2">
+          <div className="text-sm font-bold mb-1">{props.name}</div>
+          <Badge 
+            status={getStatusBadgeColor(status)}
+            text={status}
+          />
+          <div className="mt-1 text-xs">
+            Program: {props.currentProgram || 'N/A'}
           </div>
-        </Html>
-      )}
+          <div className="text-xs">
+            Parts: {props.totalCount}/{props.targetCount}
+          </div>
+        </div>
+      </Html>
     </group>
   );
 };
@@ -484,68 +519,47 @@ const getSparklineOption = (data, color, type = 'line') => ({
 
 // Main Dashboard Component
 const SupervisorDashboard = () => {
-  const [selectedMachine, setSelectedMachine] = useState(machineData[0]);
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const { initializeWebSocket, cleanup, getMappedMachineData, isConnected, error } = useDashboardStore();
+
+  // Initialize WebSocket connection
+  useEffect(() => {
+    initializeWebSocket();
+    return () => cleanup();
+  }, []);
+
+  // Get the mapped machine data
+  const machines = getMappedMachineData();
 
   const { TabPane } = Tabs;
   const { Panel } = Collapse;
 
   return (
     <div style={{ padding: '24px', height: '100vh', background: '#f0f2f5' }}>
-      {/* Stats Cards */}
-      {/* <Row gutter={16} className="mb-4">
-        <Col span={6}>
-          <Card bordered={false}>
-            <Statistic
-              title="Overall OEE"
-              value={85.7}
-              precision={1}
-              valueStyle={{ color: '#3f8600' }}
-              prefix={<ArrowUpOutlined />}
-              suffix="%"
-            />
-            <ReactECharts option={getSparklineOption([40, 45, 50, 55, 60, 45, 85], '#3f8600')} style={{ height: '40px' }} />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card bordered={false}>
-            <Statistic
-              title="Total Parts"
-              value={2847}
-              valueStyle={{ color: '#3f8600' }}
-              prefix={<ArrowUpOutlined />}
-            />
-            <ReactECharts option={getSparklineOption([28, 35, 40, 45, 50, 55, 60], '#3f8600', 'bar')} style={{ height: '40px' }} />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card bordered={false}>
-            <Statistic
-              title="Active Machines"
-              value={12}
-              suffix="/ 15"
-            />
-            <Progress percent={80} size="small" showInfo={false} />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card bordered={false}>
-            <Statistic
-              title="Efficiency"
-              value={92.3}
-              precision={1}
-              valueStyle={{ color: '#cf1322' }}
-              prefix={<ArrowDownOutlined />}
-              suffix="%"
-            />
-            <ReactECharts option={getSparklineOption([90, 92, 91, 94, 90, 92, 92], '#cf1322')} style={{ height: '40px' }} />
-          </Card>
-        </Col>
-      </Row> */}
+      {/* Connection Status */}
+      {error && (
+        <Alert
+          message="Connection Error"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: '16px' }}
+        />
+      )}
+      {!isConnected && !error && (
+        <Alert
+          message="Connecting..."
+          description="Attempting to connect to machine monitoring system..."
+          type="info"
+          showIcon
+          style={{ marginBottom: '16px' }}
+        />
+      )}
 
       {/* Main Content Area */}
       <Row gutter={16} style={{ height: 'calc(100vh - 220px)' }}>
-       {/* Machine Overview */}
-       <Col span={16}>
+        {/* Machine Overview */}
+        <Col span={16}>
           <Card 
             title="Machine Overview" 
             bodyStyle={{ 
@@ -593,19 +607,28 @@ const SupervisorDashboard = () => {
 
               <Suspense fallback={null}>
                 <ShopFloor />
-                {machineData.map((machine) => (
-                  <MachineModel
-                    key={machine.id}
-                    {...machine}
-                    onClick={() => setSelectedMachine(machine)}
-                    isSelected={selectedMachine?.id === machine.id}
-                  />
-                ))}
+                {machines.map((machine, index) => {
+                  // Use the existing machine positions from machineData
+                  const position = machineData[index % machineData.length].position;
+                  const rotation = machineData[index % machineData.length].rotation;
+                  const scale = machineData[index % machineData.length].scale;
+
+                  return (
+                    <MachineModel
+                      key={machine.id}
+                      {...machine}
+                      position={position}
+                      rotation={rotation}
+                      scale={scale}
+                      onClick={() => setSelectedMachine(machine)}
+                      isSelected={selectedMachine?.id === machine.id}
+                    />
+                  );
+                })}
                 <Environment 
                   files="/PANO_20250320_122016.hdr"
                   background={true}
                   blur={0.5}
-                  // preset="forest"
                   intensity={0.8}
                   ground={{
                     height: 15,
@@ -631,7 +654,7 @@ const SupervisorDashboard = () => {
 
         {/* Machine Details */}
         <Col span={8}>
-          <MachineDetails selectedMachine={selectedMachine} />
+          <MachineDetails selectedMachine={selectedMachine || (machines.length > 0 ? machines[0] : null)} />
         </Col>
       </Row>
     </div>
@@ -640,135 +663,343 @@ const SupervisorDashboard = () => {
 
 // Update the Machine Details section
 const MachineDetails = ({ selectedMachine }) => {
-  // Use the first machine if none selected (though this shouldn't happen now)
-  const machine = selectedMachine || machineData[0];
+  const { fetchOEEData, oeeData } = useDashboardStore();
+
+  useEffect(() => {
+    if (selectedMachine?.id) {
+      fetchOEEData(selectedMachine.id);
+    }
+  }, [selectedMachine?.id]);
+
+  if (!selectedMachine) {
+    return (
+      <Card className="h-full">
+        <Empty description="No machine selected" />
+      </Card>
+    );
+  }
+
+  // Format the last updated time
+  const formatDateTime = (dateString) => {
+    console.log('formatDateTime called with:', dateString, 'type:', typeof dateString);
+    
+    if (!dateString) {
+      console.warn('Last updated value is empty or null');
+      return 'N/A';
+    }
+    
+    try {
+      // Parse the ISO date string
+      const date = new Date(dateString);
+      console.log('Parsed date object:', date);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date detected:', dateString);
+        return 'Invalid date';
+      }
+      
+      // Format the date and time in a user-friendly way
+      const options = { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      };
+      
+      const formattedDate = date.toLocaleString(undefined, options);
+      console.log('Formatted date:', formattedDate);
+      return formattedDate;
+    } catch (error) {
+      console.error('Error formatting date:', error, dateString);
+      return 'Date error';
+    }
+  };
   
+  // This is for debugging - remove in production
+  console.log('Selected Machine Full Object:', selectedMachine);
+  console.log('Last Updated value directly:', selectedMachine.last_updated);
+  console.log('Last Updated value (camelCase):', selectedMachine.lastUpdated);
+  console.log('Last Updated value type:', typeof selectedMachine.last_updated);
+  
+  // Check if we can find the property name containing "last" and "update"
+  if (selectedMachine) {
+    console.log('All property names in selectedMachine:', Object.keys(selectedMachine));
+    
+    // Look for property names containing both "last" and "update"
+    const lastUpdatedKeys = Object.keys(selectedMachine).filter(key => 
+      key.toLowerCase().includes('last') && key.toLowerCase().includes('update')
+    );
+    
+    console.log('Property names related to last updated:', lastUpdatedKeys);
+    
+    if (lastUpdatedKeys.length > 0) {
+      lastUpdatedKeys.forEach(key => {
+        console.log(`Value of ${key}:`, selectedMachine[key]);
+      });
+    }
+  }
+
   return (
     <Card 
-      title={machine.name}
-      className="h-full overflow-auto"
+      title={selectedMachine.machine_name || selectedMachine.name}
+      className="h-full"
+      bodyStyle={{ height: 'calc(100% - 57px)', padding: '12px', overflow: 'hidden' }}
       extra={
-        <Tag color={machine.status === 'running' ? 'success' : 'warning'}>
-          {machine.status.toUpperCase()}
+        <Tag color={selectedMachine.status === 'ON' ? 'warning' : selectedMachine.status === 'PRODUCTION' ? 'success' : 'default'}>
+          {selectedMachine.status}
         </Tag>
       }
     >
-      <div className="space-y-6">
-        {/* Production Order Details */}
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h3 className="text-lg font-semibold text-blue-800 mb-4">
-            <CodeSandboxOutlined className="mr-2" />
-            Production Order Details
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-gray-500">Order ID</div>
-              <div className="font-medium">1</div>
+      <div className="h-full grid grid-rows-[0.7fr_2.3fr] gap-1">
+        {/* OEE Information - Ultra compact section */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-1 rounded-xl shadow-sm border border-blue-100">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-[10px] font-bold text-blue-900 flex items-center">
+              <DashboardOutlined className="mr-1 text-blue-600" />
+              OEE Analysis
+            </span>
+            <span className="text-[10px] text-gray-600">
+              ID: {oeeData?.machine_id}
+            </span>
+          </div>
+
+          {/* OEE Components in an ultra compact layout */}
+          <div className="grid grid-cols-6 gap-0.5">
+            {/* Main OEE Display */}
+            <div className="col-span-1">
+              <Progress
+                type="circle"
+                percent={oeeData?.average_oee || 0}
+                width={45}
+                strokeWidth={8}
+                strokeColor={{
+                  '0%': '#ff4d4f',
+                  '40%': '#faad14',
+                  '70%': '#52c41a',
+                  '100%': '#1890ff',
+                }}
+                format={(percent) => (
+                  <div className="text-center">
+                    <div className="text-[11px] font-bold">{percent}%</div>
+                    <div className="text-[8px]">OEE</div>
+                  </div>
+                )}
+              />
             </div>
-            <div>
-              <div className="text-sm text-gray-500">Priority</div>
-              <Tag color={getPriorityColor(5)}>Priority 5</Tag>
-            </div>
-            <div>
-              <div className="text-sm text-gray-500">Part Number</div>
-              <div className="font-medium">213511100114</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-500">Production Order</div>
-              <div className="font-medium">10557513</div>
+
+            {/* Individual OEE Components */}
+            <div className="col-span-5 grid grid-cols-3 gap-0.5">
+              <div className="bg-white p-0.5 rounded-lg shadow-sm text-center">
+                <Progress
+                  type="circle"
+                  percent={oeeData?.average_availability || 0}
+                  width={40}
+                  strokeWidth={8}
+                  strokeColor="#1890ff"
+                  format={(percent) => (
+                    <div>
+                      <div className="text-[10px] font-semibold">{percent}%</div>
+                      <div className="text-[8px]">Avail</div>
+                    </div>
+                  )}
+                />
+              </div>
+              <div className="bg-white p-0.5 rounded-lg shadow-sm text-center">
+                <Progress
+                  type="circle"
+                  percent={oeeData?.average_performance || 0}
+                  width={40}
+                  strokeWidth={8}
+                  strokeColor="#52c41a"
+                  format={(percent) => (
+                    <div>
+                      <div className="text-[10px] font-semibold">{percent}%</div>
+                      <div className="text-[8px]">Perf</div>
+                    </div>
+                  )}
+                />
+              </div>
+              <div className="bg-white p-0.5 rounded-lg shadow-sm text-center">
+                <Progress
+                  type="circle"
+                  percent={oeeData?.average_quality || 0}
+                  width={40}
+                  strokeWidth={8}
+                  strokeColor="#722ed1"
+                  format={(percent) => (
+                    <div>
+                      <div className="text-[10px] font-semibold">{percent}%</div>
+                      <div className="text-[8px]">Qual</div>
+                    </div>
+                  )}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Material Details */}
-        <div className="bg-green-50 p-4 rounded-lg">
-          <h3 className="text-lg font-semibold text-green-800 mb-4">
-            <BarcodeOutlined className="mr-2" />
-            Material Information
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <div className="text-sm text-gray-500">Material Description</div>
-              <div className="font-medium">SK</div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          {/* Losses Analysis - Ultra compact */}
+          <div className="bg-white p-1 rounded-lg shadow-sm mt-0.5">
+            <div className="grid grid-cols-3 gap-0.5">
               <div>
-                <div className="text-sm text-gray-500">Required Quantity</div>
-                <div className="font-medium">24</div>
+                <div className="flex justify-between text-[8px]">
+                  <span className="text-gray-600">Avail Loss</span>
+                  <span className="font-medium text-blue-600">
+                    {oeeData?.losses?.availability_loss || 0}%
+                  </span>
+                </div>
+                <Progress
+                  percent={oeeData?.losses?.availability_loss || 0}
+                  strokeColor={{
+                    '0%': '#1890ff',
+                    '100%': '#69c0ff',
+                  }}
+                  showInfo={false}
+                  size="small"
+                  strokeWidth={4}
+                />
               </div>
               <div>
-                <div className="text-sm text-gray-500">Launched Quantity</div>
-                <div className="font-medium">24</div>
+                <div className="flex justify-between text-[8px]">
+                  <span className="text-gray-600">Perf Loss</span>
+                  <span className="font-medium text-green-600">
+                    {oeeData?.losses?.performance_loss || 0}%
+                  </span>
+                </div>
+                <Progress
+                  percent={oeeData?.losses?.performance_loss || 0}
+                  strokeColor={{
+                    '0%': '#52c41a',
+                    '100%': '#95de64',
+                  }}
+                  showInfo={false}
+                  size="small"
+                  strokeWidth={4}
+                />
               </div>
-            </div>
-            <Progress 
-              percent={100} 
-              status="active"
-              strokeColor={{
-                '0%': '#108ee9',
-                '100%': '#87d068',
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Order Information */}
-        <div className="bg-purple-50 p-4 rounded-lg">
-          <h3 className="text-lg font-semibold text-purple-800 mb-4">
-            <FileTextOutlined className="mr-2" />
-            Order Information
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <div className="text-sm text-gray-500">Sales Order</div>
-              <div className="font-medium">07/3111202373/0110</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-500">Project Name</div>
-              <div className="font-medium">BMPM C-Ku 100 W</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-500">WBS Element</div>
-              <div className="font-medium text-sm">
-                Sale order :07/3111202373/0110 Part Desc :SKTI CHASSIS
-              </div>
-              <div className="font-medium text-sm">
-                Tot.No of Oprns :12
+              <div>
+                <div className="flex justify-between text-[8px]">
+                  <span className="text-gray-600">Qual Loss</span>
+                  <span className="font-medium text-purple-600">
+                    {oeeData?.losses?.quality_loss || 0}%
+                  </span>
+                </div>
+                <Progress
+                  percent={oeeData?.losses?.quality_loss || 0}
+                  strokeColor={{
+                    '0%': '#722ed1',
+                    '100%': '#b37feb',
+                  }}
+                  showInfo={false}
+                  size="small"
+                  strokeWidth={4}
+                />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Project Details
-        <div className="bg-orange-50 p-4 rounded-lg">
-          <h3 className="text-lg font-semibold text-orange-800 mb-4">
-            <ProjectOutlined className="mr-2" />
-            Project Information
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-gray-500">Project Name</div>
-              <div className="font-medium">BMPM C-Ku 100 W</div>
+        {/* Three separate boxes for machine information */}
+        <div className="grid grid-rows-3 gap-2">
+          {/* Program Details Box */}
+          <Card 
+            size="small"
+            title={
+              <span className="text-xs font-semibold text-gray-700 flex items-center">
+                <CodeSandboxOutlined className="mr-1" />
+                Program Details
+              </span>
+            }
+            className="shadow-sm"
+          >
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <div className="text-gray-500">Program Number</div>
+                <div className="font-medium">{selectedMachine.program_number || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Active Program</div>
+                <div className="font-medium">{selectedMachine.active_program || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Selected Program</div>
+                <div className="font-medium">{selectedMachine.selected_program || 'N/A'}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-sm text-gray-500">Total Operations</div>
-              <div className="font-medium">12</div>
+          </Card>
+
+          {/* Part Information Box */}
+          <Card 
+            size="small"
+            title={
+              <span className="text-xs font-semibold text-gray-700 flex items-center">
+                <BarcodeOutlined className="mr-1" />
+                Part Information
+              </span>
+            }
+            className="shadow-sm"
+          >
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <div className="text-gray-500">Part Number</div>
+                <div className="font-medium">{selectedMachine.part_number || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Part Description</div>
+                <div className="font-medium truncate">{selectedMachine.part_description || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Required Quantity</div>
+                <div className="font-medium">{selectedMachine.required_quantity || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Launched Quantity</div>
+                <div className="font-medium">{selectedMachine.launched_quantity || 'N/A'}</div>
+              </div>
             </div>
-          </div>
-          <div className="mt-4">
-            <Steps 
-              current={3} 
-              size="small"
-              className="custom-steps"
-              items={[
-                { title: 'Started' },
-                { title: 'In Progress' },
-                { title: 'Testing' },
-                { title: 'Completed' }
-              ]}
-            />
-          </div>
-        </div> */}
+          </Card>
+
+          {/* Operation Details Box */}
+          <Card 
+            size="small"
+            title={
+              <span className="text-xs font-semibold text-gray-700 flex items-center">
+                <ToolOutlined className="mr-1" />
+                Operation Details
+              </span>
+            }
+            className="shadow-sm"
+          >
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <div className="text-gray-500">Operation Number</div>
+                <div className="font-medium">{selectedMachine.operation_number || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Operation Description</div>
+                <div className="font-medium truncate">{selectedMachine.operation_description || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Machine Status</div>
+                <div className="font-medium">{selectedMachine.status || 'N/A'}</div>
+              </div>
+              <div className="relative">
+                <div className="text-gray-500">Last Updated</div>
+                <div className="font-medium">
+                  {formatDateTime(selectedMachine.lastUpdated || selectedMachine.last_updated)}
+                  <Tag 
+                    color="blue" 
+                    className="absolute right-0 top-0 text-[9px] py-0 px-1"
+                  >
+                    <ClockCircleOutlined className="mr-0.5" />Live
+                  </Tag>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
     </Card>
   );

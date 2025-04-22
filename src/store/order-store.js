@@ -6,8 +6,8 @@ import { LoadingOutlined } from '@ant-design/icons';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.85:8078',
-  QUALITY_URL: 'http://172.18.7.93:9999',
+  BASE_URL: 'http://172.16.0.203:8002',
+  QUALITY_URL: 'http://172.16.0.203:8002',
   PLANNING_URL: 'http://172.18.7.85:9671',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
@@ -144,7 +144,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.85:8078/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -229,7 +229,7 @@ const useOrderStore = create((set, get) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.85:8078/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://172.16.0.203:8002/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -494,7 +494,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.85:8078/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.16.0.203:8002/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -599,10 +599,25 @@ const useOrderStore = create((set, get) => ({
   fetchTimelineData: async () => {
     set({ isLoadingTimeline: true, timelineError: null });
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/scheduling/part-production-timeline/`);
+      // Add authorization token to the request
+      const token = localStorage.getItem('token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/scheduling/part-production-timeline/`, {
+        headers,
+        // Add timeout to prevent hanging requests
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch timeline data');
+        const errorMessage = response.status === 500 
+          ? 'Server error: The timeline service is currently unavailable'
+          : 'Failed to fetch timeline data';
+        
+        console.warn(`Timeline API returned status ${response.status}`);
+        throw new Error(errorMessage);
       }
+      
       const data = await response.json();
       
       // Extract items array from the response
@@ -615,13 +630,25 @@ const useOrderStore = create((set, get) => ({
         timelineData: timelineItems,
         isLoadingTimeline: false 
       });
+      
+      return timelineItems;
     } catch (error) {
       console.error('Error fetching timeline data:', error);
+      
+      // Silently handle the error without showing a message to the user
+      // message.error({
+      //   content: 'Could not load timeline data. Some features may be limited.',
+      //   duration: 5
+      // });
+      
       set({ 
         timelineError: error.message, 
         isLoadingTimeline: false,
-        timelineData: []
+        timelineData: [] // Set empty array instead of null to prevent rendering errors
       });
+      
+      // Return empty array to prevent downstream errors
+      return [];
     }
   },
 
@@ -630,13 +657,13 @@ const useOrderStore = create((set, get) => ({
     const { fetchAllOrders, fetchTimelineData } = get();
     
     // Initial fetch
-    fetchAllOrders();
-    fetchTimelineData();
+    fetchAllOrders().catch(error => console.error('Initial orders fetch failed:', error));
+    fetchTimelineData().catch(error => console.error('Initial timeline fetch failed:', error));
     
     // Set up polling interval (1 hour)
     const intervalId = setInterval(() => {
-      fetchAllOrders();
-      fetchTimelineData();
+      fetchAllOrders().catch(error => console.error('Polling orders fetch failed:', error));
+      fetchTimelineData().catch(error => console.error('Polling timeline fetch failed:', error));
     }, POLLING_INTERVAL);
     
     // Store the interval ID
@@ -846,7 +873,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.18.7.85:8078/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.16.0.203:8002/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -903,7 +930,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.85:8078/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -1101,14 +1128,55 @@ const useOrderStore = create((set, get) => ({
     }
   },
 
-  // Add this new function to the order store
+  // Update this function to use the uploadDocumentByType endpoint for new versions
   uploadNewVersion: async (documentId, file, version) => {
     try {
+      console.log('Uploading new version for document ID:', documentId);
+      console.log('Version number:', version);
+      
+      // Get document details from state to fetch required information
+      const state = get();
+      const { documents } = state;
+      
+      // Find the document in either MPP or Engineering Drawing
+      let documentInfo = null;
+      let docType = '';
+      
+      if (documents.mpp_document && documents.mpp_document.id === documentId) {
+        documentInfo = documents.mpp_document;
+        docType = 'MPP';
+      } else if (documents.engineering_drawing_document && documents.engineering_drawing_document.id === documentId) {
+        documentInfo = documents.engineering_drawing_document;
+        docType = 'ENGINEERING_DRAWING';
+      }
+      
+      if (!documentInfo) {
+        throw new Error('Document not found in state');
+      }
+      
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('version_number', version);
+      
+      // Handle file from antd Upload component if needed
+      const fileObj = file.originFileObj || file;
+      console.log('File to upload:', fileObj.name, fileObj.type, fileObj.size);
+      
+      formData.append('file', fileObj);
+      formData.append('name', documentInfo.name);
+      formData.append('doc_type', docType);
+      formData.append('part_number', documentInfo.part_number);
+      formData.append('description', documentInfo.description || '');
+      formData.append('version', version);
 
-      const response = await fetch(`http://172.18.7.85:8078/api/v1/document-management/documents/${documentId}/versions`, {
+      // Log FormData for debugging
+      for (let pair of formData.entries()) {
+        console.log('FormData entry:', pair[0], typeof pair[1] === 'object' ? 'File: ' + pair[1].name : pair[1]);
+      }
+
+      // Use the uploadDocumentByType endpoint
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.uploadDocumentByType}`;
+      console.log('Sending request to endpoint:', endpoint);
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -1116,12 +1184,21 @@ const useOrderStore = create((set, get) => ({
         body: formData
       });
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to upload new version');
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.detail || 'Failed to upload new version');
+        } catch (parseError) {
+          throw new Error(`Failed to upload new version (${response.status}): ${errorText.substring(0, 100)}`);
+        }
       }
 
       const data = await response.json();
+      console.log('Upload successful, response data:', data);
       return data;
     } catch (error) {
       console.error('Error uploading new version:', error);
@@ -1160,7 +1237,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.18.7.85:8078/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.16.0.203:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1210,7 +1287,7 @@ const useOrderStore = create((set, get) => ({
           }
         });
       }
-
+      
       // Update the documents state
       set({ 
         documents: {
@@ -1257,20 +1334,66 @@ const useOrderStore = create((set, get) => ({
   // Add this function to your store
   uploadDocumentVersion: async (documentId, formData) => {
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/document-management/documents/${documentId}/versions`, {
+      console.log(`Uploading document version for document ID: ${documentId}`);
+      
+      // Check if we have a token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        throw new Error('Authentication token is missing');
+      }
+      
+      // Check formData content before sending
+      console.log('FormData contents being sent:');
+      for (let pair of formData.entries()) {
+        if (pair[0] === 'file') {
+          console.log('FormData file:', {
+            name: pair[1].name,
+            type: pair[1].type,
+            size: pair[1].size
+          });
+        } else {
+          console.log(`FormData ${pair[0]}:`, pair[1]);
+        }
+      }
+      
+      // Make sure we're using the correct URL
+      const endpoint = `${API_CONFIG.BASE_URL}/api/v1/document-management/documents/${documentId}/versions`;
+      console.log(`Sending request to: ${endpoint}`);
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: formData
       });
 
+      // Log response status for debugging
+      console.log(`Response status: ${response.status}`);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload document version');
+        // Try to get detailed error information
+        let errorText;
+        try {
+          const errorData = await response.json();
+          console.error('Error response data:', errorData);
+          errorText = JSON.stringify(errorData);
+          throw new Error(errorData.detail || errorData.message || `Server returned ${response.status}`);
+        } catch (jsonError) {
+          // If we can't parse JSON, try to get text
+          try {
+            errorText = await response.text();
+            console.error('Error response text:', errorText);
+          } catch (textError) {
+            errorText = 'Could not extract error details';
+          }
+          throw new Error(`Failed to upload document version (${response.status}): ${errorText}`);
+        }
       }
 
       const data = await response.json();
+      console.log('Document version upload successful, response:', data);
       return data;
     } catch (error) {
       console.error('Error uploading document version:', error);
@@ -1278,14 +1401,21 @@ const useOrderStore = create((set, get) => ({
     }
   },
 
-  // Add uploadDocumentVersion to your store
-  uploadDocumentVersion: async (documentId, formData) => {
-    try {
-      const result = await uploadDocumentVersion(documentId, formData);
-      return result;
-    } catch (error) {
-      throw error;
-    }
+  // Remove the duplicate function and replace with a function to clear document versions
+  clearDocumentVersions: () => {
+    set({
+      documents: {
+        ...get().documents,
+        mpp_document: get().documents.mpp_document ? {
+          ...get().documents.mpp_document,
+          versions: []
+        } : null,
+        engineering_drawing_document: get().documents.engineering_drawing_document ? {
+          ...get().documents.engineering_drawing_document,
+          versions: []
+        } : null
+      }
+    });
   },
 }));
 

@@ -3,20 +3,13 @@ import {
   Card, 
   Row, 
   Col, 
-  Table, 
   Button, 
-  Input, 
   Select, 
   DatePicker, 
   Space, 
-  Tabs, 
   Tooltip, 
-  Badge, 
-  Progress, 
   Tag, 
-  Statistic,
   Typography,
-  Divider,
   Spin,
   Empty,
   message
@@ -25,11 +18,8 @@ import {
   SearchOutlined, 
   ReloadOutlined, 
   CalendarOutlined, 
-  BarChartOutlined, 
-  PieChartOutlined,
-  ClockCircleOutlined,
   AlertOutlined, 
-  CheckCircleOutlined
+  DashboardOutlined
 } from '@ant-design/icons';
 import ReactApexChart from 'react-apexcharts';
 import dayjs from 'dayjs';
@@ -38,7 +28,6 @@ import usePlanningStore from '../../store/planning-store';
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 const { Text, Title } = Typography;
-const { TabPane } = Tabs;
 
 const CapacityPlanning = () => {
   const [workCenters, setWorkCenters] = useState([]);
@@ -55,10 +44,10 @@ const CapacityPlanning = () => {
     options: {
       chart: {
         type: 'bar',
-        height: 280,
+        height: 350,
         stacked: true,
         stackType: 'normal',
-        fontFamily: 'Helvetica, Arial, sans-serif',
+        fontFamily: 'Inter, Helvetica, Arial, sans-serif',
         toolbar: {
           show: true,
           tools: {
@@ -106,9 +95,9 @@ const CapacityPlanning = () => {
       plotOptions: {
         bar: {
           horizontal: false,
-          columnWidth: '55%',
+          columnWidth: '65%',
           endingShape: 'rounded',
-          borderRadius: 6,
+          borderRadius: 4,
           barHeight: '100%',
           distributed: false
         }
@@ -203,7 +192,8 @@ const CapacityPlanning = () => {
         opacity: 1,
         type: 'solid'
       },
-      colors: ['#22c55e', '#ef4444', '#3b82f6'], // Brighter green, red, blue
+      // Updated colors for better visual distinction
+      colors: ['#3b82f6', '#ef4444', '#10b981'], // Blue, Red, Green
       legend: {
         position: 'top',
         horizontalAlign: 'center',
@@ -228,7 +218,7 @@ const CapacityPlanning = () => {
         theme: 'light',
         style: {
           fontSize: '12px',
-          fontFamily: 'Helvetica, Arial, sans-serif'
+          fontFamily: 'Inter, Helvetica, Arial, sans-serif'
         },
         custom: function({series, seriesIndex, dataPointIndex, w}) {
           const machine = w.globals.labels[dataPointIndex];
@@ -249,30 +239,40 @@ const CapacityPlanning = () => {
             : 0;
           
           return `
-            <div class="apexcharts-tooltip-box" style="padding: 10px; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.15); border: none; min-width: 200px; border-radius: 6px;">
-              <div style="margin-bottom: 10px; font-weight: bold; font-size: 14px; color: #333;">${machine}</div>
+            <div class="apexcharts-tooltip-box" style="padding: 10px; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: none; min-width: 220px; border-radius: 8px;">
+              <div style="margin-bottom: 10px; font-weight: 600; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">${machine}</div>
               
-              <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                <span style="display: inline-block; width: 12px; height: 12px; background: ${availableColor}; margin-right: 8px; border-radius: 50%;"></span>
-                <span style="color: #505050;">Available Hours: </span>
-                <span style="font-weight: bold; margin-left: 4px; color: #333;">${availableHours.toFixed(0)}</span>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center;">
+                  <span style="display: inline-block; width: 10px; height: 10px; background: ${availableColor}; margin-right: 8px; border-radius: 50%;"></span>
+                  <span style="color: #6b7280;">Available Hours:</span>
+                </div>
+                <span style="font-weight: 600; color: #374151;">${availableHours.toFixed(0)}</span>
               </div>
               
-              <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                <span style="display: inline-block; width: 12px; height: 12px; background: ${utilizedColor}; margin-right: 8px; border-radius: 50%;"></span>
-                <span style="color: #505050;">Utilized Hours: </span>
-                <span style="font-weight: bold; margin-left: 4px; color: #333;">${utilizedHours.toFixed(0)}</span>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center;">
+                  <span style="display: inline-block; width: 10px; height: 10px; background: ${utilizedColor}; margin-right: 8px; border-radius: 50%;"></span>
+                  <span style="color: #6b7280;">Utilized Hours:</span>
+                </div>
+                <span style="font-weight: 600; color: #374151;">${utilizedHours.toFixed(0)}</span>
               </div>
               
-              <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                <span style="display: inline-block; width: 12px; height: 12px; background: ${remainingColor}; margin-right: 8px; border-radius: 50%;"></span>
-                <span style="color: #505050;">Remaining Hours: </span>
-                <span style="font-weight: bold; margin-left: 4px; color: #333;">${remainingHours.toFixed(0)}</span>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center;">
+                  <span style="display: inline-block; width: 10px; height: 10px; background: ${remainingColor}; margin-right: 8px; border-radius: 50%;"></span>
+                  <span style="color: #6b7280;">Remaining Hours:</span>
+                </div>
+                <span style="font-weight: 600; color: #374151;">${remainingHours.toFixed(0)}</span>
               </div>
               
-              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
-                <span style="color: #505050;">Utilization: </span>
-                <span style="font-weight: bold; color: ${utilizedHours/availableHours > 0.8 ? '#ef4444' : utilizedHours/availableHours > 0.5 ? '#f59e0b' : '#22c55e'};">
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #6b7280;">Utilization:</span>
+                <span style="font-weight: 600; color: ${
+                  utilizedHours/availableHours > 0.8 ? '#ef4444' : 
+                  utilizedHours/availableHours > 0.5 ? '#f59e0b' : 
+                  '#10b981'
+                };">
                   ${utilizationPercentage}%
                 </span>
               </div>
@@ -352,7 +352,7 @@ const CapacityPlanning = () => {
           ...prev.options.plotOptions,
           bar: {
             ...prev.options.plotOptions.bar,
-            columnWidth: '40%'
+            columnWidth: '55%'
           }
         }
       }
@@ -422,107 +422,135 @@ const CapacityPlanning = () => {
     return date ? date.format('YYYY-MM-DD') : '';
   };
 
-  // Calculate summary statistics
-  const calculateStats = () => {
-    if (!machineUtilizationData.length) {
-      return {
-        totalMachines: 0,
-        totalAvailable: 0,
-        totalUtilized: 0,
-        totalRemaining: 0,
-        avgUtilizationPercentage: 0
-      };
-    }
-
-    const totalMachines = machineUtilizationData.length;
-    const totalAvailable = machineUtilizationData.reduce((sum, item) => sum + item.available_hours, 0);
-    const totalUtilized = machineUtilizationData.reduce((sum, item) => sum + item.utilized_hours, 0);
-    const totalRemaining = machineUtilizationData.reduce((sum, item) => sum + item.remaining_hours, 0);
-    const avgUtilizationPercentage = totalAvailable > 0 
-      ? (totalUtilized / totalAvailable) * 100 
-      : 0;
-
-    return {
-      totalMachines,
-      totalAvailable,
-      totalUtilized,
-      totalRemaining,
-      avgUtilizationPercentage
-    };
-  };
-
-  const stats = calculateStats();
-
   return (
     <div className="capacity-planning">
-      <div className="mb-6">
-        <Title level={4}>Machine Capacity Utilization</Title>
-        
+      <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm">
+        <div className="flex items-center">
+          <DashboardOutlined className="text-blue-500 text-2xl mr-3" />
+          <div>
+            <Title level={4} style={{ margin: 0, color: '#374151' }}>Machine Capacity Planning</Title>
+            <Text type="secondary">Monitor and analyze machine utilization across the shop floor</Text>
+          </div>
+        </div>
       </div>
 
       {/* Filter controls */}
-      <Card className="mb-6">
+      <Card 
+        className="mb-6 shadow-sm hover:shadow-md transition-shadow"
+        bordered={false}
+        bodyStyle={{ padding: '16px 24px' }}
+      >
         <Row gutter={16} align="middle">
-          <Col span={12}>
+          <Col xs={24} md={16}>
             <Space size="middle" align="center">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Date Range</label>
+                <label className="block text-sm text-gray-600 mb-1 font-medium">Select Date Range</label>
                 <RangePicker
                   value={dateRange}
                   onChange={handleDateRangeChange}
                   allowClear={false}
                   style={{ width: 280 }}
+                  className="rounded-md"
+                  ranges={{
+                    'Today': [dayjs(), dayjs()],
+                    'This Week': [dayjs().startOf('week'), dayjs().endOf('week')],
+                    'This Month': [dayjs().startOf('month'), dayjs()],
+                    'Last Month': [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')],
+                  }}
                 />
               </div>
               
-              <div style={{ marginTop: '18px' }}>
+              <div style={{ marginTop: '24px' }}>
                 <Button 
                   type="primary" 
                   icon={<SearchOutlined />} 
                   onClick={handleRefreshClick}
                   loading={loading}
                   size="middle"
+                  className="bg-blue-500 hover:bg-blue-600 rounded-md"
                 >
                   Get Data
                 </Button>
               </div>
             </Space>
           </Col>
-          <Col span={12} className="text-right">
+          <Col xs={24} md={8} className="text-right">
             <Text type="secondary">
-              Showing data for: <Tag color="blue">{formatDate(dateRange[0])} to {formatDate(dateRange[1])}</Tag>
+              Showing data for: 
             </Text>
+            <div className="mt-1">
+              <Tag 
+                color="blue" 
+                className="text-sm rounded-md py-1 px-2"
+                icon={<CalendarOutlined />}
+              >
+                {formatDate(dateRange[0])} to {formatDate(dateRange[1])}
+              </Tag>
+            </div>
           </Col>
         </Row>
       </Card>
 
-
       {/* Utilization Chart */}
       <Card 
         className="mb-6"
-        bodyStyle={{ padding: '16px' }}
+        bodyStyle={{ padding: '24px' }}
         bordered={false}
-        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.05)', borderRadius: '8px' }}
+        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)', borderRadius: '0.75rem' }}
       >
         {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <Spin size="large" />
+          <div className="flex justify-center items-center py-36">
+            <Spin size="large" tip="Loading utilization data..." />
           </div>
         ) : machineUtilizationData.length > 0 ? (
           <div>
-            <div className="flex justify-between items-center mb-4 px-2">
-              <Title level={5} style={{ margin: 0, fontWeight: 600 }}>Machine Capacity Utilization</Title>
-              
+            <div className="flex justify-between items-center mb-6 px-2">
+              <div>
+                <Title level={5} style={{ margin: 0, fontWeight: 600, color: '#374151' }}>
+                  Machine Utilization Chart
+                </Title>
+                <Text type="secondary">
+                  Hours distribution per machine for the selected period
+                </Text>
+              </div>
+              <Space>
+                <Tooltip title="The chart shows available hours, utilized hours, and remaining hours for each machine">
+                  <Button type="text" icon={<AlertOutlined />} />
+                </Tooltip>
+                <Button 
+                  icon={<ReloadOutlined />} 
+                  onClick={handleRefreshClick}
+                  loading={loading}
+                >
+                  Refresh
+                </Button>
+              </Space>
             </div>
             <ReactApexChart 
               options={chartData.options} 
               series={chartData.series} 
               type="bar" 
-              height={280} 
+              height={450} 
             />
           </div>
         ) : (
-          <Empty description="No utilization data available" className="py-20" />
+          <Empty 
+            description={
+              <div>
+                <p className="text-gray-500 mb-4">No utilization data available for the selected date range</p>
+                <Button 
+                  type="primary" 
+                  onClick={handleRefreshClick} 
+                  icon={<ReloadOutlined />}
+                  className="bg-blue-500"
+                >
+                  Try Different Dates
+                </Button>
+              </div>
+            } 
+            className="py-20" 
+            image={Empty.PRESENTED_IMAGE_SIMPLE} 
+          />
         )}
       </Card>
     </div>

@@ -16,9 +16,20 @@ import {
   message,
   Badge,
   Tabs,
-  Empty
+  Empty,
+  Switch
 } from 'antd';
-import { EyeOutlined, FileSearchOutlined, FileTextOutlined, FilePdfOutlined, AppstoreOutlined, LoadingOutlined, DownloadOutlined } from '@ant-design/icons';
+import { 
+  EyeOutlined, 
+  FileSearchOutlined, 
+  FileTextOutlined, 
+  FilePdfOutlined, 
+  AppstoreOutlined, 
+  LoadingOutlined, 
+  DownloadOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined
+} from '@ant-design/icons';
 import moment from 'moment';
 import InspectionReport from './InspectionReport';
 import { qualityStore } from '../../../store/quality-store';
@@ -31,7 +42,8 @@ const QualityInspectionDetails = ({
   selectedPart, 
   inspectionDetails, 
   loading,
-  openQMSSoftware 
+  openQMSSoftware,
+  orderId
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState(null);
@@ -42,6 +54,8 @@ const QualityInspectionDetails = ({
   const [loadingDrawing, setLoadingDrawing] = useState(false);
   const [measuredData, setMeasuredData] = useState(null);
   const [isMeasuredDataModalVisible, setIsMeasuredDataModalVisible] = useState(false);
+  const [approvingIds, setApprovingIds] = useState({});
+  const [approvedStatus, setApprovedStatus] = useState({});
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
 
@@ -349,49 +363,393 @@ const QualityInspectionDetails = ({
     if (!inspectionDetails?.order_id) return;
 
     try {
-      const response = await qualityStore.fetchInspectionByOrderId(inspectionDetails.order_id); // Pass the order_id instead of operation number
-      setMeasuredData(response[0]); // Set the fetched data to state
-      setIsMeasuredDataModalVisible(true); // Open the measured data modal
+      // Show loading indicator
+      message.loading({ content: 'Loading measured data...', key: 'measuredDataLoading' });
+      
+      // Fetch inspection data using the quality store
+      const response = await qualityStore.fetchInspectionByOrderId(inspectionDetails.order_id);
+      
+      // Check if we have valid data with the correct structure
+      if (response && response.inspection_data && response.inspection_data.length > 0) {
+        setMeasuredData(response);
+        setIsMeasuredDataModalVisible(true);
+        message.success({ content: 'Data loaded successfully', key: 'measuredDataLoading', duration: 1 });
+      } else {
+        message.warning({ content: 'No measurement data available', key: 'measuredDataLoading' });
+      }
     } catch (error) {
-      message.error('Failed to load measured data');
       console.error('Error loading measured data:', error);
+      message.error({ content: 'Failed to load measured data', key: 'measuredDataLoading' });
     }
+  };
+
+  // Function to prepare flat data from the nested structure
+  const prepareInspectionData = () => {
+    if (!measuredData || !measuredData.inspection_data) return [];
+    
+    // Flatten the nested structure for table display
+    const flatData = [];
+    
+    measuredData.inspection_data.forEach(operationData => {
+      const operationNumber = operationData.operation_number;
+      
+      if (operationData.inspections && operationData.inspections.length > 0) {
+        operationData.inspections.forEach(inspection => {
+          flatData.push({
+            ...inspection,
+            operation_number: operationNumber,
+            key: `${operationNumber}-${inspection.id}`
+          });
+        });
+      }
+    });
+    
+    return flatData;
   };
 
   // Function to render the measured data modal
   const renderMeasuredDataModal = () => (
     <Modal
-      title="Measured Data"
+      title={
+        <div className="flex items-center gap-2">
+          <FileSearchOutlined className="text-blue-500" />
+          <span>Measured Inspection Data</span>
+        </div>
+      }
       visible={isMeasuredDataModalVisible}
       onCancel={() => setIsMeasuredDataModalVisible(false)}
-      footer={null}
-      width={800}
+      footer={[
+        <Button key="close" onClick={() => setIsMeasuredDataModalVisible(false)}>
+          Close
+        </Button>
+      ]}
+      width={1200}
       className="measured-data-modal"
     >
-      {measuredData ? (
+      <div className="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+        <Row gutter={16}>
+          <Col span={8}>
+            <Text strong>Order ID:</Text> {measuredData?.order_id || '-'}
+          </Col>
+          <Col span={8}>
+            <Text strong>Production Order:</Text> {measuredData?.production_order || '-'}
+          </Col>
+          <Col span={8}>
+            <Text strong>Part Number:</Text> {measuredData?.part_number || '-'}
+          </Col>
+        </Row>
+      </div>
+
+      {measuredData && measuredData.inspection_data && measuredData.inspection_data.length > 0 ? (
         <Table
           columns={[
-            { title: 'Operation Number', dataIndex: 'operation_number', key: 'operation_number' },
-            { title: 'Nominal Value', dataIndex: 'nominal_value', key: 'nominal_value' },
-            { title: 'Upper Tol', dataIndex: 'uppertol', key: 'uppertol' },
-            { title: 'Lower Tol', dataIndex: 'lowertol', key: 'lowertol' },
-            { title: 'Zone', dataIndex: 'zone', key: 'zone' },
-            { title: 'Dimension Type', dataIndex: 'dimension_type', key: 'dimension_type' },
-            { title: 'Measured Instrument', dataIndex: 'measured_instrument', key: 'measured_instrument' },
-            { title: 'Measured 1', dataIndex: 'measured_1', key: 'measured_1' },
-            { title: 'Measured 2', dataIndex: 'measured_2', key: 'measured_2' },
-            { title: 'Measured 3', dataIndex: 'measured_3', key: 'measured_3' },
-            { title: 'Measured Mean', dataIndex: 'measured_mean', key: 'measured_mean' },
+            { 
+              title: 'Operation',
+              dataIndex: 'operation_number',
+              key: 'operation_number',
+              width: 90,
+              fixed: 'left',
+              render: (opNum) => <Tag color="purple">OP {opNum}</Tag>,
+              filters: measuredData.inspection_data.map(op => ({
+                text: `OP ${op.operation_number}`,
+                value: op.operation_number
+              })),
+              onFilter: (value, record) => record.operation_number === value
+            },
+            { 
+              title: 'ID',
+              dataIndex: 'id',
+              key: 'id',
+              width: 70,
+              render: (id) => <Tag color="blue">{id}</Tag>
+            },
+            { 
+              title: 'Zone',
+              dataIndex: 'zone',
+              key: 'zone',
+              width: 80,
+              render: (zone) => zone || '-'
+            },
+            { 
+              title: 'Type',
+              dataIndex: 'dimension_type',
+              key: 'dimension_type',
+              width: 120,
+              render: (type) => <Tag color="cyan">{type || 'Unknown'}</Tag>
+            },
+            { 
+              title: 'Nominal',
+              dataIndex: 'nominal_value',
+              key: 'nominal_value',
+              width: 100,
+              render: (value) => <Text strong>{value || '-'}</Text>
+            },
+            { 
+              title: 'Upper Tol',
+              dataIndex: 'uppertol',
+              key: 'uppertol',
+              width: 90,
+              render: (value) => <Text type="success">+{value || '0'}</Text>
+            },
+            { 
+              title: 'Lower Tol',
+              dataIndex: 'lowertol',
+              key: 'lowertol',
+              width: 90,
+              render: (value) => <Text type="danger">{value || '0'}</Text>
+            },
+            { 
+              title: 'Measured 1',
+              dataIndex: 'measured_1',
+              key: 'measured_1',
+              width: 100,
+              render: (value) => value || '-'
+            },
+            { 
+              title: 'Measured 2',
+              dataIndex: 'measured_2',
+              key: 'measured_2',
+              width: 100,
+              render: (value) => value || '-'
+            },
+            { 
+              title: 'Measured 3',
+              dataIndex: 'measured_3',
+              key: 'measured_3',
+              width: 100,
+              render: (value) => value || '-'
+            },
+            { 
+              title: 'Mean',
+              dataIndex: 'measured_mean',
+              key: 'measured_mean',
+              width: 100,
+              render: (value) => <Text strong type="warning">{value || '-'}</Text>
+            },
+            { 
+              title: 'Instrument',
+              dataIndex: 'measured_instrument',
+              key: 'measured_instrument',
+              width: 120,
+              render: (value) => value || '-'
+            },
+            {
+              title: 'Quantity',
+              dataIndex: 'quantity_no',
+              key: 'quantity_no',
+              width: 90,
+              render: (value) => <Tag color="orange">{value || '1'}</Tag>
+            },
+            {
+              title: 'Date',
+              dataIndex: 'created_at',
+              key: 'created_at',
+              width: 160,
+              render: (value) => value ? moment(value).format('DD-MM-YYYY HH:mm') : '-'
+            },
+            { 
+              title: 'Status',
+              key: 'status',
+              width: 100,
+              render: (_, record) => {
+                // First check if the measurement is done
+                if (record.is_done === true) {
+                  const nominal = parseFloat(record.nominal_value) || 0;
+                  const mean = parseFloat(record.measured_mean) || 0;
+                  const upperTol = parseFloat(record.uppertol) || 0;
+                  const lowerTol = parseFloat(record.lowertol) || 0;
+                  
+                  // Special handling for non-numeric nominal values (like threads "M5")
+                  if (isNaN(nominal)) {
+                    return <Badge status="processing" text="Inspected" />;
+                  }
+                  
+                  // Check if measurement is within tolerance
+                  const inTolerance = mean >= (nominal + lowerTol) && mean <= (nominal + upperTol);
+                  
+                  return inTolerance ? 
+                    <Badge status="success" text="Within Spec" /> : 
+                    <Badge status="error" text="Out of Spec" />;
+                } else if (record.is_done === false) {
+                  return <Badge status="error" text="Not Approved" />;
+                } else {
+                  return <Badge status="warning" text="Pending" />;
+                }
+              }
+            },
+            { 
+              title: 'Operator',
+              dataIndex: 'operator',
+              key: 'operator',
+              width: 120,
+              fixed: 'right',
+              render: (operator) => operator?.username || '-'
+            },
+            {
+              title: 'Approve',
+              key: 'action',
+              width: 120,
+              fixed: 'right',
+              render: (_, record) => {
+                // Check if we already have a status for this record
+                const status = approvedStatus[record.id];
+                const isLoading = approvingIds[record.id];
+                
+                // If item is loading, show loading spinner
+                if (isLoading) {
+                  return <Spin size="small" />;
+                }
+                
+                // Get the correct checked state based on record data or local state
+                let isChecked = false;
+                
+                // First check if record has direct is_done value
+                if (record.is_done === true) {
+                  isChecked = true;
+                } else if (record.is_done === false) {
+                  isChecked = false;
+                } 
+                // Then check local state if no direct value
+                else if (status === 'approved') {
+                  isChecked = true;
+                } else if (status === 'rejected') {
+                  isChecked = false;
+                }
+                
+                // Return a single switch with appropriate checked state
+                return (
+                  <Switch
+                    checked={isChecked}
+                    onChange={(checked) => handleApproveReject(record.id, checked)}
+                    checkedChildren="Done"
+                    unCheckedChildren="Not Done"
+                  />
+                );
+              }
+            }
           ]}
-          dataSource={measuredData.inspection_data} // Assuming inspection_data contains the relevant data
-          pagination={false}
+          dataSource={prepareInspectionData()}
+          pagination={{ pageSize: 10 }}
           size="small"
+          scroll={{ x: 1300, y: 500 }}
+          bordered
         />
       ) : (
-        <Empty description="No measured data available" />
+        <Empty 
+          description={
+            <div>
+              <p>No measurement data available</p>
+              <small>No data has been recorded for this inspection yet</small>
+            </div>
+          }
+          image={Empty.PRESENTED_IMAGE_SIMPLE} 
+        />
       )}
     </Modal>
   );
+
+  // Function to handle approving or rejecting a measurement
+  const handleApproveReject = async (id, isApproved) => {
+    try {
+      // Set loading state for this specific item
+      setApprovingIds(prev => ({ ...prev, [id]: true }));
+      
+      // Show a message that we're attempting to update
+      message.loading({ 
+        content: `Updating status for measurement #${id}...`, 
+        key: `update-${id}`,
+        duration: 0
+      });
+      
+      // Call the API to update the status with the specific endpoint format
+      const response = await qualityStore.updateInspectionStatus(id, isApproved);
+      
+      // The API response contains the complete record with is_done field
+      console.log(`Full API response for measurement #${id}:`, response);
+      
+      // Get the actual is_done value from the response
+      const isDone = response.is_done;
+      console.log(`Measurement #${id} is_done value from API:`, isDone);
+      
+      // Update the status based on the actual response from the API
+      setApprovedStatus(prev => ({ 
+        ...prev, 
+        [id]: isDone === true ? 'approved' : 'rejected' 
+      }));
+      
+      // Show success message with the actual status from the API
+      message.success({
+        content: isDone === true 
+          ? `Measurement #${id} marked as Done` 
+          : `Measurement #${id} marked as Not Done`,
+        key: `update-${id}`,
+        duration: 2
+      });
+      
+      // Update the measurement data in our local state immediately
+      setMeasuredData(prevData => {
+        if (!prevData || !prevData.inspection_data) return prevData;
+        
+        const newData = {...prevData};
+        
+        // Loop through all operations and find the measurement with this ID
+        newData.inspection_data = newData.inspection_data.map(op => {
+          if (!op.inspections) return op;
+          
+          // Update the is_done value in the inspections array
+          const updatedInspections = op.inspections.map(insp => {
+            if (insp.id === id) {
+              // Return a new inspection object with the updated is_done value
+              return {...insp, is_done: isDone};
+            }
+            return insp;
+          });
+          
+          return {...op, inspections: updatedInspections};
+        });
+        
+        return newData;
+      });
+      
+    } catch (error) {
+      console.error(`Error ${isApproved ? 'approving' : 'rejecting'} measurement:`, error);
+      
+      // Create a detailed error message for debugging
+      let errorMessage = `Failed to update measurement #${id}.`;
+      
+      if (error.response) {
+        errorMessage += ` Server responded with status code ${error.response.status}.`;
+        if (error.response.data) {
+          if (typeof error.response.data === 'string') {
+            errorMessage += ` Message: ${error.response.data}`;
+          } else if (error.response.data.message) {
+            errorMessage += ` Message: ${error.response.data.message}`;
+          }
+        }
+        
+        console.log('Full error response:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          headers: error.response.headers,
+          data: error.response.data
+        });
+      } else if (error.request) {
+        errorMessage += ' No response received from server. Check network connection.';
+      } else {
+        errorMessage += ` ${error.message}`;
+      }
+      
+      // Show the error message
+      message.error({
+        content: errorMessage,
+        key: `update-${id}`,
+        duration: 5
+      });
+    } finally {
+      // Clear loading state
+      setApprovingIds(prev => ({ ...prev, [id]: false }));
+    }
+  };
 
   // Update the renderModalContent function to include measured data
   const renderModalContent = () => (
@@ -525,7 +883,52 @@ const QualityInspectionDetails = ({
     };
   }, [drawingData]);
 
-  // Add these styles to your CSS
+  useEffect(() => {
+    if (orderId) {
+      fetchMeasuredData();
+    }
+  }, [orderId]);
+
+  // Add missing fetchMeasuredData function
+  const fetchMeasuredData = async () => {
+    if (!orderId) return;
+    
+    try {
+      const response = await qualityStore.fetchInspectionByOrderId(orderId);
+      if (response && response.inspection_data && response.inspection_data.length > 0) {
+        setMeasuredData(response);
+        
+        // Initialize approved status from fetched data
+        const statusMap = {};
+        response.inspection_data.forEach(opData => {
+          if (opData.inspections && opData.inspections.length > 0) {
+            opData.inspections.forEach(inspection => {
+              // Check for the is_done field explicitly
+              console.log(`Inspection #${inspection.id} is_done value:`, inspection.is_done);
+              
+              // Strictly check for boolean true/false values to set appropriate status
+              if (inspection.is_done === true) {
+                statusMap[inspection.id] = 'approved';
+              } else if (inspection.is_done === false) {
+                statusMap[inspection.id] = 'rejected';
+              } else {
+                // Handle any undefined or null cases
+                statusMap[inspection.id] = null;
+              }
+            });
+          }
+        });
+        
+        // Update the approval status state
+        setApprovedStatus(statusMap);
+        console.log('Updated approval status map:', statusMap);
+      }
+    } catch (error) {
+      console.error('Error fetching measured data:', error);
+    }
+  };
+
+  // Update styles to include more specific styles for the measured data modal
   const styles = `
     @keyframes progress {
       0% {
@@ -668,14 +1071,55 @@ const QualityInspectionDetails = ({
 
     .measured-data-modal .ant-modal-content {
       border-radius: 8px;
+      overflow: hidden;
     }
 
     .measured-data-modal .ant-modal-header {
       background-color: #f0f2f5;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 16px 24px;
+    }
+    
+    .measured-data-modal .ant-modal-body {
+      padding: 20px;
+      background: #f8fafc;
     }
 
     .measured-data-modal .ant-table {
       border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+    
+    .measured-data-modal .ant-table-thead > tr > th {
+      background: #f0f2f5;
+      font-weight: 600;
+    }
+    
+    .measured-data-modal .ant-tag {
+      border-radius: 4px;
+    }
+    
+    .measured-data-modal .ant-badge-status-dot {
+      width: 8px;
+      height: 8px;
+    }
+
+    /* Custom Switch Styling */
+    .ant-switch {
+      min-width: 70px;
+    }
+    
+    .ant-switch-checked {
+      background-color: #52c41a !important;
+    }
+    
+    .ant-switch:not(.ant-switch-checked) {
+      background-color: #ff4d4f !important;
+    }
+    
+    .ant-switch-inner {
+      color: white !important;
+      font-weight: 500 !important;
     }
   `;
 

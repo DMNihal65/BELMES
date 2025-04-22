@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Modal, Form, Input, DatePicker, Upload, Space, Select, 
-  Button, message, Divider, InputNumber, Steps, Row, Col, Alert, Card, Table 
+  Button, message, Divider, InputNumber, Steps, Row, Col, Alert, Card, Table, Tooltip, Switch 
 } from 'antd';
 import { 
   InboxOutlined, FileTextOutlined, LoadingOutlined,
@@ -17,6 +17,10 @@ const { Step } = Steps;
 
 const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData = null }) => {
   const [form] = Form.useForm();
+  const mppUploadRef = React.useRef(null);
+  const drawingUploadRef = React.useRef(null);
+  const mppVersionUploadRef = React.useRef(null);
+  const drawingVersionUploadRef = React.useRef(null);
   const { 
     uploadPDF, 
     updateOrder, 
@@ -36,7 +40,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     createManualOrder,
     checkDocumentsByPartNumber,
     clearDocuments,
-    uploadDocumentVersion
+    uploadDocumentVersion,
+    uploadNewVersion
   } = useOrderStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [fileList, setFileList] = useState([]);
@@ -53,6 +58,12 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
   const [oarcData, setOarcData] = useState(null);
   const [operations, setOperations] = useState([]);
   const [orderData, setOrderData] = useState(null);
+  const [enableMppVersionUpload, setEnableMppVersionUpload] = useState(false);
+  const [enableDrawingVersionUpload, setEnableDrawingVersionUpload] = useState(false);
+  const [mppVersionFile, setMppVersionFile] = useState(null);
+  const [drawingVersionFile, setDrawingVersionFile] = useState(null);
+  const [newMppVersion, setNewMppVersion] = useState('');
+  const [newDrawingVersion, setNewDrawingVersion] = useState('');
 
   const steps = [
     {
@@ -290,6 +301,12 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     setDrawingDocName('');
     setDrawingVersion('v1');
     setDrawingDescription('');
+    setEnableMppVersionUpload(false);
+    setEnableDrawingVersionUpload(false);
+    setMppVersionFile(null);
+    setDrawingVersionFile(null);
+    setNewMppVersion('');
+    setNewDrawingVersion('');
     onCancel();
   };
 
@@ -331,20 +348,39 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       
       // Pre-fill document fields if documents exist
       if (data.mpp_document) {
+        // For existing documents, we just store the reference
+        // These values are displayed read-only in the UI
         setMppDocName(data.mpp_document.name || '');
         setMppDescription(data.mpp_document.description || '');
         setMppVersion(data.mpp_document.latest_version?.version_number || 'v1');
+        
+        // Disable upload for existing documents
+        message.info('MPP document found. Document details cannot be modified.');
       }
       
       if (data.engineering_drawing_document) {
+        // For existing documents, we just store the reference
+        // These values are displayed read-only in the UI
         setDrawingDocName(data.engineering_drawing_document.name || '');
         setDrawingDescription(data.engineering_drawing_document.description || '');
         setDrawingVersion(data.engineering_drawing_document.latest_version?.version_number || 'v1');
+        
+        // Disable upload for existing documents
+        message.info('Engineering Drawing document found. Document details cannot be modified.');
       }
 
+      // Show success message with information about found documents
+      let successMessage = 'Documents checked successfully';
+      if (data.mpp_document || data.engineering_drawing_document) {
+        successMessage += '. Existing documents will be used.';
+      } else {
+        successMessage += '. No existing documents found. You can upload new ones.';
+      }
+      
       message.success({ 
-        content: 'Documents checked successfully', 
-        key: 'docCheck' 
+        content: successMessage, 
+        key: 'docCheck',
+        duration: 4
       });
     } catch (error) {
       message.error({ 
@@ -367,6 +403,22 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       setDrawingFile(info.fileList[0].originFileObj);
     } else {
       setDrawingFile(null);
+    }
+  };
+
+  const handleMppVersionFileChange = (info) => {
+    if (info.fileList.length > 0) {
+      setMppVersionFile(info.fileList[0].originFileObj);
+    } else {
+      setMppVersionFile(null);
+    }
+  };
+
+  const handleDrawingVersionFileChange = (info) => {
+    if (info.fileList.length > 0) {
+      setDrawingVersionFile(info.fileList[0].originFileObj);
+    } else {
+      setDrawingVersionFile(null);
     }
   };
 
@@ -500,25 +552,40 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         await onCreate(result);
       } else {
         // Handle manual creation case
-        const result = await createManualOrder({
-          ...values,
-          mppFile,
-          drawingFile,
-          mppDocName,
-          mppDescription,
-          mppVersion,
-          drawingDocName,
-          drawingDescription,
-          drawingVersion
-        });
+        try {
+          console.log('Creating manual order with values:', values);
+          
+          // Create a payload object for better debugging
+          const orderPayload = {
+            ...values,
+            mppFile,
+            drawingFile,
+            mppDocName,
+            mppDescription,
+            mppVersion,
+            drawingDocName,
+            drawingDescription,
+            drawingVersion
+          };
+          
+          // Log the payload
+          console.log('Order payload:', orderPayload);
+          
+          const result = await createManualOrder(orderPayload);
+          
+          console.log('Manual order creation result:', result);
 
-        if (result.fileUploadError) {
-          message.warning('Order was created but there was an issue uploading some files: ' + result.fileUploadError);
-        } else {
-          message.success('Order and documents created successfully');
+          if (result.fileUploadError) {
+            message.warning('Order was created but there was an issue uploading some files: ' + result.fileUploadError);
+          } else {
+            message.success('Order and documents created successfully');
+          }
+
+          await onCreate(result);
+        } catch (createError) {
+          console.error('Detailed manual order creation error:', createError);
+          throw new Error(`Failed to create order: ${createError.message || 'Unknown error'}`);
         }
-
-        await onCreate(result);
       }
 
       // Clear form and close modal
@@ -937,10 +1004,18 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
             description={
               <div>
                 {documents?.mpp_document && (
-                  <div>MPP File: {documents.mpp_document.name}</div>
+                  <div className="mb-1">
+                    <strong>MPP File:</strong> {documents.mpp_document.name} 
+                    <span className="ml-2 text-blue-500">(v{documents.mpp_document.latest_version?.version_number || '1'})</span>
+                    <div className="text-xs text-gray-500">Existing documents will be used and cannot be modified in this form.</div>
+                  </div>
                 )}
                 {documents?.engineering_drawing_document && (
-                  <div>Engineering Drawing: {documents.engineering_drawing_document.name}</div>
+                  <div>
+                    <strong>Engineering Drawing:</strong> {documents.engineering_drawing_document.name}
+                    <span className="ml-2 text-blue-500">(v{documents.engineering_drawing_document.latest_version?.version_number || '1'})</span>
+                    <div className="text-xs text-gray-500">Existing documents will be used and cannot be modified in this form.</div>
+                  </div>
                 )}
               </div>
             }
@@ -974,7 +1049,38 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       <Row gutter={16}>
         <Col span={12}>
           <Card 
-            title="MPP File"
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="font-medium">MPP File</span>
+                <div className="flex items-center">
+                  {documents?.mpp_document && (
+                    <div className="flex items-center mr-2">
+                      <span className="text-xs mr-2">New Version</span>
+                      <Switch 
+                        size="small" 
+                        checked={enableMppVersionUpload}
+                        onChange={(checked) => setEnableMppVersionUpload(checked)}
+                      />
+                    </div>
+                  )}
+                  {!documents?.mpp_document && (
+                    <Tooltip title="Upload MPP File">
+                      <Button 
+                        type="primary"
+                        shape="circle"
+                        icon={<UploadOutlined />} 
+                        size="small"
+                        onClick={() => {
+                          if (mppUploadRef.current) {
+                            mppUploadRef.current.upload.openFileDialogOnClick();
+                          }
+                        }}
+                      />
+                    </Tooltip>
+                  )}
+                </div>
+              </div>
+            }
             className="hover:shadow-sm transition-shadow duration-300"
             bordered={true}
             loading={documentLoadingStates.mpp}
@@ -989,46 +1095,169 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                 </Form.Item>
                 <Form.Item label="Version">
                   <Input 
-                    value={mppVersion}
-                    onChange={(e) => setMppVersion(e.target.value)}
-                    placeholder="Enter new version (e.g. v2)"
+                    value={documents.mpp_document.latest_version?.version_number || 'v1'}
+                    disabled
                   />
                 </Form.Item>
-                <Upload
-                  maxCount={1}
-                  onChange={handleMppFileChange}
-                  beforeUpload={() => false}
-                  accept=".pdf,.doc,.docx"
-                  showUploadList={false}
-                  customRequest={async ({ file }) => {
-                    try {
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      formData.append('version_number', mppVersion);
-                      
-                      await uploadDocumentVersion(documents.mpp_document.id, formData);
-                      message.success('MPP document version uploaded successfully');
-                      await fetchDocumentsByPartNumber(form.getFieldValue('part_number'));
-                    } catch (error) {
-                      message.error(error.message || 'Failed to upload MPP document version');
-                    }
-                  }}
-                >
+                
+                {enableMppVersionUpload ? (
+                  <>
+                    <Form.Item label="New Version Number" required>
+                      <Input
+                        value={newMppVersion}
+                        onChange={(e) => setNewMppVersion(e.target.value)}
+                        placeholder="Enter new version (e.g. v2)"
+                      />
+                    </Form.Item>
+                    <Upload
+                      maxCount={1}
+                      onChange={handleMppVersionFileChange}
+                      beforeUpload={() => false}
+                      accept=".pdf,.doc,.docx"
+                      ref={mppVersionUploadRef}
+                    >
+                      <Button icon={<UploadOutlined />} className="w-full mb-2">
+                        Select New MPP Version
+                      </Button>
+                    </Upload>
+                    <Button 
+                      type="primary"
+                      icon={<CloudUploadOutlined />}
+                      className="w-full mt-2"
+                      disabled={!mppVersionFile || !newMppVersion}
+                      onClick={async () => {
+                        if (mppVersionFile && newMppVersion && documents?.mpp_document?.id) {
+                          try {
+                            message.loading({ 
+                              content: 'Uploading new MPP version...', 
+                              key: 'mppUpload',
+                              duration: 0 
+                            });
+                            
+                            // Validate and prepare the file
+                            const fileInfo = validateAndPrepareFile(mppVersionFile);
+                            if (!fileInfo) {
+                              message.error({
+                                content: 'Invalid file selected',
+                                key: 'mppUpload'
+                              });
+                              return;
+                            }
+                            
+                            // Log detailed information for debugging
+                            console.log('MPP Upload Details:', {
+                              documentId: documents.mpp_document.id,
+                              ...fileInfo,
+                              versionNumber: newMppVersion
+                            });
+                            
+                            // Create FormData for version upload
+                            const formData = new FormData();
+                            
+                            // Ensure the file is properly attached to FormData
+                            formData.append('file', fileInfo.file);
+                            formData.append('version_number', newMppVersion);
+                            
+                            // Add document type for clarity
+                            formData.append('doc_type', 'MPP'); // This might help the server identify the document type
+                            
+                            // Add part number if available
+                            const partNumber = form.getFieldValue('part_number');
+                            if (partNumber) {
+                              formData.append('part_number', partNumber);
+                            }
+                            
+                            // Log FormData entries for verification
+                            for (let pair of formData.entries()) {
+                              console.log('FormData entry:', pair[0], 
+                                typeof pair[1] === 'object' ? `File: ${pair[1].name}, type: ${pair[1].type}, size: ${pair[1].size}` : pair[1]);
+                            }
+                            
+                            let response;
+                            try {
+                              // First try with uploadDocumentVersion 
+                              console.log('Attempting to upload with uploadDocumentVersion...');
+                              response = await uploadDocumentVersion(
+                                documents.mpp_document.id,
+                                formData
+                              );
+                              console.log('MPP Upload Response (uploadDocumentVersion):', response);
+                            } catch (initialError) {
+                              console.warn('First upload method failed, trying alternative:', initialError);
+                              
+                              // If that fails, try the original uploadNewVersion method as fallback
+                              console.log('Falling back to uploadNewVersion for MPP...');
+                              response = await uploadNewVersion(
+                                documents.mpp_document.id,
+                                fileInfo.file,
+                                newMppVersion
+                              );
+                              console.log('MPP Upload Response (uploadNewVersion fallback):', response);
+                            }
+                            
+                            message.success({ 
+                              content: `MPP document version ${newMppVersion} uploaded successfully`, 
+                              key: 'mppUpload',
+                              duration: 5
+                            });
+                            
+                            // Reset form fields after successful upload
+                            setMppVersionFile(null);
+                            setNewMppVersion('');
+                            setEnableMppVersionUpload(false);
+                            
+                            // Refresh documents for this part number
+                            if (partNumber) {
+                              await fetchDocumentsByPartNumber(partNumber);
+                            }
+                          } catch (error) {
+                            console.error('Error uploading MPP version (all methods failed):', error);
+                            
+                            // Get a more detailed error message if possible
+                            let errorMessage = error.message;
+                            if (error.response) {
+                              try {
+                                const errorData = await error.response.json();
+                                errorMessage = errorData.detail || errorData.message || error.message;
+                              } catch (e) {
+                                // If we can't parse the response, just use the original error
+                              }
+                            }
+                            
+                            message.error({ 
+                              content: `Failed to upload new version: ${errorMessage}`, 
+                              key: 'mppUpload',
+                              duration: 6
+                            });
+                          }
+                        } else {
+                          message.warning('Please provide both a new version number and a file');
+                        }
+                      }}
+                    >
+                      Upload New Version
+                    </Button>
+                  </>
+                ) : (
                   <Button 
                     type="primary"
                     icon={<CloudUploadOutlined />}
                     className="w-full mt-2"
+                    disabled
                   >
                     Upload New Version
                   </Button>
-                </Upload>
-                <Alert
-                  message="Document Already Exists"
-                  description="This part number already has an MPP document."
-                  type="info"
-                  showIcon
-                  className="mt-3"
-                />
+                )}
+                
+                {!enableMppVersionUpload && (
+                  <Alert
+                    message="Document Already Exists"
+                    description="This part number already has an MPP document. Toggle 'New Version' switch to upload a new version."
+                    type="info"
+                    showIcon
+                    className="mt-3"
+                  />
+                )}
               </>
             ) : (
               <>
@@ -1059,6 +1288,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                   onChange={handleMppFileChange}
                   beforeUpload={() => false}
                   accept=".pdf,.doc,.docx"
+                  ref={mppUploadRef}
                 >
                   <Button icon={<UploadOutlined />} className="w-full">
                     Select MPP File
@@ -1081,7 +1311,38 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         </Col>
         <Col span={12}>
           <Card 
-            title="Engineering Drawing"
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="font-medium">Engineering Drawing</span>
+                <div className="flex items-center">
+                  {documents?.engineering_drawing_document && (
+                    <div className="flex items-center mr-2">
+                      <span className="text-xs mr-2">New Version</span>
+                      <Switch 
+                        size="small" 
+                        checked={enableDrawingVersionUpload}
+                        onChange={(checked) => setEnableDrawingVersionUpload(checked)}
+                      />
+                    </div>
+                  )}
+                  {!documents?.engineering_drawing_document && (
+                    <Tooltip title="Upload Engineering Drawing">
+                      <Button 
+                        type="primary"
+                        shape="circle"
+                        icon={<UploadOutlined />} 
+                        size="small"
+                        onClick={() => {
+                          if (drawingUploadRef.current) {
+                            drawingUploadRef.current.upload.openFileDialogOnClick();
+                          }
+                        }}
+                      />
+                    </Tooltip>
+                  )}
+                </div>
+              </div>
+            }
             className="hover:shadow-sm transition-shadow duration-300"
             bordered={true}
             loading={documentLoadingStates.engineering}
@@ -1096,46 +1357,109 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                 </Form.Item>
                 <Form.Item label="Version">
                   <Input 
-                    value={drawingVersion}
-                    onChange={(e) => setDrawingVersion(e.target.value)}
-                    placeholder="Enter new version (e.g. v2)"
+                    value={documents.engineering_drawing_document.latest_version?.version_number || 'v1'}
+                    disabled
                   />
                 </Form.Item>
-                <Upload
-                  maxCount={1}
-                  onChange={handleDrawingFileChange}
-                  beforeUpload={() => false}
-                  accept=".pdf,.dwg,.dxf"
-                  showUploadList={false}
-                  customRequest={async ({ file }) => {
-                    try {
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      formData.append('version_number', drawingVersion);
-                      
-                      await uploadDocumentVersion(documents.engineering_drawing_document.id, formData);
-                      message.success('Engineering Drawing version uploaded successfully');
-                      await fetchDocumentsByPartNumber(form.getFieldValue('part_number'));
-                    } catch (error) {
-                      message.error(error.message || 'Failed to upload Engineering Drawing version');
-                    }
-                  }}
-                >
+                
+                {enableDrawingVersionUpload ? (
+                  <>
+                    <Form.Item label="New Version Number" required>
+                      <Input
+                        value={newDrawingVersion}
+                        onChange={(e) => setNewDrawingVersion(e.target.value)}
+                        placeholder="Enter new version (e.g. v2)"
+                      />
+                    </Form.Item>
+                    <Upload
+                      maxCount={1}
+                      onChange={handleDrawingVersionFileChange}
+                      beforeUpload={() => false}
+                      accept=".pdf,.dwg,.dxf"
+                      ref={drawingVersionUploadRef}
+                    >
+                      <Button icon={<UploadOutlined />} className="w-full mb-2">
+                        Select New Drawing Version
+                      </Button>
+                    </Upload>
+                    <Button 
+                      type="primary"
+                      icon={<CloudUploadOutlined />}
+                      className="w-full mt-2"
+                      disabled={!drawingVersionFile || !newDrawingVersion}
+                      onClick={async () => {
+                        if (drawingVersionFile && newDrawingVersion && documents?.engineering_drawing_document?.id) {
+                          try {
+                            message.loading({ 
+                              content: 'Uploading new Engineering Drawing version...', 
+                              key: 'drawingUpload',
+                              duration: 0 
+                            });
+                            console.log('Uploading new Drawing version with ID:', documents.engineering_drawing_document.id);
+                            
+                            // Create FormData for version upload
+                            const formData = new FormData();
+                            const fileObj = drawingVersionFile.originFileObj || drawingVersionFile;
+                            formData.append('file', fileObj);
+                            formData.append('version_number', newDrawingVersion);
+                            
+                            // Use uploadDocumentVersion instead of uploadNewVersion
+                            await uploadDocumentVersion(
+                              documents.engineering_drawing_document.id,
+                              formData
+                            );
+                            
+                            message.success({ 
+                              content: `Engineering Drawing version ${newDrawingVersion} uploaded successfully`, 
+                              key: 'drawingUpload',
+                              duration: 5
+                            });
+                            // Reset form fields after successful upload
+                            setDrawingVersionFile(null);
+                            setNewDrawingVersion('');
+                            setEnableDrawingVersionUpload(false);
+                            
+                            // Refresh documents for this part number
+                            const partNumber = form.getFieldValue('part_number');
+                            if (partNumber) {
+                              await fetchDocumentsByPartNumber(partNumber);
+                            }
+                          } catch (error) {
+                            console.error('Error uploading Drawing version:', error);
+                            message.error({ 
+                              content: `Failed to upload new version: ${error.message}`, 
+                              key: 'drawingUpload',
+                              duration: 6
+                            });
+                          }
+                        } else {
+                          message.warning('Please provide both a new version number and a file');
+                        }
+                      }}
+                    >
+                      Upload New Version
+                    </Button>
+                  </>
+                ) : (
                   <Button 
                     type="primary"
                     icon={<CloudUploadOutlined />}
                     className="w-full mt-2"
+                    disabled
                   >
                     Upload New Version
                   </Button>
-                </Upload>
-                <Alert
-                  message="Document Already Exists"
-                  description="This part number already has an Engineering Drawing document."
-                  type="info"
-                  showIcon
-                  className="mt-3"
-                />
+                )}
+                
+                {!enableDrawingVersionUpload && (
+                  <Alert
+                    message="Document Already Exists"
+                    description="This part number already has an Engineering Drawing document. Toggle 'New Version' switch to upload a new version."
+                    type="info"
+                    showIcon
+                    className="mt-3"
+                  />
+                )}
               </>
             ) : (
               <>
@@ -1166,6 +1490,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                   onChange={handleDrawingFileChange}
                   beforeUpload={() => false}
                   accept=".pdf,.dwg,.dxf"
+                  ref={drawingUploadRef}
                 >
                   <Button icon={<UploadOutlined />} className="w-full">
                     Select Drawing File
@@ -1199,6 +1524,38 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     </>
   );
 
+  const validateAndPrepareFile = (file) => {
+    console.log('Validating file:', file);
+    
+    // Get the file object (either from Upload component or direct file)
+    const fileObj = file.originFileObj || file;
+    
+    // Get file extension
+    const fileName = fileObj.name;
+    const fileExtension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+    
+    console.log('File details:', {
+      name: fileName,
+      type: fileObj.type,
+      extension: fileExtension,
+      size: fileObj.size
+    });
+    
+    // Validate file type and size
+    if (fileObj.size > 15 * 1024 * 1024) {
+      message.error('File size should not exceed 15MB');
+      return null;
+    }
+    
+    // Return processed file
+    return {
+      file: fileObj,
+      fileName,
+      fileType: fileObj.type,
+      fileExtension
+    };
+  };
+
   return (
     <Modal
       title={
@@ -1209,7 +1566,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
           />
           <div className="flex-1 text-center">
           <h3 className="text-xl font-semibold text-gray-800 mb-1">
-              {isManualCreate ? 'Create New Order' : 'Upload OARC Document'}
+              {isManualCreate ? 'Create New Order' : 'Upload OARC Document '}
             </h3>
             {!isManualCreate && (
               <Steps 

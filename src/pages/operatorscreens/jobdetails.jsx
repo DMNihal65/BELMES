@@ -944,8 +944,8 @@ const JobDetails = () => {
               </div>
             </div>
 
-            {/* Quality Status and Poka Yoke Card */}
-            <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-sky-100">
+{/* Quality Status and Poka Yoke Card */}
+<div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-sky-100">
               <div className="px-4 py-3 border-b border-sky-100 flex items-center justify-between bg-gradient-to-r from-sky-100 to-sky-50">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="text-blue-600" />
@@ -1034,7 +1034,7 @@ const JobDetails = () => {
                 </div>
               </div>
             </div>
-          </div>
+            </div>
 
           {/* Tabs Section */}
           <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden border border-gray-100">

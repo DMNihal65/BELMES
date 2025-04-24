@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, InputNumber, Spin, message, Space, Input, Card, Tag, Row, Col, Descriptions } from 'antd';
+import { Table, Button, Modal, Form, InputNumber, Spin, Space, Input, Card, Tag, Row, Col, Descriptions } from 'antd';
 import { ReloadOutlined, RollbackOutlined, SearchOutlined } from '@ant-design/icons';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 import useTransactionHistoryStore from '../../../store/transaction-history-store';
 import useAuthStore from '../../../store/auth-store';
 
@@ -36,12 +39,12 @@ const TransactionHistoryTable = () => {
 
     // Validate return quantity
     if (quantity > selectedTransaction.quantity) {
-      message.error('Return quantity cannot be greater than issued quantity');
+      toast.error('Return quantity cannot be greater than issued quantity');
       return;
     }
 
     if (quantity <= 0) {
-      message.error('Return quantity must be greater than 0');
+      toast.error('Return quantity must be greater than 0');
       return;
     }
 
@@ -55,10 +58,15 @@ const TransactionHistoryTable = () => {
         reference_request_id: selectedTransaction.request_id || null
       });
 
+      // Success toast message
+      toast.success('Return transaction created successfully!');
+
       setIsReturnModalVisible(false);
       returnForm.resetFields();
     } catch (error) {
       console.error('Error creating return transaction:', error);
+      // Error toast message
+      toast.error('Error creating return transaction. Please try again.');
     }
   };
 
@@ -191,6 +199,7 @@ const TransactionHistoryTable = () => {
 
   return (
     <div className="p-4">
+      <ToastContainer position="top-right" autoClose={5000} />
       <Card className="mb-4">
         <div className="flex justify-between items-center mb-4">
           <div>

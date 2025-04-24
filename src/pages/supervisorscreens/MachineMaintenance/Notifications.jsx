@@ -183,7 +183,7 @@ const Notifications = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-2">
       <Card className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <div className="text-lg font-semibold">MAINTENANCE LOGS</div>

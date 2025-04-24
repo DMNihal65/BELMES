@@ -12,7 +12,6 @@ import {
   Tag,
   Typography,
   Divider,
-  message,
   Select,
   Breadcrumb,
   Switch,
@@ -33,6 +32,9 @@ import useInventoryStore from '../../../store/inventory-store';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import RequestItemModal from '../../../components/inventory/RequestItemModal';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 
 const { Title, Text } = Typography;
 
@@ -189,12 +191,12 @@ const InventoryViewData = () => {
       if (result) {
         setIsModalVisible(false);
         form.resetFields();
-        message.success(`${modalType} ${rightClickedNode?.data?.id ? 'updated' : 'added'} successfully`);
+        toast.success(`${modalType} ${rightClickedNode?.data?.id ? 'updated' : 'added'} successfully`);
         await fetchCategories();
         await fetchAllSubcategories();
       }
     } catch (error) {
-      message.error(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     }
   };
 
@@ -202,13 +204,13 @@ const InventoryViewData = () => {
   const handleItemFormSubmit = async (values) => {
     try {
       if (!selectedCategory?.id || selectedCategory?.type !== 'subcategory') {
-        message.error('Please select a subcategory first');
+        toast.error('Please select a subcategory first');
         return;
       }
 
       const selectedSubcategory = subcategories.find(s => s.id === selectedCategory.id);
       if (!selectedSubcategory) {
-        message.error('Invalid subcategory');
+        toast.error('Invalid subcategory');
         return;
       }
 
@@ -257,7 +259,7 @@ const InventoryViewData = () => {
         throw new Error('Operation failed');
       }
 
-      message.success(`Item ${values.id ? 'updated' : 'added'} successfully`);
+      toast.success(`Item ${values.id ? 'updated' : 'added'} successfully`);
       setIsModalVisible(false);
       form.resetFields();
       
@@ -265,7 +267,7 @@ const InventoryViewData = () => {
       await fetchItems(selectedSubcategory.id);
     } catch (error) {
       console.error('Error submitting item:', error);
-      message.error(`Error: ${error.response?.data?.detail || error.message}`);
+      toast.error(`Error: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -536,7 +538,7 @@ const InventoryViewData = () => {
   const renderItemForm = () => {
     const subcategory = subcategories.find(sub => sub.id === selectedCategory?.id);
     if (!subcategory) {
-      message.error('Please select a subcategory first');
+      toast.error('Please select a subcategory first');
       return null;
     }
 
@@ -921,6 +923,19 @@ const InventoryViewData = () => {
           setSelectedItem(null);
         }}
         item={selectedItem}
+      />
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
       />
     </div>
   );

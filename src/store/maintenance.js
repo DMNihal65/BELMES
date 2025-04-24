@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.16.0.203:8002/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.16.0.203:8002/api/v1/operator';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.85:9078/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.85:9078/api/v1/operator';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -195,7 +195,7 @@ const useMachineMaintenanceStore = create((set, get) => ({
         description: description
       };
 
-      console.log('Sending request data:', requestData); // Add logging to verify data
+      console.log('Sendingggg request data:', requestData); // Add logging to verify data
 
       const response = await axios.put(
         `${SUPERVISOR_BASE_URL}/machine-status/${machineId}`,
@@ -226,6 +226,9 @@ const useMachineMaintenanceStore = create((set, get) => ({
       throw error;
     }
   },
+
+
+  
 
   // Fetch machine notifications
   fetchMachineNotifications: async () => {

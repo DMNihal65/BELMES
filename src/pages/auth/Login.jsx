@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, message, Steps, Select, Radio, Typography, Modal, Alert } from 'antd';
+import { Form, Input, Button, Card, Steps, Select, Radio, Typography, Modal, Alert } from 'antd';
 import { LockOutlined, UserOutlined, NumberOutlined, DesktopOutlined, SafetyCertificateOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 import shopFloorBg from '../../../public/images/shop3.jpg';
 import { motion } from 'framer-motion';
 import belLogo from '../../../public/images/BEL_Logo.png';
@@ -66,7 +69,7 @@ const Login = () => {
           
           // Check role from response
           if (response.role === 'operator') {
-            message.success(`Welcome ${values.operatorName}!`);
+            toast.success(`Welcome ${values.operatorName}!`);
             navigate('/operator/dashboard', { replace: true });
           } else {
             throw new Error('You do not have operator access');
@@ -88,7 +91,7 @@ const Login = () => {
           
           // Check role from response
           if (response.role === 'supervisor') {
-            message.success(`Welcome ${values.supervisorName}!`);
+            toast.success(`Welcome ${values.supervisorName}!`);
             navigate('/supervisor/dashboard', { replace: true });
           } else {
             throw new Error('You do not have supervisor access');
@@ -98,9 +101,9 @@ const Login = () => {
     } catch (error) {
       // Show more user-friendly error messages
       if (error.message.includes('access')) {
-        message.error('Access Denied: ' + error.message);
+        toast.error('Access Denied: ' + error.message);
       } else {
-        message.error('Login failed: ' + error.message);
+        toast.error('Login failed: ' + error.message);
       }
     }
   };
@@ -118,11 +121,11 @@ const Login = () => {
         role_id: selectedRoleId, // Use the selected role ID directly
       });
       
-      message.success('Registration successful! Please login.');
+      toast.success('Registration successful! Please login.');
       setIsRegisterModalVisible(false);
       registerForm.resetFields();
     } catch (error) {
-      message.error(error.message);
+      toast.error(error.message);
     }
   };
 
@@ -340,6 +343,7 @@ const Login = () => {
         backgroundPosition: 'center',
       }}
     >
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
 
       <motion.div 

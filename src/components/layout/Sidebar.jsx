@@ -8,13 +8,15 @@ import {
   HelpCircle,
   ClipboardList,
   Package,
+  Gauge ,
   Calendar,
   Activity,
   CheckSquare,
   Archive,
   Files,
   Box,
-  Bell
+  Bell,
+  ScrollText 
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -98,6 +100,10 @@ function Sidebar() {
           label: 'Planning',
         },
         {
+          key: '/supervisor/production-planning/capacity_planning',
+          label: "Capacity Planning"
+        },
+        {
           key: '/supervisor/production-planning/scheduling',
           label: 'Scheduling',
         },
@@ -170,7 +176,7 @@ function Sidebar() {
         // },
         {
           key: '/supervisor/inventory_data_management/inventory_all_data',
-          label: 'Inventer Master ',
+          label: 'Inventery Master ',
         },
         {
           key: '/supervisor/inventory_data_management/inventory_analytics',
@@ -189,6 +195,12 @@ function Sidebar() {
     //   label: 'Energy Monitoring BEL',
     // },
     {
+      key: '/supervisor/machine_availability',
+
+      icon: <Gauge  size={20} />,
+      label: 'Assets Availability',
+    },
+    {
       key: '/supervisor/documents',
 
       icon: <Files size={20} />,
@@ -205,7 +217,7 @@ function Sidebar() {
     },
     {
       key: '/supervisor/logs',
-      icon: <Bell size={20} />,
+      icon: <ScrollText  size={20} />,
       label: 'Logs',
     },
   ];

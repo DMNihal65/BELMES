@@ -1,11 +1,14 @@
 import React from 'react';
-import { Form, Input, Button, message } from 'antd';
+import { Form, Input, Button } from 'antd';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 
 const Signup = () => {
   const handleSignup = async (values) => {
     try {
       // Call your signup API here
-      const response = await fetch('http://172.16.0.203:8002/register', {
+      const response = await fetch('http://172.18.7.85:9078/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -17,24 +20,27 @@ const Signup = () => {
         throw new Error('Signup failed');
       }
 
-      message.success('Signup successful! You can now access the application.');
+      toast.success('Signup successful! You can now access the application.');
     } catch (error) {
-      message.error(error.message);
+      toast.error(error.message);
     }
   };
 
   return (
-    <Form onFinish={handleSignup}>
-      <Form.Item name="username" rules={[{ required: true, message: 'Please input your username!' }]}>
-        <Input placeholder="Username" />
-      </Form.Item>
-      <Form.Item name="password" rules={[{ required: true, message: 'Please input your password!' }]}>
-        <Input.Password placeholder="Password" />
-      </Form.Item>
-      <Form.Item>
-        <Button type="primary" htmlType="submit">Sign Up</Button>
-      </Form.Item>
-    </Form>
+    <>
+      <ToastContainer />
+      <Form onFinish={handleSignup}>
+        <Form.Item name="username" rules={[{ required: true, message: 'Please input your username!' }]}>
+          <Input placeholder="Username" />
+        </Form.Item>
+        <Form.Item name="password" rules={[{ required: true, message: 'Please input your password!' }]}>
+          <Input.Password placeholder="Password" />
+        </Form.Item>
+        <Form.Item>
+          <Button type="primary" htmlType="submit">Sign Up</Button>
+        </Form.Item>
+      </Form>
+    </>
   );
 };
 

@@ -10,9 +10,10 @@ import WorkcenterDashboard from './pages/supervisorscreens/configuration/Workcen
 import Maintenance from './pages/supervisorscreens/MachineMaintenance/MaintenanceDashboard';
 import Planning from './pages/supervisorscreens/productionplanning/planning';
 import Scheduling from './pages/supervisorscreens/productionplanning/scheduling';
+import CapacityPlanning from './components/ProductionPlanning/CapacityPlanning';
 import ProductionMonitoring from './pages/supervisorscreens/ProductionMon';
+import MachineMaintenance from './pages/supervisorscreens/MachineMaintenance/MachineMaintenance';
 import DocumentManagement from './pages/supervisorscreens/DocumentManagement';
-import InventoryUsageAndAnalytics from './pages/supervisorscreens/inventory/inventoryMaster';
 import RequestsCalibrationHistory from './pages/supervisorscreens/inventory/requestsCalibrationHistory';
 import DataManagement from './pages/supervisorscreens/InventoryDataManagement/DataManagement'
 import InventoryAllData from './pages/supervisorscreens/InventoryDataManagement/InventoryAllData'
@@ -63,16 +64,17 @@ const App = () => {
             <Route path="maintenance" element={<Maintenance />} />
             <Route path="production-planning/planning" element={<Planning />} />
             <Route path="production-planning/scheduling" element={<Scheduling />} />
+            <Route path="production-planning/capacity_planning" element={<CapacityPlanning />} />
 
             <Route path="production-monitoring/dashboard" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/production-vs-actual" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/order-analysis" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/oee-overview" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/analytics" element={<ProductionMonitoring />} />
-            
+
+            <Route path="machine_availability" element={<MachineMaintenance />}/> 
             <Route path="documents" element={<DocumentManagement />} />
             <Route path="quality-management" element={<QualityManagementDashboard />} />
-            <Route path="inventory_master/inventory_usage_and_analytics" element={<InventoryUsageAndAnalytics />} />
             <Route path="inventory_master/requests_calibration_history" element={<RequestsCalibrationHistory />} />
             <Route path="inventory_data_management/data_management" element={<DataManagement />} />
             <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />

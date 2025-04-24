@@ -1,0 +1,31 @@
+src/
+├── components/
+│   └── inventory/
+│       ├── FilterSidebar.jsx
+│       └── RequestItemModal.jsx
+├── pages/
+│   ├── operatorscreens/
+│   │   └── inventory/
+│   │       ├── Consumables.jsx
+│   │       ├── Fixtures.jsx
+│   │       ├── GaugesAndInstruments.jsx
+│   │       ├── InventoryViewData.jsx
+│   │       ├── RawMaterials.jsx
+│   │       └── inventoryRequest.jsx
+│   └── supervisorscreens/
+│       └── InventoryDataManagement/
+│           ├── DataManagement.jsx
+│           ├── InventoryAllData.jsx
+│           ├── InventoryAnalytics.jsx
+│           └── TransactionHistoryTable.jsx
+└── store/
+    └── inventory-store.js
+
+    const BASE_URL = 'http://172.18.7.85:9078/api/v1/api/inventory';
+
+    const getAuthHeaders = () => ({
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+        }
+    });

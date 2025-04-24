@@ -57,6 +57,9 @@ import { read, utils, write } from 'xlsx';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 
 const { Title, Text } = Typography;
 
@@ -124,7 +127,7 @@ const InventoryAllData = () => {
         set({ items: itemsData });
       } catch (error) {
         console.error('Error fetching data:', error);
-        message.error('Failed to fetch data');
+        toast.error('Failed to fetch data');
       } finally {
         set({ loading: false });
       }
@@ -143,7 +146,7 @@ const InventoryAllData = () => {
           }
         } catch (error) {
           console.error('Error refreshing data:', error);
-          message.error('Failed to refresh data');
+          toast.error('Failed to refresh data');
         } finally {
           set({ loading: false });
         }
@@ -164,7 +167,7 @@ const InventoryAllData = () => {
         ]);
       } catch (error) {
         console.error('Error refreshing data:', error);
-        message.error('Failed to refresh data');
+        toast.error('Failed to refresh data');
       } finally {
         set({ loading: false });
       }
@@ -301,7 +304,7 @@ const InventoryAllData = () => {
   // Handlers
   const handleExportExcel = () => {
     if (!selectedCategory || selectedCategory.type !== 'subcategory') {
-      message.warning('Please select a subcategory first');
+      toast.warning('Please select a subcategory first');
       return;
     }
 
@@ -372,16 +375,16 @@ const InventoryAllData = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
 
-      message.success('Excel file downloaded successfully');
+      toast.success('Excel file downloaded successfully');
     } catch (error) {
       console.error('Error exporting to Excel:', error);
-      message.error('Failed to export Excel file');
+      toast.error('Failed to export Excel file');
     }
   };
 
   const handleDownloadTemplate = () => {
     if (!selectedCategory || selectedCategory.type !== 'subcategory') {
-      message.warning('Please select a subcategory first');
+      toast.warning('Please select a subcategory first');
       return;
     }
 
@@ -453,10 +456,10 @@ const InventoryAllData = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
 
-      message.success('Template downloaded successfully');
+      toast.success('Template downloaded successfully');
     } catch (error) {
       console.error('Error creating template:', error);
-      message.error('Failed to create template');
+      toast.error('Failed to create template');
     }
   };
 
@@ -492,11 +495,11 @@ const InventoryAllData = () => {
 
   const handleExcelUpload = async (file) => {
     if (!selectedCategory || selectedCategory.type !== 'subcategory') {
-      message.warning('Please select a subcategory first');
+      toast.warning('Please select a subcategory first');
       return false;
     }
 
-    const loadingMessage = message.loading('Processing file...', 0);
+    const loadingToast = toast.loading('Processing file...');
 
     try {
       const reader = new FileReader();
@@ -569,34 +572,34 @@ const InventoryAllData = () => {
 
           try {
             await bulkUploadItems(selectedCategory.id, formattedItems);
-            loadingMessage();
-            message.success('Excel data imported successfully');
+            toast.dismiss(loadingToast);
+            toast.success('Excel data imported successfully');
             setRefreshTrigger(prev => prev + 1);
           } catch (error) {
-            loadingMessage();
+            toast.dismiss(loadingToast);
             if (error.message) {
-              message.error(error.message);
+              toast.error(error.message);
             } else {
-              message.error('Failed to upload data. Please check the server logs for details.');
+              toast.error('Failed to upload data. Please check the server logs for details.');
             }
           }
         } catch (error) {
-          loadingMessage();
+          toast.dismiss(loadingToast);
           console.error('Data Processing Error:', error);
-          message.error(error.message || 'Failed to process Excel file');
+          toast.error(error.message || 'Failed to process Excel file');
         }
       };
 
       reader.onerror = () => {
-        loadingMessage();
-        message.error('Failed to read file');
+        toast.dismiss(loadingToast);
+        toast.error('Failed to read file');
       };
 
       reader.readAsArrayBuffer(file);
     } catch (error) {
-      loadingMessage();
+      toast.dismiss(loadingToast);
       console.error('File Processing Error:', error);
-      message.error('Failed to process file');
+      toast.error('Failed to process file');
     }
 
     return false;
@@ -629,12 +632,12 @@ const InventoryAllData = () => {
       }
       
       if (result) {
-        message.success(`${record.category_id ? 'Subcategory' : 'Category'} deleted successfully`);
+        toast.success(`${record.category_id ? 'Subcategory' : 'Category'} deleted successfully`);
         // Trigger immediate refresh
         setRefreshTrigger(prev => prev + 1);
       }
     } catch (error) {
-      message.error(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     }
   };
 
@@ -686,11 +689,11 @@ const InventoryAllData = () => {
       if (result) {
         setIsModalVisible(false);
         form.resetFields();
-        message.success(`${modalType} ${rightClickedNode?.data?.id ? 'updated' : 'added'} successfully`);
+        toast.success(`${modalType} ${rightClickedNode?.data?.id ? 'updated' : 'added'} successfully`);
         setRefreshTrigger(prev => prev + 1);
       }
     } catch (error) {
-      message.error(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     }
   };
 
@@ -698,13 +701,13 @@ const InventoryAllData = () => {
   const handleItemFormSubmit = async (values) => {
     try {
       if (!selectedCategory?.id || selectedCategory?.type !== 'subcategory') {
-        message.error('Please select a subcategory first');
+        toast.error('Please select a subcategory first');
         return;
       }
 
       const selectedSubcategory = subcategories.find(s => s.id === selectedCategory.id);
       if (!selectedSubcategory) {
-        message.error('Invalid subcategory');
+        toast.error('Invalid subcategory');
         return;
       }
 
@@ -758,14 +761,14 @@ const InventoryAllData = () => {
       }
 
       if (result) {
-        message.success(`Item ${values.id ? 'updated' : 'added'} successfully`);
+        toast.success(`Item ${values.id ? 'updated' : 'added'} successfully`);
         setIsModalVisible(false);
         form.resetFields();
         setRefreshTrigger(prev => prev + 1);
       }
     } catch (error) {
       console.error('Error submitting item:', error);
-      message.error(`Error: ${error.response?.data?.detail || error.message}`);
+      toast.error(`Error: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -793,10 +796,10 @@ const InventoryAllData = () => {
         });
         setIsModalVisible(true);
       } else {
-        message.warning('Please select a subcategory to add an item');
+        toast.warning('Please select a subcategory to add an item');
       }
     } else {
-      message.warning('Please select a subcategory to add an item');
+      toast.warning('Please select a subcategory to add an item');
     }
   };
 
@@ -972,7 +975,7 @@ const InventoryAllData = () => {
       setIsCalibrationModalVisible(true);
     } catch (error) {
       console.error('Error fetching calibration data:', error);
-      message.error('Failed to fetch calibration data');
+      toast.error('Failed to fetch calibration data');
     }
   };
 
@@ -989,11 +992,11 @@ const InventoryAllData = () => {
       if (values.id) {
         // Update existing calibration
         result = await updateCalibration(values.id, formattedData);
-        message.success('Calibration details updated successfully');
+        toast.success('Calibration details updated successfully');
       } else {
         // Add new calibration
         result = await addCalibration(formattedData);
-        message.success('Calibration details saved successfully');
+        toast.success('Calibration details saved successfully');
       }
 
       setIsCalibrationModalVisible(false);
@@ -1001,7 +1004,7 @@ const InventoryAllData = () => {
       setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error saving calibration:', error);
-      message.error('Failed to save calibration details');
+      toast.error('Failed to save calibration details');
     }
   };
 
@@ -1215,12 +1218,12 @@ const InventoryAllData = () => {
                 onConfirm={async () => {
                   try {
                     await deleteItem(record.id);
-                    message.success('Item deleted successfully');
+                    toast.success('Item deleted successfully');
                     // Immediately refresh the data
                     setRefreshTrigger(prev => prev + 1);
                   } catch (error) {
                     console.error('Error deleting item:', error);
-                    message.error('Failed to delete item');
+                    toast.error('Failed to delete item');
                   }
                 }}
                 okText="Yes"
@@ -1365,7 +1368,7 @@ const InventoryAllData = () => {
     const category = categories.find(cat => cat.id === subcategory?.category_id);
     
     if (!subcategory || !category) {
-      message.error('Please select a subcategory first');
+      toast.error('Please select a subcategory first');
       return null;
     }
 
@@ -1788,7 +1791,7 @@ const InventoryAllData = () => {
   // Add this before the return statement
   const renderCalibrationModal = () => (
     <Modal
-      title={`Calibration Details - ${selectedItemForCalibration?.dynamic_data["Instrument code"] || ''}`}
+      title={`Calibration Details: - ${selectedItemForCalibration?.dynamic_data["Instrument code"] || ''}`}
       open={isCalibrationModalVisible}
       onCancel={() => {
         setIsCalibrationModalVisible(false);
@@ -1880,6 +1883,7 @@ const InventoryAllData = () => {
 
   return (
     <div className="bg-white p-4 lg:p-6 xl:p-8 rounded-lg shadow min-h-screen">
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="flex flex-col h-full">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
           <Title level={4} className="m-0">Inventory Master Data</Title>

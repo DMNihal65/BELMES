@@ -10,6 +10,9 @@ import {
 } from '@ant-design/icons';
 import useInventoryStore from '../../../store/inventory-store';
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 
 const { TabPane } = Tabs;
 const { Title, Text } = Typography;
@@ -39,7 +42,7 @@ function DataManagement() {
 
   useEffect(() => {
     if (isModalVisible) {
-      axios.get('http://172.16.0.203:8002/api/v1/api/inventory/categories/')
+      axios.get('http://172.18.7.85:9078/api/v1/api/inventory/categories/')
         .then(response => {
           const options = response.data.map(category => ({
             value: category.name,
@@ -50,7 +53,7 @@ function DataManagement() {
           setCategoryOptions(options);
         })
         .catch(error => {
-          message.error('Failed to fetch categories');
+          toast.error('Failed to fetch categories');
         });
     }
   }, [isModalVisible]);
@@ -79,17 +82,17 @@ function DataManagement() {
           description: values.description,
           created_by: values.created_by || 1
         });
-        message.success('Category updated successfully');
+        toast.success('Category updated successfully');
         fetchCategories();
       } else {
         await addCategory(values);
-        message.success('Category added successfully');
+        toast.success('Category added successfully');
       }
       setIsModalVisible(false);
       form.resetFields();
       setEditingId(null);
     } catch (error) {
-      message.error('Error: ' + (error.response?.data?.message || error.message));
+      toast.error('Error: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -104,14 +107,14 @@ function DataManagement() {
       async onOk() {
         try {
           await deleteCategory(id);
-          message.success('Category deleted successfully');
+          toast.success('Category deleted successfully');
           fetchCategories(); // Refresh the table after deletion
         } catch (error) {
-          message.error('Failed to delete category: ' + (error.response?.data?.message || error.message));
+          toast.error('Failed to delete category: ' + (error.response?.data?.message || error.message));
         }
       },
       onCancel() {
-        message.info('Delete operation cancelled');
+        toast.info('Delete operation cancelled');
       },
     });
   };
@@ -221,6 +224,7 @@ function DataManagement() {
 
   return (
     <div className="p-6">
+      <ToastContainer position="top-right" autoClose={3000} />
       <Row gutter={[24, 24]}>
         <Col span={24}>
           <Card className="shadow-sm">

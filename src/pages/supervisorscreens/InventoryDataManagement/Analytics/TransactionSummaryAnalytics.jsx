@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Table, Statistic, Spin, Input, Select, DatePicker, Space, Button } from 'antd';
+import { Card, Row, Col, Table, Statistic, Spin, Input, Select, DatePicker, Space, Button, Typography  } from 'antd';
 import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, SwapOutlined, ExportOutlined, ImportOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import useInventoryStore from '../../../../store/inventory-store';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
+const { Title, Text } = Typography;
 
 // Standard colors for charts
 const COLORS = {
@@ -210,34 +211,58 @@ const TransactionSummaryAnalytics = () => {
       {/* Key Metrics */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col span={6}>
-          <Card>
+        <Card 
+                hoverable 
+                className="shadow-sm"
+                style={{ backgroundColor: '#f0f5ff', borderLeft: '4px solid #1890ff' }}
+              >
             <Statistic
-              title="Total Transactions"
+              title={<Text strong>Total Transactions</Text>}
               value={transactionMetrics?.total_transactions || 0}
+              prefix={<SwapOutlined style={{ color: '#1890ff' }} />}
+                  valueStyle={{ color: '#1890ff' }}
             />
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card 
+            hoverable 
+            className="shadow-sm"
+            style={{ backgroundColor: '#f6ffed', borderLeft: '4px solid #52c41a' }}
+          >
             <Statistic
-              title="Items Issued"
+              title={<Text strong>Items Issued</Text>}
               value={transactionMetrics?.total_items_issued || 0}
+              prefix={<ExportOutlined style={{ color: '#52c41a' }} />}
+              valueStyle={{ color: '#52c41a' }}
             />
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card 
+            hoverable 
+            className="shadow-sm"
+            style={{ backgroundColor: '#fff7e6', borderLeft: '4px solid #fa8c16' }}
+          >
             <Statistic
-              title="Items Returned"
+              title={<Text strong>Items Returned</Text>}
               value={transactionMetrics?.total_items_returned || 0}
+              prefix={<ImportOutlined style={{ color: '#fa8c16' }} />}
+              valueStyle={{ color: '#fa8c16' }}
             />
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
+          <Card 
+            hoverable 
+            className="shadow-sm"
+            style={{ backgroundColor: '#fff1f0', borderLeft: '4px solid #f5222d' }}
+          >
             <Statistic
-              title="Pending Returns"
+              title={<Text strong>Pending Returns</Text>}
               value={transactionMetrics?.pending_returns || 0}
+              prefix={<ClockCircleOutlined style={{ color: '#f5222d' }} />}
+              valueStyle={{ color: '#f5222d' }}
             />
           </Card>
         </Col>

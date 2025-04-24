@@ -11,12 +11,9 @@ import AlertScreens from '../pages/operatorscreens/AlertScreens';
 import Login from '../pages/auth/Login';
 import Planning from '../pages/supervisorscreens/productionplanning/planning';
 import Scheduling from '../pages/supervisorscreens/productionplanning/scheduling';
-
-import InventoryUsageAndAnalytics from '../pages/supervisorscreens/inventory/inventoryMaster';
+import CapacityPlanning from '../components/ProductionPlanning/CapacityPlanning';
 import RequestsCalibrationHistory from '../pages/supervisorscreens/inventory/requestsCalibrationHistory';
 
-import InventoryAllData from '../pages/supervisorscreens/InventoryDataManagement/InventoryAllData'
-import InventoryAnalytics from '../pages/supervisorscreens/InventoryDataManagement/InventoryAnalytics'
 
 import ProductionMonitoring from '../pages/supervisorscreens/ProductionMon'
 import OrderDashboard from '../pages/supervisorscreens/ordermanagement/orderdashboard';
@@ -26,6 +23,7 @@ import ConfigurationDashboard from '../pages/supervisorscreens/configuration/Wor
 import MaintenanceScreen from '../pages/operatorscreens/maintanance/MaintenanceDashboard';
 import InspectionResult from '../pages/operatorscreens/InspectionResult';
 import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
+import MaintenanceDashboard from '../pages/supervisorscreens/MachineMaintenance/MaintenanceDashboard';
 import DocumentManagement from '../pages/supervisorscreens/DocumentManagement';
 import QualityManagement from '../pages/supervisorscreens/QualityManagement';
 import EnergyMonitoring from '../pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
@@ -168,6 +166,14 @@ export const router = createBrowserRouter([
                 ),
               },
               {
+                path: 'capacity_planning',
+                element: (
+                  <ProtectedRoute allowedRole="supervisor">
+                    <CapacityPlanning />
+                  </ProtectedRoute>
+                ),
+              },
+              {
                 path: 'scheduling',
                 element: (
                   <ProtectedRoute allowedRole="supervisor">
@@ -194,38 +200,18 @@ export const router = createBrowserRouter([
             ),
           },
           {
-
-            path: 'inventory_master',
-            children: [
-              {
-                path: 'inventory_usage_and_analytics',
-                element: <InventoryUsageAndAnalytics />,
-              },
-              {
-                path: 'requests_calibration_history',
-                element: <RequestsCalibrationHistory />,
-              },
-            ]
-
-          },
-          {
-            path: 'inventory_data_management',
-            children: [
-              {
-                path: 'inventory_all_data',
-                element: <InventoryAllData />,
-              },
-              {
-                path: 'inventory_analytics',
-                element: <InventoryAnalytics />,
-              }
-            ]
-          },
-          {
             path: 'energy-monitoring',
             element: (
               <ProtectedRoute allowedRole="supervisor">
                 <EnergyMonitoring />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'machine_availability',
+            element: (
+              <ProtectedRoute allowedRole="supervisor">
+                <MachineMaintenance />
               </ProtectedRoute>
             ),
           },

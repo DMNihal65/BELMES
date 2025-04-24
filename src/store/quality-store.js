@@ -21,7 +21,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.16.0.203:8002/api/v1/planning/all_orders',
+        'http://172.18.7.85:9078/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -43,7 +43,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.16.0.203:8002/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.85:9078/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -78,7 +78,7 @@ class QualityStore {
       
       const config = {
         method: 'get',
-        url: `http://172.16.0.203:8002/api/v1/quality/master-boc/ipids/${orderId}`,
+        url: `http://172.18.7.85:9078/api/v1/quality/master-boc/ipids/${orderId}`,
         ...this.getAuthHeaders()
       };
 
@@ -127,7 +127,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://172.16.0.203:8002/api/v1/quality/run',
+        'http://172.18.7.85:9078/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;
@@ -144,7 +144,7 @@ class QualityStore {
   async fetchBalloonedDrawing(drawingId, operationId) {
     try {
       const response = await axios.get(
-        `http://172.16.0.203:8002/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
+        `http://172.18.7.85:9078/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
         {
           ...this.getAuthHeaders(),
           responseType: 'blob' // Important: set responseType to blob for PDF data
@@ -182,43 +182,43 @@ class QualityStore {
         // Current endpoint (PUT)
         {
           method: 'put',
-          url: `http://172.16.0.203:8002/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
+          url: `http://172.18.7.85:9078/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
           data: {}
         },
         // Alternative with ID in path parameter (PATCH)
         {
           method: 'patch',
-          url: `http://172.16.0.203:8002/api/v1/quality/stage-inspection/${inspectionId}/status`,
+          url: `http://172.18.7.85:9078/api/v1/quality/stage-inspection/${inspectionId}/status`,
           data: { is_done: isDone }
         },
         // Alternative with ID in path and status in path (PUT)
         {
           method: 'put',
-          url: `http://172.16.0.203:8002/api/v1/quality/stage-inspection/${inspectionId}/${isDone ? 'complete' : 'incomplete'}`,
+          url: `http://172.18.7.85:9078/api/v1/quality/stage-inspection/${inspectionId}/${isDone ? 'complete' : 'incomplete'}`,
           data: {}
         },
         // Alternative with different base path (PUT)
         {
           method: 'put',
-          url: `http://172.16.0.203:8002/api/v1/quality/inspection/${inspectionId}/status?is_done=${isDone}`,
+          url: `http://172.18.7.85:9078/api/v1/quality/inspection/${inspectionId}/status?is_done=${isDone}`,
           data: {}
         },
         // Alternative with different base path (POST)
         {
           method: 'post',
-          url: `http://172.16.0.203:8002/api/v1/quality/inspection/${inspectionId}/status`,
+          url: `http://172.18.7.85:9078/api/v1/quality/inspection/${inspectionId}/status`,
           data: { is_done: isDone }
         },
         // Additional alternative with direct update to inspection record
         {
           method: 'put',
-          url: `http://172.16.0.203:8002/api/v1/quality/inspections/${inspectionId}`,
+          url: `http://172.18.7.85:9078/api/v1/quality/inspections/${inspectionId}`,
           data: { is_done: isDone }
         },
         // Alternative with different parameter naming
         {
           method: 'put',
-          url: `http://172.16.0.203:8002/api/v1/quality/inspection/${inspectionId}/status`,
+          url: `http://172.18.7.85:9078/api/v1/quality/inspection/${inspectionId}/status`,
           data: { isDone: isDone }
         }
       ];
@@ -362,7 +362,7 @@ class QualityStore {
       // Try to ping the server with a HEAD request
       await axios({
         method: 'head',
-        url: 'http://172.16.0.203:8002/api/v1/health', // Use a health endpoint if available
+        url: 'http://172.18.7.85:9078/api/v1/health', // Use a health endpoint if available
         timeout: 5000 // 5 second timeout
       });
       
@@ -373,7 +373,7 @@ class QualityStore {
       try {
         await axios({
           method: 'head',
-          url: 'http://172.16.0.203:8002/',
+          url: 'http://172.18.7.85:9078/',
           timeout: 5000
         });
         
@@ -391,7 +391,7 @@ class QualityStore {
       console.log('Fetching report structure data...');
       
       const response = await axios.get(
-        `http://172.16.0.203:8002/api/v1/document-management/report/structure/?force_refresh=${forceRefresh}`,
+        `http://172.18.7.85:9078/api/v1/document-management/report/structure/?force_refresh=${forceRefresh}`,
         this.getAuthHeaders()
       );
       
@@ -412,7 +412,7 @@ class QualityStore {
       console.log(`Downloading report from path: ${filePath}`);
       
       const response = await axios.get(
-        `http://172.16.0.203:8002/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`,
+        `http://172.18.7.85:9078/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`,
         {
           ...this.getAuthHeaders(),
           responseType: 'blob' // Important: set responseType to blob for file data

@@ -5,6 +5,8 @@ import {
   Tabs, Badge, Alert, Tooltip, Progress, Statistic,
   message, Spin, Switch
 } from 'antd';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 import {
   ScheduleOutlined, SyncOutlined, HistoryOutlined, CalendarOutlined, 
@@ -639,16 +641,16 @@ const Scheduling = () => {
       );
 
       if (success) {
-        message.success('Operation rescheduled successfully');
+        toast.success('Operation rescheduled successfully');
         setIsRescheduleModalVisible(false);
         // Refresh the schedule data
         fetchScheduleData();
       } else {
-        message.error('Failed to reschedule operation');
+        toast.error('Failed to reschedule operation');
       }
     } catch (error) {
       console.error('Reschedule error:', error);
-      message.error('An error occurred while rescheduling');
+      toast.error('An error occurred while rescheduling');
     }
   };
 
@@ -794,6 +796,7 @@ const Scheduling = () => {
   return (
     <Layout className="min-h-screen bg-gray-50">
       <Content >
+      <ToastContainer position="top-right" autoClose={5000} />
         <Tabs defaultActiveKey="schedule" type="card">
           <TabPane 
             tab={ 
@@ -806,7 +809,7 @@ const Scheduling = () => {
             <Card>
               <Tabs defaultActiveKey="schedule-graph" className="compact-tabs">
                 <TabPane 
-                  tab="Gantt Chart" 
+                  tab="Machine Schedule" 
                   key="schedule-graph"
                 >
                   {/* <Title level={4}>Production Schedule</Title> */}

@@ -40,6 +40,9 @@ import {
 import useInventoryStore from '../../../../store/inventory-store';
 import moment from 'moment';
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -105,7 +108,7 @@ function Calibration() {
         ]);
       } catch (error) {
         console.error('Error initializing data:', error);
-        message.error('Failed to load some data');
+        toast.error('Failed to load some data');
       } finally {
         setIsLoading(false);
       }
@@ -135,7 +138,7 @@ function Calibration() {
       setInventoryItems(items || []);
     } catch (error) {
       console.error('Error loading inventory items:', error);
-      message.error('Failed to load inventory items');
+      toast.error('Failed to load inventory items');
       setInventoryItems([]);
     }
   };
@@ -147,7 +150,7 @@ function Calibration() {
       setSubcategories(subCats || []);
     } catch (error) {
       console.error('Error loading subcategories:', error);
-      message.error('Failed to load subcategories');
+      toast.error('Failed to load subcategories');
       setSubcategories([]);
     }
   };
@@ -183,9 +186,9 @@ function Calibration() {
           // Update the local state instead of fetching
           const updatedCalibrations = calibrations.filter(cal => cal.id !== id);
           useInventoryStore.setState({ calibrations: updatedCalibrations });
-          message.success('Calibration record deleted successfully');
+          toast.success('Calibration record deleted successfully');
         } catch (error) {
-          message.error('Failed to delete calibration record');
+          toast.error('Failed to delete calibration record');
         }
       }
     });
@@ -209,20 +212,20 @@ function Calibration() {
           cal.id === editingCalibration.id ? { ...cal, ...formattedValues } : cal
         );
         useInventoryStore.setState({ calibrations: updatedCalibrations });
-        message.success('Calibration record updated successfully');
+        toast.success('Calibration record updated successfully');
       } else {
         const newCalibration = await addCalibration(formattedValues);
         // Update the local state instead of fetching
         const updatedCalibrations = [...calibrations, newCalibration];
         useInventoryStore.setState({ calibrations: updatedCalibrations });
-        message.success('Calibration record added successfully');
+        toast.success('Calibration record added successfully');
       }
       setIsModalVisible(false);
       form.resetFields();
       setEditingCalibration(null);
     } catch (error) {
       console.error('Error saving calibration:', error);
-      message.error(error.response?.data?.message || 'Failed to save calibration record');
+      toast.error(error.response?.data?.message || 'Failed to save calibration record');
     }
   };
 
@@ -338,6 +341,7 @@ function Calibration() {
 
   const columns = [
     {
+      //Inventory1111
       title: 'Inventory Item',
       dataIndex: 'inventory_item_id',
       key: 'inventory_item_id',
@@ -761,12 +765,12 @@ function Calibration() {
       const updatedHistory = [...calibrationHistory, newHistory];
       useInventoryStore.setState({ calibrationHistory: updatedHistory });
       
-      message.success('Calibration history record added successfully');
+      toast.success('Calibration history record added successfully');
       setIsHistoryModalVisible(false);
       historyForm.resetFields();
     } catch (error) {
       console.error('Error saving calibration history:', error);
-      message.error(error.response?.data?.message || 'Failed to save calibration history');
+      toast.error(error.response?.data?.message || 'Failed to save calibration history');
     }
   };
 
@@ -872,11 +876,11 @@ function Calibration() {
       );
       useInventoryStore.setState({ calibrations: updatedCalibrations });
       
-      message.success('Calibration record updated successfully');
+      toast.success('Calibration record updated successfully');
       setEditingCalibration(null);
     } catch (error) {
       console.error('Error saving calibration:', error);
-      message.error(error.response?.data?.message || 'Failed to save calibration record');
+      toast.error(error.response?.data?.message || 'Failed to save calibration record');
     }
   };
 
@@ -915,6 +919,7 @@ function Calibration() {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => showModal()}
+                
                 className="add-button"
               >
                 <span className="button-text">Add New Calibration</span>
@@ -929,53 +934,137 @@ function Calibration() {
         <div className="stats-container">
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={12} lg={6}>
-              <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden">
-                <div className="flex items-center p-1">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 mr-2">
-                    <ToolOutlined className="text-lg" />
+              <Card 
+                hoverable 
+                bodyStyle={{ padding: '16px' }}
+                style={{ 
+                  background: 'rgba(24, 144, 255, 0.05)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(24, 144, 255, 0.2)',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" 
+                       style={{ 
+                         background: 'linear-gradient(135deg, #1890ff 0%, #69c0ff 100%)',
+                         boxShadow: '0 4px 8px rgba(24, 144, 255, 0.2)'
+                       }}>
+                    <ToolOutlined style={{ fontSize: '20px', color: '#ffffff' }} />
                   </div>
-                  <div className="stat-info">
-                    <div className="stat-title">Total Equipment</div>
-                    <div className="stat-value">{stats.total}</div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={12} lg={6}>
-              <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden">
-                <div className="flex items-center p-1">
-                  <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-500 mr-2">
-                    <CheckCircleOutlined className="text-lg" />
-                  </div>
-                  <div className="stat-info">
-                    <div className="stat-title">Up to Date</div>
-                    <div className="stat-value">{stats.upToDate}</div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={12} lg={6}>
-              <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden">
-                <div className="flex items-center p-1">
-                  <div className="w-8 h-8 rounded-lg bg-yellow-50 flex items-center justify-center text-yellow-500 mr-2">
-                    <WarningOutlined className="text-lg" />
-                  </div>
-                  <div className="stat-info">
-                    <div className="stat-title">Due Soon</div>
-                    <div className="stat-value">{stats.dueSoon}</div>
+                  <div className="flex-1">
+                    <Text style={{ fontSize: '14px', color: '#8c8c8c', display: 'block', marginBottom: '4px' }}>
+                      Total Equipment
+                    </Text>
+                    <div className="flex items-end justify-between">
+                      <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
+                        {stats.total}
+                      </Title>
+                      <Text style={{ fontSize: '12px', color: '#1890ff' }}>Total</Text>
+                    </div>
                   </div>
                 </div>
               </Card>
             </Col>
             <Col xs={24} sm={12} md={12} lg={6}>
-              <Card className="h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden">
-                <div className="flex items-center p-1">
-                  <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500 mr-2">
-                    <ExclamationCircleOutlined className="text-lg" />
+              <Card 
+                hoverable 
+                bodyStyle={{ padding: '16px' }}
+                style={{ 
+                  background: 'rgba(82, 196, 26, 0.05)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(82, 196, 26, 0.2)',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" 
+                       style={{ 
+                         background: 'linear-gradient(135deg, #52c41a 0%, #95de64 100%)',
+                         boxShadow: '0 4px 8px rgba(82, 196, 26, 0.2)'
+                       }}>
+                    <CheckCircleOutlined style={{ fontSize: '20px', color: '#ffffff' }} />
                   </div>
-                  <div className="stat-info">
-                    <div className="stat-title">Overdue</div>
-                    <div className="stat-value">{stats.overdue}</div>
+                  <div className="flex-1">
+                    <Text style={{ fontSize: '14px', color: '#8c8c8c', display: 'block', marginBottom: '4px' }}>
+                      Up to Date
+                    </Text>
+                    <div className="flex items-end justify-between">
+                      <Title level={3} style={{ margin: 0, color: '#52c41a' }}>
+                        {stats.upToDate}
+                      </Title>
+                      <Text style={{ fontSize: '12px', color: '#52c41a' }}>Current</Text>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={12} lg={6}>
+              <Card 
+                hoverable 
+                bodyStyle={{ padding: '16px' }}
+                style={{ 
+                  background: 'rgba(250, 173, 20, 0.05)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(250, 173, 20, 0.2)',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" 
+                       style={{ 
+                         background: 'linear-gradient(135deg, #faad14 0%, #ffd666 100%)',
+                         boxShadow: '0 4px 8px rgba(250, 173, 20, 0.2)'
+                       }}>
+                    <WarningOutlined style={{ fontSize: '20px', color: '#ffffff' }} />
+                  </div>
+                  <div className="flex-1">
+                    <Text style={{ fontSize: '14px', color: '#8c8c8c', display: 'block', marginBottom: '4px' }}>
+                      Due Soon
+                    </Text>
+                    <div className="flex items-end justify-between">
+                      <Title level={3} style={{ margin: 0, color: '#faad14' }}>
+                        {stats.dueSoon}
+                      </Title>
+                      <Text style={{ fontSize: '12px', color: '#faad14' }}>Pending</Text>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={12} lg={6}>
+              <Card 
+                hoverable 
+                bodyStyle={{ padding: '16px' }}
+                style={{ 
+                  background: 'rgba(245, 34, 45, 0.05)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(245, 34, 45, 0.2)',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" 
+                       style={{ 
+                         background: 'linear-gradient(135deg, #f5222d 0%, #ff7875 100%)',
+                         boxShadow: '0 4px 8px rgba(245, 34, 45, 0.2)'
+                       }}>
+                    <ExclamationCircleOutlined style={{ fontSize: '20px', color: '#ffffff' }} />
+                  </div>
+                  <div className="flex-1">
+                    <Text style={{ fontSize: '14px', color: '#8c8c8c', display: 'block', marginBottom: '4px' }}>
+                      Overdue
+                    </Text>
+                    <div className="flex items-end justify-between">
+                      <Title level={3} style={{ margin: 0, color: '#f5222d' }}>
+                        {stats.overdue}
+                      </Title>
+                      <Text style={{ fontSize: '12px', color: '#f5222d' }}>Delayed</Text>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -1358,6 +1447,19 @@ function Calibration() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
 
       <style jsx global>{`
         .calibration-container {

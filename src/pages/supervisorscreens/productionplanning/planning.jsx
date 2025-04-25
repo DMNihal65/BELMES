@@ -2532,7 +2532,7 @@ const Planning = () => {
                 </Card>
               </TabPane>
 
-              <TabPane 
+              {/* <TabPane 
                 tab={
                   <span>
                     <BarChartOutlined />
@@ -2542,7 +2542,7 @@ const Planning = () => {
                 key="capacityPlanning"
               >
                 <CapacityPlanning />
-              </TabPane>
+              </TabPane> */}
 
           
             </Tabs>

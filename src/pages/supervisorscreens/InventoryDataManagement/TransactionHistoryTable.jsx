@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, InputNumber, Spin, Space, Input, Card, Tag, Row, Col, Descriptions } from 'antd';
-import { ReloadOutlined, RollbackOutlined, SearchOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Tooltip , InputNumber, Spin, Space, Input, Card, Tag, Row, Col, Descriptions } from 'antd';
+import { ReloadOutlined, RollbackOutlined, SearchOutlined, ToolOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
 import useTransactionHistoryStore from '../../../store/transaction-history-store';
 import useAuthStore from '../../../store/auth-store';
+import useInventoryStore from '../../../store/inventory-store';
 
 const TransactionHistoryTable = () => {
   const [isReturnModalVisible, setIsReturnModalVisible] = useState(false);
@@ -13,6 +14,9 @@ const TransactionHistoryTable = () => {
   const [searchText, setSearchText] = useState('');
   const [returnForm] = Form.useForm();
   const { user } = useAuthStore();
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const {
     transactions,
@@ -25,6 +29,52 @@ const TransactionHistoryTable = () => {
   useEffect(() => {
     fetchTransactionHistory();
   }, [fetchTransactionHistory]);
+
+  const { fetchCategories, fetchItems, fetchAllSubcategories, } = useInventoryStore();
+
+  useEffect(() => {
+    const initializeData = async () => {
+      setIsLoading(true);
+      try {
+        const [categoriesData, itemsData, subcatsData, upcomingData] = await Promise.all([
+          fetchCategories(),
+          loadInventoryItems(),
+          loadSubcategories(),
+        ]);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        toast.error('Failed to load some data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeData();
+  }, [fetchCategories]);
+
+  const loadSubcategories = async () => {
+    try {
+      const subCats = await fetchAllSubcategories();
+      // console.log('Loaded subcategories:', subCats); // Debug log
+      setSubcategories(subCats || []);
+    } catch (error) {
+      console.error('Error loading subcategories:', error);
+      toast.error('Failed to load subcategories');
+      setSubcategories([]);
+    }
+  };
+
+  const loadInventoryItems = async () => {
+    try {
+      const items = await fetchItems();
+      // console.log('Loaded items:', items); // Debug log
+      setInventoryItems(items || []);
+    } catch (error) {
+      console.error('Error loading inventory items:', error);
+      toast.error('Failed to load inventory items');
+      setInventoryItems([]);
+    }
+  };
 
   const handleReturn = (record) => {
     setSelectedTransaction(record);
@@ -123,6 +173,28 @@ const TransactionHistoryTable = () => {
       dataIndex: 'item_code',
       key: 'item_code',
       width: 150,
+    },
+    {
+      //Inventory1111
+      title: 'Inventory Item',
+      dataIndex: 'inventory_item_id',
+      key: 'inventory_item_id',
+      width:200,
+      render: (itemId) => {
+        const item = inventoryItems.find(item => item.id === itemId);
+        const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+        return (
+          <Tooltip title={`Click to view calibration history for this item`}>
+            <Tag 
+              icon={<ToolOutlined />} 
+              style={{ cursor: 'pointer', color: '#1890ff' }}
+              onClick={() => handleInventoryItemClick(itemId)}
+            >
+              {item ? `${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}` : itemId}
+            </Tag>
+          </Tooltip>
+        );
+      }
     },
     {
       title: 'Quantity',

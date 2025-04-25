@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Tag, Button, Space, Tooltip, Modal, Input, message, Card, Form, Row, Col, Input as AntInput, Spin, Tabs, Statistic } from 'antd';
-import { EyeOutlined, CheckOutlined, ReloadOutlined, DatabaseOutlined, ArrowUpOutlined, ArrowDownOutlined, SearchOutlined } from '@ant-design/icons';
+import { EyeOutlined, CheckOutlined, ReloadOutlined, DatabaseOutlined, ToolOutlined, ArrowUpOutlined, ArrowDownOutlined, SearchOutlined } from '@ant-design/icons';
 import { Pie, Column } from '@ant-design/plots';
 import useInventoryStore from '../../../../store/inventory-store';
 import 'tailwindcss/tailwind.css';
@@ -17,14 +17,61 @@ const RequestTable = () => {
   const [isApproveModalVisible, setIsApproveModalVisible] = useState(false);
   const [approveRecord, setApproveRecord] = useState(null);
   const [columnFilters, setColumnFilters] = useState({});
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const { requests, loading, fetchRequests, approveRequest } = useInventoryStore();
+  const { requests, loading, fetchRequests, approveRequest, fetchCategories, fetchItems, fetchAllSubcategories, } = useInventoryStore();
 
   useEffect(() => {
     fetchRequests().catch(error => {
       console.error('Error fetching requests:', error);
     });
   }, [fetchRequests]);
+
+  useEffect(() => {
+    const initializeData = async () => {
+      setIsLoading(true);
+      try {
+        const [categoriesData, itemsData, subcatsData, upcomingData] = await Promise.all([
+          fetchCategories(),
+          loadInventoryItems(),
+          loadSubcategories(),
+        ]);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        toast.error('Failed to load some data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeData();
+  }, [fetchCategories]);
+
+  const loadSubcategories = async () => {
+    try {
+      const subCats = await fetchAllSubcategories();
+      // console.log('Loaded subcategories:', subCats); // Debug log
+      setSubcategories(subCats || []);
+    } catch (error) {
+      console.error('Error loading subcategories:', error);
+      toast.error('Failed to load subcategories');
+      setSubcategories([]);
+    }
+  };
+
+  const loadInventoryItems = async () => {
+    try {
+      const items = await fetchItems();
+      // console.log('Loaded items:', items); // Debug log
+      setInventoryItems(items || []);
+    } catch (error) {
+      console.error('Error loading inventory items:', error);
+      toast.error('Failed to load inventory items');
+      setInventoryItems([]);
+    }
+  };
 
   const handleGlobalSearch = (value) => {
     setSearchText(value);
@@ -171,13 +218,35 @@ const RequestTable = () => {
 
   const columns = [
     {
-      title: 'Request ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 100,
-      sorter: (a, b) => a.id - b.id,
-      ...getColumnSearchProps('id')
+      //Inventory1111
+      title: 'Inventory Item',
+      dataIndex: 'inventory_item_id',
+      key: 'inventory_item_id',
+      width:200,
+      render: (itemId) => {
+        const item = inventoryItems.find(item => item.id === itemId);
+        const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+        return (
+          <Tooltip title={`Click to view calibration history for this item`}>
+            <Tag 
+              icon={<ToolOutlined />} 
+              style={{ cursor: 'pointer', color: '#1890ff' }}
+              onClick={() => handleInventoryItemClick(itemId)}
+            >
+              {item ? `${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}` : itemId}
+            </Tag>
+          </Tooltip>
+        );
+      }
     },
+    // {
+    //   title: 'Request ID',
+    //   dataIndex: 'id',
+    //   key: 'id',
+    //   width: 100,
+    //   sorter: (a, b) => a.id - b.id,
+    //   ...getColumnSearchProps('id')
+    // },
     {
       title: 'Quantity',
       dataIndex: 'quantity',
@@ -228,49 +297,49 @@ const RequestTable = () => {
       width: 150,
       ...getColumnSearchProps('remarks'),
     },
-    {
-      title: 'Inventory Item ID',
-      dataIndex: 'inventory_item_id',
-      key: 'inventory_item_id',
-      width: 130,
-      ...getColumnSearchProps('inventory_item_id'),
-    },
-    {
-      title: 'Inventory Item Code',
-      dataIndex: 'inventory_item_code',
-      key: 'inventory_item_code',
-      width: 130,
-      ...getColumnSearchProps('inventory_item_code'),
-    },
-    {
-      title: 'Requested By',
-      dataIndex: 'requested_by',
-      key: 'requested_by',
-      width: 120,
-      ...getColumnSearchProps('requested_by'),
-    },
-    {
-      title: 'Order ID',
-      dataIndex: 'order_id',
-      key: 'order_id',
-      width: 100,
-      ...getColumnSearchProps('order_id'),
-    },
-    {
-      title: 'Operation ID',
-      dataIndex: 'operation_id',
-      key: 'operation_id',
-      width: 120,
-      ...getColumnSearchProps('operation_id'),
-    },
-    {
-      title: 'Approved By',
-      dataIndex: 'approved_by',
-      key: 'approved_by',
-      width: 120,
-      ...getColumnSearchProps('approved_by'),
-      render: (text) => text || '-',
-    },
+    // {
+    //   title: 'Inventory Item ID',
+    //   dataIndex: 'inventory_item_id',
+    //   key: 'inventory_item_id',
+    //   width: 130,
+    //   ...getColumnSearchProps('inventory_item_id'),
+    // },
+    // {
+    //   title: 'Inventory Item Code',
+    //   dataIndex: 'inventory_item_code',
+    //   key: 'inventory_item_code',
+    //   width: 130,
+    //   ...getColumnSearchProps('inventory_item_code'),
+    // },
+    // {
+    //   title: 'Requested By',
+    //   dataIndex: 'requested_by',
+    //   key: 'requested_by',
+    //   width: 120,
+    //   ...getColumnSearchProps('requested_by'),
+    // },
+    // {
+    //   title: 'Order ID',
+    //   dataIndex: 'order_id',
+    //   key: 'order_id',
+    //   width: 100,
+    //   ...getColumnSearchProps('order_id'),
+    // },
+    // {
+    //   title: 'Operation ID',
+    //   dataIndex: 'operation_id',
+    //   key: 'operation_id',
+    //   width: 120,
+    //   ...getColumnSearchProps('operation_id'),
+    // },
+    // {
+    //   title: 'Approved By',
+    //   dataIndex: 'approved_by',
+    //   key: 'approved_by',
+    //   width: 120,
+    //   ...getColumnSearchProps('approved_by'),
+    //   render: (text) => text || '-',
+    // },
     {
       title: 'Approved At',
       dataIndex: 'approved_at',
@@ -298,7 +367,9 @@ const RequestTable = () => {
     {
       title: 'Actions',
       key: 'actions',
+      fixed: 'right',
       width: 120,
+      align: 'center',
       render: (_, record) => (
         <Space size="middle">
           <Tooltip title="View Details">

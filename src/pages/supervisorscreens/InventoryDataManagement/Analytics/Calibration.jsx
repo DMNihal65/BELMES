@@ -83,6 +83,8 @@ function Calibration() {
     upcomingCalibrations
   } = useInventoryStore();
 
+
+  
   const filterCalibrations = async (status) => {
     setSelectedStatus(status);
     if (status === 'due_soon') {
@@ -134,7 +136,7 @@ function Calibration() {
   const loadInventoryItems = async () => {
     try {
       const items = await fetchItems();
-      console.log('Loaded items:', items); // Debug log
+      // console.log('Loaded items:', items); // Debug log
       setInventoryItems(items || []);
     } catch (error) {
       console.error('Error loading inventory items:', error);
@@ -146,7 +148,7 @@ function Calibration() {
   const loadSubcategories = async () => {
     try {
       const subCats = await fetchAllSubcategories();
-      console.log('Loaded subcategories:', subCats); // Debug log
+      // console.log('Loaded subcategories:', subCats); // Debug log
       setSubcategories(subCats || []);
     } catch (error) {
       console.error('Error loading subcategories:', error);
@@ -355,7 +357,8 @@ function Calibration() {
               style={{ cursor: 'pointer', color: '#1890ff' }}
               onClick={() => handleInventoryItemClick(itemId)}
             >
-              {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId}
+              {/* {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId} */}
+              {item ? `${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}` : itemId}
             </Tag>
           </Tooltip>
         );
@@ -491,7 +494,7 @@ function Calibration() {
               calibration_date: moment(),
               next_due_date: moment().add(record.frequency_days, 'days')
             });
-            console.log('Selected Calibration ID:', record.id);
+            // console.log('Selected Calibration ID:', record.id);
           }}
         >
           Calibrate
@@ -545,6 +548,7 @@ function Calibration() {
       }
     }
   ];
+  
 
   const historyColumns = [
     {
@@ -556,7 +560,7 @@ function Calibration() {
         const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
         return (
           <Tag icon={<ToolOutlined />}>
-            {item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : 'N/A'}
+            {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId}
           </Tag>
         );
       }
@@ -775,11 +779,33 @@ function Calibration() {
   };
 
   const dueSoonColumns = [
+    // {
+    //   title: 'Item Code',
+    //   dataIndex: 'item_code',
+    //   key: 'item_code',
+    //   render: (text) => <Text strong>{text}</Text>
+    // },
     {
-      title: 'Item Code',
-      dataIndex: 'item_code',
-      key: 'item_code',
-      render: (text) => <Text strong>{text}</Text>
+      //Inventory1111
+      title: 'Inventory Item',
+      dataIndex: 'inventory_item_id',
+      key: 'inventory_item_id',
+      render: (itemId) => {
+        const item = inventoryItems.find(item => item.id === itemId);
+        const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+        return (
+          <Tooltip title={`Click to view calibration history for this item`}>
+            <Tag 
+              icon={<ToolOutlined />} 
+              style={{ cursor: 'pointer', color: '#1890ff' }}
+              onClick={() => handleInventoryItemClick(itemId)}
+            >
+              {/* {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId} */}
+              {item ? `${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}` : itemId}
+            </Tag>
+          </Tooltip>
+        );
+      }
     },
     {
       title: 'Next Calibration',
@@ -1306,8 +1332,11 @@ function Calibration() {
                     children: inventoryItems
                       .filter(item => item.subcategory_id === subcategory.id)
                       .map(item => ({
-                        label: item.dynamic_data["Instrument code"],
-                        value: item.id,
+                        // label: item.dynamic_data["Instrument code"],
+                        // value: item.dynamic_data["Instrument code"],
+                        // isLeaf: true
+                        label: item ? `${item.dynamic_data["Instrument code"] || 'N/A'}${item.dynamic_data["BEL Part Number"] ? ` - ${item.dynamic_data["BEL Part Number"]}` : ''}` : item.id,
+                        value: item ? item.dynamic_data["Instrument code"] || item.dynamic_data["BEL Part Number"] : item.id,
                         isLeaf: true
                       }))
                   }))

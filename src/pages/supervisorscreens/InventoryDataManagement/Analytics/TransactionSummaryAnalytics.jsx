@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Table, Statistic, Spin, Input, Select, DatePicker, Space, Button, Typography  } from 'antd';
+import { Card, Row, Col, Table, Statistic, Spin, Input, Select, DatePicker, Space, Button, Typography, Tag   } from 'antd';
 import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { SearchOutlined, ReloadOutlined, SwapOutlined, ExportOutlined, ImportOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, SwapOutlined, ExportOutlined, ImportOutlined, ClockCircleOutlined, ToolOutlined } from '@ant-design/icons';
 import useInventoryStore from '../../../../store/inventory-store';
 
 const { Search } = Input;
@@ -35,6 +35,9 @@ const TransactionSummaryAnalytics = () => {
   const [filteredInfo, setFilteredInfo] = useState({});
   const [sortedInfo, setSortedInfo] = useState({});
   const [dateRange, setDateRange] = useState(null);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const {
     loading,
@@ -43,12 +46,62 @@ const TransactionSummaryAnalytics = () => {
     transactionMetrics,
     transactionHistory,
     fetchAnalytics,
-    searchTransactionHistory
+    searchTransactionHistory, 
+    fetchCategories, 
+    fetchItems, 
+    fetchAllSubcategories,
   } = useInventoryStore();
+
+
+
 
   useEffect(() => {
     fetchAnalytics();
   }, []);
+
+  useEffect(() => {
+    const initializeData = async () => {
+      setIsLoading(true);
+      try {
+        const [categoriesData, itemsData, subcatsData, upcomingData] = await Promise.all([
+          fetchCategories(),
+          loadInventoryItems(),
+          loadSubcategories(),
+        ]);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        toast.error('Failed to load some data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeData();
+  }, [fetchCategories]);
+
+  const loadSubcategories = async () => {
+    try {
+      const subCats = await fetchAllSubcategories();
+      // console.log('Loaded subcategories:', subCats); // Debug log
+      setSubcategories(subCats || []);
+    } catch (error) {
+      console.error('Error loading subcategories:', error);
+      toast.error('Failed to load subcategories');
+      setSubcategories([]);
+    }
+  };
+
+  const loadInventoryItems = async () => {
+    try {
+      const items = await fetchItems();
+      // console.log('Loaded items:', items); // Debug log
+      setInventoryItems(items || []);
+    } catch (error) {
+      console.error('Error loading inventory items:', error);
+      toast.error('Failed to load inventory items');
+      setInventoryItems([]);
+    }
+  };
 
   const handleSearch = (value) => {
     setSearchText(value);
@@ -145,6 +198,41 @@ const TransactionSummaryAnalytics = () => {
       ...getColumnSearchProps(['item', 'item_code'], 'Item Code'),
     },
     {
+      title: 'Inventory Item',
+      dataIndex: 'inventory_item_id',
+      key: 'inventory_item_id',
+      width: 200,
+      render: (itemId) => {
+        // console.log('Rendering item with ID:', itemId); // Log the itemId being rendered
+        const item = inventoryItems.find(item => item.id === itemId);
+        const subcategory = item ? subcategories.find(sub => sub.id === item.subcategory_id) : null;
+
+        // console.log('Item:', item); // Debug log
+        // console.log('Subcategory:', subcategory); // Debug log
+
+        if (!item) {
+          return <span>N/A</span>; // Handle case where item is not found
+        }
+
+        const category = subcategory ? subcategory.category_name : 'N/A'; // Assuming category_name is available in subcategory
+
+        return (
+          <Tooltip title={`Click to view calibration history for this item`}>
+            <Tag 
+              icon={<ToolOutlined />} 
+              style={{ cursor: 'pointer', color: '#1890ff' }}
+              onClick={() => handleInventoryItemClick(itemId)}
+            >
+              {`${category !== 'N/A' ? `${category} - ` : ''}${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}`}
+            </Tag>
+          </Tooltip>
+        );
+      }
+    },
+
+
+    
+    {
       title: 'Performed By',
       dataIndex: ['transaction', 'performed_by', 'username'],
       key: 'username',
@@ -199,6 +287,9 @@ const TransactionSummaryAnalytics = () => {
     }
     return null;
   };
+
+  console.log('Inventory Itemssssss:', inventoryItems);
+  console.log('Subcategoriesssssss:', subcategories);
 
   if (loading) {
     return <Spin size="large" />;

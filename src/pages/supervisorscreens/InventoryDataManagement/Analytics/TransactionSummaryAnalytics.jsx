@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Table, Statistic, Spin, Input, Select, DatePicker, Space, Button, Typography, Tag   } from 'antd';
+import { Card, Row, Col, Table, Statistic, Spin, Input, Select, DatePicker, Space, Button, Typography, Tag } from 'antd';
 import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { SearchOutlined, ReloadOutlined, SwapOutlined, ExportOutlined, ImportOutlined, ClockCircleOutlined, ToolOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, SwapOutlined, ExportOutlined, ImportOutlined, ClockCircleOutlined, ToolOutlined, InfoCircleOutlined, TagOutlined } from '@ant-design/icons';
 import useInventoryStore from '../../../../store/inventory-store';
 
 const { Search } = Input;
@@ -38,9 +38,10 @@ const TransactionSummaryAnalytics = () => {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [itemDetails, setItemDetails] = useState({});
 
   const {
-    loading,
+    // loading,
     requestsByStatus,
     transactionSummary,
     transactionMetrics,
@@ -50,14 +51,15 @@ const TransactionSummaryAnalytics = () => {
     fetchCategories, 
     fetchItems, 
     fetchAllSubcategories,
+    fetchCategoryById,
+    fetchSubcategoryById,
+    fetchItemById,
   } = useInventoryStore();
-
-
-
 
   useEffect(() => {
     fetchAnalytics();
   }, []);
+  
 
   useEffect(() => {
     const initializeData = async () => {
@@ -79,6 +81,46 @@ const TransactionSummaryAnalytics = () => {
     initializeData();
   }, [fetchCategories]);
 
+  useEffect(() => {
+    const fetchItemDetails = async () => {
+      const details = {};
+      for (const transaction of transactionHistory.transactions) {
+        const itemId = transaction.item.id;
+        try {
+          const item = await fetchItemById(itemId);
+          const subcategory = await fetchSubcategoryById(item.subcategory_id);
+          const category = await fetchCategoryById(subcategory.category_id);
+
+          details[itemId] = {
+            categoryName: category?.name || 'N/A',
+            subcategoryName: subcategory?.name || 'N/A',
+          };
+        } catch (error) {
+          console.error(`Error fetching details for item ID ${itemId}:`, error.message || error);
+          details[itemId] = {
+            categoryName: `Error: ${error.message || 'Failed to fetch category'}`,
+            subcategoryName: `Error: ${error.message || 'Failed to fetch subcategory'}`,
+          };
+        }
+      }
+      setItemDetails(details);
+    };
+
+    fetchItemDetails();
+  }, [transactionHistory.transactions]);
+
+  const mostActiveItemsData = transactionMetrics?.most_active_items?.map(item => {
+    console.log('Most Active Items:', transactionMetrics.most_active_items); // Log the entire array for debugging
+    const itemId = item.item_id; // Use item.item_id instead of item.id
+    const details = itemDetails[itemId]; // Fetch item details using the correct item ID
+    console.log(`Item ID: ${itemId}, Details:`, details); // Log details for debugging
+    return {
+      ...item,
+      itemDetails: details ? `${details.categoryName} - ${details.subcategoryName}` : 'Loading', // Combine category and subcategory
+    };
+  }) || [];
+
+  
   const loadSubcategories = async () => {
     try {
       const subCats = await fetchAllSubcategories();
@@ -167,11 +209,24 @@ const TransactionSummaryAnalytics = () => {
 
   const transactionHistoryColumns = [
     {
-      title: 'Transaction ID',
-      dataIndex: ['transaction', 'id'],
-      key: 'id',
-      sorter: (a, b) => a.transaction.id - b.transaction.id,
-      ...getColumnSearchProps(['transaction', 'id'], 'Transaction ID'),
+      title: 'Item Details',
+      dataIndex: ['item', 'id'],
+      key: 'item_details',
+      width: 300,
+      render: (itemId) => {
+        const details = itemDetails[itemId];
+        return (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {details ? (
+              <Tag style={{ cursor: 'pointer', color: '#1890ff' }}>
+                <ToolOutlined /> {details.categoryName} - {details.subcategoryName}
+              </Tag>
+            ) : (
+              'Loading...'
+            )}
+          </div>
+        );
+      },
     },
     {
       title: 'Type',
@@ -191,47 +246,6 @@ const TransactionSummaryAnalytics = () => {
       sorter: (a, b) => a.transaction.quantity - b.transaction.quantity,
       ...getColumnSearchProps(['transaction', 'quantity'], 'Quantity'),
     },
-    {
-      title: 'Item Code',
-      dataIndex: ['item', 'item_code'],
-      key: 'item_code',
-      ...getColumnSearchProps(['item', 'item_code'], 'Item Code'),
-    },
-    {
-      title: 'Inventory Item',
-      dataIndex: 'inventory_item_id',
-      key: 'inventory_item_id',
-      width: 200,
-      render: (itemId) => {
-        // console.log('Rendering item with ID:', itemId); // Log the itemId being rendered
-        const item = inventoryItems.find(item => item.id === itemId);
-        const subcategory = item ? subcategories.find(sub => sub.id === item.subcategory_id) : null;
-
-        // console.log('Item:', item); // Debug log
-        // console.log('Subcategory:', subcategory); // Debug log
-
-        if (!item) {
-          return <span>N/A</span>; // Handle case where item is not found
-        }
-
-        const category = subcategory ? subcategory.category_name : 'N/A'; // Assuming category_name is available in subcategory
-
-        return (
-          <Tooltip title={`Click to view calibration history for this item`}>
-            <Tag 
-              icon={<ToolOutlined />} 
-              style={{ cursor: 'pointer', color: '#1890ff' }}
-              onClick={() => handleInventoryItemClick(itemId)}
-            >
-              {`${category !== 'N/A' ? `${category} - ` : ''}${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}`}
-            </Tag>
-          </Tooltip>
-        );
-      }
-    },
-
-
-    
     {
       title: 'Performed By',
       dataIndex: ['transaction', 'performed_by', 'username'],
@@ -291,9 +305,9 @@ const TransactionSummaryAnalytics = () => {
   console.log('Inventory Itemssssss:', inventoryItems);
   console.log('Subcategoriesssssss:', subcategories);
 
-  if (loading) {
-    return <Spin size="large" />;
-  }
+  // if (loading) {
+  //   return <Spin size="large" />;
+  // }
 
   return (
     <div style={{ padding: '24px' }}>
@@ -442,44 +456,56 @@ const TransactionSummaryAnalytics = () => {
         {/* Most Active Items */}
         <Col span={12}>
           <Card title="Most Active Items">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart 
-                data={transactionMetrics?.most_active_items || []}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                layout="vertical"
-              >
-                <XAxis 
-                  type="number"
-                  tick={{ fill: '#666' }}
-                  axisLine={{ stroke: '#ccc' }}
-                />
-                <YAxis 
-                  type="category"
-                  dataKey="item_code"
-                  tick={{ fill: '#666' }}
-                  axisLine={{ stroke: '#ccc' }}
-                  width={100}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px'
-                  }}
-                />
-                <Legend 
-                  verticalAlign="top" 
-                  height={36}
-                  formatter={(value) => <span style={{ color: '#666' }}>{value}</span>}
-                />
-                <Bar 
-                  dataKey="transaction_count" 
-                  name="Transactions" 
-                  fill={BAR_COLORS.items}
-                  radius={[0, 4, 4, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            {mostActiveItemsData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart 
+                  data={mostActiveItemsData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  layout="vertical"
+                >
+                  <XAxis 
+                    type="number"
+                    tick={{ fill: '#666' }}
+                    axisLine={{ stroke: '#ccc' }}
+                  />
+                  <YAxis 
+                    type="category"
+                    dataKey="itemDetails"
+                    tick={{
+                      fill: '#1E293B',          // dark blue-grey color for text
+                      fontSize: 12,             // smaller font size
+                      fontWeight: 500,          // medium bold
+                      angle: 0,                 // keep labels horizontal (you can change to -45 if needed)
+                      textAnchor: 'end',        // align text nicely
+                    }}
+                    axisLine={{ stroke: '#94A3B8' }}   // softer axis line color
+                    tickLine={{ stroke: '#CBD5E1', strokeWidth: 1 }} // small lines for each tick
+                    width={120}
+                  />
+
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px'
+                    }}
+                  />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={36}
+                    formatter={(value) => <span style={{ color: '#666' }}>{value}</span>}
+                  />
+                  <Bar 
+                    dataKey="transaction_count" 
+                    name="Transactions" 
+                    fill={BAR_COLORS.items}
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p>No data available for the chart.</p>
+            )}
           </Card>
         </Col>
 
@@ -565,3 +591,14 @@ const TransactionSummaryAnalytics = () => {
 };
 
 export default TransactionSummaryAnalytics;
+
+
+
+
+
+
+
+
+
+
+

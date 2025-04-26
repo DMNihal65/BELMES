@@ -17,6 +17,7 @@ const TransactionHistoryTable = () => {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [itemDetails, setItemDetails] = useState({});
 
   const {
     transactions,
@@ -30,7 +31,9 @@ const TransactionHistoryTable = () => {
     fetchTransactionHistory();
   }, [fetchTransactionHistory]);
 
-  const { fetchCategories, fetchItems, fetchAllSubcategories, } = useInventoryStore();
+  const { fetchCategories, fetchItems, fetchAllSubcategories, fetchCategoryById,
+    fetchSubcategoryById,
+    fetchItemById} = useInventoryStore();
 
   useEffect(() => {
     const initializeData = async () => {
@@ -73,6 +76,40 @@ const TransactionHistoryTable = () => {
       console.error('Error loading inventory items:', error);
       toast.error('Failed to load inventory items');
       setInventoryItems([]);
+    }
+  };
+
+  useEffect(() => {
+    const fetchAllItemDetails = async () => {
+      const details = {};
+      for (const transaction of transactions) {
+        if (transaction.item_id) {
+          details[transaction.item_id] = await loadItemDetails(transaction.item_id);
+        }
+      }
+      setItemDetails(details);
+    };
+
+    if (transactions.length > 0) {
+      fetchAllItemDetails();
+    }
+  }, [transactions]);
+
+  const loadItemDetails = async (itemId) => {
+    try {
+      const itemDetails = await fetchItemById(itemId);
+      console.log('Fetched item details:', itemDetails); // Debug log
+      const subcategoryDetails = await fetchSubcategoryById(itemDetails.subcategory_id);
+      console.log('Fetched subcategory details:', subcategoryDetails); // Debug log
+      const categoryDetails = await fetchCategoryById(subcategoryDetails.category_id);
+      console.log('Fetched category details:', categoryDetails); // Debug log
+      return {
+        categoryName: categoryDetails.name,
+        subcategoryName: subcategoryDetails.name,
+      };
+    } catch (error) {
+      console.error('Error loading item details:', error);
+      return { categoryName: 'Unknown', subcategoryName: 'Unknown' };
     }
   };
 
@@ -145,18 +182,34 @@ const TransactionHistoryTable = () => {
   });
 
   const columns = [
+    // {
+    //   title: 'Transaction ID',
+    //   dataIndex: 'id',
+    //   key: 'id',
+    //   width: 120,
+    //   sorter: (a, b) => a.id - b.id,
+    // },
     {
-      title: 'Transaction ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 120,
-      sorter: (a, b) => a.id - b.id,
+      title: 'Item Details',
+      dataIndex: 'item_id',
+      key: 'item_details',
+      width: 300,
+      render: (itemId) => {
+        const details = itemDetails[itemId] || { categoryName: 'Loading...', subcategoryName: 'Loading...' };
+        return (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Tag style={{ cursor: 'pointer', color: '#1890ff' }}>
+              <ToolOutlined /> {details.categoryName} - {details.subcategoryName}
+            </Tag>
+          </div>
+        );
+      },
     },
     {
       title: 'Type',
       dataIndex: 'type',
       key: 'type',
-      width: 100,
+      width: 150,
       render: (type) => (
         <Tag color={type === 'Issue' ? 'red' : 'green'} className="text-base px-3 py-1">
           {type}
@@ -168,34 +221,13 @@ const TransactionHistoryTable = () => {
       ],
       onFilter: (value, record) => record.type === value,
     },
-    {
-      title: 'Item Code',
-      dataIndex: 'item_code',
-      key: 'item_code',
-      width: 150,
-    },
-    {
-      //Inventory1111
-      title: 'Inventory Item',
-      dataIndex: 'inventory_item_id',
-      key: 'inventory_item_id',
-      width:200,
-      render: (itemId) => {
-        const item = inventoryItems.find(item => item.id === itemId);
-        const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
-        return (
-          <Tooltip title={`Click to view calibration history for this item`}>
-            <Tag 
-              icon={<ToolOutlined />} 
-              style={{ cursor: 'pointer', color: '#1890ff' }}
-              onClick={() => handleInventoryItemClick(itemId)}
-            >
-              {item ? `${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}` : itemId}
-            </Tag>
-          </Tooltip>
-        );
-      }
-    },
+    // {
+    //   title: 'Item ID',
+    //   dataIndex: 'item_id',
+    //   key: 'item_id',
+    //   width: 150,
+    // },
+    
     {
       title: 'Quantity',
       dataIndex: 'quantity',

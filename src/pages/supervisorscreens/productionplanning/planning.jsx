@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Upload, message,
-  Typography, Tag, Tooltip, Form, Drawer, Descriptions,
+  Typography, Tag, Tooltip, Form, Drawer, Descriptions,  Cascader,
   Badge, Alert, Spin, Progress, Divider, Collapse, DatePicker, Pagination, InputNumber
 } from 'antd';
 import {
@@ -32,6 +32,7 @@ import belLogo from '../../../assets/belUrl.png';
 import { QRCodeSVG } from 'qrcode.react';
 import * as QRCodeNode from 'qrcode';
 import { create } from 'zustand';
+import useInventoryStore from '../../../store/inventory-store';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -89,7 +90,48 @@ const Planning = () => {
   // Add new state for engineering drawings
   const [engineeringDrawings, setEngineeringDrawings] = useState([]);
   const [drawingsLoading, setDrawingsLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [inventoryItems, setInventoryItems] = useState([]);
+  // const [subcategories, setSubcategories] = useState([]);
+  const { categories, subcategories, fetchCategories, fetchAllSubcategories } = useInventoryStore();
   
+  useEffect(() => {
+    const fetchData = async () => {
+        try {
+            await fetchCategories();
+            await fetchAllSubcategories();
+        } catch (error) {
+            message.error('Failed to fetch data');
+        }
+    };
+
+    fetchData();
+}, [fetchCategories, fetchAllSubcategories]);
+
+  const loadSubcategories = async () => {
+    try {
+      const subCats = await fetchAllSubcategories();
+      // console.log('Loaded subcategories:', subCats); // Debug log
+      setSubcategories(subCats || []);
+    } catch (error) {
+      console.error('Error loading subcategories:', error);
+      toast.error('Failed to load subcategories');
+      setSubcategories([]);
+    }
+  };
+
+  const handleInventoryItemClick = (itemId) => {
+    setSelectedInventoryItem(itemId);
+    setActiveTab('history');  // Switch to history tab
+    
+    // Get item details for the message
+    const item = inventoryItems.find(item => item.id === itemId);
+    const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+    const itemName = item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId;
+    
+    message.info(`Showing calibration history for ${itemName}`);
+  };
+
   // Configuration for file upload component - customized for NC program files
   const uploadProps = {
     name: 'file',
@@ -1321,7 +1363,7 @@ const Planning = () => {
         order_id: selectedJob.id,
         operation_id: values.operation_id
       };
-      
+      console.log('Tool Data to be submitted:', toolData);
       const newTool = await addOrderTool(toolData);
       setTools(prevTools => [...prevTools, newTool]);
       message.success('Tool added successfully');
@@ -1977,13 +2019,82 @@ const Planning = () => {
                     layout="vertical"
                     onFinish={handleAddTool}
                   >
-                    <Form.Item
+                    {/* <Form.Item
                       name="tool_name"
                       label="Tool Name"
                       rules={[{ required: true, message: 'Please enter tool name' }]}
                     >
                       <Input />
+                    </Form.Item> */}
+
+                    <Form.Item
+                        name="tool_name"
+                        label="Tool Name"
+                        rules={[{ required: true, message: 'Please select an inventory item' }]}
+                    >
+                        <Select
+                            placeholder="Select Subcategory"
+                            loading={isLoading}
+                            showSearch
+                            onChange={(value) => {
+                                const selectedSubcategory = subcategories.find(sub => sub.id === value);
+                                addToolForm.setFieldsValue({
+                                    inventory_item_id: value, // Set the selected item ID
+                                    tool_name: selectedSubcategory ? selectedSubcategory.name : '' // Set the subcategory name for display
+                                });
+                            }}
+                        >
+                            {subcategories.map(subcategory => (
+                                <Select.Option key={subcategory.id} value={subcategory.id}>
+                                    {subcategory.name}
+                                </Select.Option>
+                            ))}
+                        </Select>
                     </Form.Item>
+
+                    {/* <Form.Item
+                        name="tool_name"
+                        label="Tool Name"
+                        rules={[{ required: true, message: 'Please select an inventory item' }]}
+                    >
+                        <Cascader
+                            placeholder="Select Category > Subcategory"
+                            loading={isLoading}
+                            style={{ width: '100%' }}
+                            options={categories.map(category => ({
+                                label: category.name,
+                                value: category.id,
+                                isLeaf: false,
+                                children: subcategories
+                                    .filter(sub => sub.category_id === category.id)
+                                    .map(subcategory => ({
+                                        label: subcategory.name,
+                                        value: subcategory.id, // Ensure this is the ID passed to the backend
+                                        isLeaf: true
+                                    }))
+                            }))}
+                            onChange={(value) => {
+                                if (value && value.length === 3) {
+                                    const selectedSubcategory = subcategories.find(sub => sub.id === value[2]);
+                                    addToolForm.setFieldsValue({
+                                        inventory_item_id: value[2], // Set the selected item ID
+                                        tool_name: selectedSubcategory ? selectedSubcategory.name : '' // Set the subcategory name for display
+                                    });
+                                } else {
+                                    // Reset tool_name if the selection is not complete
+                                    addToolForm.setFieldsValue({
+                                        tool_name: ''
+                                    });
+                                }
+                            }}
+                        />
+                    </Form.Item> */}
+
+
+
+
+
+
                     <Form.Item
                       name="tool_number"
                       label="Tool Number"

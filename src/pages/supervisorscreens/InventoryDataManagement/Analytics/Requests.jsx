@@ -227,7 +227,7 @@ const RequestTable = () => {
         const item = inventoryItems.find(item => item.id === itemId);
         const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
         return (
-          <Tooltip title={`Click to view calibration history for this item`}>
+          <Tooltip >
             <Tag 
               icon={<ToolOutlined />} 
               style={{ cursor: 'pointer', color: '#1890ff' }}

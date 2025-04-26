@@ -85,6 +85,8 @@ function Calibration() {
 
 
   
+
+  
   const filterCalibrations = async (status) => {
     setSelectedStatus(status);
     if (status === 'due_soon') {
@@ -118,6 +120,9 @@ function Calibration() {
 
     initializeData();
   }, [fetchCalibrations, fetchCalibrationHistory, fetchCategories, daysFilter]);
+
+
+
 
   // Add a new useEffect to refresh upcoming calibrations periodically
   useEffect(() => {
@@ -552,16 +557,25 @@ function Calibration() {
 
   const historyColumns = [
     {
+      //Inventory1111
       title: 'Inventory Item',
+      dataIndex: 'inventory_item',
       key: 'inventory_item',
+      width: 300,
       render: (_, record) => {
         const calibration = calibrations.find(cal => cal.id === record.calibration_schedule_id);
         const item = inventoryItems.find(item => item.id === calibration?.inventory_item_id);
         const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
         return (
-          <Tag icon={<ToolOutlined />}>
-            {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId}
-          </Tag>
+          <Tooltip >
+            <Tag 
+              icon={<ToolOutlined />} 
+              style={{ cursor: 'pointer', color: '#135095' }}
+              // onClick={() => handleInventoryItemClick(itemId)}
+            >
+              {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId}
+            </Tag>
+          </Tooltip>
         );
       }
     },
@@ -1233,7 +1247,8 @@ function Calibration() {
                             return (
                               <Space>
                                 <span>
-                                  Showing history for: <Text strong>{item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : selectedInventoryItem}</Text>
+                                  Showing history for: <Text strong>{item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"] || 'N/A'}${item.dynamic_data["BEL Part Number"] ? ` - ${item.dynamic_data["BEL Part Number"]}` : ''}` : selectedInventoryItem}</Text>
+                               
                                 </span>
                                 <Button 
                                   type="link" 
@@ -1310,54 +1325,58 @@ function Calibration() {
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
 
-          <Form.Item
-            name="inventory_item_id"
-            label="Inventory Item"
-            rules={[{ required: true, message: 'Please select an inventory item' }]}
-          >
-            <Cascader
-              placeholder="Select Category > Subcategory > Item"
-              loading={isLoading}
-              style={{ width: '100%' }}
-              options={categories.map(category => ({
-                label: category.name,
-                value: category.id,
-                isLeaf: false,
-                children: subcategories
-                  .filter(sub => sub.category_id === category.id)
-                  .map(subcategory => ({
-                    label: subcategory.name,
-                    value: subcategory.id,
-                    isLeaf: false,
-                    children: inventoryItems
-                      .filter(item => item.subcategory_id === subcategory.id)
-                      .map(item => ({
-                        // label: item.dynamic_data["Instrument code"],
-                        // value: item.dynamic_data["Instrument code"],
-                        // isLeaf: true
-                        label: item ? `${item.dynamic_data["Instrument code"] || 'N/A'}${item.dynamic_data["BEL Part Number"] ? ` - ${item.dynamic_data["BEL Part Number"]}` : ''}` : item.id,
-                        value: item ? item.dynamic_data["Instrument code"] || item.dynamic_data["BEL Part Number"] : item.id,
-                        isLeaf: true
-                      }))
-                  }))
-              }))}
-              showSearch={{
-                filter: (inputValue, path) => {
-                  return path.some(option => 
-                    option.label.toLowerCase().indexOf(inputValue.toLowerCase()) > -1
-                  );
-                }
-              }}
-              displayRender={(labels) => labels.join(' > ')}
-              onChange={(value, selectedOptions) => {
-                if (value && value.length === 3) {
+
+          {/* Inventory Item Select and pass the inventory_item_id */}
+            <Form.Item
+              name="inventory_selection"
+              label="Inventory Item"
+              rules={[{ required: true, message: 'Please select an inventory item' }]}
+            >
+              <Cascader
+                placeholder="Select Category > Subcategory > Item"
+                loading={isLoading}
+                style={{ width: '100%' }}
+                options={categories.map(category => ({
+                  label: category.name,
+                  value: category.id,
+                  isLeaf: false,
+                  children: subcategories
+                    .filter(sub => sub.category_id === category.id)
+                    .map(subcategory => ({
+                      label: subcategory.name,
+                      value: subcategory.id,
+                      isLeaf: false,
+                      children: inventoryItems
+                        .filter(item => item.subcategory_id === subcategory.id)
+                        .map(item => ({
+                          label: item
+                            ? `${item.dynamic_data["Instrument code"] || 'N/A'}${item.dynamic_data["BEL Part Number"] ? ` - ${item.dynamic_data["BEL Part Number"]}` : ''}`
+                            : item.id,
+                          value: item ? item.id : item.id,
+                          isLeaf: true,
+                        }))
+                    }))
+                }))}
+                showSearch={{
+                  filter: (inputValue, path) =>
+                    path.some(option =>
+                      option.label.toLowerCase().includes(inputValue.toLowerCase())
+                    )
+                }}
+                displayRender={(labels) => labels.join(' > ')}
+                onChange={(value) => {
+                  const selectedItem = inventoryItems.find(item => item.id === value[2]);
                   form.setFieldsValue({
-                    inventory_item_id: value[2]
+                    inventory_item_id: selectedItem ? selectedItem.id : null
                   });
-                }
-              }}
-            />
-          </Form.Item>
+                }}
+              />
+            </Form.Item>
+
+            {/* Hidden field to submit inventory_item_id only */}
+            <Form.Item name="inventory_item_id" noStyle>
+              <Input type="hidden" />
+            </Form.Item>
 
           <Row gutter={16}>
             <Col xs={24} sm={12}>

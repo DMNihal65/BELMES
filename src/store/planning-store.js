@@ -997,7 +997,6 @@ const usePlanningStore = create((set) => ({
     }
   },
 
-  // Function to add a tool to an order
   addOrderTool: async (toolData) => {
     try {
       set({ isLoading: true, error: null });
@@ -1005,12 +1004,10 @@ const usePlanningStore = create((set) => ({
       // Format the data for the API - order_id should be a number, not a string
       const formattedToolData = {
         ...toolData,
-        // The API expects these as numbers, not strings
         order_id: Number(toolData.order_id),
         operation_id: Number(toolData.operation_id)
       };
       
-      // Log the data we're sending to help with debugging
       console.log('Sending formatted tool data to API:', formattedToolData);
       
       const response = await fetch('http://172.18.7.85:2078/api/v1/toolsprograms/ordertools/', {
@@ -1022,7 +1019,6 @@ const usePlanningStore = create((set) => ({
         body: JSON.stringify(formattedToolData)
       });
 
-      // Get response data
       let data;
       
       try {
@@ -1041,7 +1037,6 @@ const usePlanningStore = create((set) => ({
 
       set({ isLoading: false });
       
-      // Return the response data in the expected format
       return {
         id: data.id,
         tool_name: data.tool_name || formattedToolData.tool_name,
@@ -1051,14 +1046,17 @@ const usePlanningStore = create((set) => ({
         quantity: data.quantity || formattedToolData.quantity,
         order_id: data.order_id || formattedToolData.order_id,
         operation_id: data.operation_id || formattedToolData.operation_id
-        // We don't include productionOrder and partNumber here as those will be added by the component
       };
     } catch (error) {
-      console.error('Error adding tool:', error);
+      console.error('Error adding tool:', error); // Log the error object directly
       set({ isLoading: false, error: error.message });
-      throw error;
+      throw error; // Rethrow the error for further handling
     }
   },
+
+
+
+
 
   // Function to update an existing tool
   updateOrderTool: async (toolId, toolData) => {

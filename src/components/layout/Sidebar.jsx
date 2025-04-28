@@ -12,7 +12,7 @@ import {
   Calendar,
   Activity,
   CheckSquare,
-  Archive,
+  Archive, Lock ,
   Files,
   Box,
   Bell,
@@ -222,7 +222,151 @@ function Sidebar() {
     },
   ];
 
-  const menuItems = user?.role === 'operator' ? operatorMenuItems : supervisorMenuItems;
+
+  const adminMenuItems = [
+    {
+      key: '/admin/dashboard',
+      icon: <Home size={20} />,
+      label: 'Dashboard',
+    },
+    {
+      key: '/admin/order-management',
+      icon: <Package size={20} />,
+      label: 'Order Management',
+      children: [
+        {
+          key: '/admin/order-management/',
+          label: 'Order Lists',
+        },
+        {
+          key: '/admin/configuration',
+          label: 'Work Center',
+        },
+      ]
+    },
+    {
+      key: '/admin/maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Maintenance',
+    },
+    {
+      key: 'production-planning',
+      icon: <Calendar size={20} />,
+      label: 'Production Planning',
+      children: [
+        {
+          key: '/admin/production-planning/planning',
+          label: 'Planning',
+        },
+        {
+          key: '/admin/production-planning/capacity_planning',
+          label: "Capacity Planning"
+        },
+        {
+          key: '/admin/production-planning/scheduling',
+          label: 'Scheduling',
+        },
+      ],
+    },
+    {
+      key: '/admin/production-monitoring',
+      icon: <Activity size={20} />,
+      label: 'Production Monitoring',
+      children: [
+        {
+          key: '/admin/production-monitoring/dashboard',
+          label: 'Live Monitoring',
+        },
+        {
+          key: '/admin/production-monitoring/production-vs-actual',
+          label: 'Production vs Actual',
+        },
+        {
+          key: '/admin/production-monitoring/oee-overview',
+          label: 'OEE Overview',
+        },
+        {
+          key: '/admin/production-monitoring/analytics',
+          label: 'Analytics',
+        },
+        {
+          key: '/admin/pokayoke',
+          label: 'PokaYoke Checklists',
+        },
+      ],
+    },
+    {
+      key: '/admin/quality-management',
+      icon: <CheckSquare size={20} />,
+      label: 'Quality Management',
+    },
+    {
+      key: 'inventory_data_management',
+      icon: <Archive size={20} />,
+      label: 'Inventory Management',
+      children: [
+        {
+          key: '/admin/inventory_data_management/inventory_all_data',
+          label: 'Inventery Master ',
+        },
+        {
+          key: '/admin/inventory_data_management/inventory_analytics',
+          label: 'Overview Data',
+        },
+      ],
+    },
+    {
+      key: '/admin/energy-monitoring',
+      icon: <BarChart2 size={20} />,
+      label: 'Energy Monitoring',
+    },
+    {
+      key: '/admin/machine_availability',
+
+      icon: <Gauge  size={20} />,
+      label: 'Assets Availability',
+    },
+    {
+      key: '/admin/documents',
+
+      icon: <Files size={20} />,
+      label: 'Document Management',
+    },
+    {
+      key: '/admin/notifications',
+      icon: unreadCount > 0 ? (
+        <Badge count={unreadCount} size="small" offset={[5, 0]}>
+          <Bell size={20} />
+        </Badge>
+      ) : <Bell size={20} />,
+      label: 'Notifications',
+    },
+    {
+      key: '/admin/logs',
+      icon: <ScrollText  size={20} />,
+      label: 'Logs',
+    },
+    {
+      key: 'access_control_management',
+      icon: <Lock  size={20} />,
+      label: 'Access Control Management',
+      children: [
+        {
+          key: '/admin/access_control_management/register_new_user',
+          label: 'Register New User ',
+        },
+        {
+          key: '/admin/access_control_management/machine_password_management',
+          label: 'Machine Password Management',
+        },
+      ],
+    },
+  ];
+
+  const menuItems = 
+    user?.role === 'operator' ? operatorMenuItems : 
+    user?.role === 'admin' ? adminMenuItems : // Added condition for admin
+    supervisorMenuItems;
 
   return (
     <div className="h-screen flex flex-col">

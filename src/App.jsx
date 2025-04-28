@@ -15,9 +15,9 @@ import ProductionMonitoring from './pages/supervisorscreens/ProductionMon';
 import MachineMaintenance from './pages/supervisorscreens/MachineMaintenance/MachineMaintenance';
 import DocumentManagement from './pages/supervisorscreens/DocumentManagement';
 import RequestsCalibrationHistory from './pages/supervisorscreens/inventory/requestsCalibrationHistory';
-import DataManagement from './pages/supervisorscreens/InventoryDataManagement/DataManagement'
-import InventoryAllData from './pages/supervisorscreens/InventoryDataManagement/InventoryAllData'
-import InventoryAnalytics from './pages/supervisorscreens/InventoryDataManagement/InventoryAnalytics'
+import DataManagement from './pages/supervisorscreens/InventoryDataManagement/DataManagement';
+import InventoryAllData from './pages/supervisorscreens/InventoryDataManagement/InventoryAllData';
+import InventoryAnalytics from './pages/supervisorscreens/InventoryDataManagement/InventoryAnalytics';
 import JobDetails from './pages/operatorscreens/jobdetails';
 // import Inventory from './pages/operatorscreens/inventory/inventoryRequest';
 import Inventory from './pages/operatorscreens/inventory/InventoryViewData';
@@ -43,6 +43,9 @@ import QualityInspectionDetails from './pages/supervisorscreens/QualityManagemen
 import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
 import PokaYokeDashboard from './pages/supervisorscreens/PokaYoke/PokaYokeDashboard';
 
+import RegisterNewUser from './pages/adminscreens/userManagement/RegisterNewuser';
+import MachinePasswordManagement from './pages/adminscreens/machineManagement/MachinePasswordManagement'
+
 const App = () => {
 
   console.log("Deployed on 09-04-2025")
@@ -51,6 +54,45 @@ const App = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="dashboard" element={<SupervisorDashboard />} />
+            <Route path="order-management" element={<OrderDashboard />} />
+            <Route path="configuration" element={<WorkcenterDashboard />} />
+            <Route path="maintenance" element={<Maintenance />} />
+            <Route path="production-planning/planning" element={<Planning />} />
+            <Route path="production-planning/scheduling" element={<Scheduling />} />
+            <Route path="production-planning/capacity_planning" element={<CapacityPlanning />} />
+
+            <Route path="production-monitoring/dashboard" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/production-vs-actual" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-analysis" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/oee-overview" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/analytics" element={<ProductionMonitoring />} />
+
+            <Route path="machine_availability" element={<MachineMaintenance />}/> 
+            <Route path="documents" element={<DocumentManagement />} />
+            <Route path="quality-management" element={<QualityManagementDashboard />} />
+            <Route path="inventory_master/requests_calibration_history" element={<RequestsCalibrationHistory />} />
+            <Route path="inventory_data_management/data_management" element={<DataManagement />} />
+            <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
+            <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
+            <Route path="energy-monitoring" element={<EnergyMonitoring />} />
+
+            <Route path="quality-management/inspection-details" element={<QualityInspectionDetails />} />
+
+            <Route path="quality-management/inspection-report" element={<InspectionReport />} />
+            <Route path="logs" element={<LogsDashboard />} />
+            <Route path="pokayoke" element={<PokaYokeDashboard />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="access_control_management/register_new_user" element={<RegisterNewUser />} />
+            <Route path="access_control_management/machine_password_management" element={<MachinePasswordManagement />} />
+          </Route>
           
           {/* Supervisor Routes */}
           <Route path="/supervisor" element={

@@ -75,6 +75,28 @@ const Login = () => {
             throw new Error('You do not have operator access');
           }
         }
+      } else if (loginType === 'admin') { // Added condition for admin
+        if (currentStep === 0) {
+          if (values.supervisorPin === '9999') {
+            setCurrentStep(1);
+          } else {
+            throw new Error('Invalid admin PIN');
+          }
+        } else {
+          const response = await login({
+            username: values.adminName, // Use adminName for admin login
+            password: values.password,
+            role: 'admin' // Set role to admin
+          });
+          
+          // Check role from response
+          if (response.role === 'admin') { // Check for admin role
+            toast.success(`Welcome ${values.adminName}!`);
+            navigate('/admin/dashboard', { replace: true }); // Navigate to admin dashboard
+          } else {
+            throw new Error('You do not have admin access');
+          }
+        }
       } else {
         if (currentStep === 0) {
           if (values.supervisorPin === '9999') {
@@ -247,6 +269,56 @@ const Login = () => {
       </>
     );
   };
+
+  const renderAdminSteps = () => {
+    if (currentStep === 0) {
+      return (
+        <Form.Item
+          name="supervisorPin"
+          label={<span className="text-gray-700 font-medium">Supervisor PIN</span>}
+          rules={[
+            { required: true, message: 'Please enter supervisor PIN!' },
+            { len: 4, message: 'PIN must be 4 digits!' }
+          ]}
+        >
+          <Input
+            prefix={<NumberOutlined className="text-gray-400" />}
+            placeholder="Enter 4-digit PIN"
+            maxLength={4}
+            size="large"
+            type="password"
+          />
+        </Form.Item>
+      );
+    }
+    return (
+      <>
+        <Form.Item
+          name="adminName"
+          label={<span className="text-gray-700 font-medium">Admin Name</span>}
+          rules={[{ required: true, message: 'Please enter admin name!' }]}
+        >
+          <Input
+            prefix={<UserOutlined className="text-gray-400" />}
+            placeholder="Enter your name"
+            size="large"
+          />
+        </Form.Item>
+        <Form.Item
+          name="password"
+          label={<span className="text-gray-700 font-medium">Password</span>}
+          rules={[{ required: true, message: 'Please input your password!' }]}
+        >
+          <Input.Password
+            prefix={<LockOutlined className="text-gray-400" />}
+            placeholder="Enter your password"
+            size="large"
+          />
+        </Form.Item>
+      </>
+    );
+  };
+
 
   const RegisterModal = () => (
     <Modal
@@ -445,18 +517,18 @@ const Login = () => {
                 </Form.Item>
 
                 <Form.Item
-  name="role"
-  label="Role"
-  rules={[{ required: true, message: 'Please select role!' }]}
->
-  <Select placeholder="Select role">
-    {roles.map(role => (
-      <Option key={role.id} value={role.id}> {/* Use role.id as the value */}
-        {role.role_name.charAt(0).toUpperCase() + role.role_name.slice(1)} {/* Display role_name */}
-      </Option>
-    ))}
-  </Select>
-</Form.Item>
+                  name="role"
+                  label="Role"
+                  rules={[{ required: true, message: 'Please select role!' }]}
+                >
+                  <Select placeholder="Select role">
+                    {roles.map(role => (
+                      <Option key={role.id} value={role.id}> {/* Use role.id as the value */}
+                        {role.role_name.charAt(0).toUpperCase() + role.role_name.slice(1)} {/* Display role_name */}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
 
                 <Form.Item
                   noStyle
@@ -539,6 +611,24 @@ const Login = () => {
                       </Radio.Button>
                     </motion.div>
                   </div>
+
+                  <div className="p-4 gap-2 w-64 ml-20">
+                  <motion.div 
+                      whileHover={{ scale: 1.02 }} 
+                      whileTap={{ scale: 0.98 }}
+                      className="shadow-sm"
+                    >
+                      <Radio.Button
+                        value="admin"
+                        className="text-center h-24 flex items-center justify-center w-full rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 border-2 border-transparent hover:border-blue-500"
+                      >
+                        <div className="flex justify-center items-center gap-2">
+                          <UserOutlined className="text-xl text-blue-600" />
+                          <span className=" font-medium">Admin Login</span>
+                        </div>
+                      </Radio.Button>
+                    </motion.div>
+                  </div>
                 </Radio.Group>
               </motion.div>
 
@@ -591,7 +681,7 @@ const Login = () => {
                       requiredMark={false}
                       className="space-y-4"
                     >
-                      {loginType === 'operator' ? renderOperatorSteps() : renderSupervisorSteps()}
+                      {loginType === 'admin' ? renderAdminSteps() : loginType === 'operator' ? renderOperatorSteps() : renderSupervisorSteps()}
 
                       <Form.Item className="mb-0">
                         <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>

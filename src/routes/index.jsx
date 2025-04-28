@@ -227,6 +227,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  
   {
     path: '*',
     element: <Navigate to="/" replace />,

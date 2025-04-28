@@ -83,10 +83,6 @@ function Calibration() {
     upcomingCalibrations
   } = useInventoryStore();
 
-
-  
-
-  
   const filterCalibrations = async (status) => {
     setSelectedStatus(status);
     if (status === 'due_soon') {
@@ -1329,7 +1325,7 @@ function Calibration() {
           {/* Inventory Item Select and pass the inventory_item_id */}
             <Form.Item
               name="inventory_selection"
-              label="Inventory Item"
+              label="Inventory Item Details"
               rules={[{ required: true, message: 'Please select an inventory item' }]}
             >
               <Cascader
@@ -1349,9 +1345,8 @@ function Calibration() {
                       children: inventoryItems
                         .filter(item => item.subcategory_id === subcategory.id)
                         .map(item => ({
-                          label: item
-                            ? `${item.dynamic_data["Instrument code"] || 'N/A'}${item.dynamic_data["BEL Part Number"] ? ` - ${item.dynamic_data["BEL Part Number"]}` : ''}`
-                            : item.id,
+                          label: item.dynamic_data["Instrument code"] ? `${item.dynamic_data["Instrument code"]}` 
+                            : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
                           value: item ? item.id : item.id,
                           isLeaf: true,
                         }))
@@ -1372,6 +1367,15 @@ function Calibration() {
                 }}
               />
             </Form.Item>
+
+
+
+
+
+
+
+
+            
 
             {/* Hidden field to submit inventory_item_id only */}
             <Form.Item name="inventory_item_id" noStyle>

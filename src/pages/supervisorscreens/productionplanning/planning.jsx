@@ -39,11 +39,12 @@ const { Option } = Select;
 const { TabPane } = Tabs;
 
 const Planning = () => {
+  const [form] = Form.useForm();
   const [selectedJob, setSelectedJob] = useState(null);
-  const [selectedPartNumber, setSelectedPartNumber] = useState(null);
+  const [selectedPartNumber, setSelectedPartNumber] = useState('');
   const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
   const [selectedProjectName, setSelectedProjectName] = useState(null);
-  const [selectedPartDescription, setSelectedPartDescription] = useState(null);
+  const [selectedPartDescription, setSelectedPartDescription] = useState('');
   const [showMPPDetails, setShowMPPDetails] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [activeTab, setActiveTab] = useState('jobDetails');
@@ -91,9 +92,10 @@ const Planning = () => {
   const [engineeringDrawings, setEngineeringDrawings] = useState([]);
   const [drawingsLoading, setDrawingsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [subcategories, setSubcategories] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
-  // const [subcategories, setSubcategories] = useState([]);
-  const { categories, subcategories, fetchCategories, fetchAllSubcategories } = useInventoryStore();
+  const { categories, fetchItems,  fetchCategories, fetchAllSubcategories } = useInventoryStore();
+  const [selectedSubcategoryName, setSelectedSubcategoryName] = useState('');
   
   useEffect(() => {
     const fetchData = async () => {
@@ -108,6 +110,23 @@ const Planning = () => {
     fetchData();
 }, [fetchCategories, fetchAllSubcategories]);
 
+useEffect(() => {
+  loadInventoryItems();
+  loadSubcategories();
+}, []);
+
+
+const loadInventoryItems = async () => {
+  try {
+    const items = await fetchItems();
+    // console.log('Loaded items:', items); // Debug log
+    setInventoryItems(items || []);
+  } catch (error) {
+    console.error('Error loading inventory items:', error);
+    toast.error('Failed to load inventory items');
+    setInventoryItems([]);
+  }
+};
   const loadSubcategories = async () => {
     try {
       const subCats = await fetchAllSubcategories();
@@ -225,9 +244,9 @@ const Planning = () => {
             // Only use saved tools if they match the restored job
             if (parsedTools.length > 0 && parsedTools[0].productionOrder === parsedJob.production_order) {
               setTools(parsedTools);
-              console.log('Restored matching tools from localStorage:', parsedTools);
+              // console.log('Restored matching tools from localStorage:', parsedTools);
             } else {
-              console.log('Saved tools do not match the restored job - initializing empty tools');
+              // console.log('Saved tools do not match the restored job - initializing empty tools');
               setTools([]);
             }
           } catch (error) {
@@ -244,9 +263,9 @@ const Planning = () => {
             // Only use saved programs if they match the restored job
             if (parsedPrograms.length > 0 && parsedPrograms[0].productionOrder === parsedJob.production_order) {
               setPrograms(parsedPrograms);
-              console.log('Restored matching programs from localStorage:', parsedPrograms);
+              // console.log('Restored matching programs from localStorage:', parsedPrograms);
             } else {
-              console.log('Saved programs do not match the restored job - initializing empty programs');
+              // console.log('Saved programs do not match the restored job - initializing empty programs');
               setPrograms([]);
             }
           } catch (error) {
@@ -271,7 +290,7 @@ const Planning = () => {
             selectedJob.part_number,
             selectedJob.production_order
           );
-          console.log('PDC Response for current job:', pdcResponse);
+          // console.log('PDC Response for current job:', pdcResponse);
           
           if (pdcResponse && Array.isArray(pdcResponse) && pdcResponse.length > 0) {
             // Find the matching PDC record for this specific part number and production order
@@ -283,7 +302,7 @@ const Planning = () => {
             if (matchingPdc) {
               // If a matching record was found, set it as the PDC data
               setPdcData(matchingPdc);
-              console.log('PDC data matched for current job:', matchingPdc);
+              // console.log('PDC data matched for current job:', matchingPdc);
             } else {
               // Use the first PDC record if no exact match found
               const pdcWithProductionOrder = {
@@ -292,10 +311,10 @@ const Planning = () => {
                 part_number: pdcResponse[0].part_number || selectedJob.part_number
               };
               setPdcData(pdcWithProductionOrder);
-              console.log('Using first PDC record:', pdcWithProductionOrder);
+              // console.log('Using first PDC record:', pdcWithProductionOrder);
             }
           } else {
-            console.log('No PDC data available for this part/order');
+            // console.log('No PDC data available for this part/order');
             setPdcData(null);
           }
         } catch (pdcError) {
@@ -329,7 +348,7 @@ const Planning = () => {
   useEffect(() => {
     if (programs.length > 0) {
       localStorage.setItem('jobPrograms', JSON.stringify(programs));
-      console.log('Saved programs to localStorage:', programs);
+      // console.log('Saved programs to localStorage:', programs);
     }
   }, [programs]);
 
@@ -414,7 +433,7 @@ const Planning = () => {
         try {
           setDrawingsLoading(true);
           const drawingsData = await fetchEngineeringDrawings(selectedJob.part_number);
-          console.log('Fetched engineering drawings:', drawingsData);
+          // console.log('Fetched engineering drawings:', drawingsData);
           setEngineeringDrawings(drawingsData.items || []);
         } catch (error) {
           console.error('Error fetching engineering drawings:', error);
@@ -542,7 +561,7 @@ const Planning = () => {
   const handleJobSelect = async (partNumber) => {
     try {
       setLoading(true);
-      console.log('Selected part number:', partNumber);
+      // console.log('Selected part number:', partNumber);
       setSelectedOrderNumber(partNumber);
       
       if (!partNumber) {
@@ -554,14 +573,14 @@ const Planning = () => {
         return;
       }
 
-      console.log('Selected partNumber:', partNumber);
+      // console.log('Selected partNumber:', partNumber);
       
       const fetchJobDetails = async (selectedPartNumber) => {
         try {
           const orderData = await searchOrders(selectedPartNumber);
           if (orderData && orderData.orders && orderData.orders.length > 0) {
             const jobData = orderData.orders[0];
-            console.log('Job details:', jobData);
+            // console.log('Job details:', jobData);
             setSelectedJob(jobData);
             
             // Save to localStorage for persistence
@@ -573,7 +592,7 @@ const Planning = () => {
             // Fetch tools and programs
             try {
               const toolsData = await fetchToolsByOrderId(jobData.id);
-              console.log('Tools data:', toolsData);
+              // console.log('Tools data:', toolsData);
               
               const enhancedToolsData = toolsData.map(tool => ({
                 ...tool,
@@ -592,7 +611,7 @@ const Planning = () => {
             
             try {
               const programsData = await fetchProgramsByOrderId(jobData.id);
-              console.log('Programs data:', programsData);
+              // console.log('Programs data:', programsData);
               
               const enhancedProgramsData = programsData.map(program => ({
                 ...program,
@@ -1087,7 +1106,7 @@ const Planning = () => {
 
       // Save the PDF
       const fileName = `JobCard_${selectedJob.production_order || 'unknown'}.pdf`;
-      console.log('Saving PDF with filename:', fileName);
+      // console.log('Saving PDF with filename:', fileName);
       doc.save(fileName);
       message.success('Job card downloaded successfully');
       setIsPreviewModalVisible(false);
@@ -1361,9 +1380,10 @@ const Planning = () => {
       const toolData = {
         ...values,
         order_id: selectedJob.id,
-        operation_id: values.operation_id
+        operation_id: values.operation_id,
+        tool_name: values.tool_name, // Ensure this is a string
       };
-      console.log('Tool Data to be submitted:', toolData);
+      // console.log('Tool Data to be submitted:', toolData);
       const newTool = await addOrderTool(toolData);
       setTools(prevTools => [...prevTools, newTool]);
       message.success('Tool added successfully');
@@ -2017,104 +2037,125 @@ const Planning = () => {
                   <Form
                     form={addToolForm}
                     layout="vertical"
-                    onFinish={handleAddTool}
+                    onFinish={async (values) => {
+                      try {
+                        // Prepare the tool data to be sent to the store
+                        const toolData = {
+                          tool_name: selectedSubcategoryName, // This should now be a string
+                          tool_number: values.tool_number || 'N/A', // Assuming you want to add this field
+                          bel_partnumber: selectedPartNumber,
+                          description: selectedPartDescription,
+                          quantity: values.quantity,
+                          order_id: selectedJob.id, // Assuming selectedJob.id is the order ID
+                          operation_id: values.operation_id,
+                        };
+
+                        // Call the addOrderTool function from the planning store
+                        const newTool = await usePlanningStore.getState().addOrderTool(toolData);
+                        console.log('New tool added:', newTool);
+                        message.success('Tool added successfully');
+                        setIsAddToolModalVisible(false);
+                        addToolForm.resetFields();
+                      } catch (error) {
+                        console.error('Error adding tool:', error);
+                        message.error('Failed to add tool');
+                      }
+                    }}
                   >
-                    {/* <Form.Item
-                      name="tool_name"
-                      label="Tool Name"
-                      rules={[{ required: true, message: 'Please enter tool name' }]}
-                    >
-                      <Input />
-                    </Form.Item> */}
+                  <Form.Item
+                    label="Selecet Tool"
+                    rules={[{ required: true, message: 'Please select an inventory item' }]}
+                  >
+                    <Cascader
+                      placeholder="Select Category > Subcategory > Item"
+                      loading={isLoading}
+                      style={{ width: '100%' }}
+                      options={categories.map(category => ({
+                        label: category.name,
+                        value: category.id,
+                        isLeaf: false,
+                        children: subcategories
+                          .filter(sub => sub.category_id === category.id)
+                          .map(subcategory => ({
+                            label: subcategory.name,
+                            value: subcategory.id,
+                            isLeaf: false,
+                            children: inventoryItems
+                              .filter(item => item.subcategory_id === subcategory.id)
+                              .map(item => ({
+                                label: item.dynamic_data["Instrument code"] 
+                                  ? `${item.dynamic_data["Instrument code"]}` 
+                                  : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
+                                value: item.id,
+                                isLeaf: true,
+                              }))
+                          }))
+                      }))}
 
-                    <Form.Item
-                        name="tool_name"
-                        label="Tool Name"
-                        rules={[{ required: true, message: 'Please select an inventory item' }]}
-                    >
-                        <Select
-                            placeholder="Select Subcategory"
-                            loading={isLoading}
-                            showSearch
-                            onChange={(value) => {
-                                const selectedSubcategory = subcategories.find(sub => sub.id === value);
-                                addToolForm.setFieldsValue({
-                                    inventory_item_id: value, // Set the selected item ID
-                                    tool_name: selectedSubcategory ? selectedSubcategory.name : '' // Set the subcategory name for display
-                                });
-                            }}
-                        >
-                            {subcategories.map(subcategory => (
-                                <Select.Option key={subcategory.id} value={subcategory.id}>
-                                    {subcategory.name}
-                                </Select.Option>
-                            ))}
-                        </Select>
+                      showSearch={{
+                        filter: (inputValue, path) =>
+                          path.some(option =>
+                            option.label.toLowerCase().includes(inputValue.toLowerCase())
+                          )
+                      }}
+                      // displayRender={(labels) => labels[1] || ''} 
+                      onChange={(value, selectedOptions) => {
+                        if (Array.isArray(value) && value.length === 3) {
+                          const selectedSubcategory = selectedOptions[1]; // The second option is the subcategory
+                          const subcategoryName = selectedSubcategory ? selectedSubcategory.label : '';
+
+                          // Set the form values
+                          form.setFieldsValue({
+                            tool_name: subcategoryName,  // Set the subcategory name as a string
+                            inventory_item_id: value[2],  // Set item ID if needed
+                          });
+
+                          // Set the selected subcategory name
+                          setSelectedSubcategoryName(subcategoryName);
+
+                          // Find the selected item to extract the part number and description
+                          const selectedItemData = inventoryItems.find(item => item.id === value[2]);
+
+                          if (selectedItemData) {
+                            setSelectedPartNumber(selectedItemData.dynamic_data["BEL Part Number "] || 'N/A');
+                            setSelectedPartDescription(selectedItemData.dynamic_data["BEL Part Description"] || 'N/A');
+                            
+                            // Optionally set description field as well (for backend)
+                            form.setFieldsValue({
+                              description: selectedItemData.dynamic_data["BEL Part Description"] || 'N/A',  // Description as string
+                            });
+                          } else {
+                            setSelectedPartNumber('');
+                            setSelectedPartDescription('');
+                            form.setFieldsValue({
+                              description: 'N/A',  // Fallback if no item is selected
+                            });
+                          }
+                        }
+                      }}
+                    />
+                  </Form.Item>
+
+                    <Form.Item label="Selected Subcategory">
+                      <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />
                     </Form.Item>
 
-                    {/* <Form.Item
-                        name="tool_name"
-                        label="Tool Name"
-                        rules={[{ required: true, message: 'Please select an inventory item' }]}
-                    >
-                        <Cascader
-                            placeholder="Select Category > Subcategory"
-                            loading={isLoading}
-                            style={{ width: '100%' }}
-                            options={categories.map(category => ({
-                                label: category.name,
-                                value: category.id,
-                                isLeaf: false,
-                                children: subcategories
-                                    .filter(sub => sub.category_id === category.id)
-                                    .map(subcategory => ({
-                                        label: subcategory.name,
-                                        value: subcategory.id, // Ensure this is the ID passed to the backend
-                                        isLeaf: true
-                                    }))
-                            }))}
-                            onChange={(value) => {
-                                if (value && value.length === 3) {
-                                    const selectedSubcategory = subcategories.find(sub => sub.id === value[2]);
-                                    addToolForm.setFieldsValue({
-                                        inventory_item_id: value[2], // Set the selected item ID
-                                        tool_name: selectedSubcategory ? selectedSubcategory.name : '' // Set the subcategory name for display
-                                    });
-                                } else {
-                                    // Reset tool_name if the selection is not complete
-                                    addToolForm.setFieldsValue({
-                                        tool_name: ''
-                                    });
-                                }
-                            }}
-                        />
-                    </Form.Item> */}
-
-
-
-
-
-
-                    <Form.Item
-                      name="tool_number"
-                      label="Tool Number"
-                      rules={[{ required: true, message: 'Please enter tool number' }]}
-                    >
-                      <Input />
+                    <Form.Item label="BEL Part Number">
+                      <Input 
+                        value={selectedPartNumber} 
+                        readOnly 
+                        className="bg-gray-100" 
+                      />
                     </Form.Item>
-                    <Form.Item
-                      name="bel_partnumber"
-                      label="BEL Part Number"
-                      rules={[{ required: true, message: 'Please enter BEL part number' }]}
-                    >
-                      <Input />
+
+                    <Form.Item label="BEL Part Description">
+                      <Input 
+                        value={selectedPartDescription} 
+                        readOnly 
+                        className="bg-gray-100" 
+                      />
                     </Form.Item>
-                    <Form.Item
-                      name="description"
-                      label="Description"
-                    >
-                      <Input.TextArea />
-                    </Form.Item>
+
                     <Form.Item
                       name="quantity"
                       label="Quantity"
@@ -2137,6 +2178,10 @@ const Planning = () => {
                     </Form.Item>
                   </Form>
                 </Modal>
+
+
+
+                
 
                 {/* Edit Tool Modal */}
                 <Modal
@@ -2230,7 +2275,7 @@ const Planning = () => {
                             handleAddProgram(values);
                           })
                           .catch(info => {
-                            console.log('Validate Failed:', info);
+                            // console.log('Validate Failed:', info);
                           });
                       }}
                     >
@@ -2303,7 +2348,7 @@ const Planning = () => {
                             handleEditProgram(values);
                           })
                           .catch(info => {
-                            console.log('Validate Failed:', info);
+                            // console.log('Validate Failed:', info);
                           });
                       }}
                     >

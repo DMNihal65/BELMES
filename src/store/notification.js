@@ -3,7 +3,7 @@ import { message } from 'antd';
 import { Wrench, Package } from 'lucide-react';
 
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.18.7.85:8078/api/v1';
+const API_BASE_URL = 'http://172.18.7.88:3252/api/v1';
 const API_ENDPOINTS = {
   // GET endpoints for notifications
   machineNotifications: `${API_BASE_URL}/maintainance/supervisor/machine-notifications/`,

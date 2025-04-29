@@ -414,13 +414,18 @@ function Header() {
         onClick={toggleSidebar}
       />
 
-      <Input
+      {/* <Input
         placeholder="Search..."
         prefix={<Search size={16} />}
         style={{ maxWidth: '400px' }}
-      />
+      /> */}
 
+       
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="flex justify-between items-center mr-16 mt-2">
+          <h1 className="text-2xl font-semibold">SBU-Fabrication Components</h1>
+        </div>
+
         <img
           src={belLogo}
           alt="BEL Logo"

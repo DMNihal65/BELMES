@@ -96,6 +96,9 @@ export default function MachineMaintenance() {
       
       // Show success toast
       toast.success('Machine status updated successfully!');
+
+
+      
     } catch (errInfo) {
       console.log('Validate Failed:', errInfo);
       // Show error toast

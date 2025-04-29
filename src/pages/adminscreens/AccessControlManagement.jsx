@@ -8,25 +8,99 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useAccessControlStore } from '../../store/access-control-management';
 import useAuthStore from '../../store/auth-store';
 import MachinePasswordManagement from "../../pages/adminscreens/machineManagement/MachinePasswordManagement"; 
-
+import axios from 'axios';
 const { TabPane } = Tabs;
 
-const AccessControlManagement = () => {
+const AccessControlManagement = ({onSuccess }) => {
   const [activeTab, setActiveTab] = useState('users');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
   const [isRegisterModalVisible, setIsRegisterModalVisible] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [registerForm] = Form.useForm();
   const { isLoading, roles = [], fetchRoles, register } = useAuthStore();
   const [isMachinePasswordModalVisible, setMachinePasswordModalVisible] = useState(false);
-
+  const [machineCredentials, setMachineCredentials] = useState([]);
+  const [editMachineModalVisible, setEditMachineModalVisible] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [machineForm] = Form.useForm();
   const { users, loading, totalUsers, fetchUsers, deleteUser, updateUser } = useAccessControlStore();
+  const [searchText, setSearchText] = useState('');
+  const [filteredUsers, setFilteredUsers] = useState([]);
 
   const { registerUser } = useAccessControlStore();
+
+  useEffect(() => {
+    if (activeTab === 'machines') {
+      fetchMachineCredentials();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (users.length > 0) {
+      const filtered = users.filter(user => 
+        user.username.toLowerCase().includes(searchText.toLowerCase()) ||
+        user.role.role_name.toLowerCase().includes(searchText.toLowerCase()) ||
+        (user.role.access_list && JSON.parse(user.role.access_list).some(access => 
+          access.toLowerCase().includes(searchText.toLowerCase())
+        ))
+      );
+      setFilteredUsers(filtered);
+    } else {
+      setFilteredUsers([]);
+    }
+  }, [searchText, users]);
+
+  const fetchMachineCredentials = async () => {
+    try {
+      const response = await axios.get('http://172.18.7.88:3252/api/v1/auth/get-machine-credentials');
+      setMachineCredentials(response.data);
+    } catch (error) {
+      message.error('Failed to fetch machine credentials');
+    }
+  };
+  
+  const handleEditMachine = (record) => {
+    setSelectedMachine(record);
+    machineForm.setFieldsValue({
+      password: record.password
+    });
+    setEditMachineModalVisible(true);
+  };
+  
+  const handleUpdateMachinePassword = async (values) => {
+    try {
+      await axios.put(`http://172.18.7.88:3252/api/v1/auth/machine-credentials/${selectedMachine.machine_id}`, {
+        password: values.password
+      });
+      message.success('Machine password updated successfully');
+      setEditMachineModalVisible(false);
+      fetchMachineCredentials();
+    } catch (error) {
+      message.error('Failed to update machine password');
+    }
+  };
+  
+  const handleDeleteMachineCredential = (machineId) => {
+    Modal.confirm({
+      title: 'Are you sure you want to delete this machine credential?',
+      content: 'This action cannot be undone.',
+      okText: 'Yes',
+      okType: 'danger',
+      cancelText: 'No',
+      onOk: async () => {
+        try {
+          await axios.delete(`http://172.18.7.88:3252/api/v1/auth/machine-credentials/${machineId}`);
+          message.success('Machine credential deleted successfully');
+          fetchMachineCredentials();
+        } catch (error) {
+          message.error('Failed to delete machine credential');
+        }
+      },
+    });
+  };
 
   useEffect(() => {
     fetchRoles();
@@ -44,23 +118,25 @@ const AccessControlManagement = () => {
     setCurrentPage(1);
   };
 
-  const handleLimitChange = (value) => {
-    setPageSize(value);
-    setCurrentPage(1);
-  };
 
   const handleRefresh = () => {
-    fetchUsers((currentPage - 1) * pageSize, pageSize);
+    if (pageSize === -1) {
+      fetchUsers(0, 999999); // For "All" option
+    } else {
+      fetchUsers((currentPage - 1) * pageSize, pageSize);
+    }
   };
 
-  const handleEdit = (record) => {
-    setEditingUser(record);
-    form.setFieldsValue({
-      username: record.username,
-      role: record.role.role_name
-    });
-    setIsEditModalVisible(true);
-  };
+  useEffect(() => {
+    if (activeTab === 'users') {
+      if (pageSize === -1) {
+        fetchUsers(0, 999999); // For "All" option
+      } else {
+        fetchUsers((currentPage - 1) * pageSize, pageSize);
+      }
+    }
+  }, [activeTab, currentPage, pageSize, fetchUsers]);
+
 
   const handleDelete = (userId) => {
     Modal.confirm({
@@ -69,22 +145,20 @@ const AccessControlManagement = () => {
       okText: 'Yes',
       okType: 'danger',
       cancelText: 'No',
-      onOk() {
-        deleteUser(userId);
+      onOk: async () => {
+        try {
+          await axios.delete(`http://172.18.7.88:3252/api/v1/auth/users/${userId}`);
+          message.success('User deleted successfully');
+          handleRefresh(); // Refresh the user list after deletion
+        } catch (error) {
+          message.error('Failed to delete user');
+          console.error('Error deleting user:', error);
+        }
       },
     });
   };
 
-  const handleEditSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      await updateUser(editingUser.id, values);
-      setIsEditModalVisible(false);
-      form.resetFields();
-    } catch (error) {
-      console.error('Validation failed:', error);
-    }
-  };
+
 
   const handleRegister = async (values) => {
     try {
@@ -171,13 +245,6 @@ const AccessControlManagement = () => {
       width: '10%',
       render: (_, record) => (
         <Space>
-          <Tooltip title="Edit">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
           <Tooltip title="Delete">
             <Button 
               type="text" 
@@ -191,31 +258,58 @@ const AccessControlManagement = () => {
     },
   ];
 
+  const MachineColumns = [
+    // {
+    //   title: 'Machine ID',
+    //   dataIndex: 'machine_id',
+    //   key: 'machine_id',
+    //   width: '30%',
+    // },
+    {
+      title: 'Machine Name',
+      dataIndex: 'machine_name',
+      key: 'machine_name',
+      width: '30%',
+    },
+    {
+      title: 'Password',
+      dataIndex: 'password',
+      key: 'password',
+      width: '40%',
+      render: (password) => '••••••••' // Hide actual password
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: '30%',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="Edit">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => handleEditMachine(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Delete">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDeleteMachineCredential(record.machine_id)}
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
+
   return (
     <div className="p-6">
       <ToastContainer position="top-right" autoClose={3000} />
       <Card bordered={false}>
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-semibold">Access Control Management</h1>
-          <Space>
-            <Select
-              value={pageSize}
-              onChange={handleLimitChange}
-              style={{ width: 120 }}
-            >
-              <Select.Option value={5}>Latest 5</Select.Option>
-              <Select.Option value={10}>Latest 10</Select.Option>
-              <Select.Option value={15}>Latest 15</Select.Option>
-              <Select.Option value={20}>Latest 20</Select.Option>
-              <Select.Option value={-1}>All</Select.Option>
-            </Select>
-            <Tooltip title="Refresh">
-              <Button 
-                icon={<ReloadOutlined />} 
-                onClick={handleRefresh}
-              />
-            </Tooltip>
-          </Space>
         </div>
 
         <Tabs activeKey={activeTab} onChange={handleTabChange}>
@@ -227,24 +321,41 @@ const AccessControlManagement = () => {
             }
             key="users"
           >
-          <div className='flex justify-end p-2'>
+          <div className="flex justify-between items-center mb-4">
+              <Input.Search
+                placeholder="Search by username, role, or access"
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{ width: 300 }}
+                allowClear
+              />
               <Button type="primary" onClick={() => setShowRegister(true)}>
-                  Register New User
+                Register New User
               </Button>
             </div>
 
             <Table
-              dataSource={users}
+              dataSource={searchText ? filteredUsers : users}
               columns={UsersColumns}
               rowKey={(record) => record.id}
               pagination={{
                 current: currentPage,
                 pageSize: pageSize,
-                total: totalUsers,
+                total: searchText ? filteredUsers.length : totalUsers,
                 showSizeChanger: true,
                 showQuickJumper: true,
+                pageSizeOptions: ['5', '10', '15', '20'],
                 position: ['bottomCenter'],
-                onChange: (page) => setCurrentPage(page),
+                onChange: (page, size) => {
+                  setCurrentPage(page);
+                  setPageSize(size);
+                  fetchUsers((page - 1) * size, size);
+                },
+                onShowSizeChange: (current, size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                  fetchUsers(0, size);
+                },
+                showTotal: (total) => `Total ${total} items`
               }}
               loading={loading}
               size="middle"
@@ -253,7 +364,7 @@ const AccessControlManagement = () => {
           </TabPane>
           <TabPane
             tab={
-              <Badge count={0} offset={[10, 0]}>
+              <Badge count={machineCredentials.length} offset={[10, 0]}>
                 <span>Machines</span>
               </Badge>
             }
@@ -269,22 +380,22 @@ const AccessControlManagement = () => {
               </Button>
             </div>
             <Table
-              dataSource={[]}
+              dataSource={machineCredentials}
+              columns={MachineColumns}
               rowKey={(record) => record.id}
               pagination={{
-                current: currentPage,
-                total: 0,
+                pageSize: 10,
                 showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total) => `Total ${total} machines`,
-                position: ['bottomCenter'],
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                responsive: true
               }}
+              scroll={{ x: 'max-content' }}
+                className="responsive-table"
               size="middle"
               bordered
-              locale={{ emptyText: 'No machines available' }}
             />
           </TabPane>
-          <TabPane
+          {/* <TabPane
             tab={
               <Badge count={0} offset={[10, 0]}>
                 <span>Roles</span>
@@ -307,46 +418,11 @@ const AccessControlManagement = () => {
               bordered
               locale={{ emptyText: 'No roles available' }}
             />
-          </TabPane>
+          </TabPane> */}
           
           {/* Other tabs can be added here */}
         </Tabs>
       </Card>
-
-      {/* Edit User Modal */}
-      <Modal
-        title="Edit User"
-        visible={isEditModalVisible}
-        onOk={handleEditSubmit}
-        onCancel={() => {
-          setIsEditModalVisible(false);
-          form.resetFields();
-        }}
-        okText="Save"
-        cancelText="Cancel"
-      >
-        <Form
-          form={form}
-          layout="vertical"
-        >
-          <Form.Item
-            name="username"
-            label="Username"
-            rules={[{ required: true, message: 'Please input the username!' }]}
-
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="role"
-            label="Role"
-            rules={[{ required: true, message: 'Please input the role!' }]}
-
-          >
-            <Input />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       <Modal
         title="Register New User"
@@ -456,6 +532,33 @@ const AccessControlManagement = () => {
         destroyOnClose
       >
         <MachinePasswordManagement />
+      </Modal>
+
+      <Modal
+        title="Edit Machine Password"
+        open={editMachineModalVisible}
+        onCancel={() => setEditMachineModalVisible(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={machineForm}
+          layout="vertical"
+          onFinish={handleUpdateMachinePassword}
+        >
+          <Form.Item
+            name="password"
+            label="New Password"
+            rules={[{ required: true, message: 'Please enter new password!' }]}
+          >
+            <Input.Password />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block>
+              Update Password
+            </Button>
+          </Form.Item>
+        </Form>
       </Modal>
 
       

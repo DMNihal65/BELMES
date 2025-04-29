@@ -222,16 +222,18 @@ const Scheduling = () => {
     if (!scheduleData?.work_centers) return [];
     
     // Get all machines from work_centers in the order they appear in the API
-    const workCenterMachines = scheduleData.work_centers.flatMap(wc => 
-      wc.machines.map(machine => ({
-        id: machine.id,  // Original machine ID
-        machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work center code and machine ID
-        name: machine.name,
-        work_center_code: wc.work_center_code,
-        work_center_name: wc.work_center_name,
-        displayName: `${wc.work_center_code} - ${machine.name}`,  // Display format
-        order: scheduleData.work_centers.indexOf(wc) * 100 + wc.machines.indexOf(machine) // Preserve order
-      }))
+    const workCenterMachines = scheduleData.work_centers
+      .filter(wc => wc.is_schedulable === true) // Only include work centers that are schedulable
+      .flatMap(wc => 
+        wc.machines.map(machine => ({
+          id: machine.id,  // Original machine ID
+          machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work center code and machine ID
+          name: machine.name,
+          work_center_code: wc.work_center_code,
+          work_center_name: wc.work_center_name,
+          displayName: `${wc.work_center_code} - ${machine.name}`,  // Display format
+          order: scheduleData.work_centers.indexOf(wc) * 100 + wc.machines.indexOf(machine) // Preserve order
+        }))
     );
     
     // Get machines from scheduled operations to check which ones are running

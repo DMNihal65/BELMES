@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Upload, message,
-  Typography, Tag, Tooltip, Form, Drawer, Descriptions, Cascader,
+  Typography, Tag, Tooltip, Form, Drawer, Descriptions,
   Badge, Alert, Spin, Progress, Divider, Collapse, DatePicker, Pagination, InputNumber
 } from 'antd';
 import {
@@ -11,9 +11,9 @@ import {
   CalendarOutlined, BarChartOutlined,
   ToolOutlined, DownloadOutlined, DeleteOutlined,
   ScheduleOutlined, ReloadOutlined, EyeOutlined,
-  AppstoreOutlined, CheckCircleOutlined, RobotOutlined,
+  AppstoreOutlined, CheckOutlined, RobotOutlined,
   ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined,
-  CloseCircleOutlined
+  HistoryOutlined
 } from '@ant-design/icons';
 import {
   Timer, AlertTriangle, CheckCircle2, 
@@ -33,7 +33,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import * as QRCodeNode from 'qrcode';
 import { create } from 'zustand';
 import moment from 'moment';
-import useInventoryStore from '../../../store/inventory-store';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -92,18 +91,59 @@ const PdcInfo = ({ productionOrder }) => {
 };
 
 const Planning = () => {
-  const [form] = Form.useForm();
+  // Job and part selection states
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedPartNumber, setSelectedPartNumber] = useState(null);
   const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
   const [selectedProjectName, setSelectedProjectName] = useState(null);
   const [selectedPartDescription, setSelectedPartDescription] = useState(null);
-  const [showMPPDetails, setShowMPPDetails] = useState(false);
-  const [selectedOperation, setSelectedOperation] = useState(null);
-  const [activeTab, setActiveTab] = useState('jobDetails');
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
+
+  // UI visibility states
+  const [showMPPDetails, setShowMPPDetails] = useState(false);
+  const [isPreviewModalVisible, setIsPreviewModalVisible] = useState(false);
+  const [isAddDocumentModalVisible, setIsAddDocumentModalVisible] = useState(false);
+  const [isAddToolModalVisible, setIsAddToolModalVisible] = useState(false);
+  const [isEditToolModalVisible, setIsEditToolModalVisible] = useState(false);
+  const [isAddProgramModalVisible, setIsAddProgramModalVisible] = useState(false);
+  const [isEditProgramModalVisible, setIsEditProgramModalVisible] = useState(false);
+  const [isVersionUpdateModalVisible, setIsVersionUpdateModalVisible] = useState(false);
+  const [selectedProgramForVersion, setSelectedProgramForVersion] = useState(null);
+  const [versionFile, setVersionFile] = useState(null);
+  const [versionNumber, setVersionNumber] = useState('');
+  const [form] = Form.useForm();
+
+  // Selected item states
+  const [selectedOperation, setSelectedOperation] = useState(null);
+  const [selectedTool, setSelectedTool] = useState(null);
+  const [selectedProgram, setSelectedProgram] = useState(null);
+
+  // Data states
+  const [tools, setTools] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [pdcData, setPdcData] = useState(null);
+  const [engineeringDrawings, setEngineeringDrawings] = useState([]);
+  const [programDocuments, setProgramDocuments] = useState([]);
+  const [programVersions, setProgramVersions] = useState([]); // Add state for versions
+  const [isVersionHistoryModalVisible, setIsVersionHistoryModalVisible] = useState(false); // Add state for modal
+
+  // UI control states
+  const [activeTab, setActiveTab] = useState('jobDetails');
   const [currentPage, setCurrentPage] = useState(1);
   const [programCurrentPage, setProgramCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [drawingsLoading, setDrawingsLoading] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Form instances
+  const [addDocumentForm] = Form.useForm();
+  const [addToolForm] = Form.useForm();
+  const [editToolForm] = Form.useForm();
+  const [addProgramForm] = Form.useForm();
+  const [editProgramForm] = Form.useForm();
+
+  // Store hooks
   const { 
     fetchAllOrders, 
     searchOrders, 
@@ -123,88 +163,14 @@ const Planning = () => {
     deleteOrderProgram,
     fetchPartProductionPDC,
     fetchEngineeringDrawings,
-    downloadDocument
+    downloadDocument,
+    uploadCncProgram,
+    fetchProgramDocuments,
+    updateProgramVersion,
+    fetchProgramVersions,
+    fetchCncProgramDetails // Add this line
   } = usePlanningStore();
-  const [isPreviewModalVisible, setIsPreviewModalVisible] = useState(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [isAddToolModalVisible, setIsAddToolModalVisible] = useState(false);
-  const [isEditToolModalVisible, setIsEditToolModalVisible] = useState(false);
-  const [isAddProgramModalVisible, setIsAddProgramModalVisible] = useState(false);
-  const [isEditProgramModalVisible, setIsEditProgramModalVisible] = useState(false);
-  const [selectedTool, setSelectedTool] = useState(null);
-  const [selectedProgram, setSelectedProgram] = useState(null);
-  const [addToolForm] = Form.useForm();
-  const [editToolForm] = Form.useForm();
-  const [addProgramForm] = Form.useForm();
-  const [editProgramForm] = Form.useForm();
-  const [tools, setTools] = useState([]);
-  const [programs, setPrograms] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pdcData, setPdcData] = useState(null);
-  // Add new state for engineering drawings
-  const [engineeringDrawings, setEngineeringDrawings] = useState([]);
-  const [drawingsLoading, setDrawingsLoading] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [updatingProductionOrder, setUpdatingProductionOrder] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [subcategories, setSubcategories] = useState([]);
-  const [inventoryItems, setInventoryItems] = useState([]);
-  const { categories, fetchItems,  fetchCategories, fetchAllSubcategories } = useInventoryStore();
-  const [selectedSubcategoryName, setSelectedSubcategoryName] = useState('');
-
-  useEffect(() => {
-    const fetchData = async () => {
-        try {
-            await fetchCategories();
-            await fetchAllSubcategories();
-        } catch (error) {
-            message.error('Failed to fetch data');
-        }
-    };
-    fetchData();
-}, [fetchCategories, fetchAllSubcategories]);
-
-useEffect(() => {
-  loadInventoryItems();
-  loadSubcategories();
-}, []);
-
-const loadInventoryItems = async () => {
-  try {
-    const items = await fetchItems();
-    // console.log('Loaded items:', items); // Debug log
-    setInventoryItems(items || []);
-  } catch (error) {
-    console.error('Error loading inventory items:', error);
-    toast.error('Failed to load inventory items');
-    setInventoryItems([]);
-  }
-};
-
-  const loadSubcategories = async () => {
-    try {
-      const subCats = await fetchAllSubcategories();
-      // console.log('Loaded subcategories:', subCats); // Debug log
-      setSubcategories(subCats || []);
-    } catch (error) {
-      console.error('Error loading subcategories:', error);
-      toast.error('Failed to load subcategories');
-      setSubcategories([]);
-    }
-  };
-
-
-
-  const handleInventoryItemClick = (itemId) => {
-    setSelectedInventoryItem(itemId);
-    setActiveTab('history');  // Switch to history tab
-    // Get item details for the message
-    const item = inventoryItems.find(item => item.id === itemId);
-    const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
-    const itemName = item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId;
-    message.info(`Showing calibration history for ${itemName}`);
-  };
-
+  
   // Configuration for file upload component - customized for NC program files
   const uploadProps = {
     name: 'file',
@@ -243,6 +209,52 @@ const loadInventoryItems = async () => {
       }
       
       return (isValidFileType && isLessThan20MB) || Upload.LIST_IGNORE;
+    },
+    showUploadList: true,
+  };
+
+  // Update your existing uploadProps or add a new one for documents
+  const documentUploadProps = {
+    name: 'file',
+    multiple: false,
+    customRequest: ({ onSuccess }) => {
+      setTimeout(() => {
+        onSuccess("ok", null);
+      }, 0);
+    },
+    beforeUpload: (file) => {
+      // Define allowed CNC program extensions
+      const allowedExtensions = [
+        '.NC', '.TXT', '.CNC', '.EIA', '.ISO', '.H', '.PGM',
+        '.MIN', '.MZK', '.APL', '.ARF', '.SUB', '.DNC', '.MPF', '.SPF'
+      ];
+      
+      // Get the file extension and convert to uppercase
+      const extension = '.' + file.name.split('.').pop().toUpperCase();
+      
+      // Check if the file extension is allowed
+      const isValidFileType = allowedExtensions.includes(extension);
+      const isLessThan20MB = file.size / 1024 / 1024 < 20;
+      
+      if (!isValidFileType) {
+        message.error(`Please upload a valid CNC program file. Allowed types: ${allowedExtensions.join(', ')}`);
+        return Upload.LIST_IGNORE;
+      }
+      
+      if (!isLessThan20MB) {
+        message.error('File must be smaller than 20MB!');
+        return Upload.LIST_IGNORE;
+      }
+      
+      return true;
+    },
+    onChange(info) {
+      const { status } = info.file;
+      if (status === 'done') {
+        message.success(`${info.file.name} ready for upload.`);
+      } else if (status === 'error') {
+        message.error(`${info.file.name} file upload failed.`);
+      }
     },
     showUploadList: true,
   };
@@ -325,6 +337,26 @@ const loadInventoryItems = async () => {
           } catch (error) {
             console.error('Error parsing saved programs:', error);
             setPrograms([]);
+          }
+        }
+        
+        // Remove this block
+        // Restore saved program documents from localStorage
+        const savedProgramDocuments = localStorage.getItem('programDocuments');
+        if (savedProgramDocuments) {
+          try {
+            const parsedDocuments = JSON.parse(savedProgramDocuments);
+            // Only use saved documents if they match the restored job
+            if (parsedDocuments.length > 0 && parsedDocuments[0].part_number === parsedJob.part_number) {
+              setProgramDocuments(parsedDocuments);
+              console.log('Restored matching program documents from localStorage:', parsedDocuments);
+            } else {
+              console.log('Saved program documents do not match the restored job - initializing empty documents');
+              setProgramDocuments([]);
+            }
+          } catch (error) {
+            console.error('Error parsing saved program documents:', error);
+            setProgramDocuments([]);
           }
         }
       } catch (error) {
@@ -539,13 +571,10 @@ const loadInventoryItems = async () => {
       onOk: async () => {
         try {
           setUpdatingStatus(true);
-          await usePlanningStore.getState().changePartStatus(productionOrder, newStatus);
+          await changePartStatus(productionOrder, newStatus);
           
           // Refresh data after status change
           await fetchActiveParts();
-          
-          // Force re-fetch of PDC data by creating a unique key
-          const pdcKey = `pdc-${productionOrder}-${Date.now()}`;
           
           // Update the component state to trigger re-rendering
           setDataSource(prevDataSource => 
@@ -554,7 +583,6 @@ const loadInventoryItems = async () => {
                 return {
                   ...item,
                   status: newStatus,
-                  pdcInfoKey: pdcKey
                 };
               }
               return item;
@@ -573,20 +601,16 @@ const loadInventoryItems = async () => {
 
   // Update the renderStatusButton function to properly display the text based on current status
   const renderStatusButton = (productionOrder) => {
+    // Get the current status
     const status = getJobStatus(productionOrder);
-    const isUpdating = updatingStatus && updatingProductionOrder === productionOrder;
+    console.log(`Rendering status button for ${productionOrder}: Current status is ${status}`);
     
     return (
       <Button
-        type={status === 'active' ? 'primary' : 'default'} 
-        style={{
-          backgroundColor: status === 'active' ? '#1890ff' : '#faad14', // Blue for active, Yellow for inactive
-          color: 'white',
-          borderColor: status === 'active' ? '#1890ff' : '#faad14'
-        }}
+        type={status === 'active' ? 'primary' : 'default'}
         onClick={() => handleStatusChange(productionOrder, status)}
-        loading={isUpdating}
-        icon={status === 'active' ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+        loading={updatingStatus}
+        className={status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}
       >
         {status === 'active' ? 'Active' : 'Inactive'}
       </Button>
@@ -1415,8 +1439,7 @@ const loadInventoryItems = async () => {
       const toolData = {
         ...values,
         order_id: selectedJob.id,
-        operation_id: values.operation_id,
-        tool_name: values.tool_name, // Ensure this is a string
+        operation_id: values.operation_id
       };
       
       const newTool = await addOrderTool(toolData);
@@ -1568,6 +1591,381 @@ const loadInventoryItems = async () => {
       message.error('Failed to view drawing');
     }
   };
+
+  const handleAddDocument = async (values) => {
+    try {
+      setLoading(true);
+      
+      // Get the file from the Upload component
+      const file = values.file?.fileList[0]?.originFileObj;
+      if (!file) {
+        throw new Error('Please select a file to upload');
+      }
+
+      // Create FormData object
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('program_name', values.program_name);
+      formData.append('description', values.description || '');
+      formData.append('version_number', values.version || '1');
+      formData.append('part_number', selectedJob.part_number);
+      
+      // Get the operation number from the selected operation
+      const selectedOperation = selectedJob.operations.find(op => op.id === values.operation_id);
+      if (selectedOperation) {
+        formData.append('operation_number', selectedOperation.operation_number);
+      }
+
+      // Upload the CNC program
+      const response = await uploadCncProgram(formData);
+      console.log('Upload response:', response);
+      
+      // Add the new document to the list
+      if (response && response.id) {
+        const newDocument = {
+          id: response.id,
+          name: response.name,
+          description: response.description,
+          type: 'CNC Program',
+          doc_type_id: response.doc_type_id,
+          part_number: response.part_number,
+          production_order_id: response.production_order_id,
+          created_at: response.created_at,
+          upload_date: response.created_at,
+          is_active: response.is_active,
+          latest_version: response.latest_version,
+          operation_number: response.latest_version?.metadata?.operation_number || '',
+          operation_id: selectedOperation ? selectedOperation.id : null
+        };
+        
+        setProgramDocuments(prevDocs => {
+          const updatedDocs = [...prevDocs, newDocument];
+          // Update localStorage
+          localStorage.setItem('programDocuments', JSON.stringify(updatedDocs));
+          return updatedDocs;
+        });
+      }
+      
+      message.success('CNC program uploaded successfully');
+      setIsAddDocumentModalVisible(false);
+      addDocumentForm.resetFields();
+    } catch (error) {
+      console.error('Error uploading CNC program:', error);
+      message.error(`Failed to upload CNC program: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add this useEffect to set the form values when the modal opens
+  useEffect(() => {
+    if (isAddDocumentModalVisible && selectedJob) {
+      const selectedOrder = partNumbers.find(order => order.productionOrder === selectedJob.production_order);
+      if (selectedOrder) {
+        addDocumentForm.setFieldsValue({
+          part_number: selectedOrder.partNumber || selectedJob.part_number
+        });
+      }
+    }
+  }, [isAddDocumentModalVisible, selectedJob, partNumbers, addDocumentForm]);
+
+  // Add effect to fetch program documents when job changes or tab changes
+  useEffect(() => {
+    const fetchProgramDocs = async () => {
+      if (selectedJob?.id && activeTab === 'toolsAndPrograms') {
+        try {
+          setLoading(true);
+          const documentsData = await fetchProgramDocuments(selectedJob.id);
+          console.log('Fetched program documents:', documentsData);
+          setProgramDocuments(documentsData || []);
+          
+          // Store in localStorage for persistence
+          localStorage.setItem('programDocuments', JSON.stringify(documentsData || []));
+        } catch (error) {
+          console.error('Error fetching program documents:', error);
+          
+          // Try to load from localStorage as fallback
+          const savedDocuments = localStorage.getItem('programDocuments');
+          if (savedDocuments) {
+            try {
+              const parsedDocuments = JSON.parse(savedDocuments);
+              setProgramDocuments(parsedDocuments);
+            } catch (parseError) {
+              console.error('Error parsing saved documents:', parseError);
+              setProgramDocuments([]);
+            }
+          }
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchProgramDocs();
+  }, [selectedJob?.id, activeTab, fetchProgramDocuments]);
+
+  // Add the documentsColumns definition before the return statement
+  // Define the columns for the Program Documents table
+  const documentsColumns = [
+    { 
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      className: 'bg-gray-50'
+    },
+    { 
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      className: 'bg-gray-50'
+    },
+    { 
+      title: 'Operation',
+      dataIndex: 'operation_number',
+      key: 'operation_number',
+      className: 'bg-gray-50',
+      render: (operationNumber, record) => {
+        if (!operationNumber) return 'N/A';
+        const operation = selectedJob?.operations?.find(op => op.operation_number === operationNumber);
+        return operation 
+          ? `${operation.operation_number} - ${operation.operation_description}`
+          : `${operationNumber}`;
+      }
+    },
+    { 
+      title: 'Version',
+      dataIndex: ['latest_version', 'version_number'],
+      key: 'version',
+      className: 'bg-gray-50',
+      render: (version) => version || 'N/A'
+    },
+    { 
+      title: 'Upload Date',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      className: 'bg-gray-50',
+      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
+    },
+    {
+      title: 'Action',
+      key: 'action',
+      className: 'bg-gray-50',
+      align: 'center',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="Download Document">
+            <Button 
+              type="link" 
+              icon={<DownloadOutlined />}
+              onClick={() => handleDownloadDocument(record)}
+            />
+          </Tooltip>
+          <Tooltip title="View Version History">
+            <Button
+              type="link"
+              icon={<HistoryOutlined />}
+              onClick={() => handleViewVersionHistory(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Update Version">
+            <Button
+              type="link"
+              icon={<UploadOutlined />}
+              onClick={() => handleUpdateVersion(record)}
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
+
+  // Add a new function to handle viewing version history
+  const handleViewVersionHistory = async (record) => {
+    try {
+      if (!record || !record.id) {
+        message.error('Invalid document selected');
+        return;
+      }
+      
+      setSelectedProgramForVersion(record);
+      setLoading(true);
+      
+      // Fetch all versions for this document
+      const versions = await fetchProgramVersions(record.id);
+      setProgramVersions(versions);
+      
+      setIsVersionHistoryModalVisible(true);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching version history:', error);
+      message.error('Failed to fetch version history');
+      setLoading(false);
+    }
+  };
+
+  // Update the handleUpdateVersion function to use document_id directly
+  const handleUpdateVersion = async (record) => {
+    try {
+      if (!record || !record.id) {
+        message.error('Invalid document selected');
+        return;
+      }
+      
+      setSelectedProgramForVersion(record);
+      setVersionFile(null);
+      setVersionNumber('');
+      form.resetFields();
+      setIsVersionUpdateModalVisible(true);
+    } catch (error) {
+      message.error('Failed to prepare version update');
+    }
+  };
+
+  // Update the handleVersionUpdateConfirm function to use document_id
+  const handleVersionUpdateConfirm = async () => {
+    try {
+      // Add console.log to debug the values
+      console.log('Selected Program:', selectedProgramForVersion);
+      console.log('Uploaded File:', versionFile);
+      console.log('Version Number:', versionNumber);
+
+      // Check if all required values are present
+      if (!selectedProgramForVersion || !selectedProgramForVersion.id) {
+        message.error('No program selected');
+        return;
+      }
+
+      if (!versionFile) {
+        message.error('Please select a file');
+        return;
+      }
+
+      if (!versionNumber) {
+        message.error('Please enter a version number');
+        return;
+      }
+
+      // Use the document ID directly for the API call
+      await updateProgramVersion(selectedProgramForVersion.id, versionFile, versionNumber);
+      message.success('Program version updated successfully');
+      setIsVersionUpdateModalVisible(false);
+      
+      // Clear the form values
+      setVersionFile(null);
+      setVersionNumber('');
+      
+      // Refresh the program documents list
+      if (selectedJob?.id) {
+        const updatedDocs = await fetchProgramDocuments(selectedJob.id);
+        setProgramDocuments(updatedDocs || []);
+      }
+    } catch (error) {
+      message.error(error.message || 'Failed to update program version');
+    }
+  };
+
+  // Define columns for the version history table
+  const versionHistoryColumns = [
+    {
+      title: 'Version',
+      dataIndex: 'version_number',
+      key: 'version_number',
+      render: (text) => text || 'N/A',
+    },
+    {
+      title: 'Upload Date',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A',
+    },
+    {
+      title: 'File Size',
+      dataIndex: 'file_size',
+      key: 'file_size',
+      render: (size) => size ? `${(size / 1024).toFixed(2)} KB` : 'N/A',
+    },
+    {
+      title: 'File Name',
+      dataIndex: 'file_name',
+      key: 'file_name',
+      render: (name) => name || 'N/A',
+    },
+    {
+      title: 'Action',
+      key: 'action',
+      align: 'center',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="Download Version">
+            <Button
+              type="link"
+              icon={<DownloadOutlined />}
+              onClick={() => handleDownloadVersion(record)}
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
+
+  // Add function to handle downloading a specific version
+  const handleDownloadVersion = async (version) => {
+    try {
+      if (version?.id) {
+        await downloadDocument(version.document_id);
+      } else {
+        message.error('Version information is missing');
+      }
+    } catch (error) {
+      console.error('Error downloading version:', error);
+      message.error('Failed to download version');
+    }
+  };
+
+  // Make sure you have the file upload handler
+  const handleFileChange = (info) => {
+    if (info.file.status === 'done') {
+      setVersionFile(info.file.originFileObj);
+      message.success(`${info.file.name} file uploaded successfully`);
+    } else if (info.file.status === 'error') {
+      message.error(`${info.file.name} file upload failed.`);
+    }
+  };
+
+  // Handle document download
+  const handleDownloadDocument = async (record) => {
+    try {
+      if (record.latest_version?.id) {
+        await downloadDocument(record.latest_version.id);
+      } else {
+        message.error('No version available for download');
+      }
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      message.error('Failed to download document');
+    }
+  };
+
+  // Add effect to fetch program details when a part number is selected
+  useEffect(() => {
+    const fetchProgramDetails = async () => {
+      if (selectedJob?.part_number && activeTab === 'toolsAndPrograms') {
+        try {
+          setLoading(true);
+          const programDetails = await fetchCncProgramDetails(selectedJob.part_number);
+          console.log('Fetched CNC program details:', programDetails);
+          // Store the program details if needed in additional state
+        } catch (error) {
+          console.error('Error fetching CNC program details:', error);
+          // Don't show error to user as this might be optional data
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchProgramDetails();
+  }, [selectedJob?.part_number, activeTab, fetchCncProgramDetails]);
 
   return (
     <div className="space-y-6 p-6">
@@ -1979,30 +2377,22 @@ const loadInventoryItems = async () => {
                                 className: 'bg-gray-50',
                                 align: 'center',
                                 render: (_, record) => (
-                                  <Space>
-                                    <Button 
-                                      type="link" 
-                                      icon={<EditOutlined className="text-blue-500" />}
-                                      onClick={() => {
-                                        setSelectedProgram(record);
-                                        setIsEditProgramModalVisible(true);
-                                      }}
-                                    />
-                                    <Button
-                                      type="link"
-                                      danger
-                                      icon={<DeleteOutlined />}
-                                      onClick={() => {
-                                        Modal.confirm({
-                                          title: 'Delete Program',
-                                          content: 'Are you sure you want to delete this program?',
-                                          okText: 'Yes',
-                                          okType: 'danger',
-                                          cancelText: 'No',
-                                          onOk: () => handleDeleteProgram(record.id),
-                                        });
-                                      }}
-                                    />
+                                  <Space size="middle">
+                                    <Tooltip title="Update Version">
+                                      <Button
+                                        type="text"
+                                        icon={<UploadOutlined />}
+                                        onClick={() => handleUpdateVersion(record)}
+                                      />
+                                    </Tooltip>
+                                    <Tooltip title="Delete">
+                                      <Button
+                                        type="text"
+                                        danger
+                                        icon={<DeleteOutlined />}
+                                        onClick={() => handleDeleteProgram(record.id)}
+                                      />
+                                    </Tooltip>
                                   </Space>
                                 ),
                               },
@@ -2024,10 +2414,59 @@ const loadInventoryItems = async () => {
                         )}
                       </div>
                     </TabPane>
+
+              <TabPane 
+                tab={
+                        <span className="flex items-center">
+                          <FileTextOutlined className="mr-2" />
+                          Program Documents
+                  </span>
+                }
+                      key="documents"
+                    >
+                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                        <div className="flex justify-between items-center mb-4">
+                          <Text strong className="text-lg flex items-center">
+                            <FileTextOutlined className="text-blue-500 mr-2" />
+                            Program Documents
+                          </Text>
+                          <Button
+                            type="primary"
+                            onClick={() => setIsAddDocumentModalVisible(true)}
+                            icon={<PlusOutlined />}
+                            className="bg-blue-500 hover:bg-blue-600"
+                          >
+                            Add Document
+                          </Button>
+                        </div>
+                        {loading ? (
+                          <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
+                            <Spin size="large" />
+                          </div>
+                        ) : programDocuments.length > 0 ? (
+                          <Table
+                            dataSource={programDocuments}
+                            columns={documentsColumns}
+                            rowKey="id"
+                            pagination={{
+                              current: programCurrentPage,
+                              onChange: setProgramCurrentPage,
+                              pageSize: 5,
+                              showSizeChanger: false
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-lg">
+                            <FileTextOutlined style={{ fontSize: 48 }} className="text-gray-300 mb-4" />
+                            <Text className="text-gray-500">No documents found</Text>
+                          </div>
+                        )}
+                      </div>
+                    </TabPane>
                   </Tabs>
                 </Card>
 
-                 {/* Add Tool Modal */}
+                {/* Add Tool Modal */}
                 <Modal
                   title="Add Tool"
                   visible={isAddToolModalVisible}
@@ -2038,128 +2477,105 @@ const loadInventoryItems = async () => {
                   }}
                   confirmLoading={loading}
                 >
-                 <Form
+                  <Form
                     form={addToolForm}
                     layout="vertical"
-                    onFinish={async (values) => {
-                      try {
-                        // Prepare the tool data to be sent to the store
-                        const toolData = {
-                          tool_name: selectedSubcategoryName, // This should now be a string
-                          tool_number: values.tool_number || 'N/A', // Assuming you want to add this field
-                          bel_partnumber: selectedPartNumber,
-                          description: selectedPartDescription,
-                          quantity: values.quantity,
-                          order_id: selectedJob.id, // Assuming selectedJob.id is the order ID
-                          operation_id: values.operation_id,
-                        };
-
-                        // Call the addOrderTool function from the planning store
-                        const newTool = await usePlanningStore.getState().addOrderTool(toolData);
-                        console.log('New tool added:', newTool);
-                        message.success('Tool added successfully');
-                        setIsAddToolModalVisible(false);
-                        addToolForm.resetFields();
-                      } catch (error) {
-                        console.error('Error adding tool:', error);
-                        message.error('Failed to add tool');
-                      }
-                    }}
+                    onFinish={handleAddTool}
                   >
-                  <Form.Item
-                    label="Selecet Tool"
-                    rules={[{ required: true, message: 'Please select an inventory item' }]}
+                    <Form.Item
+                      name="tool_name"
+                      label="Tool Name"
+                      rules={[{ required: true, message: 'Please enter tool name' }]}
+                    >
+                      <Input />
+                    </Form.Item>
+                    <Form.Item
+                      name="tool_number"
+                      label="Tool Number"
+                      rules={[{ required: true, message: 'Please enter tool number' }]}
+                    >
+                      <Input />
+                    </Form.Item>
+                    <Form.Item
+                      name="bel_partnumber"
+                      label="BEL Part Number"
+                      rules={[{ required: true, message: 'Please enter BEL part number' }]}
+                    >
+                      <Input />
+                    </Form.Item>
+                    <Form.Item
+                      name="description"
+                      label="Description"
+                    >
+                      <Input.TextArea />
+                    </Form.Item>
+                    <Form.Item
+                      name="quantity"
+                      label="Quantity"
+                      rules={[{ required: true, message: 'Please enter quantity' }]}
+                    >
+                      <InputNumber min={1} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item
+                      name="operation_id"
+                      label="Operation"
+                      rules={[{ required: true, message: 'Please select an operation' }]}
+                    >
+                      <Select>
+                        {selectedJob?.operations?.map(op => (
+                          <Select.Option key={op.id} value={op.id}>
+                            {`Operation ${op.operation_number} - ${op.operation_description}`}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Form>
+                </Modal>
+
+                {/* Edit Tool Modal */}
+                <Modal
+                  title="Edit Tool"
+                  visible={isEditToolModalVisible}
+                  onOk={() => editToolForm.submit()}
+                  onCancel={() => {
+                    setIsEditToolModalVisible(false);
+                    editToolForm.resetFields();
+                  }}
+                  confirmLoading={loading}
+                >
+                  <Form
+                    form={editToolForm}
+                    layout="vertical"
+                    onFinish={handleUpdateTool}
+                    initialValues={selectedTool}
                   >
-                    <Cascader
-                      placeholder="Select Category > Subcategory > Item"
-                      loading={isLoading}
-                      style={{ width: '100%' }}
-                      options={categories.map(category => ({
-                        label: category.name,
-                        value: category.id,
-                        isLeaf: false,
-                        children: subcategories
-                          .filter(sub => sub.category_id === category.id)
-                          .map(subcategory => ({
-                            label: subcategory.name,
-                            value: subcategory.id,
-                            isLeaf: false,
-                            children: inventoryItems
-                              .filter(item => item.subcategory_id === subcategory.id)
-                              .map(item => ({
-                                label: item.dynamic_data["Instrument code"] 
-                                  ? `${item.dynamic_data["Instrument code"]}` 
-                                  : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
-                                value: item.id,
-                                isLeaf: true,
-                              }))
-                          }))
-                      }))}
-
-                      showSearch={{
-                        filter: (inputValue, path) =>
-                          path.some(option =>
-                            option.label.toLowerCase().includes(inputValue.toLowerCase())
-                          )
-                      }}
-                      // displayRender={(labels) => labels[1] || ''} 
-                      onChange={(value, selectedOptions) => {
-                        if (Array.isArray(value) && value.length === 3) {
-                          const selectedSubcategory = selectedOptions[1]; // The second option is the subcategory
-                          const subcategoryName = selectedSubcategory ? selectedSubcategory.label : '';
-
-                          // Set the form values
-                          form.setFieldsValue({
-                            tool_name: subcategoryName,  // Set the subcategory name as a string
-                            inventory_item_id: value[2],  // Set item ID if needed
-                          });
-
-                          // Set the selected subcategory name
-                          setSelectedSubcategoryName(subcategoryName);
-
-                          // Find the selected item to extract the part number and description
-                          const selectedItemData = inventoryItems.find(item => item.id === value[2]);
-
-                          if (selectedItemData) {
-                            setSelectedPartNumber(selectedItemData.dynamic_data["BEL Part Number "] || 'N/A');
-                            setSelectedPartDescription(selectedItemData.dynamic_data["BEL Part Description"] || 'N/A');
-                            
-                            // Optionally set description field as well (for backend)
-                            form.setFieldsValue({
-                              description: selectedItemData.dynamic_data["BEL Part Description"] || 'N/A',  // Description as string
-                            });
-                          } else {
-                            setSelectedPartNumber('');
-                            setSelectedPartDescription('');
-                            form.setFieldsValue({
-                              description: 'N/A',  // Fallback if no item is selected
-                            });
-                          }
-                        }
-                      }}
-                    />
-                  </Form.Item>
-
-                    <Form.Item label="Selected Subcategory">
-                      <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />
+                    <Form.Item
+                      name="tool_name"
+                      label="Tool Name"
+                      rules={[{ required: true, message: 'Please enter tool name' }]}
+                    >
+                      <Input />
                     </Form.Item>
-
-                    <Form.Item label="BEL Part Number">
-                      <Input 
-                        value={selectedPartNumber} 
-                        readOnly 
-                        className="bg-gray-100" 
-                      />
+                    <Form.Item
+                      name="tool_number"
+                      label="Tool Number"
+                      rules={[{ required: true, message: 'Please enter tool number' }]}
+                    >
+                      <Input />
                     </Form.Item>
-
-                    <Form.Item label="BEL Part Description">
-                      <Input 
-                        value={selectedPartDescription} 
-                        readOnly 
-                        className="bg-gray-100" 
-                      />
+                    <Form.Item
+                      name="bel_partnumber"
+                      label="BEL Part Number"
+                      rules={[{ required: true, message: 'Please enter BEL part number' }]}
+                    >
+                      <Input />
                     </Form.Item>
-
+                    <Form.Item
+                      name="description"
+                      label="Description"
+                    >
+                      <Input.TextArea />
+                    </Form.Item>
                     <Form.Item
                       name="quantity"
                       label="Quantity"
@@ -2278,7 +2694,7 @@ const loadInventoryItems = async () => {
                       onClick={() => {
                         editProgramForm.validateFields()
                           .then(values => {
-                            handleEditProgram(values);
+                            handleUpdateProgram(values);
                           })
                           .catch(info => {
                             console.log('Validate Failed:', info);
@@ -2673,6 +3089,181 @@ const loadInventoryItems = async () => {
             renderPreviewContent()
           )}
         </div>
+      </Modal>
+
+      {/* Add Document Modal */}
+      <Modal
+        title="Add CNC Program Document"
+        open={isAddDocumentModalVisible}
+        onCancel={() => {
+          setIsAddDocumentModalVisible(false);
+          addDocumentForm.resetFields();
+        }}
+        footer={[
+          <Button key="cancel" onClick={() => {
+            setIsAddDocumentModalVisible(false);
+            addDocumentForm.resetFields();
+          }}>
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={loading}
+            onClick={() => {
+              addDocumentForm.validateFields()
+                .then(values => {
+                  handleAddDocument(values);
+                })
+                .catch(info => {
+                  console.log('Validate Failed:', info);
+                });
+            }}
+          >
+            Upload
+          </Button>,
+        ]}
+      >
+        <Form form={addDocumentForm} layout="vertical">
+          <Form.Item
+            name="operation_id"
+            label="Operation"
+            rules={[{ required: true, message: 'Please select an operation' }]}
+          >
+            <Select placeholder="Select operation">
+              {selectedJob?.operations?.map((operation) => (
+                <Option key={operation.id} value={operation.id}>
+                  {operation.operation_number} - {operation.operation_description}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="program_name"
+            label="Program Name"
+            rules={[{ required: true, message: 'Please enter program name' }]}
+          >
+            <Input placeholder="Enter program name" />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="Description"
+          >
+            <Input.TextArea placeholder="Enter program description" />
+          </Form.Item>
+          <Form.Item
+            name="version"
+            label="Version"
+            initialValue="1"
+          >
+            <Input placeholder="Enter version (e.g., 1)" />
+          </Form.Item>
+          <Form.Item
+            name="file"
+            label="Upload CNC Program File"
+            rules={[{ required: true, message: 'Please select a file to upload' }]}
+          >
+            <Upload {...documentUploadProps} maxCount={1}>
+              <Button icon={<UploadOutlined />}>Click to Upload</Button>
+              <div className="mt-2 text-xs text-gray-500">
+                Support for CNC program files (.nc, .txt, .cnc, etc.)
+              </div>
+            </Upload>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Version Update Modal */}
+      <Modal
+        title="Update Program Version"
+        open={isVersionUpdateModalVisible}
+        onOk={handleVersionUpdateConfirm}
+        onCancel={() => {
+          setIsVersionUpdateModalVisible(false);
+          setSelectedProgramForVersion(null);
+          setVersionFile(null);
+          setVersionNumber('');
+          form.resetFields();
+        }}
+        okText="Update"
+        cancelText="Cancel"
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="file"
+            label="Select Program File"
+            rules={[{ required: true, message: 'Please select a file' }]}
+          >
+            <Upload
+              maxCount={1}
+              beforeUpload={(file) => {
+                setVersionFile(file);
+                return false;
+              }}
+              onRemove={() => setVersionFile(null)}
+            >
+              <Button icon={<UploadOutlined />}>Select File</Button>
+            </Upload>
+          </Form.Item>
+          
+          <Form.Item
+            name="version_number"
+            label="Version Number"
+            rules={[{ required: true, message: 'Please enter version number' }]}
+          >
+            <Input
+              placeholder="Enter version number"
+              value={versionNumber}
+              onChange={(e) => setVersionNumber(e.target.value)}
+            />
+          </Form.Item>
+
+          <div className="bg-gray-50 p-3 rounded mt-2">
+            <h4 className="font-medium">Current Program Information</h4>
+            <p><strong>Program:</strong> {selectedProgramForVersion?.name}</p>
+            <p><strong>Current Version:</strong> {selectedProgramForVersion?.latest_version?.version_number || 'None'}</p>
+          </div>
+        </Form>
+      </Modal>
+
+      {/* Version History Modal */}
+      <Modal
+        title={`Version History - ${selectedProgramForVersion?.name}`}
+        open={isVersionHistoryModalVisible}
+        onCancel={() => {
+          setIsVersionHistoryModalVisible(false);
+          setProgramVersions([]);
+        }}
+        width={800}
+        footer={[
+          <Button 
+            key="close" 
+            onClick={() => setIsVersionHistoryModalVisible(false)}
+          >
+            Close
+          </Button>,
+          <Button
+            key="update"
+            type="primary"
+            icon={<UploadOutlined />}
+            onClick={() => {
+              setIsVersionHistoryModalVisible(false);
+              handleUpdateVersion(selectedProgramForVersion);
+            }}
+          >
+            Add New Version
+          </Button>
+        ]}
+      >
+        <Table
+          dataSource={programVersions}
+          columns={versionHistoryColumns}
+          rowKey="id"
+          size="middle"
+          loading={loading}
+          pagination={false}
+          className="mt-4"
+        />
       </Modal>
     </div>
   );

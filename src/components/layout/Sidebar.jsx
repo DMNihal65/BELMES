@@ -16,7 +16,8 @@ import {
   Files,
   Box,
   Bell,
-  ScrollText 
+  ScrollText,
+  LockKeyhole
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -85,11 +86,7 @@ function Sidebar() {
         },
       ]
     },
-    {
-      key: '/supervisor/maintenance',
-      icon: <Wrench size={20} />,
-      label: 'Maintenance',
-    },
+
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,
@@ -102,6 +99,12 @@ function Sidebar() {
         {
           key: '/supervisor/production-planning/capacity_planning',
           label: "Capacity Planning"
+        },
+        {
+          key: '/supervisor/machine_availability',
+    
+          // icon: <Gauge  size={20} />,
+          label: 'Assets Availability',
         },
         {
           key: '/supervisor/production-planning/scheduling',
@@ -185,6 +188,11 @@ function Sidebar() {
       ],
     },
     {
+      key: '/supervisor/maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Maintenance',
+    },
+    {
       key: '/supervisor/energy-monitoring',
       icon: <BarChart2 size={20} />,
       label: 'Energy Monitoring',
@@ -194,12 +202,12 @@ function Sidebar() {
     //   icon: <BarChart2 size={20} />,
     //   label: 'Energy Monitoring BEL',
     // },
-    {
-      key: '/supervisor/machine_availability',
+    // {
+    //   key: '/supervisor/machine_availability',
 
-      icon: <Gauge  size={20} />,
-      label: 'Assets Availability',
-    },
+    //   icon: <Gauge  size={20} />,
+    //   label: 'Assets Availability',
+    // },
     {
       key: '/supervisor/documents',
 
@@ -245,11 +253,6 @@ function Sidebar() {
       ]
     },
     {
-      key: '/admin/maintenance',
-      icon: <Wrench size={20} />,
-      label: 'Maintenance',
-    },
-    {
       key: 'production-planning',
       icon: <Calendar size={20} />,
       label: 'Process Engineering',
@@ -261,6 +264,12 @@ function Sidebar() {
         {
           key: '/admin/production-planning/capacity_planning',
           label: "Capacity Planning"
+        },
+        {
+          key: '/supervisor/machine_availability',
+    
+          // icon: <Gauge  size={20} />,
+          label: 'Assets Availability',
         },
         {
           key: '/admin/production-planning/scheduling',
@@ -316,16 +325,21 @@ function Sidebar() {
       ],
     },
     {
+      key: '/admin/maintenance',
+      icon: <Wrench size={20} />,
+      label: 'Maintenance',
+    },
+    {
       key: '/admin/energy-monitoring',
       icon: <BarChart2 size={20} />,
       label: 'Energy Monitoring',
     },
-    {
-      key: '/admin/machine_availability',
+    // {
+    //   key: '/admin/machine_availability',
 
-      icon: <Gauge  size={20} />,
-      label: 'Assets Availability',
-    },
+    //   icon: <Gauge  size={20} />,
+    //   label: 'Assets Availability',
+    // },
     {
       key: '/admin/documents',
 
@@ -348,24 +362,24 @@ function Sidebar() {
     },
     {
       key: '/admin/access_control_management',
-      icon: <ScrollText  size={20} />,
+      icon: <LockKeyhole />,
       label: 'Access Control Management',
     },
-    {
-      key: 'access_control_management',
-      icon: <Lock  size={20} />,
-      label: 'Access Control Management',
-      children: [
-        {
-          key: '/admin/access_control_management/user_management',
-          label: 'Register New User ',
-        },
-        {
-          key: '/admin/access_control_management/machine_password_management',
-          label: 'Machine Password Management',
-        },
-      ],
-    },
+    // {
+    //   key: 'access_control_management',
+    //   icon: <Lock  size={20} />,
+    //   label: 'Access Control Management',
+    //   children: [
+    //     {
+    //       key: '/admin/access_control_management/user_management',
+    //       label: 'Register New User ',
+    //     },
+    //     {
+    //       key: '/admin/access_control_management/machine_password_management',
+    //       label: 'Machine Password Management',
+    //     },
+    //   ],
+    // },
   ];
 
   const menuItems = 

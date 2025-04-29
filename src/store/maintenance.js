@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.85:8078/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.85:8078/api/v1/operator';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.88:3252/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.88:3252/api/v1/operator';
+const MASTER_ORDER_URL = 'http://172.18.7.88:3232/api/v1/master-order';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -147,15 +148,37 @@ const useMachineMaintenanceStore = create((set, get) => ({
   fetchMachineStatuses: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.get(`${SUPERVISOR_BASE_URL}/machine-status/`);
-      const machinesWithIds = response.data.statuses.map(machine => ({
-        ...machine,
-        id: extractMachineId(machine.machine_make),
-        description: machine.description || ''
-      }));
+      // First fetch all machines from master-order endpoint
+      const machinesResponse = await axios.get(`${MASTER_ORDER_URL}/all-machines/`);
+      
+      // Filter machines where work_center_boolean is true
+      const workCenterMachines = machinesResponse.data.filter(machine => machine.work_center_boolean);
+      
+      // Get status for each machine from maintenance endpoint
+      const statusResponse = await axios.get(`${SUPERVISOR_BASE_URL}/machine-status/`);
+      
+      // Combine machine data with status data
+      const machinesWithStatus = workCenterMachines.map(machine => {
+        const machineStatus = statusResponse.data.statuses.find(
+          status => status.machine_id === machine.id
+        ) || {
+          status_name: 'OFF',
+          available_from: new Date().toISOString(),
+          description: ''
+        };
+  
+        return {
+          ...machineStatus,
+          machine_id: machine.id,
+          machine_make: machine.work_center.description || machine.make,
+          id: machine.id,
+          description: machineStatus.description || ''
+        };
+      });
+  
       set({
-        machines: machinesWithIds,
-        totalMachines: response.data.total_machines,
+        machines: machinesWithStatus,
+        totalMachines: machinesWithStatus.length,
         loading: false
       });
     } catch (error) {
@@ -194,31 +217,51 @@ const useMachineMaintenanceStore = create((set, get) => ({
         available_from: data.available_from,
         description: description
       };
-
-      console.log('Sendingggg request data:', requestData); // Add logging to verify data
-
+  
+      console.log('Sendingggg request data:', requestData);
+  
       const response = await axios.put(
         `${SUPERVISOR_BASE_URL}/machine-status/${machineId}`,
         requestData
       );
-
-      // Refresh machine statuses after update
-      const fetchResponse = await axios.get(`${SUPERVISOR_BASE_URL}/machine-status/`);
-      const machinesWithIds = fetchResponse.data.statuses.map(machine => ({
-        ...machine,
-        id: extractMachineId(machine.machine_make),
-        description: machine.description?.trim() || '' // Ensure consistent description handling
-      }));
+  
+      // Fetch fresh data from both endpoints
+      const [machinesResponse, statusResponse] = await Promise.all([
+        axios.get(`${MASTER_ORDER_URL}/all-machines/`),
+        axios.get(`${SUPERVISOR_BASE_URL}/machine-status/`)
+      ]);
+  
+      // Filter machines where work_center_boolean is true
+      const workCenterMachines = machinesResponse.data.filter(machine => machine.work_center_boolean);
       
+      // Combine machine data with status data
+      const machinesWithStatus = workCenterMachines.map(machine => {
+        const machineStatus = statusResponse.data.statuses.find(
+          status => status.machine_id === machine.id
+        ) || {
+          status_name: 'OFF',
+          available_from: new Date().toISOString(),
+          description: ''
+        };
+  
+        return {
+          ...machineStatus,
+          machine_id: machine.id,
+          machine_make: machine.work_center.description || machine.make,
+          id: machine.id,
+          description: machineStatus.description || ''
+        };
+      });
+  
       set({
-        machines: machinesWithIds,
-        totalMachines: fetchResponse.data.total_machines,
+        machines: machinesWithStatus,
+        totalMachines: machinesWithStatus.length,
         loading: false
       });
-
+  
       return response.data;
     } catch (error) {
-      console.error('Error updating machine status:', error); // Add error logging
+      console.error('Error updating machine status:', error);
       set({ 
         error: error.response?.data?.detail || error.message, 
         loading: false 

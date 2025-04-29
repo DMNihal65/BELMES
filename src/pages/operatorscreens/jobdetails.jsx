@@ -1263,7 +1263,7 @@ const JobDetails = () => {
                 onChange={async (value) => {
                   try {
                     // Fetch detailed order information when an order is selected
-                    const response = await fetch(`http://172.18.7.85:8078/api/v1/planning/search_order2?production_order=${value}`);
+                    const response = await fetch(`http://172.18.7.88:3252/api/v1/planning/search_order2?production_order=${value}`);
                     const data = await response.json();
                     
                     // Get the order data from the response

@@ -20,8 +20,8 @@ const calculateUptime = (lastUpdated) => {
   return moment(lastUpdated).fromNow();
 };
 
-const BASE_URL = 'http://172.18.7.88:3502/production_monitoring';
-const WS_URL = 'ws://172.18.7.88:3502/production_monitoring/ws/live-status/';
+const BASE_URL = 'http://172.18.7.85:8078/production_monitoring';
+const WS_URL = 'ws://172.18.7.85:8078/production_monitoring/ws/live-status/';
 
 const useProductionStore = create(
   devtools((set, get) => ({
@@ -564,6 +564,11 @@ const useProductionStore = create(
         console.error('Error fetching overall OEE metrics:', error);
       }
     },
+
+    
+
+
+    
 
     // Add this to the initial state
     overallOEEMetrics: {

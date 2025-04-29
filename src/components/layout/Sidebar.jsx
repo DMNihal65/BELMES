@@ -93,11 +93,11 @@ function Sidebar() {
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,
-      label: 'Production Planning',
+      label: 'Process Engineering',
       children: [
         {
           key: '/supervisor/production-planning/planning',
-          label: 'Planning',
+          label: 'Process Planning',
         },
         {
           key: '/supervisor/production-planning/capacity_planning',
@@ -105,7 +105,7 @@ function Sidebar() {
         },
         {
           key: '/supervisor/production-planning/scheduling',
-          label: 'Scheduling',
+          label: 'Machine Scheduling',
         },
       ],
     },
@@ -252,11 +252,11 @@ function Sidebar() {
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,
-      label: 'Production Planning',
+      label: 'Process Engineering',
       children: [
         {
           key: '/admin/production-planning/planning',
-          label: 'Planning',
+          label: 'Process Planning',
         },
         {
           key: '/admin/production-planning/capacity_planning',
@@ -264,7 +264,7 @@ function Sidebar() {
         },
         {
           key: '/admin/production-planning/scheduling',
-          label: 'Scheduling',
+          label: 'Machine Scheduling',
         },
       ],
     },
@@ -347,12 +347,17 @@ function Sidebar() {
       label: 'Logs',
     },
     {
+      key: '/admin/access_control_management',
+      icon: <ScrollText  size={20} />,
+      label: 'Access Control Management',
+    },
+    {
       key: 'access_control_management',
       icon: <Lock  size={20} />,
       label: 'Access Control Management',
       children: [
         {
-          key: '/admin/access_control_management/register_new_user',
+          key: '/admin/access_control_management/user_management',
           label: 'Register New User ',
         },
         {

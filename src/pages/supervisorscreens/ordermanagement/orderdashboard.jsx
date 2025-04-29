@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table } from 'antd';
+import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
@@ -26,13 +26,26 @@ const OrderDashboard = () => {
   const [localOrders, setLocalOrders] = useState([]);
   const [priorityOrders, setPriorityOrders] = useState([]);
   const [parent] = useAutoAnimate();
+  const [timelineError, setTimelineError] = useState(null);
   
   // Initialize orders and start polling when component mounts
   useEffect(() => {
     const initializeOrders = async () => {
-      await fetchAllOrders();
-      await fetchTimelineData();
+      try {
+        await fetchAllOrders();
+        try {
+          await fetchTimelineData();
+        } catch (timelineError) {
+          // Silently handle timeline errors
+          console.error('Timeline data fetch failed, continuing without it:', timelineError);
+          setTimelineError(timelineError);
+        }
+      } catch (error) {
+        console.error('Failed to initialize order data:', error);
+        message.error('Failed to load order data. Please try refreshing the page.');
+      }
     };
+    
     initializeOrders();
     
     // Start polling with 1-hour interval
@@ -55,8 +68,20 @@ const OrderDashboard = () => {
   }, [orders]);
 
   const handleRefresh = useCallback(async () => {
-    await fetchTimelineData();
-    await fetchAllOrders();
+    try {
+      await fetchAllOrders();
+      try {
+        await fetchTimelineData();
+      } catch (timelineError) {
+        // Silently handle timeline errors
+        console.warn('Timeline refresh failed:', timelineError);
+        setTimelineError(timelineError);
+      }
+    } catch (error) {
+      console.error('Failed to refresh data:', error);
+      // Only show error message for critical failures
+      message.error('Failed to refresh data. Please try again.');
+    }
   }, [fetchTimelineData, fetchAllOrders]);
 
   const handleOrderCreate = async (newOrder) => {
@@ -78,7 +103,6 @@ const OrderDashboard = () => {
 
       // Close modal and show success message
       setIsModalVisible(false);
-      message.success('Order created successfully');
 
       // Fetch fresh data in the background
       await handleRefresh();
@@ -148,6 +172,45 @@ const OrderDashboard = () => {
       ),
     },
   ];
+  
+  // Render timeline table with error handling
+  const renderTimelineTable = () => {
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <Spin size="large" />
+        </div>
+      );
+    }
+    
+    if (timelineError) {
+      // Instead of showing error message, just show empty state
+      return (
+        <Empty 
+          description="No timeline data available" 
+          className="py-8" 
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
+      );
+    }
+    
+    if (!timelineData || timelineData.length === 0) {
+      return (
+        <Empty description="No timeline data available" className="py-8" />
+      );
+    }
+    
+    return (
+      <Table
+        dataSource={timelineData}
+        columns={timelineColumns}
+        rowKey="key"
+        size="small"
+        pagination={{ pageSize: 5 }}
+        scroll={{ x: 'max-content' }}
+      />
+    );
+  };
 
   // Filter orders for in-progress tab
   const inProgressOrders = orders.filter(order => order.status === 'in_progress');
@@ -213,21 +276,7 @@ const OrderDashboard = () => {
                 </TabPane>
                 <TabPane tab="In Progress" key="in_progress">
                   <div className="h-full overflow-auto">
-                    <Table 
-                      columns={timelineColumns}
-                      dataSource={timelineData}
-                      loading={isLoading}
-                      rowKey="production_order"
-                      scroll={{ x: 1800, y: 'calc(100vh - 300px)' }}
-                      pagination={{ 
-                        pageSize: 10,
-                        position: ['bottomCenter'],
-                        showSizeChanger: true,
-                        showTotal: (total) => `Total ${total} items`
-                      }}
-                      size="middle"
-                      bordered
-                    />
+                    {renderTimelineTable()}
                   </div>
                 </TabPane>
                 <TabPane tab="Completed" key="completed">

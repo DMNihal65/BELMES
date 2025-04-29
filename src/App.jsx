@@ -45,6 +45,8 @@ import PokaYokeDashboard from './pages/supervisorscreens/PokaYoke/PokaYokeDashbo
 
 import RegisterNewUser from './pages/adminscreens/userManagement/RegisterNewuser';
 import MachinePasswordManagement from './pages/adminscreens/machineManagement/MachinePasswordManagement'
+import UserManagement from './pages/adminscreens/userManagement/userManagement';
+import AccessControlManagement from './pages/adminscreens/AccessControlManagement';
 
 const App = () => {
 
@@ -90,7 +92,8 @@ const App = () => {
             <Route path="logs" element={<LogsDashboard />} />
             <Route path="pokayoke" element={<PokaYokeDashboard />} />
             <Route path="notifications" element={<Notifications />} />
-            <Route path="access_control_management/register_new_user" element={<RegisterNewUser />} />
+            <Route path="access_control_management" element={<AccessControlManagement />} />
+            <Route path="access_control_management/user_management" element={<UserManagement />} />
             <Route path="access_control_management/machine_password_management" element={<MachinePasswordManagement />} />
           </Route>
           

@@ -7,7 +7,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
 import shopFloorBg from '../../../public/images/shop3.jpg';
 import { motion } from 'framer-motion';
-import belLogo from '../../../public/images/BEL_Logo.png';
+import belLogo from '../../../public/images/belLogo.png';
+// import belLogo from '../../../public/images/BEL_Logo.png';
 import cmtiLogo from '../../../public/images/CMTI_Logo2.png';
 import useAuthStore from '../../store/auth-store';
 
@@ -75,14 +76,8 @@ const Login = () => {
             throw new Error('You do not have operator access');
           }
         }
-      } else if (loginType === 'admin') { // Added condition for admin
-        if (currentStep === 0) {
-          if (values.supervisorPin === '9999') {
-            setCurrentStep(1);
-          } else {
-            throw new Error('Invalid admin PIN');
-          }
-        } else {
+      } 
+          else if (loginType === 'admin') {
           const response = await login({
             username: values.adminName, // Use adminName for admin login
             password: values.password,
@@ -96,15 +91,7 @@ const Login = () => {
           } else {
             throw new Error('You do not have admin access');
           }
-        }
       } else {
-        if (currentStep === 0) {
-          if (values.supervisorPin === '9999') {
-            setCurrentStep(1);
-          } else {
-            throw new Error('Invalid supervisor PIN');
-          }
-        } else {
           const response = await login({
             username: values.supervisorName,
             password: values.password,
@@ -119,7 +106,6 @@ const Login = () => {
             throw new Error('You do not have supervisor access');
           }
         }
-      }
     } catch (error) {
       // Show more user-friendly error messages
       if (error.message.includes('access')) {
@@ -222,26 +208,7 @@ const Login = () => {
   };
 
   const renderSupervisorSteps = () => {
-    if (currentStep === 0) {
-      return (
-        <Form.Item
-          name="supervisorPin"
-          label={<span className="text-gray-700 font-medium">Supervisor PIN</span>}
-          rules={[
-            { required: true, message: 'Please enter supervisor PIN!' },
-            { len: 4, message: 'PIN must be 4 digits!' }
-          ]}
-        >
-          <Input
-            prefix={<NumberOutlined className="text-gray-400" />}
-            placeholder="Enter 4-digit PIN"
-            maxLength={4}
-            size="large"
-            type="password"
-          />
-        </Form.Item>
-      );
-    }
+   
     return (
       <>
         <Form.Item
@@ -271,26 +238,7 @@ const Login = () => {
   };
 
   const renderAdminSteps = () => {
-    if (currentStep === 0) {
-      return (
-        <Form.Item
-          name="supervisorPin"
-          label={<span className="text-gray-700 font-medium">Supervisor PIN</span>}
-          rules={[
-            { required: true, message: 'Please enter supervisor PIN!' },
-            { len: 4, message: 'PIN must be 4 digits!' }
-          ]}
-        >
-          <Input
-            prefix={<NumberOutlined className="text-gray-400" />}
-            placeholder="Enter 4-digit PIN"
-            maxLength={4}
-            size="large"
-            type="password"
-          />
-        </Form.Item>
-      );
-    }
+   
     return (
       <>
         <Form.Item
@@ -715,7 +663,7 @@ const Login = () => {
             
           )}
           {/* Toggle between Login and Register */}
-          <div className="flex justify-center mb-4">
+          {/* <div className="flex justify-center mb-4">
             <Button 
               type="link" 
               onClick={() => setShowRegister(!showRegister)}
@@ -723,7 +671,7 @@ const Login = () => {
             >
               {showRegister ? 'Back to Login' : 'Register New User'}
             </Button>
-          </div>
+          </div> */}
           
 
           {/* Footer */}

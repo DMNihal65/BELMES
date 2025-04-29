@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Upload, message,
-  Typography, Tag, Tooltip, Form, Drawer, Descriptions,  Cascader,
+  Typography, Tag, Tooltip, Form, Drawer, Descriptions, Cascader,
   Badge, Alert, Spin, Progress, Divider, Collapse, DatePicker, Pagination, InputNumber
 } from 'antd';
 import {
@@ -11,8 +11,9 @@ import {
   CalendarOutlined, BarChartOutlined,
   ToolOutlined, DownloadOutlined, DeleteOutlined,
   ScheduleOutlined, ReloadOutlined, EyeOutlined,
-  AppstoreOutlined, CheckOutlined, RobotOutlined,
-  ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined
+  AppstoreOutlined, CheckCircleOutlined, RobotOutlined,
+  ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined,
+  CloseCircleOutlined
 } from '@ant-design/icons';
 import {
   Timer, AlertTriangle, CheckCircle2, 
@@ -22,7 +23,6 @@ import { Link } from 'react-router-dom';
 import JobOperationsTable from '../../../components/ProductionPlanning/JobOperationsTable';
 import OperationMPPDetails from '../../../components/ProductionPlanning/OperationMPPDetails';
 import ResourceUtilization from '../../../components/ProductionPlanning/ResourceUtilization';
-import CapacityPlanning from '../../../components/ProductionPlanning/CapacityPlanning';
 import { mockJobData, mockPartNumbers, mockMachines } from '../../../data/mockPlanningData';
 import usePlanningStore from '../../../store/planning-store';
 import { jsPDF } from "jspdf";
@@ -32,19 +32,72 @@ import belLogo from '../../../assets/belUrl.png';
 import { QRCodeSVG } from 'qrcode.react';
 import * as QRCodeNode from 'qrcode';
 import { create } from 'zustand';
+import moment from 'moment';
 import useInventoryStore from '../../../store/inventory-store';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TabPane } = Tabs;
 
+// Create a separate component for PDC info
+const PdcInfo = ({ productionOrder }) => {
+  const [pdcInfo, setPdcInfo] = useState({ pdc: null, status: 'loading', data_source: null });
+  const { fetchPdcForCurrentJob, activeParts } = usePlanningStore();
+
+  // This effect will run whenever productionOrder changes
+  useEffect(() => {
+    if (productionOrder) {
+      fetchPdc();
+    }
+  }, [productionOrder, activeParts]); // Include activeParts to refresh when status changes
+
+  const fetchPdc = async () => {
+    try {
+      console.log(`Fetching PDC for production order: ${productionOrder}`);
+      const data = await fetchPdcForCurrentJob(productionOrder);
+      console.log(`PDC result:`, data);
+      setPdcInfo(data);
+    } catch (error) {
+      console.error('Error fetching PDC info:', error);
+      setPdcInfo({ pdc: null, status: 'error', data_source: null });
+    }
+  };
+
+  // Different display based on status
+  if (pdcInfo.status === 'loading') {
+    return <Spin size="small" />;
+  }
+  
+  // For inactive parts, always show "Not yet scheduled"
+  if (pdcInfo.status === 'inactive') {
+    return <span>Not yet scheduled</span>;
+  }
+  
+  // For active parts with PDC data, show the date
+  if (pdcInfo.status === 'active' && pdcInfo.pdc) {
+    return (
+      <Tooltip title={`Data source: ${pdcInfo.data_source || 'Unknown'}`}>
+        <span>{moment(pdcInfo.pdc).format('MM/DD/YYYY')}</span>
+      </Tooltip>
+    );
+  }
+  
+  // For active parts without PDC data
+  if (pdcInfo.status === 'active' && !pdcInfo.pdc) {
+    return <span>Pending PDC</span>;
+  }
+  
+  // Fallback for any other case
+  return <span>-</span>;
+};
+
 const Planning = () => {
   const [form] = Form.useForm();
   const [selectedJob, setSelectedJob] = useState(null);
-  const [selectedPartNumber, setSelectedPartNumber] = useState('');
+  const [selectedPartNumber, setSelectedPartNumber] = useState(null);
   const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
   const [selectedProjectName, setSelectedProjectName] = useState(null);
-  const [selectedPartDescription, setSelectedPartDescription] = useState('');
+  const [selectedPartDescription, setSelectedPartDescription] = useState(null);
   const [showMPPDetails, setShowMPPDetails] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [activeTab, setActiveTab] = useState('jobDetails');
@@ -91,12 +144,14 @@ const Planning = () => {
   // Add new state for engineering drawings
   const [engineeringDrawings, setEngineeringDrawings] = useState([]);
   const [drawingsLoading, setDrawingsLoading] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingProductionOrder, setUpdatingProductionOrder] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [subcategories, setSubcategories] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const { categories, fetchItems,  fetchCategories, fetchAllSubcategories } = useInventoryStore();
   const [selectedSubcategoryName, setSelectedSubcategoryName] = useState('');
-  
+
   useEffect(() => {
     const fetchData = async () => {
         try {
@@ -106,7 +161,6 @@ const Planning = () => {
             message.error('Failed to fetch data');
         }
     };
-
     fetchData();
 }, [fetchCategories, fetchAllSubcategories]);
 
@@ -114,7 +168,6 @@ useEffect(() => {
   loadInventoryItems();
   loadSubcategories();
 }, []);
-
 
 const loadInventoryItems = async () => {
   try {
@@ -127,6 +180,7 @@ const loadInventoryItems = async () => {
     setInventoryItems([]);
   }
 };
+
   const loadSubcategories = async () => {
     try {
       const subCats = await fetchAllSubcategories();
@@ -139,15 +193,15 @@ const loadInventoryItems = async () => {
     }
   };
 
+
+
   const handleInventoryItemClick = (itemId) => {
     setSelectedInventoryItem(itemId);
     setActiveTab('history');  // Switch to history tab
-    
     // Get item details for the message
     const item = inventoryItems.find(item => item.id === itemId);
     const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
     const itemName = item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId;
-    
     message.info(`Showing calibration history for ${itemName}`);
   };
 
@@ -244,9 +298,9 @@ const loadInventoryItems = async () => {
             // Only use saved tools if they match the restored job
             if (parsedTools.length > 0 && parsedTools[0].productionOrder === parsedJob.production_order) {
               setTools(parsedTools);
-              // console.log('Restored matching tools from localStorage:', parsedTools);
+              console.log('Restored matching tools from localStorage:', parsedTools);
             } else {
-              // console.log('Saved tools do not match the restored job - initializing empty tools');
+              console.log('Saved tools do not match the restored job - initializing empty tools');
               setTools([]);
             }
           } catch (error) {
@@ -263,9 +317,9 @@ const loadInventoryItems = async () => {
             // Only use saved programs if they match the restored job
             if (parsedPrograms.length > 0 && parsedPrograms[0].productionOrder === parsedJob.production_order) {
               setPrograms(parsedPrograms);
-              // console.log('Restored matching programs from localStorage:', parsedPrograms);
+              console.log('Restored matching programs from localStorage:', parsedPrograms);
             } else {
-              // console.log('Saved programs do not match the restored job - initializing empty programs');
+              console.log('Saved programs do not match the restored job - initializing empty programs');
               setPrograms([]);
             }
           } catch (error) {
@@ -290,7 +344,7 @@ const loadInventoryItems = async () => {
             selectedJob.part_number,
             selectedJob.production_order
           );
-          // console.log('PDC Response for current job:', pdcResponse);
+          console.log('PDC Response for current job:', pdcResponse);
           
           if (pdcResponse && Array.isArray(pdcResponse) && pdcResponse.length > 0) {
             // Find the matching PDC record for this specific part number and production order
@@ -302,7 +356,7 @@ const loadInventoryItems = async () => {
             if (matchingPdc) {
               // If a matching record was found, set it as the PDC data
               setPdcData(matchingPdc);
-              // console.log('PDC data matched for current job:', matchingPdc);
+              console.log('PDC data matched for current job:', matchingPdc);
             } else {
               // Use the first PDC record if no exact match found
               const pdcWithProductionOrder = {
@@ -311,10 +365,10 @@ const loadInventoryItems = async () => {
                 part_number: pdcResponse[0].part_number || selectedJob.part_number
               };
               setPdcData(pdcWithProductionOrder);
-              // console.log('Using first PDC record:', pdcWithProductionOrder);
+              console.log('Using first PDC record:', pdcWithProductionOrder);
             }
           } else {
-            // console.log('No PDC data available for this part/order');
+            console.log('No PDC data available for this part/order');
             setPdcData(null);
           }
         } catch (pdcError) {
@@ -348,7 +402,7 @@ const loadInventoryItems = async () => {
   useEffect(() => {
     if (programs.length > 0) {
       localStorage.setItem('jobPrograms', JSON.stringify(programs));
-      // console.log('Saved programs to localStorage:', programs);
+      console.log('Saved programs to localStorage:', programs);
     }
   }, [programs]);
 
@@ -433,7 +487,7 @@ const loadInventoryItems = async () => {
         try {
           setDrawingsLoading(true);
           const drawingsData = await fetchEngineeringDrawings(selectedJob.part_number);
-          // console.log('Fetched engineering drawings:', drawingsData);
+          console.log('Fetched engineering drawings:', drawingsData);
           setEngineeringDrawings(drawingsData.items || []);
         } catch (error) {
           console.error('Error fetching engineering drawings:', error);
@@ -447,121 +501,102 @@ const loadInventoryItems = async () => {
     fetchDrawings();
   }, [selectedJob?.part_number, activeTab, fetchEngineeringDrawings]);
 
-  const getJobStatus = (partNumber) => {
-    const activePart = activeParts.find(part => part.part_number === partNumber);
-    return activePart ? activePart.status : 'unknown';
+  // Update the getJobStatus function to correctly check based on production order
+  const getJobStatus = (productionOrder) => {
+    // Check if the production order exists in the activeParts array
+    const foundPart = activeParts.find(part => 
+      part.production_order === productionOrder || 
+      part.production_order_number === productionOrder
+    );
+    
+    // Check the status
+    const isActive = foundPart && foundPart.status === 'active';
+    
+    console.log(`Checking status for ${productionOrder}:`, {
+      foundInActiveParts: !!foundPart,
+      partStatus: foundPart?.status,
+      isActive: isActive,
+      returnStatus: isActive ? 'active' : 'inactive'
+    });
+    
+    return isActive ? 'active' : 'inactive';
   };
 
-  const handleStatusChange = (partNumber, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    const modalTitle = currentStatus === 'active' ? 'Deactivate Part' : 'Activate Part';
-    const modalContent = currentStatus === 'active' 
-      ? 'Are you sure you want to deactivate this part?' 
-      : 'Are you sure you want to activate this part?';
-
+  // Update the handleStatusChange function to properly toggle status
+  const handleStatusChange = (productionOrder, currentStatus) => {
+    // Get the current status directly from activeParts to make sure we have the latest
+    const actualCurrentStatus = getJobStatus(productionOrder);
+    
+    // Determine new status based on current status
+    const newStatus = actualCurrentStatus === 'active' ? 'inactive' : 'active';
+    
+    console.log(`Toggling status for ${productionOrder}: ${actualCurrentStatus} -> ${newStatus}`);
+    
+    // Show confirmation modal
     Modal.confirm({
-      title: modalTitle,
-      content: modalContent,
-      okText: 'Yes',
-      cancelText: 'No',
+      title: `Confirm Status Change`,
+      content: `Are you sure you want to change the status of production order ${productionOrder} to ${newStatus}?`,
       onOk: async () => {
         try {
-          // Call API to change status
-          await changePartStatus(partNumber, newStatus);
-          message.success(`Part status successfully changed to ${newStatus}`);
+          setUpdatingStatus(true);
+          await usePlanningStore.getState().changePartStatus(productionOrder, newStatus);
           
-          // Create a copy of activeParts with the updated status
-          const updatedActiveParts = activeParts.map(part => {
-            if (part.part_number === partNumber) {
-              return { ...part, status: newStatus };
-            }
-            return part;
-          });
+          // Refresh data after status change
+          await fetchActiveParts();
           
-          // Update the local activeParts state to reflect the change immediately
-          usePlanningStore.setState({ activeParts: updatedActiveParts });
+          // Force re-fetch of PDC data by creating a unique key
+          const pdcKey = `pdc-${productionOrder}-${Date.now()}`;
           
-          // Immediately update PDC display based on new status
-          if (newStatus === 'active' && selectedJob) {
-            // If changing to active, fetch PDC data
-            try {
-              const pdcResponse = await fetchPartProductionPDC(
-                selectedJob.part_number,
-                selectedJob.production_order
-              );
-              
-              if (pdcResponse && Array.isArray(pdcResponse) && pdcResponse.length > 0) {
-                const matchingPdc = pdcResponse.find(item => 
-                  item.part_number === selectedJob.part_number && 
-                  item.production_order === selectedJob.production_order
-                );
-                
-                if (matchingPdc) {
-                  setPdcData(matchingPdc);
-                } else {
-                  const pdcWithProductionOrder = {
-                    ...pdcResponse[0],
-                    production_order: pdcResponse[0].production_order || selectedJob.production_order,
-                    part_number: pdcResponse[0].part_number || selectedJob.part_number
-                  };
-                  setPdcData(pdcWithProductionOrder);
-                }
-              } else {
-                setPdcData(null);
+          // Update the component state to trigger re-rendering
+          setDataSource(prevDataSource => 
+            prevDataSource.map(item => {
+              if (item.productionOrder === productionOrder) {
+                return {
+                  ...item,
+                  status: newStatus,
+                  pdcInfoKey: pdcKey
+                };
               }
-            } catch (pdcError) {
-              console.error('Error fetching PDC data after status change:', pdcError);
-              setPdcData(null);
-            }
-          } else if (newStatus === 'inactive') {
-            // If changing to inactive, no need to fetch PDC data
-            // The renderPdcInfo function will show "Not yet scheduled" based on status
-          }
+              return item;
+            })
+          );
+          
+          message.success(`Status changed to ${newStatus} successfully`);
         } catch (error) {
-          message.error('Failed to change part status');
+          message.error(`Failed to change status: ${error.message}`);
+        } finally {
+          setUpdatingStatus(false);
         }
       }
     });
   };
 
-  const renderStatusButton = (partNumber) => {
-    const status = getJobStatus(partNumber);
+  // Update the renderStatusButton function to properly display the text based on current status
+  const renderStatusButton = (productionOrder) => {
+    const status = getJobStatus(productionOrder);
+    const isUpdating = updatingStatus && updatingProductionOrder === productionOrder;
     
-    switch (status) {
-      case 'active':
-        return (
-          <Button 
-            className="bg-green-600 text-white hover:bg-green-700"
-            onClick={() => handleStatusChange(partNumber, status)}
-          >
-            <CalendarCheck className="w-5 h-5 mr-2" /> Active
-          </Button>
-        );
-      case 'inactive':
-        return (
-          <Button 
-            className="bg-yellow-600 text-white hover:bg-yellow-700"
-            onClick={() => handleStatusChange(partNumber, status)}
-          >
-            <Hourglass className="w-5 h-5 mr-2" /> Inactive
-          </Button>
-        );
-      default:
-        return (
-          <Button 
-            className="bg-gray-600 text-white hover:bg-gray-700"
-            onClick={() => handleStatusChange(partNumber, 'unknown')}
-          >
-            <AlertTriangle className="w-5 h-5 mr-2" /> Unknown
-          </Button>
-        );
-    }
+    return (
+      <Button
+        type={status === 'active' ? 'primary' : 'default'} 
+        style={{
+          backgroundColor: status === 'active' ? '#1890ff' : '#faad14', // Blue for active, Yellow for inactive
+          color: 'white',
+          borderColor: status === 'active' ? '#1890ff' : '#faad14'
+        }}
+        onClick={() => handleStatusChange(productionOrder, status)}
+        loading={isUpdating}
+        icon={status === 'active' ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+      >
+        {status === 'active' ? 'Active' : 'Inactive'}
+      </Button>
+    );
   };
 
   const handleJobSelect = async (partNumber) => {
     try {
       setLoading(true);
-      // console.log('Selected part number:', partNumber);
+      console.log('Selected part number:', partNumber);
       setSelectedOrderNumber(partNumber);
       
       if (!partNumber) {
@@ -573,14 +608,14 @@ const loadInventoryItems = async () => {
         return;
       }
 
-      // console.log('Selected partNumber:', partNumber);
+      console.log('Selected partNumber:', partNumber);
       
       const fetchJobDetails = async (selectedPartNumber) => {
         try {
           const orderData = await searchOrders(selectedPartNumber);
           if (orderData && orderData.orders && orderData.orders.length > 0) {
             const jobData = orderData.orders[0];
-            // console.log('Job details:', jobData);
+            console.log('Job details:', jobData);
             setSelectedJob(jobData);
             
             // Save to localStorage for persistence
@@ -592,7 +627,7 @@ const loadInventoryItems = async () => {
             // Fetch tools and programs
             try {
               const toolsData = await fetchToolsByOrderId(jobData.id);
-              // console.log('Tools data:', toolsData);
+              console.log('Tools data:', toolsData);
               
               const enhancedToolsData = toolsData.map(tool => ({
                 ...tool,
@@ -611,7 +646,7 @@ const loadInventoryItems = async () => {
             
             try {
               const programsData = await fetchProgramsByOrderId(jobData.id);
-              // console.log('Programs data:', programsData);
+              console.log('Programs data:', programsData);
               
               const enhancedProgramsData = programsData.map(program => ({
                 ...program,
@@ -1106,7 +1141,7 @@ const loadInventoryItems = async () => {
 
       // Save the PDF
       const fileName = `JobCard_${selectedJob.production_order || 'unknown'}.pdf`;
-      // console.log('Saving PDF with filename:', fileName);
+      console.log('Saving PDF with filename:', fileName);
       doc.save(fileName);
       message.success('Job card downloaded successfully');
       setIsPreviewModalVisible(false);
@@ -1383,7 +1418,7 @@ const loadInventoryItems = async () => {
         operation_id: values.operation_id,
         tool_name: values.tool_name, // Ensure this is a string
       };
-      // console.log('Tool Data to be submitted:', toolData);
+      
       const newTool = await addOrderTool(toolData);
       setTools(prevTools => [...prevTools, newTool]);
       message.success('Tool added successfully');
@@ -1519,45 +1554,9 @@ const loadInventoryItems = async () => {
     }
   };
 
+  // In your Planning component, replace the renderPdcInfo function with:
   const renderPdcInfo = (productionOrder) => {
-    // Get the current status directly from activeParts state to ensure latest value
-    const currentPart = activeParts.find(part => part.part_number === selectedJob?.part_number);
-    const status = currentPart ? currentPart.status : 'unknown';
-    
-    // Only show PDC when the job status is active
-    if (status !== 'active') {
-      return (
-        <Tag color="orange">Not yet scheduled</Tag>
-      );
-    }
-    
-    // Continue with existing logic only if the job is active
-    // Verify that pdcData matches the current production order
-    const isPdcForCurrentJob = pdcData && 
-                              pdcData.production_order === productionOrder;
-    
-    // If PDC exists for this specific production order: Show the PDC date/time
-    if (isPdcForCurrentJob) {
-      // Format the date for better readability
-      const pdcDate = new Date(pdcData.pdc);
-      const formattedDate = pdcDate.toLocaleDateString();
-      const formattedTime = pdcDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-      // For active jobs, show PDC with blue tag
-      return (
-        <Tooltip title={`Production Due Date (${pdcData.data_source})`}>
-          <Tag color="blue" style={{ fontWeight: 'bold' }}>
-            {formattedDate} {formattedTime}
-          </Tag>
-        </Tooltip>
-      );
-    }
-    // If no PDC data for this production order
-    else {
-      return (
-        <Tag color="red">PDC not defined</Tag>
-      );
-    }
+    return <PdcInfo productionOrder={productionOrder} key={`pdc-${productionOrder}`} />;
   };
 
   // Handle viewing/downloading a drawing
@@ -1582,17 +1581,22 @@ const loadInventoryItems = async () => {
                   <Select
                     className="job-select"
                     showSearch
-                    loading={isLoading}
-                    placeholder="Search by Production Order"
+                    style={{ width: 300 }}
+                    placeholder="Select Production Order"
+                    optionFilterProp="label"
+                    value={selectedOrderNumber}
                     onChange={handleJobSelect}
-                    optionFilterProp="children"
-                    style={{ width: '500px' }}
-                    allowClear
-                    value={selectedJob?.production_order}
+                    filterOption={(input, option) =>
+                      option.label.toLowerCase().includes(input.toLowerCase())
+                    }
                   >
-                    {partNumbers.map(item => (
-                      <Option key={item.id} value={item.productionOrder}>
-                        {item.productionOrder}
+                    {partNumbers.map(order => (
+                      <Option 
+                        key={order.id} 
+                        value={order.value}
+                        label={order.label}
+                      >
+                        {order.label}
                       </Option>
                     ))}
                   </Select>
@@ -1630,9 +1634,9 @@ const loadInventoryItems = async () => {
               >
                 <Card 
                   className={`shadow-sm mb-6 hover:shadow-md transition-shadow ${
-                    getJobStatus(selectedJob.part_number) === 'active' 
+                    getJobStatus(selectedJob.production_order) === 'active' 
                       ? 'bg-green-50' 
-                      : getJobStatus(selectedJob.part_number) === 'inactive'
+                      : getJobStatus(selectedJob.production_order) === 'inactive'
                       ? 'bg-yellow-50'
                       : 'bg-gray-50'
                   }`}
@@ -1668,7 +1672,7 @@ const loadInventoryItems = async () => {
                     </Descriptions.Item>
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Status</span>}>
                       <div className="flex items-center space-x-2">
-                        {renderStatusButton(selectedJob.part_number)}
+                        {renderStatusButton(selectedJob.production_order)}
                       </div>
                     </Descriptions.Item>
                     <Descriptions.Item 
@@ -2023,7 +2027,7 @@ const loadInventoryItems = async () => {
                   </Tabs>
                 </Card>
 
-                {/* Add Tool Modal */}
+                 {/* Add Tool Modal */}
                 <Modal
                   title="Add Tool"
                   visible={isAddToolModalVisible}
@@ -2034,7 +2038,7 @@ const loadInventoryItems = async () => {
                   }}
                   confirmLoading={loading}
                 >
-                  <Form
+                 <Form
                     form={addToolForm}
                     layout="vertical"
                     onFinish={async (values) => {
@@ -2179,77 +2183,6 @@ const loadInventoryItems = async () => {
                   </Form>
                 </Modal>
 
-
-
-                
-
-                {/* Edit Tool Modal */}
-                <Modal
-                  title="Edit Tool"
-                  visible={isEditToolModalVisible}
-                  onOk={() => editToolForm.submit()}
-                  onCancel={() => {
-                    setIsEditToolModalVisible(false);
-                    editToolForm.resetFields();
-                  }}
-                  confirmLoading={loading}
-                >
-                  <Form
-                    form={editToolForm}
-                    layout="vertical"
-                    onFinish={handleUpdateTool}
-                    initialValues={selectedTool}
-                  >
-                    <Form.Item
-                      name="tool_name"
-                      label="Tool Name"
-                      rules={[{ required: true, message: 'Please enter tool name' }]}
-                    >
-                      <Input />
-                    </Form.Item>
-                    <Form.Item
-                      name="tool_number"
-                      label="Tool Number"
-                      rules={[{ required: true, message: 'Please enter tool number' }]}
-                    >
-                      <Input />
-                    </Form.Item>
-                    <Form.Item
-                      name="bel_partnumber"
-                      label="BEL Part Number"
-                      rules={[{ required: true, message: 'Please enter BEL part number' }]}
-                    >
-                      <Input />
-                    </Form.Item>
-                    <Form.Item
-                      name="description"
-                      label="Description"
-                    >
-                      <Input.TextArea />
-                    </Form.Item>
-                    <Form.Item
-                      name="quantity"
-                      label="Quantity"
-                      rules={[{ required: true, message: 'Please enter quantity' }]}
-                    >
-                      <InputNumber min={1} style={{ width: '100%' }} />
-                    </Form.Item>
-                    <Form.Item
-                      name="operation_id"
-                      label="Operation"
-                      rules={[{ required: true, message: 'Please select an operation' }]}
-                    >
-                      <Select>
-                        {selectedJob?.operations?.map(op => (
-                          <Select.Option key={op.id} value={op.id}>
-                            {`Operation ${op.operation_number} - ${op.operation_description}`}
-                          </Select.Option>
-                        ))}
-                      </Select>
-                    </Form.Item>
-                  </Form>
-                </Modal>
-
                 {/* Add Program Modal */}
                 <Modal
                   title="Add Program"
@@ -2275,7 +2208,7 @@ const loadInventoryItems = async () => {
                             handleAddProgram(values);
                           })
                           .catch(info => {
-                            // console.log('Validate Failed:', info);
+                            console.log('Validate Failed:', info);
                           });
                       }}
                     >
@@ -2348,7 +2281,7 @@ const loadInventoryItems = async () => {
                             handleEditProgram(values);
                           })
                           .catch(info => {
-                            // console.log('Validate Failed:', info);
+                            console.log('Validate Failed:', info);
                           });
                       }}
                     >
@@ -2687,20 +2620,6 @@ const loadInventoryItems = async () => {
                   </div>
                 </Card>
               </TabPane>
-
-              {/* <TabPane 
-                tab={
-                  <span>
-                    <BarChartOutlined />
-                    Capacity Planning
-                  </span>
-                }
-                key="capacityPlanning"
-              >
-                <CapacityPlanning />
-              </TabPane> */}
-
-          
             </Tabs>
           </Card>
 

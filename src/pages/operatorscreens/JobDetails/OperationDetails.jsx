@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Table, Card, Button, Space, Drawer, Upload, 
   Tabs, Typography, Tag, Image, Tooltip, Steps,
-  Divider, Row, Col, Progress, Badge, Descriptions,Collapse,List, Spin
+  Divider, Row, Col, Progress, Badge, Descriptions,Collapse,List, Spin, Input, message, Alert
 } from 'antd';
 import { 
   FileTextOutlined, EyeOutlined, UploadOutlined,
   InfoCircleOutlined, ToolOutlined, 
-  ClockCircleOutlined, CheckCircleOutlined
+  ClockCircleOutlined, CheckCircleOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import {
   Timer,  Settings, AlertTriangle,
@@ -22,94 +22,442 @@ const { Title, Text } = Typography;
 const { Step } = Steps;
 const { Panel } = Collapse;
 
-const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => (
+const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => {
+  const { 
+    fetchOperationDocuments, 
+    clearOperationDocuments,
+    operationDocuments,
+    documentLoading,
+    documentError,
+    downloadDocumentById,
+    openDocumentInNewTab
+  } = useWebSocketStore();
+  const [fixtureNo, setFixtureNo] = useState('');
+  const [ipidNo, setIpidNo] = useState('');
+  const [datumX, setDatumX] = useState('');
+  const [datumY, setDatumY] = useState('');
+  const [datumZ, setDatumZ] = useState('');
+  const [fixtureSetup, setFixtureSetup] = useState('');
+  const [jobPreparation, setJobPreparation] = useState('');
+  const [postMachining, setPostMachining] = useState('');
+  
+  const [hasMppData, setHasMppData] = useState(false);
+
+  const handleDownloadDocument = async (documentType) => {
+    if (!operationDocuments) return;
+    
+    let document = null;
+    switch (documentType) {
+      case 'mpp':
+        document = operationDocuments.mpp;
+        break;
+      case 'ipid':
+        document = operationDocuments.ipid;
+        break;
+      case 'engineering':
+        document = operationDocuments.engineering;
+        break;
+      default:
+        message.error('Document type not supported');
+        return;
+    }
+    
+    if (!document || !document.id) {
+      message.error(`No ${documentType.toUpperCase()} document available`);
+      return;
+    }
+    
+    try {
+      message.loading(`Downloading ${documentType.toUpperCase()} document...`);
+      const result = await downloadDocumentById(document.id);
+      
+      if (result.success) {
+        message.success(`${documentType.toUpperCase()} document downloaded successfully`);
+      } else {
+        message.error(result.error || 'Failed to download document');
+      }
+    } catch (error) {
+      console.error(`Error downloading ${documentType} document:`, error);
+      message.error('Failed to download document');
+    }
+  };
+
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (showDrawer && selectedOperation?.part_number) {
+        console.log(`Fetching documents for part: ${selectedOperation.part_number}, operation: ${selectedOperation.operation_number}`);
+        const result = await fetchOperationDocuments(
+          selectedOperation.part_number,
+          selectedOperation.operation_number
+        );
+        
+        if (result.success) {
+          console.log('Documents fetched successfully:', result.data);
+          if (result.data.mpp) {
+            console.log('MPP document available:', result.data.mpp);
+          }
+          if (result.data.mppData) {
+            setHasMppData(true);
+            const mpp = result.data.mppData;
+            
+            setFixtureNo(mpp.fixture_number || '');
+            setIpidNo(mpp.ipid_number || '');
+            
+            setDatumX(mpp.datum_x || '');
+            setDatumY(mpp.datum_y || '');
+            setDatumZ(mpp.datum_z || '');
+            
+            if (mpp.work_instructions && mpp.work_instructions.sections) {
+              const sections = mpp.work_instructions.sections;
+              
+              const fixtureSetupSection = sections.find(s => s.title === 'Fixture Setup');
+              const jobPrepSection = sections.find(s => s.title === 'Job Preparation');
+              const postMachiningSection = sections.find(s => s.title === 'Post-Machining Steps');
+              
+              setFixtureSetup(fixtureSetupSection ? fixtureSetupSection.instructions : '');
+              setJobPreparation(jobPrepSection ? jobPrepSection.instructions : '');
+              setPostMachining(postMachiningSection ? postMachiningSection.instructions : '');
+            }
+            message.success('Operation data loaded successfully');
+          } else if (!result.data.hasDocuments) {
+            setFixtureNo('No Data');
+            setIpidNo('No Data');
+            setDatumX('No Data');
+            setDatumY('No Data');
+            setDatumZ('No Data');
+            setFixtureSetup('No Data');
+            setJobPreparation('No Data');
+            setPostMachining('No Data');
+            message.info('No operation data available');
+          }
+        }
+      }
+    };
+
+    loadDocuments();
+
+    return () => {
+      clearOperationDocuments();
+      resetFields();
+    };
+  }, [showDrawer, selectedOperation]);
+
+  const resetFields = () => {
+    setFixtureNo('');
+    setIpidNo('');
+    setDatumX('');
+    setDatumY('');
+    setDatumZ('');
+    setFixtureSetup('');
+    setJobPreparation('');
+    setPostMachining('');
+    setHasMppData(false);
+  };
+
+  const fieldsDisabled = !hasMppData && !(operationDocuments && operationDocuments.hasDocuments);
+
+  const renderHtml = (htmlContent) => {
+    if (!htmlContent) return null;
+    return <div dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+  };
+
+  return (
   <Drawer
     title={
-      <Space>
-        <Text strong className="text-lg">
+        <div className="flex items-center space-x-4">
+          <div className="flex-1">
+            <div className="text-lg font-semibold text-gray-800">
           Operation {selectedOperation?.operation_number}
-        </Text>
-        <Tag color="blue">{selectedOperation?.description}</Tag>
-      </Space>
+            </div>
+            <div className="text-sm text-gray-500">
+              {selectedOperation?.description}
+            </div>
+          </div>
+          <Tag color={selectedOperation?.status === 'completed' ? 'success' : 'processing'}>
+            {selectedOperation?.status?.toUpperCase()}
+          </Tag>
+        </div>
     }
     placement="right"
-    width={720}
+      width={800}
     onClose={onClose}
     open={showDrawer}
     destroyOnClose={true}
-  >
-    {selectedOperation && (
+      className="operation-details-drawer"
+    >
+      {documentLoading ? (
+        <div className="flex justify-center items-center h-96">
+          <Spin size="large" />
+        </div>
+      ) : documentError ? (
+        <Alert
+          type="error"
+          message="Error loading documents"
+          description={documentError}
+          className="mb-6"
+        />
+      ) : (
       <div className="space-y-6">
-        {/* Fixture and IPID Information */}
-        <Card title="Fixture & IPID Details">
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="Fixture No with Rev.">
-              <Text strong>Fx-62805080AA-70.80-Rev.01</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="IPID No with Rev.">
-              <Text strong>IPID-62805080AA-80-Rev.01</Text>
-            </Descriptions.Item>
-          </Descriptions>
+          {/* Operation Overview */}
+          <Card className="shadow-sm border-0">
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <Text type="secondary">Part Number</Text>
+                <div className="text-lg font-medium">{selectedOperation?.part_number}</div>
+              </div>
+              <div>
+                <Text type="secondary">Operation Type</Text>
+                <div className="text-lg font-medium">{selectedOperation?.operation_type || 'N/A'}</div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Document Information */}
+          {operationDocuments && (
+            <Card 
+              title={
+                <div className="flex items-center space-x-2">
+                  <FileTextOutlined className="text-blue-500" />
+                  <span>Documents</span>
+                </div>
+              }
+              className="shadow-sm border-0"
+            >
+              <div className="space-y-4">
+                {operationDocuments.mpp && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Tag color="blue" className="m-0">MPP</Tag>
+                      <span className="text-sm">{operationDocuments.mpp.document_number || operationDocuments.mpp.name}</span>
+                    </div>
+                    <Button 
+                      type="primary" 
+                      icon={<DownloadOutlined />}
+                      onClick={() => handleDownloadDocument('mpp')}
+                      size="small"
+                    >
+                      Download
+                    </Button>
+                  </div>
+                )}
+                {operationDocuments.ipid && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Tag color="green" className="m-0">IPID</Tag>
+                      <span className="text-sm">{operationDocuments.ipid.document_number || operationDocuments.ipid.name}</span>
+                    </div>
+                    <Button 
+                      type="primary" 
+                      icon={<DownloadOutlined />}
+                      onClick={() => handleDownloadDocument('ipid')}
+                      size="small"
+                    >
+                      Download
+                    </Button>
+                  </div>
+                )}
+                {operationDocuments.engineering && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Tag color="orange" className="m-0">Engineering</Tag>
+                      <span className="text-sm">{operationDocuments.engineering.document_number || operationDocuments.engineering.name}</span>
+                    </div>
+                    <Button 
+                      type="primary" 
+                      icon={<DownloadOutlined />}
+                      onClick={() => handleDownloadDocument('engineering')}
+                      size="small"
+                    >
+                      Download
+                    </Button>
+                  </div>
+                )}
+                {!operationDocuments.mpp && !operationDocuments.ipid && !operationDocuments.engineering && operationDocuments.mppData && (
+                  <Alert
+                    message="MPP Data Available"
+                    description="The operation details are available in the sections below."
+                    type="info"
+                    showIcon
+                  />
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Fixture & IPID Details */}
+          <Card 
+            title={
+              <div className="flex items-center space-x-2">
+                <ToolOutlined className="text-blue-500" />
+                <span>Fixture & IPID Details</span>
+              </div>
+            }
+            className="shadow-sm border-0"
+          >
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <Text type="secondary">Fixture Number</Text>
+                <Input 
+                  value={fixtureNo}
+                  onChange={(e) => setFixtureNo(e.target.value)}
+                  placeholder="Enter fixture number"
+                  disabled={fieldsDisabled}
+                  className={`mt-2 ${fieldsDisabled ? "bg-gray-50" : ""}`}
+                />
+              </div>
+              <div>
+                <Text type="secondary">IPID Number</Text>
+                <Input 
+                  value={ipidNo}
+                  onChange={(e) => setIpidNo(e.target.value)}
+                  placeholder="Enter IPID number"
+                  disabled={fieldsDisabled}
+                  className={`mt-2 ${fieldsDisabled ? "bg-gray-50" : ""}`}
+                />
+              </div>
+            </div>
         </Card>
 
         {/* Datum Information */}
-        <Card title="Datum Information">
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="Datum X Axis">
-              <Text strong>0 at the job center</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Datum Y Axis">
-              <Text strong>0 at the job center</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Datum Z Axis">
-              <Text strong>+0.25mm at top of the job</Text>
-            </Descriptions.Item>
-          </Descriptions>
+          <Card 
+            title={
+              <div className="flex items-center space-x-2">
+                <InfoCircleOutlined className="text-blue-500" />
+                <span>Datum Information</span>
+              </div>
+            }
+            className="shadow-sm border-0"
+          >
+            <div className="grid grid-cols-3 gap-6">
+              {['X', 'Y', 'Z'].map((axis) => (
+                <div key={axis}>
+                  <Text type="secondary">Datum {axis} Axis</Text>
+                  <Input 
+                    value={eval(`datum${axis}`)}
+                    onChange={(e) => eval(`setDatum${axis}`)(e.target.value)}
+                    placeholder={`Enter ${axis} axis datum`}
+                    disabled={fieldsDisabled}
+                    className={`mt-2 ${fieldsDisabled ? "bg-gray-50" : ""}`}
+                  />
+                </div>
+              ))}
+            </div>
         </Card>
 
-        {/* Work Holding Instructions */}
-        <Card title="Work Holding Instructions">
+          {/* Work Instructions */}
+          <Card 
+            title={
+              <div className="flex items-center space-x-2">
+                <FileTextOutlined className="text-blue-500" />
+                <span>Work Instructions</span>
+              </div>
+            }
+            className="shadow-sm border-0"
+          >
           <Collapse defaultActiveKey={['1']} ghost>
             <Panel header="Fixture Setup" key="1">
-              <List>
-                <List.Item>
-                  <Text>Hold the fixture in vise with around 3 to 5 mm projection over jaws.</Text>
-                </List.Item>
-                <List.Item>
-                  <Text>Clamp the job on fixture with (14X) MS screws while ensuring longest edge to be parallel to X axis within +/-0.1 mm through dialing.</Text>
-                </List.Item>
-              </List>
+                <div className={`p-4 rounded-lg ${fieldsDisabled ? "bg-gray-50" : "border"}`}>
+                  {renderHtml(fixtureSetup) || "No data available"}
+                </div>
+              </Panel>
+              <Panel header="Job Preparation" key="2">
+                <div className={`p-4 rounded-lg ${fieldsDisabled ? "bg-gray-50" : "border"}`}>
+                  {renderHtml(jobPreparation) || "No data available"}
+                </div>
+              </Panel>
+              <Panel header="Post-Machining Steps" key="3">
+                <div className={`p-4 rounded-lg ${fieldsDisabled ? "bg-gray-50" : "border"}`}>
+                  {renderHtml(postMachining) || "No data available"}
+                </div>
             </Panel>
           </Collapse>
         </Card>
 
         {/* Reference Images */}
-        <Card title="Reference Images">
-          <Row gutter={[16, 16]}>
-            <Col span={12}>
+          <Card 
+            title={
+              <div className="flex items-center space-x-2">
+                <ImageIcon className="text-blue-500" />
+                <span>Reference Images</span>
+              </div>
+            }
+            className="shadow-sm border-0"
+          >
+            <div className="grid grid-cols-2 gap-6">
+              <div>
               <Image
                 src="/images/job_loading.png"
                 alt="Job Loading"
+                  className="rounded-lg"
               />
               <Text className="block mt-2 text-center">Job Loading</Text>
-            </Col>
-            <Col span={12}>
+              </div>
+              <div>
               <Image
                 src="/images/post_machine.png"
                 alt="Post Machining"
+                  className="rounded-lg"
               />
               <Text className="block mt-2 text-center">Post Machining</Text>
-            </Col>
-          </Row>
+              </div>
+            </div>
         </Card>
       </div>
     )}
   </Drawer>
 );
+};
+
+// Create a new component for the Download MPP button
+const DownloadMppButton = ({ record, machineOperations }) => {
+  const { fetchOperationDocuments, downloadDocumentById } = useWebSocketStore();
+  
+  const handleDownload = (e) => {
+    e.stopPropagation();
+    const partNumber = record.part_number || machineOperations?.inprogress?.[0]?.part_number;
+    
+    if (partNumber) {
+      message.loading('Fetching MPP document...');
+      fetchOperationDocuments(partNumber, record.operation_number)
+        .then(result => {
+          if (result.success && result.data.mpp && result.data.mpp.id) {
+            message.success('MPP document found, downloading...');
+            return downloadDocumentById(result.data.mpp.id);
+          } else {
+            message.info('No MPP document available for this operation');
+          }
+        })
+        .catch(error => {
+          message.error('Failed to fetch document: ' + error.message);
+          console.error('Error fetching documents:', error);
+        });
+    } else {
+      message.error('No part number available');
+    }
+  };
+  
+  return (
+    <Button
+      type="default"
+      size="small"
+      icon={<DownloadOutlined />}
+      onClick={handleDownload}
+    >
+      Download MPP
+    </Button>
+  );
+};
 
 const OperationDetails = () => {
   const { currentMachine } = useAuthStore();
-  const { fetchMachineOperations, machineOperations, loading } = useWebSocketStore();
+  const { 
+    fetchMachineOperations, 
+    machineOperations, 
+    loading, 
+    fetchOperationDocuments, 
+    downloadDocumentById,
+    openDocumentInNewTab
+  } = useWebSocketStore();
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [showDrawer, setShowDrawer] = useState(false);
 
@@ -187,21 +535,64 @@ const OperationDetails = () => {
       key: 'actions',
       width: 100,
       render: (_, record) => (
-        <Button 
-          type="primary"
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedOperation(record);
-            setShowDrawer(true);
-          }}
-        >
-          Details
-        </Button>
+        <Space>
+          <Button 
+            type="primary"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              const partNumber = record.part_number || machineOperations?.inprogress?.[0]?.part_number;
+              
+              if (partNumber) {
+                fetchOperationDocuments(partNumber, record.operation_number)
+                  .then(result => {
+                    if (result.success && result.data.mpp && result.data.mpp.id) {
+                      message.success('MPP document found, opening in new tab...');
+                      return openDocumentInNewTab(result.data.mpp.id);
+                    } else {
+                      const operationData = {
+                        ...record,
+                        part_number: partNumber
+                      };
+                      setSelectedOperation(operationData);
+                      setShowDrawer(true);
+                      return { success: true };
+                    }
+                  })
+                  .then(result => {
+                    if (!result.success) {
+                      message.error(result.error || 'Failed to open document');
+                    }
+                  })
+                  .catch(error => {
+                    console.error('Error handling operation:', error);
+                    message.error('Failed to process operation');
+                    
+                    const operationData = {
+                      ...record,
+                      part_number: partNumber
+                    };
+                    setSelectedOperation(operationData);
+                    setShowDrawer(true);
+                  });
+              } else {
+                message.warning('Part number not available');
+                
+                const operationData = {
+                  ...record
+                };
+                setSelectedOperation(operationData);
+                setShowDrawer(true);
+              }
+            }}
+          >
+            Details
+          </Button>
+        </Space>
       ),
     }
-  ], []);
+  ], [machineOperations, fetchOperationDocuments, openDocumentInNewTab, setSelectedOperation, setShowDrawer]);
 
   const allOperations = useMemo(() => {
     return [
@@ -351,52 +742,46 @@ const OperationDetails = () => {
       />
 
       <style jsx global>{`
-        .operation-drawer .ant-drawer-header {
-          padding: 16px 24px;
+        .operation-details-drawer .ant-drawer-content-wrapper {
+          box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .operation-details-drawer .ant-drawer-header {
+          padding: 20px 24px;
           border-bottom: 1px solid #f0f0f0;
         }
 
-        .operation-drawer .ant-drawer-body {
+        .operation-details-drawer .ant-drawer-body {
           padding: 24px;
+          background-color: #f5f5f5;
         }
 
-        /* Remove hover and animation effects from cards inside drawer */
-        .operation-drawer .ant-card {
+        .operation-details-drawer .ant-card {
           border-radius: 8px;
-          transform: none !important;
-          transition: none !important;
+          overflow: hidden;
+          transition: all 0.3s ease;
         }
 
-        .operation-drawer .ant-card:hover {
-          transform: none !important;
-          box-shadow: none !important;
+        .operation-details-drawer .ant-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
-        /* Keep other styles for main content */
-        .ant-card-head {
-          border-bottom: 1px solid #f0f0f0;
-          padding: 16px 24px;
-        }
-
-        .ant-card-body {
-          padding: 24px;
-        }
-
-        .ant-btn {
+        .operation-details-drawer .ant-input {
           border-radius: 6px;
         }
 
-        .ant-tag {
+        .operation-details-drawer .ant-collapse-header {
+          padding: 12px 16px !important;
+        }
+
+        .operation-details-drawer .ant-collapse-content-box {
+          padding: 0 !important;
+        }
+
+        .operation-details-drawer .ant-tag {
           border-radius: 4px;
-        }
-
-        /* Keep animations only for main content */
-        .operation-table .ant-card:hover {
-          transform: translateY(-2px);
-        }
-
-        .operation-table .ant-btn:hover {
-          transform: translateY(-1px);
+          padding: 2px 8px;
         }
       `}</style>
     </div>

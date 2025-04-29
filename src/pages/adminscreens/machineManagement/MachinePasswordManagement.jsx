@@ -20,7 +20,7 @@ const MachinePasswordManagement = () => {
     setIsLoading(true);
     try {
       const response = await axios.get(
-        "http://172.18.7.85:2078/api/v1/master-order/machines/"
+        "http://172.18.7.85:8078/api/v1/master-order/machines/"
       );
       setMachines(response.data || []);
     } catch (error) {
@@ -37,7 +37,7 @@ const MachinePasswordManagement = () => {
     setSubmitLoading(true);
     try {
       const response = await axios.post(
-        `http://172.18.7.85:2078/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
+        `http://172.18.7.85:8078/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
       );
       message.success(response.data.status || "Password set successfully");
       toast.success(response.data.status || "Password set successfully");
@@ -52,7 +52,7 @@ const MachinePasswordManagement = () => {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-300 p-4">
+    <div className="flex justify-center items-center  bg-gradient-to-br from-slate-100 to-slate-300 p-4">
       <Card className="w-full max-w-md p-6 rounded-xl shadow-2xl bg-white">
         <h2 className="text-3xl font-bold text-center text-blue-700 mb-8">Machine Password Management</h2>
         <Form

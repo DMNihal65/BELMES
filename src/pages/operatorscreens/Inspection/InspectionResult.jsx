@@ -26,6 +26,9 @@ function InspectionResult() {
   const [selectedOperationData, setSelectedOperationData] = useState(null);
   const [isQmsModalVisible, setIsQmsModalVisible] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [detailedMeasurements, setDetailedMeasurements] = useState(null);
+  const [isDetailedMeasurementsVisible, setIsDetailedMeasurementsVisible] = useState(false);
+  const [loadingDetailedMeasurements, setLoadingDetailedMeasurements] = useState(false);
 
   useEffect(() => {
     const fetchPartNumbers = async () => {
@@ -60,9 +63,54 @@ function InspectionResult() {
       setSelectedPartNumber(value);
       setSelectedOrderId(value);
       
-      const inspectionData = await qualityStore.fetchInspectionByOrderId(value);
-      console.log('Received inspection data:', inspectionData);
-      setInspectionData(inspectionData);
+      // Use fetchInspectionDetails instead of fetchInspectionByOrderId
+      const inspectionDetails = await qualityStore.fetchInspectionDetails(value);
+      console.log('Received inspection details:', inspectionDetails);
+      
+      // Format the data for the table display
+      const formattedData = [{
+        key: value,
+        order_id: inspectionDetails.order_id || value,
+        production_order: inspectionDetails.production_order || '',
+        part_number: inspectionDetails.part_number || '',
+        operations: inspectionDetails.operations || [],
+        inspection_data: [] // We'll modify this as needed based on operation_groups
+      }];
+      
+      // Check if we have operation_groups to process
+      if (inspectionDetails.operation_groups && inspectionDetails.operation_groups.length > 0) {
+        // Group the inspection data by operation
+        const groupedByOperation = {};
+        
+        inspectionDetails.operation_groups.forEach(group => {
+          const opNo = group.op_no;
+          
+          if (!groupedByOperation[opNo]) {
+            groupedByOperation[opNo] = {
+              operation_number: opNo,
+              inspections: []
+            };
+          }
+          
+          // Add this measurement to the operation's inspections
+          if (group.details) {
+            groupedByOperation[opNo].inspections.push({
+              id: `${opNo}-${group.details.zone || 'unknown'}-${groupedByOperation[opNo].inspections.length + 1}`,
+              dimension_type: group.details.dimension_type || '',
+              nominal_value: group.details.nominal || '',
+              uppertol: group.details.uppertol || '',
+              lowertol: group.details.lowertol || '',
+              zone: group.details.zone || '',
+              measured_instrument: group.details.measured_instrument || ''
+            });
+          }
+        });
+        
+        // Convert the grouped data back to an array
+        formattedData[0].inspection_data = Object.values(groupedByOperation);
+      }
+      
+      setInspectionData(formattedData);
       
     } catch (error) {
       console.error('Error fetching inspection details:', error);
@@ -176,6 +224,28 @@ function InspectionResult() {
           dataIndex: 'measured_mean',
           key: 'measured_mean',
           width: '8%',
+          render: (value, record) => {
+            // Format to 4 decimal places
+            const formattedValue = typeof value === 'number' ? value.toFixed(4) : value;
+            
+            // Check if value is within tolerance
+            const nominal = parseFloat(record.nominal_value);
+            const upper = parseFloat(record.uppertol);
+            const lower = parseFloat(record.lowertol);
+            const mean = parseFloat(value);
+            
+            if (isNaN(mean) || isNaN(nominal)) {
+              return <span className="font-mono">{formattedValue}</span>;
+            }
+            
+            const withinTolerance = mean <= (nominal + upper) && mean >= (nominal + lower);
+            
+            return (
+              <span className={`font-mono font-medium ${withinTolerance ? 'text-green-600' : 'text-red-600'}`}>
+                {formattedValue}
+              </span>
+            );
+          }
         },
       ],
     },
@@ -366,116 +436,636 @@ function InspectionResult() {
     XLSX.writeFile(wb, 'inspection_results.xlsx');
   };
 
-  // Modal for showing operation measurements
-  const OperationMeasurementsModal = () => (
-    <Modal
-      title={
-        <div className="flex items-center gap-3 py-2">
-          <div className="bg-green-50 p-2 rounded-lg">
-            <CheckCircleOutlined className="text-green-500 text-xl" />
-          </div>
-          <div>
-            <div className="text-lg font-semibold">Operation {selectedOperation} Measurements</div>
-            <Text type="secondary" className="text-sm">
-              Detailed measurement data and inspection results
-            </Text>
-          </div>
-        </div>
+  // Modal for showing operation measurements with simplified UI and drawing
+  const OperationMeasurementsModal = () => {
+    // State for active filter tab
+    const [activeTab, setActiveTab] = useState('all');
+    // State for drawing data
+    const [drawingData, setDrawingData] = useState(null);
+    // State for drawing loading
+    const [loadingDrawing, setLoadingDrawing] = useState(false);
+    
+    // Fetch the drawing when the modal opens
+    useEffect(() => {
+      if (isOperationModalVisible && selectedOperation) {
+        fetchBalloonedDrawing();
       }
-      open={isOperationModalVisible}
-      onCancel={() => {
-        setIsOperationModalVisible(false);
-        setSelectedOperationData(null);
-      }}
-      width={1200}
-      className="custom-modal"
-      footer={[
-        <Button 
-          key="close" 
-          onClick={() => {
-            setIsOperationModalVisible(false);
-            setSelectedOperationData(null);
-          }}
-          className="hover:scale-105 transition-transform"
-          icon={<CloseOutlined />}
-        >
-          Close
-        </Button>
-      ]}
-    >
-      <div className="p-4">
-        {selectedOperationData ? (
-          <>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card className="bg-blue-50 border-0">
-                <Statistic
-                  title={<Text strong>Total Measurements</Text>}
-                  value={selectedOperationData.inspections.length}
-                  prefix={<DatabaseOutlined className="text-blue-500" />}
-                />
-              </Card>
-              <Card className="bg-green-50 border-0">
-                <Statistic
-                  title={<Text strong>Operator</Text>}
-                  value={selectedOperationData.inspections[0]?.operator?.username || 'N/A'}
-                  prefix={<UserOutlined className="text-green-500" />}
-                />
-              </Card>
-              <Card className="bg-purple-50 border-0">
-                <Statistic
-                  title={<Text strong>Last Updated</Text>}
-                  value={moment(selectedOperationData.inspections[0]?.created_at).format('YYYY-MM-DD HH:mm')}
-                  prefix={<ClockCircleOutlined className="text-purple-500" />}
-                />
-              </Card>
-            </div>
-
-            {/* Measurements Table */}
-            <Card 
-              className="shadow-sm border-0 rounded-lg"
-              title={
-                <div className="flex items-center gap-2">
-                  <FileSearchOutlined className="text-blue-500" />
-                  <span>Measurement Details</span>
-                </div>
+      
+      return () => {
+        // Clean up blob URL when component unmounts
+        if (drawingData?.url) {
+          URL.revokeObjectURL(drawingData.url);
+        }
+      };
+    }, [isOperationModalVisible, selectedOperation]);
+    
+    // Function to fetch ballooned drawing
+    const fetchBalloonedDrawing = async () => {
+      try {
+        setLoadingDrawing(true);
+        
+        // Use the provided endpoint - assuming drawingId=10557513 and operation=selectedOperation
+        const drawingId = '10557513';
+        const operation = selectedOperation;
+        
+        const response = await qualityStore.fetchBalloonedDrawing(drawingId, operation);
+        setDrawingData(response);
+      } catch (error) {
+        console.error('Error fetching drawing:', error);
+        message.error('Failed to load drawing');
+      } finally {
+        setLoadingDrawing(false);
+      }
+    };
+    
+    // Function to fetch detailed measurements
+    const fetchDetailedMeasurements = async () => {
+      try {
+        setLoadingDetailedMeasurements(true);
+        
+        // Use the inspection ID - using 14 as specified
+        const inspectionId = '14';
+        
+        const response = await qualityStore.fetchDetailedInspection(inspectionId);
+        console.log('Detailed measurements data:', response);
+        setDetailedMeasurements(response);
+        setIsDetailedMeasurementsVisible(true);
+      } catch (error) {
+        console.error('Error fetching detailed measurements:', error);
+        message.error('Failed to load detailed measurements');
+      } finally {
+        setLoadingDetailedMeasurements(false);
+      }
+    };
+    
+    // Function to filter measurements
+    const getFilteredInspections = () => {
+      if (!selectedOperationData?.inspections) return [];
+      
+      const allInspections = selectedOperationData.inspections;
+      
+      if (activeTab === 'all') {
+        return allInspections;
+      } else if (zones.includes(activeTab)) {
+        // Filter by zone when a zone button is clicked
+        return allInspections.filter(record => record.zone === activeTab);
+      }
+      
+      return allInspections;
+    };
+    
+    // Get unique zones for zone filtering
+    const getUniqueZones = () => {
+      if (!selectedOperationData?.inspections) return [];
+      
+      const zones = new Set();
+      selectedOperationData.inspections.forEach(item => {
+        if (item.zone) {
+          zones.add(item.zone);
+        }
+      });
+      
+      return Array.from(zones).sort();
+    };
+    
+    const zones = getUniqueZones();
+    
+    // Columns for detailed measurements table
+    const detailedMeasurementColumns = [
+      {
+        title: 'Zone',
+        dataIndex: 'zone',
+        key: 'zone',
+        width: '8%',
+        render: (zone) => (
+          <Tag color="blue" className="zone-tag">
+            {zone || 'N/A'}
+          </Tag>
+        )
+      },
+      {
+        title: 'Dimension Type',
+        dataIndex: 'dimension_type',
+        key: 'dimension_type',
+        width: '15%',
+      },
+      {
+        title: 'Nominal',
+        dataIndex: 'nominal_value',
+        key: 'nominal_value',
+        width: '10%',
+        render: (value) => (
+          <span className="font-mono font-medium">{value || '-'}</span>
+        )
+      },
+      {
+        title: 'Tolerance',
+        children: [
+          {
+            title: 'Upper',
+            dataIndex: 'uppertol',
+            key: 'uppertol',
+            width: '8%',
+            render: (value) => (
+              <span className="font-mono text-green-600 font-medium">
+                {value > 0 ? `+${value}` : value}
+              </span>
+            )
+          },
+          {
+            title: 'Lower',
+            dataIndex: 'lowertol',
+            key: 'lowertol',
+            width: '8%',
+            render: (value) => (
+              <span className="font-mono text-red-600 font-medium">
+                {value}
+              </span>
+            )
+          }
+        ]
+      },
+      {
+        title: 'Measured Values',
+        children: [
+          {
+            title: 'M1',
+            dataIndex: 'measured_1',
+            key: 'measured_1',
+            width: '8%',
+            render: (value) => (
+              <span className="font-mono">{value}</span>
+            )
+          },
+          {
+            title: 'M2',
+            dataIndex: 'measured_2',
+            key: 'measured_2',
+            width: '8%',
+            render: (value) => (
+              <span className="font-mono">{value}</span>
+            )
+          },
+          {
+            title: 'M3',
+            dataIndex: 'measured_3',
+            key: 'measured_3',
+            width: '8%',
+            render: (value) => (
+              <span className="font-mono">{value}</span>
+            )
+          },
+          {
+            title: 'Mean',
+            dataIndex: 'measured_mean',
+            key: 'measured_mean',
+            width: '8%',
+            render: (value, record) => {
+              // Format to 4 decimal places
+              const formattedValue = typeof value === 'number' ? value.toFixed(4) : value;
+              
+              // Check if value is within tolerance
+              const nominal = parseFloat(record.nominal_value);
+              const upper = parseFloat(record.uppertol);
+              const lower = parseFloat(record.lowertol);
+              const mean = parseFloat(value);
+              
+              if (isNaN(mean) || isNaN(nominal)) {
+                return <span className="font-mono">{formattedValue}</span>;
               }
+              
+              const withinTolerance = mean <= (nominal + upper) && mean >= (nominal + lower);
+              
+              return (
+                <span className={`font-mono font-medium ${withinTolerance ? 'text-green-600' : 'text-red-600'}`}>
+                  {formattedValue}
+                </span>
+              );
+            }
+          }
+        ]
+      },
+      {
+        title: 'Instrument',
+        dataIndex: 'measured_instrument',
+        key: 'measured_instrument',
+        width: '10%',
+        render: (value) => (
+          <Tag color="cyan" className="instrument-tag">
+            {value || 'N/A'}
+          </Tag>
+        )
+      },
+      {
+        title: 'Status',
+        dataIndex: 'is_done',
+        key: 'is_done',
+        width: '8%',
+        render: (isDone) => (
+          isDone ? 
+            <Tag color="success" icon={<CheckCircleOutlined />}>Done</Tag> : 
+            <Tag color="warning" icon={<ClockCircleOutlined />}>Pending</Tag>
+        )
+      },
+      {
+        title: 'Operator',
+        dataIndex: 'operator',
+        key: 'operator',
+        width: '10%',
+        render: (operator) => (
+          <Tooltip title={`${operator?.email || ''}`}>
+            <Tag icon={<UserOutlined />} color="processing">
+              {operator?.username || 'Unknown'}
+            </Tag>
+          </Tooltip>
+        )
+      }
+    ];
+    
+    // Simplified measurement columns as requested
+    const simplifiedColumns = [
+      {
+        title: 'Zone',
+        dataIndex: 'zone',
+        key: 'zone',
+        width: '10%',
+        render: (zone) => (
+          <Tag color="blue" className="zone-tag">{zone || 'N/A'}</Tag>
+        )
+      },
+      {
+        title: 'Description',
+        dataIndex: 'dimension_type',
+        key: 'dimension_type',
+        width: '25%',
+        render: (type) => {
+          // Handle GDT symbols properly
+          if (type?.includes('GDT:')) {
+            return (
+              <div className="flex items-center">
+                <span className="text-purple-700 font-medium">
+                  {type}
+                </span>
+              </div>
+            );
+          }
+          return <span className="text-gray-800">{type || '-'}</span>;
+        }
+      },
+      {
+        title: 'Nominal',
+        dataIndex: 'nominal_value',
+        key: 'nominal_value',
+        width: '20%',
+        render: (value) => {
+          if (value?.toLowerCase().includes('hole') || 
+              value?.toLowerCase().includes('tapped')) {
+            return <Tag color="orange" className="w-full text-center">{value}</Tag>;
+          }
+          return <span className="font-mono font-medium">{value || '-'}</span>;
+        }
+      },
+      {
+        title: 'Upper Tol',
+        dataIndex: 'uppertol',
+        key: 'uppertol',
+        width: '15%',
+        render: (value) => (
+          <span className="font-mono text-green-600 font-medium">
+            {value > 0 ? `+${value}` : value}
+          </span>
+        )
+      },
+      {
+        title: 'Lower Tol',
+        dataIndex: 'lowertol',
+        key: 'lowertol',
+        width: '15%',
+        render: (value) => (
+          <span className="font-mono text-red-600 font-medium">
+            {value}
+          </span>
+        )
+      },
+      {
+        title: 'Instrument',
+        dataIndex: 'measured_instrument',
+        key: 'measured_instrument',
+        width: '15%',
+        render: (value) => (
+          <Tag color="cyan" className="instrument-tag">
+            {value || 'N/A'}
+          </Tag>
+        )
+      }
+    ];
+
+    // DetailedMeasurementsModal component
+    const DetailedMeasurementsModal = () => {
+      // Function to get the measurements for the selected operation
+      const getOperationMeasurements = () => {
+        if (!detailedMeasurements || !detailedMeasurements.inspection_data) {
+          return [];
+        }
+        
+        // Find the operation data matching the selected operation
+        const operationData = detailedMeasurements.inspection_data.find(
+          data => data.operation_number === parseInt(selectedOperation, 10)
+        );
+        
+        // Return the inspections if found, otherwise empty array
+        return operationData?.inspections || [];
+      };
+      
+      const measurements = getOperationMeasurements();
+      
+      return (
+        <Modal
+          title={
+            <div className="flex items-center gap-3 py-2">
+              <div className="bg-blue-50 p-2 rounded-lg">
+                <DatabaseOutlined className="text-blue-500 text-xl" />
+              </div>
+              <div>
+                <div className="text-lg font-semibold">Operation {selectedOperation} Measurements</div>
+                <Text type="secondary" className="text-sm">
+                  {detailedMeasurements?.production_order} | {detailedMeasurements?.part_number}
+                </Text>
+              </div>
+            </div>
+          }
+          open={isDetailedMeasurementsVisible}
+          onCancel={() => setIsDetailedMeasurementsVisible(false)}
+          width={1400}
+          footer={[
+            <Button 
+              key="close" 
+              onClick={() => setIsDetailedMeasurementsVisible(false)}
+              className="hover:scale-105 transition-transform"
+              icon={<CloseOutlined />}
             >
-              <Table
-                columns={measurementColumns}
-                dataSource={selectedOperationData.inspections}
-                pagination={false}
-                scroll={{ x: 'max-content', y: 400 }}
-                size="middle"
-                bordered
-                rowKey="id"
-                className="custom-measurement-table"
-                rowClassName={(record) => {
-                  const mean = parseFloat(record.measured_mean);
-                  const nominal = parseFloat(record.nominal_value);
-                  const upper = parseFloat(record.uppertol);
-                  const lower = parseFloat(record.lowertol);
-                  
-                  if (isNaN(mean) || isNaN(nominal) || isNaN(upper) || isNaN(lower)) {
-                    return '';
+              Close
+            </Button>
+          ]}
+        >
+          <div className="p-4">
+            {loadingDetailedMeasurements ? (
+              <div className="flex justify-center items-center p-12">
+                <Spin size="large" />
+              </div>
+            ) : detailedMeasurements ? (
+              <div>
+                <Alert
+                  message="Inspection Details"
+                  description={
+                    <Row gutter={[16, 16]} className="pt-2">
+                      <Col span={6}>
+                        <Text strong>Order ID:</Text> {detailedMeasurements.order_id}
+                      </Col>
+                      <Col span={6}>
+                        <Text strong>Part Number:</Text> {detailedMeasurements.part_number}
+                      </Col>
+                      <Col span={6}>
+                        <Text strong>Production Order:</Text> {detailedMeasurements.production_order}
+                      </Col>
+                      <Col span={6}>
+                        <Text strong>Operation:</Text> {selectedOperation}
+                      </Col>
+                    </Row>
                   }
+                  type="info"
+                  showIcon
+                  className="mb-4"
+                />
+                
+                {measurements.length > 0 ? (
+                  <Table
+                    columns={detailedMeasurementColumns}
+                    dataSource={measurements.map(item => ({
+                      ...item,
+                      key: item.id
+                    }))}
+                    bordered
+                    size="middle"
+                    scroll={{ y: 500, x: 1300 }}
+                    pagination={{ pageSize: 10, showSizeChanger: false }}
+                    className="detailed-measurements-table"
+                    summary={data => {
+                      return (
+                        <Table.Summary fixed>
+                          <Table.Summary.Row className="bg-gray-50">
+                            <Table.Summary.Cell index={0} colSpan={2}>
+                              <Text strong>Total Items: {data.length}</Text>
+                            </Table.Summary.Cell>
+                            <Table.Summary.Cell index={1} colSpan={5}>
+                              <Space>
+                                <Badge status="success" text={`Completed: ${data.filter(item => item.is_done).length}`} />
+                                <Badge status="warning" text={`Pending: ${data.filter(item => !item.is_done).length}`} />
+                              </Space>
+                            </Table.Summary.Cell>
+                            <Table.Summary.Cell index={2} colSpan={3}>
+                              <Text type="secondary">
+                                {data.length > 0 ? `Last Updated: ${new Date(Math.max(...data.map(item => new Date(item.created_at)))).toLocaleString()}` : ''}
+                              </Text>
+                            </Table.Summary.Cell>
+                          </Table.Summary.Row>
+                        </Table.Summary>
+                      );
+                    }}
+                  />
+                ) : (
+                  <Empty description="No measurements found for this operation" />
+                )}
+              </div>
+            ) : (
+              <Empty description="No detailed measurements available" />
+            )}
+          </div>
+        </Modal>
+      );
+    };
+
+    return (
+      <Modal
+        title={
+          <div className="flex items-center gap-3 py-2">
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <FileSearchOutlined className="text-blue-500 text-xl" />
+            </div>
+            <div>
+              <div className="text-lg font-semibold">Operation {selectedOperation} Measurements</div>
+              <Text type="secondary" className="text-sm">
+                {inspectionData?.[0]?.production_order} | {inspectionData?.[0]?.part_number}
+              </Text>
+            </div>
+          </div>
+        }
+        open={isOperationModalVisible}
+        onCancel={() => {
+          setIsOperationModalVisible(false);
+          setSelectedOperationData(null);
+          setActiveTab('all');
+          setDrawingData(null);
+        }}
+        width={1600}
+        className="custom-modal measurement-modal"
+        footer={[
+          <Button 
+            key="close" 
+            onClick={() => {
+              setIsOperationModalVisible(false);
+              setSelectedOperationData(null);
+              setActiveTab('all');
+              setDrawingData(null);
+            }}
+            className="hover:scale-105 transition-transform"
+            icon={<CloseOutlined />}
+            size="large"
+          >
+            Close
+          </Button>
+        ]}
+      >
+        <div className="p-4">
+          {selectedOperationData ? (
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Left side - Measurements */}
+              <div className="w-full md:w-1/2">
+                {/* Simple zone filter */}
+                {zones.length > 0 && (
+                  <div className="mb-4 pb-3 border-b border-gray-200">
+                    <Text strong className="mr-2">Filter by Zone:</Text>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Button
+                        type={activeTab === 'all' ? 'primary' : 'default'}
+                        onClick={() => setActiveTab('all')}
+                        className="zone-button"
+                        size="small"
+                      >
+                        All Zones
+                      </Button>
+                      {zones.map(zone => (
+                        <Button
+                          key={zone}
+                          type={activeTab === zone ? 'primary' : 'default'}
+                          onClick={() => setActiveTab(activeTab === zone ? 'all' : zone)}
+                          className="zone-button"
+                          size="small"
+                        >
+                          {zone}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Main Table with simplified columns */}
+                <Table
+                  columns={simplifiedColumns}
+                  dataSource={getFilteredInspections()}
+                  pagination={{ 
+                    pageSize: 10,
+                    showSizeChanger: false, 
+                    showTotal: (total) => `Total ${total} items`
+                  }}
+                  rowKey={(record) => `${record.zone}-${record.dimension_type}-${record.nominal_value}`}
+                  bordered
+                  size="middle"
+                  className="measurement-table"
+                  scroll={{ y: 500 }}
+                  rowClassName={(record) => {
+                    if (record.dimension_type?.toLowerCase().includes('gdt')) {
+                      return 'bg-purple-50 hover:bg-purple-100';
+                    } else if (record.nominal_value?.toLowerCase().includes('hole') || 
+                              record.nominal_value?.toLowerCase().includes('tapped')) {
+                      return 'bg-orange-50 hover:bg-orange-100';
+                    } else if (record.dimension_type?.toLowerCase().includes('length')) {
+                      return 'bg-green-50 hover:bg-green-100';
+                    }
+                    return '';
+                  }}
+                  onRow={(record) => ({
+                    onClick: () => {
+                      // Optionally highlight the corresponding zone in the drawing
+                      console.log(`Clicked zone: ${record.zone}`);
+                    }
+                  })}
+                />
+              </div>
+              
+              {/* Right side - Drawing */}
+              <div className="w-full md:w-1/2 mt-4 md:mt-0">
+                <div className="h-full bg-white border border-gray-200 rounded-lg">
+                  <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200">
+                    <Text strong>Ballooned Drawing</Text>
+                    <Space>
+                      {/* New View Measurements button */}
+                      <Button 
+                        type="primary"
+                        icon={<EyeOutlined />}
+                        size="small"
+                        onClick={fetchDetailedMeasurements}
+                        loading={loadingDetailedMeasurements}
+                      >
+                        View Measurements
+                      </Button>
+                      
+                      {drawingData && (
+                        <Button 
+                          type="default"
+                          icon={<DownloadOutlined />}
+                          size="small"
+                          onClick={() => {
+                            // Create a download link for the drawing
+                            const link = document.createElement('a');
+                            link.href = drawingData.url;
+                            link.download = `drawing-op-${selectedOperation}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
+                          Download
+                        </Button>
+                      )}
+                    </Space>
+                  </div>
                   
-                  return (mean > (nominal + upper) || mean < (nominal + lower)) 
-                    ? 'bg-red-50 hover:bg-red-100' 
-                    : 'bg-green-50 hover:bg-green-100';
-                }}
-              />
-            </Card>
-          </>
-        ) : (
-          <Empty 
-            description="No measurement data available for this operation"
-            className="my-12" 
-          />
-        )}
-      </div>
-    </Modal>
-  );
+                  <div className="h-[600px] flex items-center justify-center bg-gray-50">
+                    {loadingDrawing ? (
+                      <div className="text-center">
+                        <Spin size="large" />
+                        <div className="mt-2 text-gray-500">Loading drawing...</div>
+                      </div>
+                    ) : drawingData ? (
+                      <iframe
+                        src={drawingData.url}
+                        className="w-full h-full border-0"
+                        title="Ballooned Drawing"
+                      />
+                    ) : (
+                      <div className="text-center">
+                        <FileSearchOutlined style={{ fontSize: '48px', opacity: 0.2 }} />
+                        <div className="mt-2 text-gray-500">No drawing available</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Empty 
+              description="No measurement data available for this operation"
+              className="my-12" 
+            />
+          )}
+        </div>
+        
+        {/* Render the Detailed Measurements Modal */}
+        <DetailedMeasurementsModal />
+      </Modal>
+    );
+  };
 
   // QMS Modal
   const QmsModal = () => (
@@ -849,6 +1439,168 @@ const styles = `
 
   .qms-loading-modal .ant-modal-body {
     padding: 24px;
+  }
+
+  /* Enhanced measurement table styling */
+  .measurement-modal .ant-modal-content {
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  
+  .measurement-modal .ant-modal-header {
+    background: #f0f7ff;
+    border-bottom: 1px solid #e0e7ff;
+    padding: 16px 24px;
+  }
+  
+  .measurement-modal .ant-statistic-title {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  
+  .measurement-modal .ant-statistic-content {
+    font-size: 24px;
+    font-weight: 500;
+  }
+  
+  .tab-button {
+    padding: 8px 16px;
+    height: auto;
+    border-radius: 8px 8px 0 0;
+    transition: all 0.3s;
+  }
+  
+  .tab-button:hover {
+    transform: translateY(-2px);
+  }
+  
+  .active-tab {
+    font-weight: 500;
+    border-bottom: 2px solid #1890ff;
+  }
+  
+  .length-tab.active-tab {
+    color: #16a34a;
+    border-bottom-color: #16a34a;
+  }
+  
+  .gdt-tab.active-tab {
+    color: #7e22ce;
+    border-bottom-color: #7e22ce;
+  }
+  
+  .holes-tab.active-tab {
+    color: #ea580c;
+    border-bottom-color: #ea580c;
+  }
+  
+  .custom-measurement-table .ant-table-thead > tr > th {
+    background: #f8fafc;
+    text-align: center;
+    font-weight: 600;
+    color: #334155;
+  }
+  
+  .custom-measurement-table .zone-tag {
+    border-radius: 4px;
+    font-weight: 500;
+    text-align: center;
+    display: block;
+    margin: 0 auto;
+    width: fit-content;
+  }
+  
+  .custom-measurement-table .holes-tag {
+    border-radius: 4px;
+    font-weight: 500;
+    text-align: center;
+    display: block;
+    margin: 0 auto;
+    width: fit-content;
+    font-size: 11px;
+    white-space: normal;
+    line-height: 1.4;
+    max-width: 180px;
+  }
+  
+  .custom-measurement-table .instrument-tag {
+    text-align: center;
+    display: block;
+    margin: 0 auto;
+    width: fit-content;
+  }
+  
+  .dimension-type {
+    font-weight: 500;
+    color: #334155;
+  }
+  
+  .gdt-symbol {
+    font-family: monospace;
+    letter-spacing: 0.5px;
+  }
+  
+  .nominal-value {
+    font-weight: 500;
+  }
+  
+  .zone-button {
+    min-width: 90px;
+    border-radius: 20px;
+    font-weight: 500;
+    transition: all 0.3s;
+    margin: 4px;
+  }
+  
+  .zone-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Styles for the simplified measurement table */
+  .measurement-table .ant-table-thead > tr > th {
+    background: #f0f5ff;
+    font-weight: 600;
+    text-align: center;
+    color: #1e3a8a;
+    padding: 12px 8px;
+  }
+  
+  .measurement-table .ant-table-tbody > tr > td {
+    padding: 12px 8px;
+    text-align: center;
+  }
+  
+  .zone-tag {
+    display: inline-block;
+    font-weight: 500;
+    min-width: 40px;
+  }
+  
+  .instrument-tag {
+    display: inline-block;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  
+  .tab-button {
+    border-radius: 6px;
+    margin-right: 4px;
+    margin-bottom: 4px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+  }
+  
+  .zone-button {
+    font-size: 11px;
+    height: 24px;
+    border-radius: 12px;
+    padding: 0 10px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 `;
 

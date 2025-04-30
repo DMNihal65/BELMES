@@ -29,8 +29,36 @@ const AccessControlManagement = ({onSuccess }) => {
   const { users, loading, totalUsers, fetchUsers, deleteUser, updateUser } = useAccessControlStore();
   const [searchText, setSearchText] = useState('');
   const [filteredUsers, setFilteredUsers] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   const { registerUser } = useAccessControlStore();
+
+    // Add this new function to fetch total count
+    const fetchTotalUsersCount = async () => {
+      try {
+        const response = await axios.get('http://172.18.7.88:3252/api/v1/auth/users-count');
+        if (response.data && response.data.count) {
+          setTotalCount(response.data.count);
+        }
+      } catch (error) {
+        console.error('Error fetching total users:', error);
+      }
+    };
+  
+    // Add useEffect to fetch total count when component mounts
+    useEffect(() => {
+      fetchTotalUsersCount();
+    }, []);
+  
+    // Update the useEffect that fetches users to also update total count
+    useEffect(() => {
+      if (activeTab === 'users') {
+        fetchUsers((currentPage - 1) * pageSize, pageSize);
+        fetchTotalUsersCount(); // Also update total count when fetching users
+      }
+    }, [activeTab, currentPage, pageSize, fetchUsers]);
+  
+
 
   useEffect(() => {
     if (activeTab === 'machines') {
@@ -118,13 +146,13 @@ const AccessControlManagement = ({onSuccess }) => {
     setCurrentPage(1);
   };
 
-
   const handleRefresh = () => {
     if (pageSize === -1) {
-      fetchUsers(0, 999999); // For "All" option
+      fetchUsers(0, 999999);
     } else {
       fetchUsers((currentPage - 1) * pageSize, pageSize);
     }
+    fetchTotalUsersCount(); // Add this line
   };
 
   useEffect(() => {
@@ -180,6 +208,7 @@ const AccessControlManagement = ({onSuccess }) => {
 
       setShowRegister(false);
       registerForm.resetFields();
+      handleRefresh();
       if (onSuccess) onSuccess();  // <- Call parent's callback
     } catch (error) {
       toast.error(error.message);
@@ -340,22 +369,24 @@ const AccessControlManagement = ({onSuccess }) => {
               pagination={{
                 current: currentPage,
                 pageSize: pageSize,
-                total: searchText ? filteredUsers.length : totalUsers,
+                total: totalCount, // Use totalCount here
                 showSizeChanger: true,
                 showQuickJumper: true,
-                pageSizeOptions: ['5', '10', '15', '20'],
+                pageSizeOptions: ['5', '10', '20', '50'],
                 position: ['bottomCenter'],
                 onChange: (page, size) => {
                   setCurrentPage(page);
                   setPageSize(size);
-                  fetchUsers((page - 1) * size, size);
+                  const skip = (page - 1) * size;
+                  fetchUsers(skip, size);
                 },
                 onShowSizeChange: (current, size) => {
                   setPageSize(size);
                   setCurrentPage(1);
                   fetchUsers(0, size);
                 },
-                showTotal: (total) => `Total ${total} items`
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                style: { marginTop: '16px' }
               }}
               loading={loading}
               size="middle"

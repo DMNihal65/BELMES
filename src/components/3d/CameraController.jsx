@@ -14,7 +14,7 @@ const CameraController = ({
   const { camera, scene } = useThree();
   
   const viewPositions = {
-    overview: { position: [-30, 40, 40], target: [0, 0, 0] },
+    overview: { position: [-50, 10, 10], target: [0, 0, 0] },
     topDown: { position: [0, 60, 0], target: [0, 0, 0] },
     firstPerson: { position: [0, 5, 30], target: [0, 5, 0] },
     focusMachine: { position: [0, 8, 12], target: [0, 0, 0] }, // This will be adjusted based on selectedMachine

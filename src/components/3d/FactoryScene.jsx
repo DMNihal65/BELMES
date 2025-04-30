@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Environment, Sky, Stars, Loader, SpotLight, useHelper, useGLTF } from '@react-three/drei';
+import { Sky, Stars, Loader, SpotLight, useHelper } from '@react-three/drei';
 import * as THREE from 'three';
 
 // Import custom components
@@ -17,7 +17,8 @@ const FactoryScene = ({
   cameraView = 'overview'
 }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [viewDetails, setViewDetails] = useState(true);
+  const [viewDetails, setViewDetails] = useState(false); // Start with simplified view for performance
+  const [quality, setQuality] = useState('medium'); // 'low', 'medium', 'high'
 
   // Define machine positions in a grid layout
   const getMachinePosition = (index, total) => {
@@ -50,32 +51,56 @@ const FactoryScene = ({
   };
 
   useEffect(() => {
-    // Simulate loading assets
+    // Simulate loading assets with a shorter timeout
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 1000);
+    }, 300);
     
     return () => clearTimeout(timer);
   }, []);
 
+  // Get pixel ratio based on quality setting
+  const getPixelRatio = () => {
+    switch(quality) {
+      case 'high': return [1, 2];
+      case 'medium': return [1, 1.5];
+      case 'low': default: return [0.8, 1];
+    }
+  };
+
   return (
     <div className={`relative h-full w-full ${className}`}>
+      {/* Quality controls */}
+      <div className="absolute top-4 left-4 z-10 flex items-center">
+        <span className="text-xs text-white bg-black/50 px-2 py-1 rounded-l">Quality:</span>
+        {["low", "medium", "high"].map((q) => (
+          <button 
+            key={q}
+            className={`px-2 py-1 text-xs ${quality === q ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'} ${q === "low" ? "" : ""} ${q === "high" ? "rounded-r" : ""}`}
+            onClick={() => setQuality(q)}
+          >
+            {q.charAt(0).toUpperCase() + q.slice(1)}
+          </button>
+        ))}
+      </div>
+
       <Canvas
-        shadows
-        dpr={[1, 2]}
+        shadows={quality !== 'low'}
+        dpr={getPixelRatio()}
         gl={{ 
-          antialias: true,
+          antialias: quality !== 'low',
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.2,
+          toneMappingExposure: 1,
           outputEncoding: THREE.sRGBEncoding
         }}
+        performance={{ min: 0.5 }}
       >
         <Suspense fallback={null}>
           {/* Scene lighting */}
-          <ambientLight intensity={0.4} />
+          <ambientLight intensity={0.5} />
           
-          {/* Main factory lighting */}
-          <Factory3DLighting />
+          {/* Main factory lighting - simplified for performance */}
+          <Factory3DLighting quality={quality} />
           
           {/* Factory environment */}
           <FactoryFloor size={100} />
@@ -98,16 +123,16 @@ const FactoryScene = ({
             );
           })}
           
-          {/* Add factory workers at various positions */}
-          {viewDetails && <FactoryWorkers machinePositions={machines.map((_, i) => getMachinePosition(i, machines.length))} />}
+          {/* Add factory workers at various positions - only in high quality mode */}
+          {viewDetails && quality === 'high' && <FactoryWorkers machinePositions={machines.map((_, i) => getMachinePosition(i, machines.length))} />}
           
-          {/* Add factory equipment */}
-          {viewDetails && <FactoryEquipment />}
+          {/* Add factory equipment - only in medium+ quality mode */}
+          {viewDetails && quality !== 'low' && <FactoryEquipment />}
           
-          {/* Environment and atmosphere */}
-          <Environment preset="warehouse" />
+          {/* Simple environment and atmosphere - no HDR loading */}
+          <fog attach="fog" args={['#f0f0f0', 30, 100]} />
           <Sky distance={450000} sunPosition={[5, 1, 8]} inclination={0.5} azimuth={0.25} />
-          {viewDetails && <Stars radius={100} depth={50} count={1000} factor={4} fade />}
+          {viewDetails && quality === 'high' && <Stars radius={100} depth={50} count={500} factor={4} fade />}
           
           {/* Camera controller */}
           <CameraController 
@@ -149,28 +174,24 @@ const FactoryScene = ({
 };
 
 // Factory lighting setup
-const Factory3DLighting = () => {
+const Factory3DLighting = ({ quality = 'medium' }) => {
   // References for the lights to apply helpers if needed
   const spotLightRef1 = React.useRef();
-  const spotLightRef2 = React.useRef();
-  const spotLightRef3 = React.useRef();
-  const spotLightRef4 = React.useRef();
+  const mainLightRef = React.useRef();
   
-  // Uncomment to show light helpers during development
-  // useHelper(spotLightRef1, THREE.SpotLightHelper, 'white');
-  // useHelper(spotLightRef2, THREE.SpotLightHelper, 'white');
-  // useHelper(spotLightRef3, THREE.SpotLightHelper, 'white');
-  // useHelper(spotLightRef4, THREE.SpotLightHelper, 'white');
+  // Determine number of lights based on quality
+  const lightCount = quality === 'high' ? 4 : quality === 'medium' ? 2 : 1;
   
   return (
     <>
       {/* Directional light (main light) */}
       <directionalLight
+        ref={mainLightRef}
         position={[20, 30, 20]}
         intensity={0.8}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        castShadow={quality !== 'low'}
+        shadow-mapSize-width={quality === 'high' ? 2048 : 1024}
+        shadow-mapSize-height={quality === 'high' ? 2048 : 1024}
         shadow-camera-far={100}
         shadow-camera-left={-30}
         shadow-camera-right={30}
@@ -179,62 +200,52 @@ const Factory3DLighting = () => {
         shadow-bias={-0.0001}
       />
       
-      {/* Factory spotlights */}
-      <SpotLight
-        ref={spotLightRef1}
-        position={[25, 15, 25]}
-        angle={Math.PI / 6}
-        penumbra={0.5}
-        intensity={0.5}
-        distance={60}
-        castShadow
-        shadow-bias={-0.0001}
-        attenuation={5}
-        anglePower={5}
-        color="#ffffff"
-      />
+      {/* Additional lights only added for medium and high quality */}
+      {lightCount >= 2 && (
+        <SpotLight
+          ref={spotLightRef1}
+          position={[25, 15, 25]}
+          angle={Math.PI / 6}
+          penumbra={0.5}
+          intensity={0.4}
+          distance={60}
+          castShadow={quality === 'high'}
+          shadow-bias={-0.0001}
+          attenuation={5}
+          anglePower={5}
+          color="#ffffff"
+        />
+      )}
       
-      <SpotLight
-        ref={spotLightRef2}
-        position={[-25, 15, 25]}
-        angle={Math.PI / 6}
-        penumbra={0.5}
-        intensity={0.5}
-        distance={60}
-        castShadow
-        shadow-bias={-0.0001}
-        attenuation={5}
-        anglePower={5}
-        color="#ffffff"
-      />
+      {lightCount >= 3 && (
+        <SpotLight
+          position={[-25, 15, 25]}
+          angle={Math.PI / 6}
+          penumbra={0.5}
+          intensity={0.4}
+          distance={60}
+          castShadow={quality === 'high'}
+          shadow-bias={-0.0001}
+          attenuation={5}
+          anglePower={5}
+          color="#ffffff"
+        />
+      )}
       
-      <SpotLight
-        ref={spotLightRef3}
-        position={[25, 15, -25]}
-        angle={Math.PI / 6}
-        penumbra={0.5}
-        intensity={0.5}
-        distance={60}
-        castShadow
-        shadow-bias={-0.0001}
-        attenuation={5}
-        anglePower={5}
-        color="#ffffff"
-      />
-      
-      <SpotLight
-        ref={spotLightRef4}
-        position={[-25, 15, -25]}
-        angle={Math.PI / 6}
-        penumbra={0.5}
-        intensity={0.5}
-        distance={60}
-        castShadow
-        shadow-bias={-0.0001}
-        attenuation={5}
-        anglePower={5}
-        color="#ffffff"
-      />
+      {lightCount >= 4 && (
+        <SpotLight
+          position={[0, 15, -25]}
+          angle={Math.PI / 6}
+          penumbra={0.5}
+          intensity={0.4}
+          distance={60}
+          castShadow={quality === 'high'}
+          shadow-bias={-0.0001}
+          attenuation={5}
+          anglePower={5}
+          color="#ffffff"
+        />
+      )}
     </>
   );
 };
@@ -245,8 +256,8 @@ const FactoryWorkers = ({ machinePositions = [] }) => {
   return (
     <>
       {machinePositions.map((position, index) => {
-        // Only place workers at some machines (every other one)
-        if (index % 2 !== 0) return null;
+        // Only place workers at some machines (every third one for performance)
+        if (index % 3 !== 0) return null;
         
         // Calculate position in front of the machine
         const workerPosition = [
@@ -305,9 +316,8 @@ const FactoryEquipment = () => {
       <Workbench position={[35, 0, 0]} rotation={[0, Math.PI/4, 0]} />
       <Workbench position={[-35, 0, -10]} rotation={[0, -Math.PI/3, 0]} />
       
-      {/* Material racks */}
+      {/* Material racks - reduced for better performance */}
       <MaterialRack position={[40, 0, -30]} rotation={[0, Math.PI/2, 0]} />
-      <MaterialRack position={[-40, 0, 30]} rotation={[0, -Math.PI/2, 0]} />
       
       {/* Forklift */}
       <Forklift position={[0, 0, 35]} rotation={[0, Math.PI, 0]} />
@@ -325,21 +335,17 @@ const Toolbox = ({ position, rotation = [0, 0, 0] }) => {
         <meshStandardMaterial color="#ef4444" metalness={0.7} roughness={0.3} />
       </mesh>
       
-      {/* Drawers */}
-      {[0, 0.5, 1].map((y, i) => (
-        <mesh key={i} position={[0, y, 0.05]} castShadow>
-          <boxGeometry args={[1.9, 0.4, 0.1]} />
-          <meshStandardMaterial color="#f8fafc" metalness={0.5} roughness={0.5} />
-        </mesh>
-      ))}
+      {/* Drawers - simplified to one drawer for performance */}
+      <mesh position={[0, 0.5, 0.05]} castShadow>
+        <boxGeometry args={[1.9, 0.4, 0.1]} />
+        <meshStandardMaterial color="#f8fafc" metalness={0.5} roughness={0.5} />
+      </mesh>
       
-      {/* Handles */}
-      {[0, 0.5, 1].map((y, i) => (
-        <mesh key={i} position={[0, y, 0.15]} castShadow>
-          <boxGeometry args={[0.8, 0.1, 0.1]} />
-          <meshStandardMaterial color="#0f172a" metalness={0.8} roughness={0.2} />
-        </mesh>
-      ))}
+      {/* Handle */}
+      <mesh position={[0, 0.5, 0.15]} castShadow>
+        <boxGeometry args={[0.8, 0.1, 0.1]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.8} roughness={0.2} />
+      </mesh>
     </group>
   );
 };
@@ -354,28 +360,21 @@ const Workbench = ({ position, rotation = [0, 0, 0] }) => {
         <meshStandardMaterial color="#78716c" metalness={0.1} roughness={0.8} />
       </mesh>
       
-      {/* Legs */}
+      {/* Legs - simplified to two legs for performance */}
       {[
-        [-2.2, 1.5, -1], 
-        [2.2, 1.5, -1], 
-        [-2.2, 1.5, 1], 
-        [2.2, 1.5, 1]
+        [-2.2, 1.5, 0], 
+        [2.2, 1.5, 0]
       ].map((pos, i) => (
         <mesh key={i} position={pos} castShadow receiveShadow>
-          <boxGeometry args={[0.2, 3, 0.2]} />
+          <boxGeometry args={[0.2, 3, 2]} />
           <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.3} />
         </mesh>
       ))}
       
       {/* Tools on bench */}
-      <mesh position={[-1.5, 3.2, 0]} castShadow>
+      <mesh position={[0, 3.2, 0]} castShadow>
         <boxGeometry args={[1, 0.2, 1.5]} />
         <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      <mesh position={[1, 3.2, 0.5]} castShadow>
-        <cylinderGeometry args={[0.3, 0.3, 0.4, 16]} />
-        <meshStandardMaterial color="#0f172a" metalness={0.4} roughness={0.6} />
       </mesh>
     </group>
   );
@@ -391,27 +390,15 @@ const MaterialRack = ({ position, rotation = [0, 0, 0] }) => {
         <meshStandardMaterial color="#334155" metalness={0.6} roughness={0.4} />
       </mesh>
       
-      {/* Shelves */}
-      {[1, 3, 5].map((y, i) => (
-        <mesh key={i} position={[0, y, 0.5]} castShadow receiveShadow>
-          <boxGeometry args={[3.8, 0.1, 1.2]} />
-          <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.3} />
-        </mesh>
-      ))}
+      {/* Shelves - simplified to one shelf for performance */}
+      <mesh position={[0, 3, 0.5]} castShadow receiveShadow>
+        <boxGeometry args={[3.8, 0.1, 1.2]} />
+        <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.3} />
+      </mesh>
       
       {/* Materials on shelves */}
-      <mesh position={[0, 1, 0.7]} castShadow>
-        <boxGeometry args={[3, 0.5, 0.8]} />
-        <meshStandardMaterial color="#a1a1aa" metalness={0.8} roughness={0.2} />
-      </mesh>
-      
       <mesh position={[0, 3, 0.7]} castShadow>
         <boxGeometry args={[2.5, 0.8, 0.6]} />
-        <meshStandardMaterial color="#a1a1aa" metalness={0.8} roughness={0.2} />
-      </mesh>
-      
-      <mesh position={[0, 5, 0.7]} castShadow>
-        <boxGeometry args={[3, 0.3, 0.8]} />
         <meshStandardMaterial color="#a1a1aa" metalness={0.8} roughness={0.2} />
       </mesh>
     </group>
@@ -422,15 +409,9 @@ const MaterialRack = ({ position, rotation = [0, 0, 0] }) => {
 const Forklift = ({ position, rotation = [0, 0, 0] }) => {
   return (
     <group position={position} rotation={rotation}>
-      {/* Base */}
-      <mesh position={[0, 0.8, 0]} castShadow receiveShadow>
-        <boxGeometry args={[2.5, 1, 4]} />
-        <meshStandardMaterial color="#eab308" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Cabin */}
-      <mesh position={[0, 2, -1]} castShadow receiveShadow>
-        <boxGeometry args={[2, 1.5, 2]} />
+      {/* Base and cabin combined for performance */}
+      <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
+        <boxGeometry args={[2.5, 2.5, 4]} />
         <meshStandardMaterial color="#eab308" metalness={0.6} roughness={0.4} />
       </mesh>
       
@@ -440,29 +421,11 @@ const Forklift = ({ position, rotation = [0, 0, 0] }) => {
         <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.3} />
       </mesh>
       
-      {/* Forks */}
-      <mesh position={[-0.5, 1, 2.5]} castShadow>
-        <boxGeometry args={[0.2, 0.1, 1.5]} />
+      {/* Forks combined for performance */}
+      <mesh position={[0, 1, 2.5]} castShadow>
+        <boxGeometry args={[1.2, 0.1, 1.5]} />
         <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.2} />
       </mesh>
-      
-      <mesh position={[0.5, 1, 2.5]} castShadow>
-        <boxGeometry args={[0.2, 0.1, 1.5]} />
-        <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.2} />
-      </mesh>
-      
-      {/* Wheels */}
-      {[
-        [-1, 0.5, -1.5], 
-        [1, 0.5, -1.5], 
-        [-1, 0.5, 1.5], 
-        [1, 0.5, 1.5]
-      ].map((pos, i) => (
-        <mesh key={i} position={pos} rotation={[Math.PI/2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.5, 0.5, 0.3, 16]} />
-          <meshStandardMaterial color="#0f172a" metalness={0.3} roughness={0.7} />
-        </mesh>
-      ))}
     </group>
   );
 };

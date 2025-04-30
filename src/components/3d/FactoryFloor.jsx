@@ -149,8 +149,8 @@ const FactoryWalls = ({ size = 100 }) => {
       </mesh>
       
       {/* Support columns */}
-      {Array.from({ length: 4 }).map((_, i) => (
-        Array.from({ length: 4 }).map((_, j) => (
+      {Array.from({ length: 0 }).map((_, i) => (
+        Array.from({ length: 0 }).map((_, j) => (
           <SupportColumn 
             key={`column-${i}-${j}`}
             position={[

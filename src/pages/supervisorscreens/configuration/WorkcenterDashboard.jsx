@@ -708,7 +708,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:3252/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:4422/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -796,13 +796,15 @@ const Workcenter = () => {
                 style={{
                   width: '100%'
                 }}
-                options={workcenterOptions.map(wc => ({
-                  value: wc.code,
-                  label: wc.code,
-                  key: wc.id,
-                  data: { id: wc.id },
-                  description: wc.description
-                }))}
+                options={workcenterOptions
+                  .filter(wc => wc.is_schedulable)
+                  .map(wc => ({
+                    value: wc.code,
+                    label: wc.code,
+                    key: wc.id,
+                    data: { id: wc.id },
+                    description: wc.description
+                  }))}
                 optionRender={(option) => (
                   <div style={{ 
                     display: 'flex',

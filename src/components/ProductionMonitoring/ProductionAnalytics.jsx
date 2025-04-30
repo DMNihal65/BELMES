@@ -16,10 +16,11 @@ import {
   Col,
   Statistic
 } from 'antd';
-import { ReloadOutlined, FullscreenOutlined, DownloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ReloadOutlined, FullscreenOutlined, DownloadOutlined, InfoCircleOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import useProductionStore from '../../store/productionStore';
 import dayjs from 'dayjs';
+import axios from 'axios';
 
 const { RangePicker } = DatePicker;
 
@@ -30,10 +31,10 @@ const statusColors = {
   'STOPPED': '#ff4d4f',
   'MAINTENANCE': '#1890ff',
   'OFFLINE': '#d9d9d9',
-  // Add legacy status mappings for backward compatibility
-  'PRODUCTION': '#52c41a',
-  'ON': '#1890ff',
-  'OFF': '#ff4d4f'
+  // Updated color mappings as requested
+  'PRODUCTION': '#355E3B', // Green
+  'ON': '#faad14',         // Yellow
+  'OFF': '#C70039 '         // Red
 };
 
 // Custom title component with info tooltip
@@ -63,22 +64,64 @@ function ProductionAnalytics() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedMachines, setSelectedMachines] = useState([]);
   const [timelineGrouping, setTimelineGrouping] = useState('machine'); // 'machine' or 'date'
+  const [workCenters, setWorkCenters] = useState([]);
+  const [loadingWorkCenters, setLoadingWorkCenters] = useState(false);
+  const [schedulableMachines, setSchedulableMachines] = useState([]);
+
+  // Fetch work centers and filter to only include schedulable ones
+  const fetchWorkCenters = async () => {
+    setLoadingWorkCenters(true);
+    try {
+      const response = await axios.get('http://172.18.7.88:4422/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const workCentersData = response.data;
+      
+      // Filter work centers that are schedulable
+      const schedulableWorkCenters = workCentersData.filter(wc => wc.is_schedulable === true);
+      setWorkCenters(schedulableWorkCenters);
+      
+      // Extract machine codes from schedulable work centers
+      const machineNames = schedulableWorkCenters.map(wc => wc.code);
+      setSchedulableMachines(machineNames);
+    } catch (error) {
+      console.error('Error fetching work centers:', error);
+    } finally {
+      setLoadingWorkCenters(false);
+    }
+  };
 
   useEffect(() => {
     // Initial data fetch
     const [startDate, endDate] = analyticsData.dateRange;
     fetchMachineStatusTimeline(startDate, endDate);
     fetchDailyProduction(startDate, endDate);
+    fetchWorkCenters();
   }, []);
+
+  // Filter machines based on schedulable work centers
+  const filterSchedulableMachines = (machines) => {
+    if (!schedulableMachines.length || !machines) return machines;
+    
+    // Extract work center code from machine name (assuming format like "CNCT-Machine1")
+    return machines.filter(machine => {
+      const nameParts = machine.name ? machine.name.split('-') : [];
+      if (nameParts.length > 0) {
+        const workCenterCode = nameParts[0];
+        return schedulableMachines.includes(workCenterCode);
+      }
+      return true; // Include machines without clear work center in name
+    });
+  };
 
   // Update available machines list for filtering
   useEffect(() => {
     if (analyticsData.timelineData?.machines?.length > 0 && selectedMachines.length === 0) {
-      setSelectedMachines(analyticsData.timelineData.machines.map(m => m.name));
+      // Filter machines based on is_schedulable flag
+      const schedulableMachineList = filterSchedulableMachines(analyticsData.timelineData.machines);
+      setSelectedMachines(schedulableMachineList.map(m => m.name));
     } else if (analyticsData.machineTimelines?.length > 0 && selectedMachines.length === 0) {
       setSelectedMachines(analyticsData.machineTimelines.map(m => m.machine_name));
     }
-  }, [analyticsData.timelineData, analyticsData.machineTimelines]);
+  }, [analyticsData.timelineData, analyticsData.machineTimelines, schedulableMachines]);
 
   const handleDateRangeChange = (range) => {
     if (range) {
@@ -476,14 +519,19 @@ function ProductionAnalytics() {
       tooltip: {
         trigger: 'item',
         formatter: (params) => {
-          const { data } = params;
+          if (!params.data) return '';
+          
+          // Destructure with defaults to prevent undefined values
+          const [index, startTime, endTime, status = 'Unknown', machineName = 'Unknown', program = ''] = params.data;
+          
+          // Use the extracted values rather than accessing data properties
           return `
-            <div style="font-weight:bold">${data.machine_name}</div>
-            <div>Status: <span style="color:${statusColors[data.status] || '#8884d8'}">${data.status}</span></div>
-            <div>Start: ${dayjs(data.start_time).format('MMM D, YYYY HH:mm')}</div>
-            <div>End: ${dayjs(data.end_time).format('MMM D, YYYY HH:mm')}</div>
-            <div>Duration: ${dayjs(data.end_time).diff(dayjs(data.start_time), 'hour', true).toFixed(1)} hrs</div>
-            ${data.program ? `<div>Program: ${data.program}</div>` : ''}
+            <div style="font-weight:bold">${machineName}</div>
+            <div>Status: <span style="color:${statusColors[status] || '#8884d8'}">${status}</span></div>
+            <div>Start: ${dayjs(startTime).format('MMM D, YYYY HH:mm')}</div>
+            <div>End: ${dayjs(endTime).format('MMM D, YYYY HH:mm')}</div>
+            <div>Duration: ${dayjs(endTime).diff(dayjs(startTime), 'hour', true).toFixed(1)} hrs</div>
+            ${program ? `<div>Program: ${program}</div>` : ''}
           `;
         }
       },
@@ -496,6 +544,35 @@ function ProductionAnalytics() {
         textStyle: {
           fontSize: 12
         }
+      },
+      dataZoom: [
+        {
+          type: 'slider',
+          xAxisIndex: 0,
+          filterMode: 'weakFilter',
+          height: 20,
+          bottom: 50,
+          start: 0,
+          end: 100,
+          handleIcon: 'M10.7,11.9v-1.3H9.3v1.3c-4.9,0.3-8.8,4.4-8.8,9.4c0,5,3.9,9.1,8.8,9.4v1.3h1.3v-1.3c4.9-0.3,8.8-4.4,8.8-9.4C19.5,16.3,15.6,12.2,10.7,11.9z M13.3,24.4H6.7V23h6.6V24.4z M13.3,19.6H6.7v-1.4h6.6V19.6z',
+          handleSize: '80%'
+        },
+        {
+          type: 'inside',
+          xAxisIndex: 0,
+          filterMode: 'weakFilter'
+        }
+      ],
+      toolbox: {
+        feature: {
+          restore: {},
+          saveAsImage: {},
+          dataZoom: {
+            yAxisIndex: 'none'
+          }
+        },
+        right: 20,
+        top: 0
       },
       grid: {
         left: '3%',
@@ -745,8 +822,15 @@ function ProductionAnalytics() {
               <>
                 <div className="flex flex-wrap gap-4 mb-4 items-center">
                   <div className="flex items-center gap-2">
-                    
-                    
+                    <Radio.Group 
+                      value={timelineView} 
+                      onChange={e => setTimelineView(e.target.value)}
+                      buttonStyle="solid"
+                      size="small"
+                    >
+                      <Radio.Button value="timeline">Timeline</Radio.Button>
+                     
+                    </Radio.Group>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -755,17 +839,39 @@ function ProductionAnalytics() {
                       mode="multiple"
                       allowClear
                       style={{ minWidth: 200 }}
-                      placeholder="Select machines"
+                      placeholder={loadingWorkCenters ? "Loading machines..." : "Select machines"}
                       value={selectedMachines}
                       onChange={handleMachineFilter}
                       maxTagCount="responsive"
-                      options={analyticsData.timelineData?.machines?.map(machine => ({
-                        label: machine.name,
-                        value: machine.name
-                      })) || analyticsData.machineTimelines?.map(machine => ({
-                        label: machine.machine_name,
-                        value: machine.machine_name
-                      })) || []}
+                      loading={loadingWorkCenters}
+                      options={
+                        (() => {
+                          let machineOptions = [];
+                          
+                          if (analyticsData.timelineData?.machines) {
+                            // Filter for schedulable machines only
+                            const filteredMachines = filterSchedulableMachines(analyticsData.timelineData.machines);
+                            machineOptions = filteredMachines.map(machine => ({
+                              label: machine.name,
+                              value: machine.name
+                            }));
+                          } else if (analyticsData.machineTimelines) {
+                            machineOptions = analyticsData.machineTimelines.map(machine => ({
+                              label: machine.machine_name,
+                              value: machine.machine_name
+                            }));
+                          }
+                          
+                          return machineOptions;
+                        })()
+                      }
+                    />
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => fetchWorkCenters()}
+                      size="small"
+                      loading={loadingWorkCenters}
+                      title="Refresh machine list"
                     />
                   </div>
                 </div>
@@ -786,7 +892,31 @@ function ProductionAnalytics() {
                   onChartReady={instance => setChartInstance(instance)}
                   notMerge={true}
                   lazyUpdate={true}
+                  opts={{ renderer: 'canvas' }}
+                  className="analytics-chart shadow-sm border border-gray-200 rounded-lg"
                 />
+
+                {/* Chart Legend - Make it more visible */}
+                {getTimelineDisplayMode() !== 'empty' && (
+                  <div className="flex flex-wrap justify-center gap-4 mt-4 p-2 bg-gray-50 rounded-md border border-gray-200">
+                    {Object.entries(statusColors).map(([status, color]) => (
+                      <div key={status} className="flex items-center gap-1 px-2 py-1">
+                        <div style={{ 
+                          width: '12px', 
+                          height: '12px', 
+                          backgroundColor: color,
+                          borderRadius: '50%'
+                        }} />
+                        <span className="text-xs font-medium">{status}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add a help text for navigation */}
+                <div className="text-xs text-gray-500 text-center mt-2">
+                  <p>Tip: Use mouse wheel to zoom, drag to pan timeline, or use zoom controls on the chart.</p>
+                </div>
               </>
             ) : (
               <Empty description="No machine timeline data available" />

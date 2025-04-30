@@ -1263,7 +1263,7 @@ const JobDetails = () => {
                 onChange={async (value) => {
                   try {
                     // Fetch detailed order information when an order is selected
-                    const response = await fetch(`http://172.18.7.88:3252/api/v1/planning/search_order2?production_order=${value}`);
+                    const response = await fetch(`http://172.18.7.88:4422/api/v1/planning/search_order2?production_order=${value}`);
                     const data = await response.json();
                     
                     // Get the order data from the response
@@ -1454,7 +1454,6 @@ const JobDetails = () => {
             key="submit" 
             type="primary"
             onClick={() => {
-              // Handle form submission
               console.log('Submitting data:', updateFormData);
               message.success('Production data updated successfully');
               setIsUpdateModalVisible(false);
@@ -1495,7 +1494,7 @@ const JobDetails = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="text-sm text-gray-600 mb-1">Quality Completed</div>
+              <div className="text-sm text-gray-600 mb-1">Quantity Complete</div>
               <Input
                 type="number"
                 value={updateFormData.qualityCompleted}
@@ -1504,7 +1503,7 @@ const JobDetails = () => {
               />
             </div>
             <div>
-              <div className="text-sm text-gray-600 mb-1">Quality Rejected</div>
+              <div className="text-sm text-gray-600 mb-1">Quantity Rejected</div>
               <Input
                 type="number"
                 value={updateFormData.qualityRejected}

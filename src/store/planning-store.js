@@ -26,7 +26,7 @@ const usePlanningStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:3252/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.88:4422/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -67,7 +67,7 @@ const usePlanningStore = create((set) => ({
   searchOrders: async (productionOrder) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/planning/search_order2?production_order=${productionOrder}`);
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/planning/search_order2?production_order=${productionOrder}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -128,7 +128,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Fetching MPP for production order:', productionOrder); // Debug log
 
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/documents/mpp/${productionOrder}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/documents/mpp/${productionOrder}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -196,7 +196,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.88:3252/api/v1/mpp', {
+      const response = await fetch('http://172.18.7.88:4422/api/v1/mpp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,7 +256,7 @@ const usePlanningStore = create((set) => ({
   fetchActiveParts: async () => {
     try {
       set({ isLoading: true });
-      const response = await fetch('http://172.18.7.88:3252/api/v1/scheduling/active-parts');
+      const response = await fetch('http://172.18.7.88:4422/api/v1/scheduling/active-parts');
       const data = await response.json();
       
       if (!response.ok) {
@@ -285,7 +285,7 @@ const usePlanningStore = create((set) => ({
   changePartStatus: async (productionOrder, newStatus) => {
     try {
       // Using production order in the endpoint
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/scheduling/set-part-status/${productionOrder}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/scheduling/set-part-status/${productionOrder}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -340,7 +340,7 @@ const usePlanningStore = create((set) => ({
   // Add this new function to fetch machine details
   fetchMachineDetails: async (machineId) => {
     try {
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/master-order/machines/${machineId}`);
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/master-order/machines/${machineId}`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -357,7 +357,7 @@ const usePlanningStore = create((set) => ({
   // Add the updateMachine function to the store
   updateMachine: async (machineId, updatedData) => {
     try {
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/master-order/machines/${machineId}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/master-order/machines/${machineId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -381,7 +381,7 @@ const usePlanningStore = create((set) => ({
   // Function to update operation details
   updateOperationDetails: async (partNumber, operationNumber, updateData) => {
     try {
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -421,7 +421,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending machine update data:', formattedData);
 
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -453,7 +453,7 @@ const usePlanningStore = create((set) => ({
       }
 
       // First try to get MPP documents using production order
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/documents/mpp/${productionOrder}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/documents/mpp/${productionOrder}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -475,7 +475,7 @@ const usePlanningStore = create((set) => ({
   // Function to fetch MPP by identifier (production order and operation)
   fetchMppByIdentifier: async (productionOrder, operationNumber) => {
     try {
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/mpp/by-identifier?operation_number=${operationNumber}&production_order=${productionOrder}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/mpp/by-identifier?operation_number=${operationNumber}&production_order=${productionOrder}`, {
         headers: {
           'accept': 'application/json'
         }
@@ -518,7 +518,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending formatted MPP data:', formattedData);
 
-      const response = await fetch('http://172.18.7.88:3252/api/v1/mpp', {
+      const response = await fetch('http://172.18.7.88:4422/api/v1/mpp', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -553,7 +553,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/documents/${versionId}/download`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/documents/${versionId}/download`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -585,7 +585,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -620,7 +620,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/document-management/documents/${documentId}/download-latest`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/document-management/documents/${documentId}/download-latest`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
@@ -662,7 +662,7 @@ const usePlanningStore = create((set) => ({
       console.log('Checking MPP document for part number:', partNumber);
       
       // 1. First check if MPP document exists
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/document-management/documents/by-part-number-all/${partNumber}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -682,7 +682,7 @@ const usePlanningStore = create((set) => ({
         
         // Download the document
         const downloadResponse = await fetch(
-          `http://172.18.7.88:3252/api/v1/document-management/documents/${documentsData.mpp_document.latest_version.id}/download-latest`, {
+          `http://172.18.7.88:4422/api/v1/document-management/documents/${documentsData.mpp_document.latest_version.id}/download-latest`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'accept': '*/*'
@@ -704,7 +704,7 @@ const usePlanningStore = create((set) => ({
       // 2. If no document exists, check for MPP data using the correct endpoint
       console.log('Checking MPP data for part:', partNumber, 'operation:', operation.operation_number);
       const mppResponse = await fetch(
-        `http://172.18.7.88:3252/api/v1/mpp/by-part/${partNumber}/${operation.operation_number}`, {
+        `http://172.18.7.88:4422/api/v1/mpp/by-part/${partNumber}/${operation.operation_number}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -728,7 +728,7 @@ const usePlanningStore = create((set) => ({
   // Update the createOrFetchMPP function
   createOrFetchMPP: async (partNumber, operationNumber) => {
     try {
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -769,7 +769,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending update MPP data:', formattedData);
 
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/mpp/by-part/${partNumber}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -801,7 +801,7 @@ const usePlanningStore = create((set) => ({
     try {
       console.log('Creating operation with data:', operationData);
       
-      const response = await fetch('http://172.18.7.88:3252/api/v1/planning/operations', {
+      const response = await fetch('http://172.18.7.88:4422/api/v1/planning/operations', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -829,7 +829,7 @@ const usePlanningStore = create((set) => ({
       // Fetch machines for the work center
       let workCenterMachines = [];
       try {
-        const machinesResponse = await fetch(`http://172.18.7.88:3252/api/v1/planning/work-center-machines/${operationData.work_center_code}`, {
+        const machinesResponse = await fetch(`http://172.18.7.88:4422/api/v1/planning/work-center-machines/${operationData.work_center_code}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'accept': 'application/json'
@@ -853,7 +853,7 @@ const usePlanningStore = create((set) => ({
         
         try {
           // Update the operation with the default machine
-          await fetch(`http://172.18.7.88:3252/api/v1/planning/operations/${partNumber}/${operationData.operation_number}`, {
+          await fetch(`http://172.18.7.88:4422/api/v1/planning/operations/${partNumber}/${operationData.operation_number}`, {
             method: 'PUT',
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -888,7 +888,7 @@ const usePlanningStore = create((set) => ({
   // Add this to your store
   fetchWorkCenters: async () => {
     try {
-      const response = await fetch('http://172.18.7.88:3252/api/v1/planning/work_centers', {
+      const response = await fetch('http://172.18.7.88:4422/api/v1/planning/work_centers', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -910,8 +910,8 @@ const usePlanningStore = create((set) => ({
   // Update the checkIpidStatus function to use the correct endpoint
   checkIpidStatus: async (productionOrder, operationNumber) => {
     try {
-      // Update the endpoint URL from http://172.18.7.88:3252 to http://172.18.7.88:3252
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/document-management/ipid/status?production_order=${productionOrder}&operation_number=${operationNumber}`, {
+      // Update the endpoint URL from http://172.18.7.88:4422 to http://172.18.7.88:4422
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/document-management/ipid/status?production_order=${productionOrder}&operation_number=${operationNumber}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -955,7 +955,7 @@ const usePlanningStore = create((set) => ({
         metadata
       });
 
-      const response = await fetch('http://172.18.7.88:3252/api/v1/document-management/ipid/upload/', {
+      const response = await fetch('http://172.18.7.88:4422/api/v1/document-management/ipid/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -986,7 +986,7 @@ const usePlanningStore = create((set) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/scheduling/machine-utilization?month=${month}&year=${year}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/scheduling/machine-utilization?month=${month}&year=${year}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1018,7 +1018,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Fetching machine utilization for date range: ${formattedStartDate} to ${formattedEndDate}`);
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/scheduling/machine-utilization/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/scheduling/machine-utilization/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1055,7 +1055,7 @@ const usePlanningStore = create((set) => ({
       // Log the data we're sending to help with debugging
       console.log('Sending formatted tool data to API:', formattedToolData);
       
-      const response = await fetch('http://172.18.7.88:3252/api/v1/toolsprograms/ordertools/', {
+      const response = await fetch('http://172.18.7.88:4422/api/v1/toolsprograms/ordertools/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1119,7 +1119,7 @@ const usePlanningStore = create((set) => ({
       console.log(`Updating tool ${toolId} with data:`, formattedToolData);
       
       // Making sure the URL has the correct format
-      const apiUrl = `http://172.18.7.88:3252/api/v1/toolsprograms/ordertools/${toolId}/`;
+      const apiUrl = `http://172.18.7.88:4422/api/v1/toolsprograms/ordertools/${toolId}/`;
       console.log(`Sending PUT request to: ${apiUrl}`);
       
       const response = await fetch(apiUrl, {
@@ -1184,7 +1184,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Deleting tool with ID: ${toolId}`);
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/toolsprograms/ordertools/${toolId}/`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/toolsprograms/ordertools/${toolId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1220,7 +1220,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Fetching tools for order ID: ${orderId}`);
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/toolsprograms/ordertools/?order_id=${orderId}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/toolsprograms/ordertools/?order_id=${orderId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1296,7 +1296,7 @@ const usePlanningStore = create((set) => ({
       // Log the data we're sending to help with debugging
       console.log('Sending formatted program data to API:', formattedProgramData);
       
-      const response = await fetch('http://172.18.7.88:3252/api/v1/toolsprograms/programs/', {
+      const response = await fetch('http://172.18.7.88:4422/api/v1/toolsprograms/programs/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1350,7 +1350,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Fetching programs for order ID: ${orderId}`);
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/toolsprograms/programs/?order_id=${orderId}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/toolsprograms/programs/?order_id=${orderId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1425,7 +1425,7 @@ const usePlanningStore = create((set) => ({
       // Log the data we're sending
       console.log(`Updating program ${programId} with data:`, formattedProgramData);
       
-      const apiUrl = `http://172.18.7.88:3252/api/v1/toolsprograms/programs/${programId}/`;
+      const apiUrl = `http://172.18.7.88:4422/api/v1/toolsprograms/programs/${programId}/`;
       console.log(`Sending PUT request to: ${apiUrl}`);
       
       const response = await fetch(apiUrl, {
@@ -1489,7 +1489,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Deleting program with ID: ${programId}`);
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/toolsprograms/programs/${programId}/`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/toolsprograms/programs/${programId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1528,7 +1528,7 @@ const usePlanningStore = create((set) => ({
       formData.append('file', file);
       formData.append('version_number', versionNumber);
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/document-management/cnc-program/${programId}/versions`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/document-management/cnc-program/${programId}/versions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1559,7 +1559,7 @@ const usePlanningStore = create((set) => ({
       
       console.log(`Fetching versions for document ID: ${documentId}`);
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/document-management/cnc-program/${documentId}/versions`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/document-management/cnc-program/${documentId}/versions`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1596,7 +1596,7 @@ const usePlanningStore = create((set) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const response = await fetch('http://172.18.7.88:3252/api/v1/document-management/cnc-program/upload/', {
+      const response = await fetch('http://172.18.7.88:4422/api/v1/document-management/cnc-program/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1624,7 +1624,7 @@ const usePlanningStore = create((set) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const url = new URL('http://172.18.7.88:3252/api/v1/scheduling/part-production-pdc');
+      const url = new URL('http://172.18.7.88:4422/api/v1/scheduling/part-production-pdc');
       if (partNumber) url.searchParams.append('part_number', partNumber);
       if (productionOrder) url.searchParams.append('production_order', productionOrder);
       
@@ -1670,7 +1670,7 @@ const usePlanningStore = create((set) => ({
       console.log(`Fetching latest operation number for part: ${partNumber}`);
       
       // First attempt to get the latest operation number from the API
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/planning/operations/latest/${partNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/planning/operations/latest/${partNumber}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1738,7 +1738,7 @@ const usePlanningStore = create((set) => ({
       set({ isLoading: true, error: null });
       
       // Construct URL with the specific part number
-      const url = `http://172.18.7.88:3252/api/v1/document-management/documents/?page=1&page_size=10&part_number=${partNumber}`;
+      const url = `http://172.18.7.88:4422/api/v1/document-management/documents/?page=1&page_size=10&part_number=${partNumber}`;
       
       console.log('Fetching engineering drawings from:', url);
       
@@ -1782,7 +1782,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
 
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/document-management/documents/${documentId}/download-latest`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/document-management/documents/${documentId}/download-latest`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'accept': '*/*'
@@ -1893,7 +1893,7 @@ const usePlanningStore = create((set) => ({
       
       // If active, fetch the PDC data from the main endpoint that returns all PDCs
       console.log(`Fetching PDC data for active part ${productionOrder}`);
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/scheduling/part-production-pdc`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/scheduling/part-production-pdc`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1939,7 +1939,7 @@ const usePlanningStore = create((set) => ({
   // Add this new function to fetch PDC data
   fetchPdcData: async (productionOrder) => {
     try {
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/scheduling/part-production-pdc?production_order=${productionOrder}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/scheduling/part-production-pdc?production_order=${productionOrder}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'
@@ -1970,7 +1970,7 @@ const usePlanningStore = create((set) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const response = await fetch(`http://172.18.7.88:3252/api/v1/document-management/cnc-program/by-part/${partNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4422/api/v1/document-management/cnc-program/by-part/${partNumber}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'accept': 'application/json'

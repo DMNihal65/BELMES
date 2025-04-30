@@ -9,7 +9,7 @@ const useOperatorMppStore = create((set) => ({
   fetchAllOrders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:3252/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.88:4422/api/v1/planning/all_orders');
       const data = await response.json();
       
       if (!response.ok) {
@@ -19,7 +19,7 @@ const useOperatorMppStore = create((set) => ({
       // Transform the data to include operations
       const transformedOrders = Array.isArray(data) ? await Promise.all(data.map(async (order) => {
         // Fetch operations using the new endpoint
-        const operationsResponse = await fetch(`http://172.18.7.88:3252/api/v1/planning/search_order2?production_order=${order.production_order}`);
+        const operationsResponse = await fetch(`http://172.18.7.88:4422/api/v1/planning/search_order2?production_order=${order.production_order}`);
         const operationsData = await operationsResponse.json();
         
         return {

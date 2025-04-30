@@ -36,6 +36,17 @@ const ProductionMon = () => {
         return <ProductionAnalytics />;
       case '/supervisor/production-monitoring/oee-overview':
         return <OEEDashboard />;
+      
+        case '/admin/production-monitoring/dashboard':
+          return <MachineDashboard />;
+        case '/admin/production-monitoring/production-vs-actual':
+          return <ProductionSchedule />;
+        case '/admin/production-monitoring/order-analysis':
+          return <ProductionOrderAnalysis />;
+        case '/admin/production-monitoring/analytics':
+          return <ProductionAnalytics />;
+        case '/admin/production-monitoring/oee-overview':
+          return <OEEDashboard />;
       default:
         return <MachineDashboard />; // Default to machine dashboard
     }

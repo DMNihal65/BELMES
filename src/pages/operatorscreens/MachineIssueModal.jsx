@@ -135,6 +135,7 @@ const MachineIssueModal = ({
           }
 
           const machinePayload = {
+            machine_id: values.machineId,
             description: values.description || '',
             is_on: values.machineStatus === 'ON',
             created_by: currentUserId.toString()

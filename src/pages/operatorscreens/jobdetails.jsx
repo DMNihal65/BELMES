@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Card, Button, Input, Layout, Modal, Tabs,
   Row, Col, Statistic, Badge, Space, Progress, Avatar,
-  Tooltip, Divider, Alert, message, Tag, Table, Empty, DatePicker, Spin, Select
+  Tooltip, Divider, Alert, message, Tag, Table, Empty, DatePicker, Spin
 } from 'antd';
 import { 
   ClockCircleOutlined, UserOutlined, BellOutlined,
@@ -27,8 +27,6 @@ import useAuthStore from '../../store/auth-store';
 import useWebSocketStore from '../../store/websocket-store';
 import { formatDistanceToNow } from 'date-fns';
 import DocumentsList from '../operatorscreens/JobDetails/DocumentsList';
-import useOperatorMppStore from '../../store/operatormpp-store';
-
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
@@ -156,22 +154,6 @@ const JobDetails = () => {
 
   // Add this for idle timer display
   const [idleTime, setIdleTime] = useState(0);
-
-  // Add these new state variables
-  const [isOrderModalVisible, setIsOrderModalVisible] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const { allOrders, isLoading: isLoadingOrders, fetchAllOrders } = useOperatorMppStore();
-
-  // First, add this to your state declarations at the top of the component
-  const [isUpdateModalVisible, setIsUpdateModalVisible] = useState(false);
-  const [updateFormData, setUpdateFormData] = useState({
-    startTime: null,
-    endTime: null,
-    qualityCompleted: '',
-    qualityRejected: '',
-    notes: ''
-  });
-  const [selectedOperation, setSelectedOperation] = useState(null);
 
   // Initialize WebSocket when component mounts
   useEffect(() => {
@@ -343,13 +325,6 @@ const JobDetails = () => {
   useEffect(() => {
     console.log('Machine Operations updated:', machineOperations);
   }, [machineOperations]);
-
-  // Add this effect to fetch orders when modal opens
-  useEffect(() => {
-    if (isOrderModalVisible) {
-      fetchAllOrders();
-    }
-  }, [isOrderModalVisible, fetchAllOrders]);
 
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
@@ -966,24 +941,11 @@ const JobDetails = () => {
                     </Button>
                   </Space.Compact>
                 </div>
-
-                {/* Production Order Update */}
-                <div className="bg-white rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-2">Update Production Order Data</div>
-                  <Button
-                    type="primary"
-                    onClick={() => setIsOrderModalVisible(true)}
-                    className="w-full flex items-center justify-center gap-2"
-                  >
-                    <FileTextOutlined />
-                    View Production Orders
-                  </Button>
-                </div>
               </div>
             </div>
 
-            {/* Quality Status and Poka Yoke Card */}
-            <div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-sky-100">
+{/* Quality Status and Poka Yoke Card */}
+<div className="bg-sky-50 rounded-xl shadow-xl overflow-hidden border border-sky-100">
               <div className="px-4 py-3 border-b border-sky-100 flex items-center justify-between bg-gradient-to-r from-sky-100 to-sky-50">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="text-blue-600" />
@@ -1072,7 +1034,7 @@ const JobDetails = () => {
                 </div>
               </div>
             </div>
-          </div>
+            </div>
 
           {/* Tabs Section */}
           <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden border border-gray-100">
@@ -1127,7 +1089,7 @@ const JobDetails = () => {
       <Modal
         title={
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="text-blue-500" />
+            <FileText className="text-blue-500" />
             <span>Poka Yoke Checklist</span>
           </div>
         }
@@ -1136,14 +1098,8 @@ const JobDetails = () => {
         footer={null}
         width={800}
         className="quality-modal"
-        destroyOnClose={true}
       >
-        <PokaYokeChecklist 
-          jobId={jobData.jobId} 
-          machineId={currentMachine?.id}
-          productionOrder={machineStatus?.production_order}
-          partNumber={machineStatus?.part_number}
-        />
+        <PokaYokeChecklist jobId={jobData.jobId} />
       </Modal>
 
       {/* Feedback History Modal */}
@@ -1234,296 +1190,6 @@ const JobDetails = () => {
         machineId={currentMachine?.id}
         partNumber={jobData?.part_number}
       />
-
-      {/* Production Orders Modal */}
-      <Modal
-        title={
-          <div className="flex items-center gap-2">
-            <FileTextOutlined className="text-blue-500" />
-            <span>Production Orders</span>
-          </div>
-        }
-        open={isOrderModalVisible}
-        onCancel={() => setIsOrderModalVisible(false)}
-        width={1200}
-        footer={null}
-      >
-        {isLoadingOrders ? (
-          <div className="flex justify-center py-8">
-            <Spin size="large" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Production Order Selection */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="mb-2 text-sm font-medium text-gray-600">Select Production Order</div>
-              <Select
-                style={{ width: '100%' }}
-                placeholder="Select a production order"
-                onChange={async (value) => {
-                  try {
-                    // Fetch detailed order information when an order is selected
-                    const response = await fetch(`http://172.18.7.88:4422/api/v1/planning/search_order2?production_order=${value}`);
-                    const data = await response.json();
-                    
-                    // Get the order data from the response
-                    const orderData = data.orders[0];
-                    
-                    // Set the selected order with all the details
-                    setSelectedOrder({
-                      ...orderData,
-                      operations: orderData.operations || []
-                    });
-                  } catch (error) {
-                    console.error('Error fetching order details:', error);
-                    message.error('Failed to fetch order details');
-                  }
-                }}
-                options={allOrders.map(order => ({
-                  value: order.production_order,
-                  label: `${order.production_order} - ${order.part_number}`
-                }))}
-              />
-            </div>
-
-            {/* Selected Order Details */}
-            {selectedOrder && (
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <div className="text-sm text-gray-500">Part Number</div>
-                    <div className="font-medium">{selectedOrder.part_number}</div>
-                    <div className="text-xs text-gray-400 mt-1">{selectedOrder.part_description}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Production Order</div>
-                    <div className="font-medium">{selectedOrder.production_order}</div>
-                    <div className="text-xs text-gray-400 mt-1">Sales Order: {selectedOrder.sale_order}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Project Details</div>
-                    <div className="font-medium">{selectedOrder.project?.name}</div>
-                    <div className="text-xs text-gray-400 mt-1">Priority: {selectedOrder.project?.priority}</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <div className="text-sm text-gray-500">Required Quantity</div>
-                    <div className="font-medium">{selectedOrder.required_quantity}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Launched Quantity</div>
-                    <div className="font-medium">{selectedOrder.launched_quantity}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Total Operations</div>
-                    <div className="font-medium">{selectedOrder.total_operations}</div>
-                  </div>
-                </div>
-
-                {/* Raw Materials Section */}
-                {selectedOrder.raw_materials && selectedOrder.raw_materials.length > 0 && (
-                  <div className="mb-4">
-                    <div className="text-sm font-medium text-gray-600 mb-2">Raw Materials</div>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      {selectedOrder.raw_materials.map((material, index) => (
-                        <div key={index} className="flex justify-between items-center mb-2">
-                          <div>
-                            <div className="font-medium">{material.child_part_number}</div>
-                            <div className="text-sm text-gray-500">{material.description}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium">{material.quantity} {material.unit.name}</div>
-                            <Tag color={material.status.name === 'Available' ? 'green' : 'orange'}>
-                              {material.status.name}
-                            </Tag>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Operations Table */}
-                <div className="mt-4">
-                  <div className="text-sm font-medium text-gray-600 mb-2">Operations</div>
-                  {selectedOrder?.operations?.length > 0 ? (
-                    <Table
-                      dataSource={selectedOrder.operations.sort((a, b) => a.operation_number - b.operation_number)}
-                      rowKey={(record) => `${record.operation_number}`}
-                      columns={[
-                        {
-                          title: 'Operation',
-                          dataIndex: 'operation_number',
-                          key: 'operation_number',
-                          width: '10%',
-                          render: (text) => `OP ${text}`
-                        },
-                        {
-                          title: 'Description',
-                          dataIndex: 'operation_description',
-                          key: 'operation_description',
-                          width: '25%',
-                        },
-                        {
-                          title: 'Work Center',
-                          dataIndex: 'work_center',
-                          key: 'work_center',
-                          width: '15%',
-                        },
-                        {
-                          title: 'Setup Time (Hrs)',
-                          dataIndex: 'setup_time',
-                          key: 'setup_time',
-                          width: '12%',
-                        },
-                        {
-                          title: 'Cycle Time (Hrs)',
-                          dataIndex: 'ideal_cycle_time',
-                          key: 'ideal_cycle_time',
-                          width: '12%',
-                        },
-                        {
-                          title: 'Machine',
-                          dataIndex: ['primary_machine', 'name'],
-                          key: 'machine',
-                          width: '13%',
-                        },
-                        {
-                          title: 'Actions',
-                          key: 'actions',
-                          width: '13%',
-                          render: (_, record) => (
-                            <Button
-                              type="primary"
-                              size="small"
-                              icon={<FileTextOutlined />}
-                              onClick={() => {
-                                setSelectedOperation(record);
-                                setIsUpdateModalVisible(true);
-                              }}
-                              style={{ fontSize: '12px', padding: '0 8px', height: '24px' }}
-                            >
-                              Update
-                            </Button>
-                          ),
-                        }
-                      ]}
-                      pagination={false}
-                      scroll={{ y: 300 }}
-                      size="small"
-                    />
-                  ) : (
-                    <Empty description="No operations available for this order" />
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
-
-      {/* Production Data Update Modal */}
-      <Modal
-        title={
-          <div className="flex items-center gap-2">
-            <FileTextOutlined className="text-blue-500" />
-            <span>Update Production Data - OP {selectedOperation?.operation_number}</span>
-          </div>
-        }
-        open={isUpdateModalVisible}
-        onCancel={() => {
-          setIsUpdateModalVisible(false);
-          setUpdateFormData({
-            startTime: null,
-            endTime: null,
-            qualityCompleted: '',
-            qualityRejected: '',
-            notes: ''
-          });
-        }}
-        footer={[
-          <Button 
-            key="cancel" 
-            onClick={() => setIsUpdateModalVisible(false)}
-          >
-            Cancel
-          </Button>,
-          <Button 
-            key="submit" 
-            type="primary"
-            onClick={() => {
-              console.log('Submitting data:', updateFormData);
-              message.success('Production data updated successfully');
-              setIsUpdateModalVisible(false);
-              setUpdateFormData({
-                startTime: null,
-                endTime: null,
-                qualityCompleted: '',
-                qualityRejected: '',
-                notes: ''
-              });
-            }}
-          >
-            Submit
-          </Button>
-        ]}
-      >
-        <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-gray-600 mb-1">Start Time</div>
-              <DatePicker
-                showTime
-                className="w-full"
-                value={updateFormData.startTime}
-                onChange={(date) => setUpdateFormData(prev => ({ ...prev, startTime: date }))}
-              />
-            </div>
-            <div>
-              <div className="text-sm text-gray-600 mb-1">End Time</div>
-              <DatePicker
-                showTime
-                className="w-full"
-                value={updateFormData.endTime}
-                onChange={(date) => setUpdateFormData(prev => ({ ...prev, endTime: date }))}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-gray-600 mb-1">Quantity Complete</div>
-              <Input
-                type="number"
-                value={updateFormData.qualityCompleted}
-                onChange={(e) => setUpdateFormData(prev => ({ ...prev, qualityCompleted: e.target.value }))}
-                placeholder="Enter completed quantity"
-              />
-            </div>
-            <div>
-              <div className="text-sm text-gray-600 mb-1">Quantity Rejected</div>
-              <Input
-                type="number"
-                value={updateFormData.qualityRejected}
-                onChange={(e) => setUpdateFormData(prev => ({ ...prev, qualityRejected: e.target.value }))}
-                placeholder="Enter rejected quantity"
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="text-sm text-gray-600 mb-1">Notes</div>
-            <Input.TextArea
-              value={updateFormData.notes}
-              onChange={(e) => setUpdateFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Enter any additional notes"
-              rows={4}
-            />
-          </div>
-        </div>
-      </Modal>
 
       {/* Debugging Information */}
       {process.env.NODE_ENV === 'development' && (

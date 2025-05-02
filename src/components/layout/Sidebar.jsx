@@ -90,7 +90,7 @@ function Sidebar() {
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,
-      label: 'Process Engineering',
+      label: 'Process Engineering Cell',
       children: [
         {
           key: '/supervisor/production-planning/planning',
@@ -255,7 +255,7 @@ function Sidebar() {
     {
       key: 'production-planning',
       icon: <Calendar size={20} />,
-      label: 'Process Engineering',
+      label: 'Process Engineering Cell',
       children: [
         {
           key: '/admin/production-planning/planning',

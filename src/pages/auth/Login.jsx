@@ -686,7 +686,7 @@ const Login = () => {
                 © 2025 Bharat Electronics Limited. All rights reserved.
               </Text>
               <Text type="secondary" className="text-xs">
-                Developed and maintained by CMTI
+                Developed and maintained by CMTI 
               </Text>
             </div>
           </motion.div>

@@ -423,7 +423,7 @@ function Header() {
        
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
         <div className="flex justify-between items-center mr-16 mt-2">
-          <h1 className="text-2xl font-semibold">SBU-Fabrication Components</h1>
+          <h1 className="text-2xl font-semibold">Fabrication Components</h1>
         </div>
 
         <img

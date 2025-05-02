@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
-const WEBSOCKET_URL = 'ws://172.16.0.203:8002/production_monitoring/ws/live-status/';
-const OEE_API_URL = 'http://172.16.0.203:8002/production_monitoring/machine-oee-analysis';
+const WEBSOCKET_URL = 'ws://172.18.7.89:7000/production_monitoring/ws/live-status/';
+const OEE_API_URL = 'http://172.18.7.89:7000/production_monitoring/machine-oee-analysis';
 
 const useDashboardStore = create((set, get) => ({
   machineData: [],
@@ -113,10 +113,14 @@ const useDashboardStore = create((set, get) => ({
       return [];
     }
     
+    try {
     console.log('Raw machineData before mapping:', machineData);
     
     // Map the incoming WebSocket data to match our machine data format
     return machineData.map(wsData => {
+        if (!wsData) return null;
+        
+        try {
       // Log the last_updated field from the WebSocket data
       console.log(`Mapping machine ${wsData.machine_id} (${wsData.machine_name})`);
       console.log('-> last_updated from WebSocket:', wsData.last_updated);
@@ -165,7 +169,22 @@ const useDashboardStore = create((set, get) => ({
       console.log(`-> lastUpdated value in mapped object:`, mappedMachine.lastUpdated);
       
       return mappedMachine;
-    });
+        } catch (err) {
+          console.error(`Error mapping machine data for ${wsData?.machine_id || 'unknown'}:`, err);
+          // Return a minimal valid machine object
+          return {
+            id: wsData?.machine_id?.toString() || 'unknown',
+            name: wsData?.machine_name || 'Error Machine',
+            status: 'OFF',
+            currentProgram: 'N/A',
+            lastUpdated: new Date().toISOString()
+          };
+        }
+      }).filter(Boolean); // Remove any null values
+    } catch (err) {
+      console.error('Error processing machine data:', err);
+      return [];
+    }
   }
 }));
 

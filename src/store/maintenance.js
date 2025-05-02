@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.16.0.203:8002/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.16.0.203:8002/api/v1/operator';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.89:7000/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.89:7000/api/v1/operator';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {

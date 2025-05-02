@@ -218,8 +218,8 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
     >
       <div className="space-y-4">
         {/* Status Summary */}
-        {/* <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-3 rounded-xl shadow-sm border border-blue-100"> */}
-          {/* <div className="grid grid-cols-3 gap-3">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-3 rounded-xl shadow-sm border border-blue-100">
+          <div className="grid grid-cols-3 gap-3">
             <Statistic
               title="OEE"
               value={oeeData?.average_oee || selectedMachine.oee || 0}
@@ -239,10 +239,10 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
               valueStyle={{ color: '#722ed1' }}
               prefix={<BarChartOutlined />}
             />
-          </div> */}
+          </div>
 
           {/* Progress bar */}
-          {/* <div className="mt-3">
+          <div className="mt-3">
             <div className="flex justify-between items-center text-xs mb-1">
               <span>Production Progress</span>
               <span className="font-medium">{completionPercentage}%</span>
@@ -260,8 +260,8 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
                   undefined
               }
             />
-          </div> */}
-        {/* </div> */}
+          </div>
+        </div>
 
         {/* OEE Components */}
         {oeeData && (

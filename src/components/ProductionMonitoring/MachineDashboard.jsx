@@ -1,17 +1,21 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { 
   Card, Row, Col, Statistic, Progress, Badge, Space, Button, 
   Input, Select, Tooltip, Tag, Modal, Drawer, Switch, Empty,
-  Divider, Table, Tabs, Avatar, Alert, Spin
+  Divider, Table, Tabs, Avatar, Alert, Spin, Typography
 } from 'antd';
 import { 
   RefreshCw, Search, Grid, List, Filter, Bell, 
   Activity, CheckCircle, PauseCircle, Clock, 
-  Zap, Percent, Award, Target
+  Zap, Percent, Award, Target, Box, Monitor,
+  FileText, HashIcon, Code, Server, BarChart2, Settings,
+  Cpu, RotateCw, Disc,
+  Eye
 } from 'lucide-react';
 import { 
   EyeOutlined, InfoCircleOutlined, CloseCircleFilled, 
-  ToolOutlined, SortAscendingOutlined, SortDescendingOutlined
+  ToolOutlined, SortAscendingOutlined, SortDescendingOutlined,
+  ToolFilled
 } from '@ant-design/icons';
 import useProductionStore from '../../store/productionStore';
 import dayjs from 'dayjs';
@@ -22,6 +26,7 @@ dayjs.extend(relativeTime);
 
 const { TabPane } = Tabs;
 const { Search: SearchInput } = Input;
+const { Text, Title } = Typography;
 
 const MachineDashboard = () => {
   const { 
@@ -142,28 +147,54 @@ const MachineDashboard = () => {
     return matchesStatus && matchesSearch;
   });
 
-  // Sort machines based on selected order
-  const sortedMachines = [...filteredMachines].sort((a, b) => {
-    if (sortOrder === 'name') {
-      return (a.machine_name || '').localeCompare(b.machine_name || '');
-    } else if (sortOrder === 'status') {
-      // Priority order: ON > PRODUCTION > OFF
-      const statusPriority = {
-        'ON': 0,
-        'IDLE': 0, // Same priority as ON
-        'PRODUCTION': 1,
-        'RUNNING': 1, // Same priority as PRODUCTION
-        'OFF': 2,
-        'OFFLINE': 2, // Same priority as OFF
-        'STOPPED': 3,
-        'MAINTENANCE': 4
-      };
-      return (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
-    } else if (sortOrder === 'parts') {
-      return (b.part_count || 0) - (a.part_count || 0);
+  // Get machine data in a stable order that won't change positions
+  const stableSortedMachines = useMemo(() => {
+    if (!filteredMachines.length) return [];
+    
+    // First sort by machine ID to ensure stable ordering
+    return [...filteredMachines].sort((a, b) => {
+      // First sort by the criteria selected by user
+      if (sortOrder === 'name') {
+        return (a.machine_name || '').localeCompare(b.machine_name || '');
+      } else if (sortOrder === 'status') {
+        // Priority order: ON > PRODUCTION > OFF
+        const statusPriority = {
+          'ON': 0,
+          'IDLE': 0, // Same priority as ON
+          'PRODUCTION': 1,
+          'RUNNING': 1, // Same priority as PRODUCTION
+          'OFF': 2,
+          'OFFLINE': 2, // Same priority as OFF
+          'STOPPED': 3,
+          'MAINTENANCE': 4
+        };
+        return (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
+      } else if (sortOrder === 'parts') {
+        return (b.part_count || 0) - (a.part_count || 0);
+      }
+      
+      // Then always sort by ID as a secondary criteria for stability
+      return a.machine_id - b.machine_id;
+    });
+  }, [filteredMachines, sortOrder]);
+
+  // Helper function to safely access machine properties
+  const getMachineData = (machine, property, defaultValue = 'N/A') => {
+    // Check if the property exists directly on the machine object
+    if (machine[property] !== undefined && machine[property] !== null) {
+      return machine[property];
     }
-    return 0;
-  });
+    
+    // Check if the property exists in the production_details
+    if (machine.production_details && 
+        machine.production_details[property] !== undefined && 
+        machine.production_details[property] !== null) {
+      return machine.production_details[property];
+    }
+    
+    // Return default value if not found
+    return defaultValue;
+  };
 
   // Handle manual refresh
   const handleRefresh = () => {
@@ -223,112 +254,241 @@ const MachineDashboard = () => {
     return () => clearInterval(timerInterval);
   }, [machines]);
 
-  // Render machine card
+  // Extract workcenter and machine name
+  const extractMachineInfo = (machineName) => {
+    if (!machineName) return { workcenter: '', machine: 'Unknown' };
+    
+    // Check if the machine name contains a hyphen (indicating workcenter-machine format)
+    const parts = machineName.split('-');
+    if (parts.length >= 2) {
+      // The last part is the machine name, the rest is the workcenter
+      const machine = parts[parts.length - 1];
+      const workcenter = parts.slice(0, parts.length - 1).join('-');
+      return { workcenter, machine };
+    }
+    
+    return { workcenter: '', machine: machineName };
+  };
+
+  // Format program name for better display
+  const formatProgramName = (programPath) => {
+    if (!programPath) return 'No Program';
+    
+    // If it has backslashes, get the filename only
+    if (programPath.includes('\\')) {
+      const parts = programPath.split('\\');
+      return parts[parts.length - 1];
+    }
+    
+    // If it has forward slashes, get the filename only
+    if (programPath.includes('/')) {
+      const parts = programPath.split('/');
+      return parts[parts.length - 1];
+    }
+    
+    return programPath;
+  };
+
+  // Render machine card - completely redesigned with fixed data access
   const renderMachineCard = (machine) => {
     const status = machine.status || 'OFFLINE';
     const statusInfo = statusConfig[status] || statusConfig.OFFLINE;
     const hasIdleTimer = (status === 'IDLE' || status === 'ON') && machineTimers[machine.machine_id];
     
+    // Extract workcenter and machine name
+    const { workcenter, machine: machineName } = extractMachineInfo(machine.machine_name);
+    
+    // Get data safely with our helper function
+    const part_count = getMachineData(machine, 'part_count', 0);
+    const required_quantity = getMachineData(machine, 'required_quantity', 0);
+    const launched_quantity = getMachineData(machine, 'launched_quantity', 0);
+    const production_order = getMachineData(machine, 'production_order', '');
+    const part_number = getMachineData(machine, 'part_number', '');
+    const part_description = getMachineData(machine, 'part_description', '');
+    const operation_number = getMachineData(machine, 'operation_number', '');
+    const operation_description = getMachineData(machine, 'operation_description', '');
+    
+    // Format program name - handle both direct and nested properties
+    const active_program = getMachineData(machine, 'active_program', '');
+    const program_number = getMachineData(machine, 'program_number', '');
+    const selected_program = getMachineData(machine, 'selected_program', '');
+    
+    const fullProgramPath = active_program || program_number || selected_program;
+    const programName = formatProgramName(fullProgramPath);
+
+    
+    
     return (
-      <Card 
-        key={machine.machine_id}
-        className="h-full shadow-sm hover:shadow-md transition-shadow"
+      <div 
+        className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
         style={{ 
-          borderLeft: `4px solid ${statusInfo.color}`,
-          backgroundColor: statusInfo.bgColor,
-          opacity: status === 'OFF' || status === 'OFFLINE' ? 0.8 : 1
+          borderLeft: `6px solid ${statusInfo.color}`,
         }}
-        bodyStyle={{ padding: '16px' }}
         onClick={() => setSelectedMachine(machine)}
       >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-4">
+        {/* Status bar on top with machine name and status */}
+        <div className="flex justify-between items-center px-4 py-3" style={{ backgroundColor: `${statusInfo.color}40` }}>
+          <div className="flex items-center gap-2">
+            <div className="bg-white p-2 rounded-lg shadow-sm ">
+              <Cpu size={18} className="text-gray-700" />
+            </div>
             <div>
-              <div className="text-lg font-semibold">{machine.machine_name}</div>
-              <div className="text-xs text-gray-500">ID: {machine.machine_id}</div>
+              {workcenter && (
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{workcenter}</div>
+              )}
+              <div className="text-lg font-bold text-gray-800">{machineName}</div>
             </div>
-            <Tag color={statusInfo.color} className="flex items-center gap-1">
-              {statusInfo.icon}
-              <span>{statusInfo.label}</span>
-            </Tag>
           </div>
-          
-          <div className="flex-grow">
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <Statistic 
-                title="Parts Count" 
-                value={machine.part_count || 0} 
-                valueStyle={{ fontSize: '1.25rem' }}
-              />
-              <Statistic 
-                title="Last Updated" 
-                value={dayjs(machine.last_updated).fromNow()} 
-                valueStyle={{ fontSize: '1.25rem' }}
-              />
-            </div>
-            
-            {/* Idle Timer */}
-            {hasIdleTimer && (
-              <div className="mt-2 mb-3">
-                <div className="flex items-center gap-2 text-yellow-600">
-                  <Clock size={16} />
-                  <span className="font-medium">Idle for: {formatDuration(machineTimers[machine.machine_id].duration)}</span>
+          <Tag color={statusInfo.color} className="flex items-center gap-1 rounded-full py-1 px-3">
+            {statusInfo.icon}
+            <span className="font-medium">{statusInfo.label}</span>
+          </Tag>
+        </div>
+        
+        {/* Main content */}
+        <div className="p-4 "style={{ backgroundColor: `${statusInfo.color}25` }}>
+          {/* Order and Part number section */}
+          <div className="flex flex-wrap gap-3 mb-2">
+            {production_order && (
+              <div className="flex-1 min-w-[140px] bg-blue-50 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText size={16} className="text-blue-500" />
+                  <span className="text-xs flex font-semibold text-blue-600">PRODUCTION ORDER</span>
                 </div>
+                <div className="text-base font-bold text-gray-800">{production_order}</div>
               </div>
             )}
             
-            {/* Program Info */}
-            <div className="mt-3 border-t pt-3 border-gray-200">
-              <div className="text-sm font-medium mb-1">Active Program:</div>
-              <div className="text-sm bg-white p-2 rounded border border-gray-200 truncate">
-                {machine.production_details?.active_program || 'No active program'}
+            {part_number && (
+              <div className="flex-1 min-w-[140px] bg-green-50 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Box size={16} className="text-green-500" />
+                  <span className="text-xs font-semibold text-green-600">PART NUMBER</span>
+                </div>
+                <div className="text-base font-bold text-gray-800">{part_number}</div>
+              </div>
+            )}
+          </div>
+          
+          
+          
+          {/* Production metrics */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${statusInfo.color}25` }}>
+                <BarChart2 size={20} style={{ color: statusInfo.color }} />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 font-medium">PRODUCED</div>
+                <div className="text-xl font-bold">{part_count}</div>
               </div>
             </div>
             
-            {/* Production Order */}
-            {machine.production_details?.production_order && (
-              <div className="mt-3">
-                <div className="text-sm font-medium mb-1">Production Order:</div>
-                <div className="flex items-center">
-                  <Tag color="blue">{machine.production_details.production_order}</Tag>
-                  {machine.job_status === 1 && (
-                    <Badge status="processing" text="Active" />
+            <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                <Target size={20} className="text-purple-500" />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 font-medium">TARGET</div>
+                <div className="text-xl font-bold">{required_quantity}</div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Idle Timer Alert */}
+          {hasIdleTimer && (
+            <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center gap-2">
+              <Clock size={18} className="text-amber-500" />
+              <span className="font-medium text-amber-700">
+                Idle for: <span className="font-bold">{formatDuration(machineTimers[machine.machine_id].duration)}</span>
+              </span>
+            </div>
+          )}
+          
+          {/* Program and Operation Info */}
+          <div className="space-y-3 mt-4">
+            {/* Program Info */}
+            <div className="relative">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Code size={14} className="text-gray-500" />
+                <div className="text-xs font-semibold text-gray-600">PROGRAM</div>
+              </div>
+              <Tooltip title={fullProgramPath || 'No program'} placement="bottom">
+                <div className="text-sm bg-gray-50 p-2.5 rounded-lg border border-gray-200 truncate hover:bg-gray-100 transition-colors">
+                  {programName || 'No program'}
+                </div>
+              </Tooltip>
+            </div>
+            
+            {/* Operation Info */}
+            {operation_number && (
+              <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <ToolFilled size={14} className="text-gray-500" />
+                  <div className="text-xs font-semibold text-gray-600">OPERATION</div>
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium">{operation_number}</span>
+                  {operation_description && (
+                    <span className="text-gray-600 ml-1">- {operation_description}</span>
                   )}
                 </div>
               </div>
             )}
-          </div>
-          
-          {/* Footer */}
-          <div className="mt-3 pt-2 border-t border-gray-200 flex justify-between items-center">
-            <div className="text-xs text-gray-500">
-              {machine.production_details?.part_number 
-                ? `Part: ${machine.production_details.part_number}` 
-                : 'No part assigned'}
-            </div>
-            <Button 
-              type="text" 
-              size="small" 
-              icon={<EyeOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedMachine(machine);
-              }}
-            >
-              Details
-            </Button>
+            
+            
           </div>
         </div>
-      </Card>
+        
+        {/* Footer Actions */}
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end "style={{ backgroundColor: `${statusInfo.color}25` }}>
+          <Button 
+            type="primary"
+            icon={<Eye size={16} />}
+            className="flex items-center gap-1 shadow-sm hover:shadow"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedMachine(machine);
+            }}
+          >
+            View Details
+          </Button>
+        </div>
+      </div>
     );
   };
 
-  // Render machine as a table row
+  // Render machine as a table row - with fixed data access
   const renderMachineListItem = (machine) => {
     const status = machine.status || 'OFFLINE';
     const statusInfo = statusConfig[status] || statusConfig.OFFLINE;
     const hasIdleTimer = (status === 'IDLE' || status === 'ON') && machineTimers[machine.machine_id];
+
+    
+    
+    // Extract workcenter and machine name
+    const { workcenter, machine: machineName } = extractMachineInfo(machine.machine_name);
+    
+    // Get data safely with our helper function
+    const part_count = getMachineData(machine, 'part_count', 0);
+    const required_quantity = getMachineData(machine, 'required_quantity', 0);
+    const production_order = getMachineData(machine, 'production_order', '');
+    const part_number = getMachineData(machine, 'part_number', '');
+    
+    // Format program name
+    const active_program = getMachineData(machine, 'active_program', '');
+    const program_number = getMachineData(machine, 'program_number', '');
+    const selected_program = getMachineData(machine, 'selected_program', '');
+    
+    const fullProgramPath = active_program || program_number || selected_program;
+    const programName = formatProgramName(fullProgramPath);
+
+    const completionPercentage = required_quantity > 0
+    ? Math.min(Math.round((parseInt(part_count) || 0) / parseInt(required_quantity) * 100), 100)
+    : 0;
+  
+  // Determine if the machine is behind, on track, or ahead of schedule
+  
     
     return (
       <Card 
@@ -339,57 +499,86 @@ const MachineDashboard = () => {
       >
         <div className="flex items-center">
           <div 
-            className="w-4 h-full min-h-[40px]"
+            className="w-2 h-full min-h-[60px]"
             style={{ backgroundColor: statusInfo.color }}
           />
-          <div className="flex-grow flex items-center justify-between px-4">
+          <div className="flex-grow flex flex-col md:flex-row md:items-center justify-between px-4 py-2 gap-4">
             <div className="flex items-center gap-4">
-              <div>
-                <div className="font-medium">{machine.machine_name}</div>
-                <div className="text-xs text-gray-500">ID: {machine.machine_id}</div>
-              </div>
-              
-              <Tag color={statusInfo.color} className="flex items-center gap-1">
-                {statusInfo.icon}
-                <span>{statusInfo.label}</span>
-                {hasIdleTimer && (
-                  <span className="ml-1 text-xs">
-                    ({formatDuration(machineTimers[machine.machine_id].duration * 1000)})
-                  </span>
+              <div className="flex flex-col">
+                {workcenter && (
+                  <div className="text-xs font-medium text-gray-500 uppercase">{workcenter}</div>
                 )}
-              </Tag>
+                <div className="text-lg font-bold">{machineName}</div>
+                <Tag color={statusInfo.color} className="mt-1 flex items-center gap-1 w-fit">
+                  {statusInfo.icon}
+                  <span>{statusInfo.label}</span>
+                  {hasIdleTimer && (
+                    <span className="ml-1 text-xs">
+                      ({formatDuration(machineTimers[machine.machine_id].duration)})
+                    </span>
+                  )}
+                </Tag>
+              </div>
             </div>
             
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <div className="text-xs text-gray-500">Parts</div>
-                <div className="font-medium">{machine.part_count || 0}</div>
-              </div>
-              
-              <div className="text-center">
-                <div className="text-xs text-gray-500">Job</div>
-                <div className="font-medium">
-                  {machine.job_in_progress ? (
-                    <Badge status="processing" text="Active" />
-                  ) : (
-                    <Badge status="default" text="None" />
-                  )}
+            <div className="flex flex-wrap md:flex-nowrap items-center gap-4 md:gap-6 mt-3 md:mt-0">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center">
+                  <BarChart2 size={14} className="text-blue-500" />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Parts</div>
+                  <div className="font-medium">{part_count}/{required_quantity}</div>
                 </div>
               </div>
               
-              <div className="text-center">
-                <div className="text-xs text-gray-500">Last Updated</div>
-                <div className="font-medium">{dayjs(machine.last_updated).fromNow()}</div>
-              </div>
+              {production_order && (
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-indigo-50 flex items-center justify-center">
+                    <FileText size={14} className="text-indigo-500" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Order</div>
+                    <div className="font-medium">{production_order}</div>
+                  </div>
+                </div>
+              )}
+              
+              {part_number && (
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-green-50 flex items-center justify-center">
+                    <Box size={14} className="text-green-500" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Part</div>
+                    <div className="font-medium">{part_number}</div>
+                  </div>
+                </div>
+              )}
+              
+              <Tooltip title={fullProgramPath || 'No program'}>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-teal-50 flex items-center justify-center">
+                    <Code size={14} className="text-teal-500" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Program</div>
+                    <div className="font-medium truncate max-w-[120px]">{programName}</div>
+                  </div>
+                </div>
+              </Tooltip>
               
               <Button 
-                type="text" 
+                type="primary" 
+                size="small"
                 icon={<EyeOutlined />} 
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedMachine(machine);
                 }}
-              />
+              >
+                Details
+              </Button>
             </div>
           </div>
         </div>
@@ -397,103 +586,227 @@ const MachineDashboard = () => {
     );
   };
 
-  // Machine details modal
+  // Completely redesigned machine details modal
   const renderMachineDetailsModal = () => {
     if (!selectedMachine) return null;
     
     const status = selectedMachine.status || 'OFFLINE';
     const statusInfo = statusConfig[status] || statusConfig.OFFLINE;
+    const hasIdleTimer = (status === 'IDLE' || status === 'ON') && machineTimers[selectedMachine.machine_id];
+    
+    // Extract workcenter and machine name
+    const { workcenter, machine: machineName } = extractMachineInfo(selectedMachine.machine_name);
+    
+    // Get data safely with our helper function
+    const part_count = getMachineData(selectedMachine, 'part_count', 0);
+    const required_quantity = getMachineData(selectedMachine, 'required_quantity', 0);
+    const launched_quantity = getMachineData(selectedMachine, 'launched_quantity', 0);
+    const production_order = getMachineData(selectedMachine, 'production_order', 'N/A');
+    const part_number = getMachineData(selectedMachine, 'part_number', 'N/A');
+    const part_description = getMachineData(selectedMachine, 'part_description', 'N/A');
+    const operation_number = getMachineData(selectedMachine, 'operation_number', 'N/A');
+    const operation_description = getMachineData(selectedMachine, 'operation_description', 'N/A');
+    
+    // Format program name
+    const active_program = getMachineData(selectedMachine, 'active_program', '');
+    const program_number = getMachineData(selectedMachine, 'program_number', '');
+    const selected_program = getMachineData(selectedMachine, 'selected_program', '');
+    
+    const fullProgramPath = active_program || program_number || selected_program;
+    const programName = formatProgramName(fullProgramPath);
     
     return (
       <Modal
         title={
-          <div className="flex items-center justify-between">
-            <span>{selectedMachine.machine_name} Details</span>
-            <Tag color={statusInfo.color} className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-md bg-gray-100">
+              <Cpu size={20} className="text-gray-700" />
+            </div>
+            <div className="flex flex-col">
+              {workcenter && (
+                <span className="text-xs font-medium text-gray-500 uppercase">{workcenter}</span>
+              )}
+              <span className="text-xl font-bold">{machineName}</span>
+            </div>
+            <Tag color={statusInfo.color} className="ml-auto flex items-center gap-1 rounded-full px-3">
               {statusInfo.icon}
               <span>{statusInfo.label}</span>
+              {hasIdleTimer && (
+                <span className="ml-1 text-xs">
+                  ({formatDuration(machineTimers[selectedMachine.machine_id].duration)})
+                </span>
+              )}
             </Tag>
           </div>
         }
         open={!!selectedMachine}
         onCancel={() => setSelectedMachine(null)}
         footer={null}
-        width={700}
+        width={800}
+        bodyStyle={{ padding: '20px' }}
+        centered
       >
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card title="Machine Information" className="shadow-sm">
-              <div className="space-y-4">
-                <div>
-                  <div className="text-sm text-gray-500">Machine ID</div>
-                  <div className="font-medium">{selectedMachine.machine_id}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Machine Type</div>
-                  <div className="font-medium">{selectedMachine.machine_type || 'Not specified'}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Last Updated</div>
-                  <div className="font-medium">{dayjs(selectedMachine.last_updated).format('YYYY-MM-DD HH:mm:ss')}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Status</div>
-                  <div className="font-medium flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusInfo.color }}></div>
-                    {statusInfo.label}
+        <div className="space-y-6">
+          {/* Main Information Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Status Card */}
+            <Card className="shadow-sm bg-gradient-to-br from-gray-50 to-white">
+              <div className="flex flex-col items-center text-center p-2">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2`}
+                  style={{ backgroundColor: `${statusInfo.color}20` }}>
+                  <div className="text-2xl" style={{ color: statusInfo.color }}>
+                    {statusInfo.icon}
                   </div>
                 </div>
+                <div className="text-sm font-medium text-gray-500">Status</div>
+                <div className="text-xl font-bold" style={{ color: statusInfo.color }}>
+                  {statusInfo.label}
+                </div>
+                {hasIdleTimer && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    Idle for {formatDuration(machineTimers[selectedMachine.machine_id].duration)}
+                  </div>
+                )}
               </div>
             </Card>
             
-            <Card title="Production Details" className="shadow-sm">
-              <div className="space-y-4">
-                <div>
-                  <div className="text-sm text-gray-500">Active Program</div>
-                  <div className="font-medium">{selectedMachine.production_details?.active_program || 'No active program'}</div>
+            {/* Production Stats */}
+            <Card className="shadow-sm bg-gradient-to-br from-blue-50 to-white">
+              <div className="flex flex-col items-center text-center p-2">
+                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                  <BarChart2 size={24} className="text-blue-500" />
                 </div>
-                <div>
-                  <div className="text-sm text-gray-500">Production Order</div>
-                  <div className="font-medium">
-                    {selectedMachine.production_details?.production_order || 'No active order'}
-                    {selectedMachine.job_status === 1 && (
-                      <Badge status="processing" text="Active" className="ml-2" />
-                    )}
-                  </div>
+                <div className="text-sm font-medium text-gray-500">Parts Count</div>
+                <div className="text-xl font-bold text-blue-600">
+                  {part_count} / {required_quantity}
                 </div>
-                <div>
-                  <div className="text-sm text-gray-500">Part Number</div>
-                  <div className="font-medium">{selectedMachine.production_details?.part_number || 'Not specified'}</div>
+                {parseInt(required_quantity) > 0 && (
+                  <Progress 
+                    percent={Math.round((parseInt(part_count) || 0) / parseInt(required_quantity) * 100)} 
+                    size="small" 
+                    className="w-full mt-2"
+                  />
+                )}
+              </div>
+            </Card>
+            
+            {/* Machine Information */}
+            <Card className="shadow-sm bg-gradient-to-br from-gray-50 to-white">
+              <div className="flex flex-col items-center text-center p-2">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+                  <Server size={24} className="text-gray-500" />
                 </div>
-                <div>
-                  <div className="text-sm text-gray-500">Parts Count</div>
-                  <div className="font-medium">{selectedMachine.part_count || 0}</div>
+                <div className="text-sm font-medium text-gray-500">Machine ID</div>
+                <div className="text-xl font-bold text-gray-700">
+                  {selectedMachine.machine_id}
+                </div>
+                <div className="text-sm text-gray-500 mt-1">
+                  Last Updated: {dayjs(selectedMachine.last_updated).format('HH:mm:ss')}
                 </div>
               </div>
             </Card>
           </div>
           
-          <div className="mt-6">
-            <Card title="Current Status" className="shadow-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Statistic 
-                    title="Uptime" 
-                    value={selectedMachine.uptime || '0h 0m'} 
-                    prefix={<Clock size={16} />} 
-                  />
+          {/* Production Details */}
+          <Card 
+            title={
+              <div className="flex items-center gap-2">
+                <FileText size={18} className="text-blue-500" />
+                <span>Production Details</span>
+              </div>
+            }
+            className="shadow-sm"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              {/* Production Order */}
+              <div>
+                <div className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
+                  <HashIcon size={14} />
+                  <span>Production Order</span>
                 </div>
-                <div>
-                  <Statistic 
-                    title="Efficiency" 
-                    value={selectedMachine.efficiency || 0} 
-                    suffix="%" 
-                    prefix={<Zap size={16} />} 
-                  />
+                <div className="font-medium text-lg">
+                  {production_order}
                 </div>
               </div>
-            </Card>
-          </div>
+              
+              {/* Part Information */}
+              <div>
+                <div className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
+                  <Box size={14} />
+                  <span>Part Number</span>
+                </div>
+                <div className="font-medium text-lg">
+                  {part_number}
+                </div>
+                {part_description && part_description !== 'N/A' && (
+                  <div className="text-sm text-gray-500">
+                    {part_description}
+                  </div>
+                )}
+              </div>
+              
+              {/* Operation */}
+              <div>
+                <div className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
+                  <ToolFilled size={14} />
+                  <span>Operation</span>
+                </div>
+                <div className="font-medium">
+                  {operation_number !== 'N/A' 
+                    ? `${operation_number} - ${operation_description}`
+                    : 'N/A'
+                  }
+                </div>
+              </div>
+              
+              {/* Quantities */}
+              <div>
+                <div className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
+                  <Disc size={14} />
+                  <span>Quantities</span>
+                </div>
+                <div className="flex gap-4">
+                  <div>
+                    <span className="text-xs text-gray-500">Required</span>
+                    <div className="font-medium">{required_quantity}</div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">Launched</span>
+                    <div className="font-medium">{launched_quantity}</div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">Completed</span>
+                    <div className="font-medium">{part_count}</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Active Program */}
+              <div className="col-span-2">
+                <div className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
+                  <Code size={14} />
+                  <span>Active Program</span>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-md border border-gray-200 font-mono text-sm break-words">
+                  {fullProgramPath || 'No program'}
+                </div>
+                {programName !== fullProgramPath && fullProgramPath && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    File: {programName}
+                  </div>
+                )}
+              </div>
+              
+              {/* Last Update */}
+              <div className="col-span-2 pt-2 mt-2 border-t border-gray-100">
+                <div className="text-sm text-gray-500 flex items-center gap-1.5">
+                  <RotateCw size={14} />
+                  <span>Last Updated:</span>
+                  <span className="font-medium">{dayjs(selectedMachine.last_updated).format('YYYY-MM-DD HH:mm:ss')}</span>
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
       </Modal>
     );
@@ -528,13 +841,7 @@ const MachineDashboard = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <Button 
-                icon={<Bell size={16} />} 
-                onClick={() => setShowAlertsDrawer(true)}
-                badge={{ count: alertsCount }}
-              >
-                Alerts
-              </Button>
+              
               
               <Button 
                 icon={<Filter size={16} />} 
@@ -610,200 +917,202 @@ const MachineDashboard = () => {
           )}
         </div>
 
-        {/* Stats Cards */}
-        <Card className="shadow-sm">
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={12} lg={6}>
-              <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-0 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <div>
-                    <div className="text-sm text-gray-500">Overall OEE</div>
-                    <div className="text-2xl font-bold text-blue-600">
-                      {overallOEEMetrics?.oee.toFixed(1)}%
-                      </div>
-                    </div>
-                  <div className="p-3 rounded-full bg-blue-200">
-                    <Award size={24} className="text-blue-600" />
-                    </div>
+        {/* Merged OEE and Status Summary - Combined into one modern section */}
+        <Card className="shadow-sm overflow-hidden">
+          <div className="flex flex-col lg:flex-row">
+            {/* Left side - OEE Summary with radial gauges */}
+            <div className="flex-1 bg-gradient-to-br from-blue-50 to-white p-4 lg:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Activity size={20} className="text-blue-500" />
+                  <span className="font-bold text-gray-800">Overall Efficiency</span>
+                </div>
+                <Tooltip title="Last updated">
+                  <div className="text-xs text-gray-500 flex items-center">
+                    <Clock size={14} className="mr-1 text-blue-400" />
+                    {overallOEEMetrics?.lastUpdated ? dayjs(overallOEEMetrics.lastUpdated).format('HH:mm') : '--:--'}
                   </div>
-                <Progress 
-                  percent={overallOEEMetrics?.oee || 0} 
-                  size="small" 
-                  strokeColor="#1890ff"
-                  className="mt-2"
-                />
-              </Card>
-            </Col>
-            
-            <Col xs={24} md={12} lg={6}>
-              <Card className="bg-gradient-to-r from-green-50 to-green-100 border-0 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-gray-500">Availability</div>
-                    <div className="text-2xl font-bold text-green-600">
-                      {overallOEEMetrics?.availability.toFixed(1)}%
-                    </div>
-                    </div>
-                  <div className="p-3 rounded-full bg-green-200">
-                    <Clock size={24} className="text-green-600" />
-                    </div>
+                </Tooltip>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-3">
+                {/* Overall OEE */}
+                <div className="col-span-4 md:col-span-1 flex flex-col items-center">
+                  <div className="relative w-20 h-20">
+                    <Progress
+                      type="circle"
+                      percent={Math.round(overallOEEMetrics?.oee || 0)}
+                      size={80}
+                      strokeColor="#1890ff"
+                      strokeWidth={10}
+                    />
+                    {/* <div className="absolute inset-0 flex items-center justify-center">
+                      <Award size={24} className="text-blue-500" />
+                    </div> */}
                   </div>
-                <Progress 
-                  percent={overallOEEMetrics?.availability || 0} 
-                  size="small" 
-                  strokeColor="#52c41a"
-                  className="mt-2"
-                />
-                </Card>
-            </Col>
+                  <div className="mt-2 text-center">
+                    <div className='flex'><Award size={24} className="text-blue-500" />
+                    <div className="text-sm font-medium text-gray-600">OEE</div></div>
+                   
+                    <div className="text-xl font-bold text-blue-600">{overallOEEMetrics?.oee?.toFixed(1)}%</div>
+                  </div>
+                </div>
                 
-            <Col xs={24} md={12} lg={6}>
-              <Card className="bg-gradient-to-r from-yellow-50 to-yellow-100 border-0 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <div>
-                    <div className="text-sm text-gray-500">Performance</div>
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {overallOEEMetrics?.performance.toFixed(1)}%
+                {/* OEE Factors */}
+                <div className="col-span-4 md:col-span-3 grid grid-cols-3 gap-2">
+                  {/* Availability */}
+                  <div className="flex flex-col items-center">
+                    <div className="relative w-16 h-16">
+                      <Progress
+                        type="circle"
+                        percent={Math.round(overallOEEMetrics?.availability || 0)}
+                        size={64}
+                        strokeColor="#52c41a"
+                        strokeWidth={8}
+                      />
+                     
+                    </div>
+                    <div className="mt-1 text-center">
+                    <div className='flex gap-1'> <Clock size={15} className="text-green-500" />
+                    <div className="text-xs font-medium text-gray-500">Availability</div></div>
+                   
+                     
+                      <div className="text-base font-bold text-green-600">{overallOEEMetrics?.availability?.toFixed(1)}%</div>
+                    </div>
+                  </div>
+                  
+                  {/* Performance */}
+                  <div className="flex flex-col items-center">
+                    <div className="relative w-16 h-16">
+                      <Progress
+                        type="circle"
+                        percent={Math.round(overallOEEMetrics?.performance || 0)}
+                        size={64}
+                        strokeColor="#faad14"
+                        strokeWidth={8}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                       
                       </div>
                     </div>
-                  <div className="p-3 rounded-full bg-yellow-200">
-                    <Zap size={24} className="text-yellow-600" />
+                    <div className="mt-1 text-center ">
+                    <div className='flex gap-1'>  <Zap size={15} className="text-yellow-500" />
+                    <div className="text-xs font-medium text-gray-500">Performance</div></div>
+                      
+                      <div className="text-base font-bold text-yellow-600">{overallOEEMetrics?.performance?.toFixed(1)}%</div>
                     </div>
                   </div>
-                <Progress 
-                  percent={overallOEEMetrics?.performance || 0} 
-                  size="small" 
-                  strokeColor="#faad14"
-                  className="mt-2"
-                />
-              </Card>
-            </Col>
-            
-            <Col xs={24} md={12} lg={6}>
-              <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-0 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <div>
-                    <div className="text-sm text-gray-500">Quality</div>
-                    <div className="text-2xl font-bold text-purple-600">
-                      {overallOEEMetrics?.quality.toFixed(1)}%
-                      </div>
+                  
+                  {/* Quality */}
+                  <div className="flex flex-col items-center">
+                    <div className="relative w-16 h-16">
+                      <Progress
+                        type="circle"
+                        percent={Math.round(overallOEEMetrics?.quality || 0)}
+                        size={64}
+                        strokeColor="#722ed1"
+                        strokeWidth={8}
+                      />
+                      
                     </div>
-                  <div className="p-3 rounded-full bg-purple-200">
-                    <Target size={24} className="text-purple-600" />
-                      </div>
+                    <div className="mt-1 text-center">
+                    <div className='flex gap-1'> <Target size={15} className="text-purple-500" />
+                    <div className="text-xs font-medium text-gray-500">Quality</div></div>
+                     
+                      <div className="text-base font-bold text-purple-600">{overallOEEMetrics?.quality?.toFixed(1)}%</div>
                     </div>
-                <Progress 
-                  percent={overallOEEMetrics?.quality || 0} 
-                  size="small" 
-                  strokeColor="#722ed1"
-                  className="mt-2"
-                />
-                </Card>
-            </Col>
-          </Row>
-            </Card>
-        
-        {/* Machine Status Summary - Enhanced Version */}
-        <Card 
-          className="shadow-sm mb-4"
-          title={
-            <div className="flex items-center gap-2">
-              <Activity size={18} className="text-blue-500" />
-              <span className="font-semibold">Machine Status Summary</span>
-            </div>
-          }
-          extra={
-            <Tooltip title="Last updated">
-              <div className="text-xs text-gray-500 flex items-center">
-                <Clock size={14} className="mr-1 text-blue-400" />
-                {overallOEEMetrics?.lastUpdated ? dayjs(overallOEEMetrics.lastUpdated).format('HH:mm') : '--:--'}
-              </div>
-            </Tooltip>
-          }
-        >
-          <div className="flex flex-wrap justify-between items-center">
-            {/* Status Indicators */}
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Production Status */}
-              <div className="flex-1 min-w-[110px] bg-gradient-to-r from-green-50 to-green-100 p-3 rounded-lg shadow-sm border border-green-100">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    <span className="text-sm font-medium text-green-700">Production</span>
                   </div>
-                  <Activity size={16} className="text-green-500" />
                 </div>
-                <div className="text-2xl font-bold text-green-600 text-center">{stats.production}</div>
-              </div>
-              
-              {/* Idle Status */}
-              <div className="flex-1 min-w-[110px] bg-gradient-to-r from-yellow-50 to-yellow-100 p-3 rounded-lg shadow-sm border border-yellow-100">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <span className="text-sm font-medium text-yellow-700">Idle</span>
-                  </div>
-                  <PauseCircle size={16} className="text-yellow-500" />
-                </div>
-                <div className="text-2xl font-bold text-yellow-600 text-center">{stats.on + stats.idle}</div>
-              </div>
-              
-              {/* Offline Status */}
-              <div className="flex-1 min-w-[110px] bg-gradient-to-r from-gray-50 to-gray-100 p-3 rounded-lg shadow-sm border border-gray-100">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                    <span className="text-sm font-medium text-gray-700">Offline</span>
-                  </div>
-                  <InfoCircleOutlined className="text-gray-500" />
-                </div>
-                <div className="text-2xl font-bold text-gray-600 text-center">{stats.off + stats.offline}</div>
               </div>
             </div>
             
-            {/* Divider for small screens */}
-            <div className="hidden sm:block w-px h-16 bg-gray-200 mx-4"></div>
-            
-            {/* Summary Stats */}
-            <div className="flex items-center gap-4 mt-3 sm:mt-0">
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mb-1 shadow-sm">
-                  <span className="text-blue-600 font-bold">{stats.totalMachines}</span>
+            {/* Right side - Machine Status Summary */}
+            <div className="flex-1 p-4 lg:p-6 bg-gradient-to-br from-gray-50 to-white border-t lg:border-t-0 lg:border-l border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Server size={20} className="text-gray-700" />
+                  <span className="font-bold text-gray-800">Machine Status</span>
                 </div>
-                <div className="text-xs text-gray-600 text-center">Total<br/>Machines</div>
+                <div className="text-sm flex items-center">
+                  <span className="font-medium text-gray-600">Total: </span>
+                  <span className="font-bold text-gray-800 ml-1">{stats.totalMachines}</span>
+                </div>
               </div>
               
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-1 shadow-sm">
-                  <span className="text-purple-600 font-bold">{stats.activeJobs}</span>
+              <div className="flex flex-wrap gap-2">
+                {/* Status pills with animations */}
+                <div className="flex-1 min-w-[110px] p-3 rounded-xl flex items-center gap-3 bg-gradient-to-r from-green-50 to-green-100 border border-green-100 shadow-sm transition-all hover:shadow-md">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-sm">
+                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center pulse-animation">
+                      <Activity size={16} className="text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-green-600">Production</div>
+                    <div className="text-xl font-bold text-gray-800">{stats.production}</div>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-600 text-center">Active<br/>Jobs</div>
+                
+                <div className="flex-1 min-w-[110px] p-3 rounded-xl flex items-center gap-3 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-100 shadow-sm transition-all hover:shadow-md">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-sm">
+                    <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
+                      <PauseCircle size={16} className="text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-yellow-600">Idle</div>
+                    <div className="text-xl font-bold text-gray-800">{stats.on + stats.idle}</div>
+                  </div>
+                </div>
+                
+                <div className="flex-1 min-w-[110px] p-3 rounded-xl flex items-center gap-3 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 shadow-sm transition-all hover:shadow-md">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-sm">
+                    <div className="w-6 h-6 rounded-full bg-gray-500 flex items-center justify-center">
+                      <InfoCircleOutlined className="text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Offline</div>
+                    <div className="text-xl font-bold text-gray-800">{stats.off + stats.offline}</div>
+                  </div>
+                </div>
               </div>
               
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center mb-1 shadow-sm">
-                  <RefreshCw size={16} className="text-cyan-600" />
+              {/* Machine distribution bar */}
+              <div className="mt-4">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Machine Distribution</span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span>Production</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                      <span>Idle</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                      <span>Offline</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-600 text-center">Auto<br/>Refresh</div>
+                
+                <div className="h-3 w-full rounded-full overflow-hidden flex">
+                  <div 
+                    className="bg-green-500 transition-all duration-500" 
+                    style={{ width: `${stats.totalMachines ? (stats.production / stats.totalMachines) * 100 : 0}%` }}
+                  ></div>
+                  <div 
+                    className="bg-yellow-500 transition-all duration-500" 
+                    style={{ width: `${stats.totalMachines ? ((stats.on + stats.idle) / stats.totalMachines) * 100 : 0}%` }}
+                  ></div>
+                  <div 
+                    className="bg-gray-500 transition-all duration-500" 
+                    style={{ width: `${stats.totalMachines ? ((stats.off + stats.offline) / stats.totalMachines) * 100 : 0}%` }}
+                  ></div>
+                </div>
               </div>
-            </div>
-          </div>
-          
-          {/* Progress bar showing machine distribution */}
-          <div className="mt-4">
-            <div className="h-2 w-full rounded-full overflow-hidden flex">
-              <div 
-                className="bg-green-500" 
-                style={{ width: `${stats.totalMachines ? (stats.production / stats.totalMachines) * 100 : 0}%` }}
-              ></div>
-              <div 
-                className="bg-yellow-500" 
-                style={{ width: `${stats.totalMachines ? ((stats.on + stats.idle) / stats.totalMachines) * 100 : 0}%` }}
-              ></div>
-              <div 
-                className="bg-gray-500" 
-                style={{ width: `${stats.totalMachines ? ((stats.off + stats.offline) / stats.totalMachines) * 100 : 0}%` }}
-              ></div>
             </div>
           </div>
         </Card>
@@ -832,27 +1141,30 @@ const MachineDashboard = () => {
         </div>
 
         {/* Machines Grid/List */}
-          {isLoading ? (
+        {isLoading ? (
           <div className="flex justify-center items-center py-20 bg-white rounded-lg shadow-sm">
             <div className="text-center">
               <Spin size="large" />
               <div className="mt-4 text-gray-500">Loading machine data...</div>
             </div>
-            </div>
-          ) : filteredMachines.length > 0 ? (
-            <div className={`
-              ${viewMode === 'grid' 
-              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4'
-              : 'space-y-3'
-              }
-            `}>
-              {sortedMachines.map(machine => (
-              viewMode === 'grid' 
-                ? renderMachineCard(machine)
-                : renderMachineListItem(machine)
-              ))}
-            </div>
-          ) : (
+          </div>
+        ) : stableSortedMachines.length > 0 ? (
+          <div className={`
+            ${viewMode === 'grid' 
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4'
+            : 'space-y-3'
+            }
+          `}>
+            {stableSortedMachines.map(machine => (
+              <div key={machine.machine_id}>
+                {viewMode === 'grid' 
+                  ? renderMachineCard(machine)
+                  : renderMachineListItem(machine)
+                }
+              </div>
+            ))}
+          </div>
+        ) : (
           <div className="bg-white rounded-lg shadow-sm p-6">
             <Empty 
               description={
@@ -869,164 +1181,34 @@ const MachineDashboard = () => {
               className="py-10"
             />
           </div>
-          )}
+        )}
       </div>
 
       {/* Machine Details Modal */}
-      <Modal
-        title={
-          <div className="flex items-center gap-2">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: selectedMachine?.status_color || '#d9d9d9' }}
-            />
-            <span>{selectedMachine?.machine_name || 'Machine Details'}</span>
-          </div>
-        }
-        open={!!selectedMachine}
-        onCancel={() => setSelectedMachine(null)}
-        footer={null}
-        width={700}
-      >
-        {selectedMachine && (
-            <div className="space-y-4">
-            {/* Overview Section */}
-            <Card title="Machine Overview" className="shadow-sm">
-              <div className="grid grid-cols-2 gap-4">
-                    <div>
-                  <div className="text-sm text-gray-500">Status</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Tag color={selectedMachine.status_color} className="flex items-center gap-1">
-                      {statusConfig[selectedMachine.status]?.icon}
-                      {statusConfig[selectedMachine.status]?.label || selectedMachine.status}
-                    </Tag>
-                    {(selectedMachine.status === 'IDLE' || selectedMachine.status === 'ON') && machineTimers[selectedMachine.machine_id] && (
-                      <span className="text-sm text-gray-500">
-                        for {formatDuration(machineTimers[selectedMachine.machine_id].duration * 1000)}
-                      </span>
-                    )}
-                    </div>
-                </div>
-                
-                  <div>
-                  <div className="text-sm text-gray-500">Last Updated</div>
-                  <div className="mt-1">{dayjs(selectedMachine.last_updated).format('YYYY-MM-DD HH:mm:ss')}</div>
-                  </div>
-                
-                  <div>
-                  <div className="text-sm text-gray-500">Machine ID</div>
-                  <div className="mt-1">{selectedMachine.machine_id}</div>
-                  </div>
-                
-                    <div>
-                  <div className="text-sm text-gray-500">Part Count</div>
-                  <div className="mt-1">{selectedMachine.part_count || 0}</div>
-            </div>
-                    </div>
-            </Card>
-            
-            {/* Production Details */}
-            {selectedMachine.job_in_progress ? (
-              <Card title="Current Production" className="shadow-sm">
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                    <div className="text-sm text-gray-500">Production Order</div>
-                    <div className="mt-1 font-medium">{selectedMachine.production_details?.production_order || '-'}</div>
-                    </div>
-                  
-                  <div>
-                    <div className="text-sm text-gray-500">Part Number</div>
-                    <div className="mt-1">{selectedMachine.production_details?.part_number || '-'}</div>
-            </div>
-                  
-                    <div>
-                    <div className="text-sm text-gray-500">Part Description</div>
-                    <div className="mt-1">{selectedMachine.production_details?.part_description || '-'}</div>
-                    </div>
-                  
-                    <div>
-                    <div className="text-sm text-gray-500">Operation</div>
-                    <div className="mt-1">{selectedMachine.production_details?.operation_number || '-'} - {selectedMachine.production_details?.operation_description || '-'}</div>
-                    </div>
-                  
-                  <div>
-                    <div className="text-sm text-gray-500">Quantity</div>
-                    <div className="mt-1">
-                      {selectedMachine.part_count || 0} / {selectedMachine.production_details?.required_quantity || 0}
-                      <Progress 
-                        percent={selectedMachine.production_details?.required_quantity ? 
-                          (selectedMachine.part_count / selectedMachine.production_details.required_quantity) * 100 : 0
-                        } 
-                        size="small" 
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="text-sm text-gray-500">Program</div>
-                    <div className="mt-1">{selectedMachine.production_details?.active_program || '-'}</div>
-                  </div>
-                </div>
-              </Card>
-            ) : (
-              <Alert
-                message="No Active Production"
-                description="This machine is not currently running a production order."
-                type="info"
-                showIcon
-              />
-            )}
-            </div>
-        )}
-      </Modal>
+      {renderMachineDetailsModal()}
       
       {/* Alerts Drawer */}
-      <Drawer
-        title={
-          <div className="flex items-center gap-2">
-            <Bell size={16} />
-            <span>Recent Alerts</span>
-            <Badge count={alertsCount} style={{ backgroundColor: '#ff4d4f' }} />
-          </div>
-        }
-        placement="right"
-        onClose={() => setShowAlertsDrawer(false)}
-        open={showAlertsDrawer}
-        width={400}
-      >
-        <div className="space-y-4">
-          {alerts.map(alert => (
-            <Card 
-              key={alert.id}
-              size="small"
-              className="shadow-sm"
-              style={{ 
-                borderLeft: `3px solid ${
-                  alert.type === 'error' ? '#ff4d4f' : 
-                  alert.type === 'warning' ? '#faad14' : '#1890ff'
-                }`
-              }}
-            >
-              <div className="flex justify-between items-start">
-        <div>
-                  <div className="font-medium">{alert.machine}</div>
-                  <div className="text-sm text-gray-600 mt-1">{alert.message}</div>
-        </div>
-                <Tag color={
-                  alert.type === 'error' ? 'error' : 
-                  alert.type === 'warning' ? 'warning' : 'processing'
-                }>
-                  {alert.type}
-                </Tag>
-        </div>
-              <div className="text-xs text-gray-500 mt-2">{alert.time}</div>
-            </Card>
-          ))}
-      </div>
-      </Drawer>
+      
     </div>
   );
 };
 
 export default MachineDashboard;
+
+<style jsx>{`
+  .pulse-animation {
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(74, 222, 128, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+    }
+  }
+`}</style>

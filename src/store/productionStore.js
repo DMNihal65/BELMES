@@ -20,8 +20,8 @@ const calculateUptime = (lastUpdated) => {
   return moment(lastUpdated).fromNow();
 };
 
-const BASE_URL = 'http://172.16.0.203:8002/production_monitoring';
-const WS_URL = 'ws://172.16.0.203:8002/production_monitoring/ws/live-status/';
+const BASE_URL = 'http://172.18.7.89:7000/production_monitoring';
+const WS_URL = 'ws://172.18.7.89:7000/production_monitoring/ws/live-status/';
 
 const useProductionStore = create(
   devtools((set, get) => ({
@@ -35,6 +35,8 @@ const useProductionStore = create(
     connectionAttempts: 0,
     maxAttempts: 5,
     productionData: [],
+    workcenters: [],
+    allWorkcenters: [],
 
     // Add new KPI Dashboard state
     kpiData: null,
@@ -180,6 +182,27 @@ const useProductionStore = create(
       get().fetchProductionSchedule();
     },
 
+    // Fetch work centers for filtering schedulable machines
+    fetchWorkCenters: async () => {
+      try {
+        const response = await axios.get('http://172.18.7.88:3252/api/v1/master-order/workcenters/?skip=0&limit=100');
+        const workcenters = response.data;
+        
+        // Filter only schedulable work centers
+        const schedulableWorkcenters = workcenters.filter(wc => wc.is_schedulable === true);
+        
+        set({
+          workcenters: schedulableWorkcenters,
+          allWorkcenters: workcenters
+        });
+        
+        return schedulableWorkcenters;
+      } catch (error) {
+        console.error('Error fetching work centers:', error);
+        return [];
+      }
+    },
+
     // Cleanup
     cleanup: () => {
       const { wsConnection } = get();
@@ -194,7 +217,9 @@ const useProductionStore = create(
         scheduledOperations: [],
         productionData: [],
         selectedDateRange: null,
-        selectedMachines: []
+        selectedMachines: [],
+        workcenters: [],
+        allWorkcenters: []
       });
     },
 

@@ -2,9 +2,9 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.88:4422/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.88:4422/api/v1/operator';
-const MASTER_ORDER_URL = 'http://172.18.7.88:4422/api/v1/master-order';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.88:9422/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.88:9422/api/v1/operator';
+const MASTER_ORDER_URL = 'http://172.18.7.88:9422/api/v1/master-order';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -170,7 +170,7 @@ const useMachineMaintenanceStore = create((set, get) => ({
         return {
           ...machineStatus,
           machine_id: machine.id,
-          machine_make: machine.work_center.description || machine.make,
+          machine_make: machine.make,
           id: machine.id,
           description: machineStatus.description || ''
         };
@@ -247,7 +247,7 @@ const useMachineMaintenanceStore = create((set, get) => ({
         return {
           ...machineStatus,
           machine_id: machine.id,
-          machine_make: machine.work_center.description || machine.make,
+          machine_make: machine.make,
           id: machine.id,
           description: machineStatus.description || ''
         };

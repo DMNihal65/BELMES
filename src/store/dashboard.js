@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
-const WEBSOCKET_URL = 'ws://172.18.7.85:2088/production_monitoring/ws/live-status/';
-const OEE_API_URL = 'http://172.18.7.85:2088/production_monitoring/machine-oee-analysis';
+const WEBSOCKET_URL = 'ws://172.18.7.88:9422/production_monitoring/ws/live-status/';
+const OEE_API_URL = 'http://172.18.7.88:9422/production_monitoring/machine-oee-analysis';
 
 const useDashboardStore = create((set, get) => ({
   machineData: [],

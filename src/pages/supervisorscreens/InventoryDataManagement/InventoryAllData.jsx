@@ -1015,9 +1015,12 @@ const InventoryAllData = () => {
     }
     
     const columns = [];
+    
 
     // Get the subcategory to access its dynamic fields
     const subcategory = subcategories.find(sub => sub.id === selectedCategory.id);
+    // Get the category for this subcategory
+    const category = categories.find(cat => cat.id === subcategory?.category_id);
     if (subcategory?.dynamic_fields) {
       // Get dynamic fields and sort by order
       const orderedDynamicFields = Object.entries(subcategory.dynamic_fields)
@@ -1097,26 +1100,28 @@ const InventoryAllData = () => {
     }
 
     // Add Calibration column before Actions
-    columns.push(
-      {
-        title: 'Calibration',
-        key: 'calibration',
-        fixed: 'right',
-        width: 100,
-        align: 'center',
-        render: (_, record) => (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={() => showCalibrationModal(record)}
-            className="add-button bg-green-500"
-          >
-           <span className="button-text ">Calibration</span>
-          </Button>
-        ),
-      }
-    );
+    if (category && category.name === "Instruments") {
+      columns.push(
+        {
+          title: 'Calibration',
+          key: 'calibration',
+          fixed: 'right',
+          width: 100,
+          align: 'center',
+          render: (_, record) => (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              size="small"
+              onClick={() => showCalibrationModal(record)}
+              className="add-button bg-green-500"
+            >
+              <span className="button-text">Calibration</span>
+            </Button>
+          ),
+        }
+      );
+    }
 
     // Add Total Quantity, Available Quantity, Status, and Actions at the end
     columns.push(

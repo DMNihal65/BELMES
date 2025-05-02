@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Upload, message,
-  Typography, Tag, Tooltip, Form, Drawer, Descriptions,
+  Typography, Tag, Tooltip, Form, Drawer, Descriptions, Cascader,
   Badge, Alert, Spin, Progress, Divider, Collapse, DatePicker, Pagination, InputNumber
 } from 'antd';
 import {
@@ -11,8 +11,8 @@ import {
   CalendarOutlined, BarChartOutlined,
   ToolOutlined, DownloadOutlined, DeleteOutlined,
   ScheduleOutlined, ReloadOutlined, EyeOutlined,
-  AppstoreOutlined, CheckOutlined, RobotOutlined,
-  ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined,
+  AppstoreOutlined, CheckOutlined, RobotOutlined, CheckCircleOutlined,
+  ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined, CloseCircleOutlined,
   HistoryOutlined
 } from '@ant-design/icons';
 import {
@@ -33,6 +33,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import * as QRCodeNode from 'qrcode';
 import { create } from 'zustand';
 import moment from 'moment';
+import useInventoryStore from '../../../store/inventory-store';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -67,23 +68,23 @@ const PdcInfo = ({ productionOrder }) => {
     return <Spin size="small" />;
   }
   
-  // For inactive parts, always show "Not yet scheduled"
+  // For inactive parts, show "Not yet scheduled" in orange color
   if (pdcInfo.status === 'inactive') {
-    return <span>Not yet scheduled</span>;
+    return <span className="text-orange-500 font-medium">Not yet scheduled</span>;
   }
   
-  // For active parts with PDC data, show the date
+  // For active parts with PDC data, show the date with blue text
   if (pdcInfo.status === 'active' && pdcInfo.pdc) {
     return (
       <Tooltip title={`Data source: ${pdcInfo.data_source || 'Unknown'}`}>
-        <span>{moment(pdcInfo.pdc).format('MM/DD/YYYY')}</span>
+        <span className="text-blue-600 font-medium">{moment(pdcInfo.pdc).format('MM/DD/YYYY')}</span>
       </Tooltip>
     );
   }
   
   // For active parts without PDC data
   if (pdcInfo.status === 'active' && !pdcInfo.pdc) {
-    return <span>Pending PDC</span>;
+    return <span className="text-blue-600 font-medium">Pending PDC</span>;
   }
   
   // Fallback for any other case
@@ -142,7 +143,6 @@ const Planning = () => {
   const [editToolForm] = Form.useForm();
   const [addProgramForm] = Form.useForm();
   const [editProgramForm] = Form.useForm();
-
   // Store hooks
   const { 
     fetchAllOrders, 
@@ -170,7 +170,66 @@ const Planning = () => {
     fetchProgramVersions,
     fetchCncProgramDetails // Add this line
   } = usePlanningStore();
+
+
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [subcategories, setSubcategories] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const { categories, fetchItems,  fetchCategories, fetchAllSubcategories } = useInventoryStore();
+  const [selectedSubcategoryName, setSelectedSubcategoryName] = useState('');
   
+  useEffect(() => {
+    const fetchData = async () => {
+        try {
+            await fetchCategories();
+            await fetchAllSubcategories();
+        } catch (error) {
+            message.error('Failed to fetch data');
+        }
+    };
+    fetchData();
+}, [fetchCategories, fetchAllSubcategories]);
+
+useEffect(() => {
+  loadInventoryItems();
+  loadSubcategories();
+}, []);
+
+const loadInventoryItems = async () => {
+  try {
+    const items = await fetchItems();
+    // console.log('Loaded items:', items); // Debug log
+    setInventoryItems(items || []);
+  } catch (error) {
+    console.error('Error loading inventory items:', error);
+    toast.error('Failed to load inventory items');
+    setInventoryItems([]);
+  }
+};
+
+  const loadSubcategories = async () => {
+    try {
+      const subCats = await fetchAllSubcategories();
+      // console.log('Loaded subcategories:', subCats); // Debug log
+      setSubcategories(subCats || []);
+    } catch (error) {
+      console.error('Error loading subcategories:', error);
+      toast.error('Failed to load subcategories');
+      setSubcategories([]);
+    }
+  };
+
+
+
+  const handleInventoryItemClick = (itemId) => {
+    setSelectedInventoryItem(itemId);
+    setActiveTab('history');  // Switch to history tab
+    // Get item details for the message
+    const item = inventoryItems.find(item => item.id === itemId);
+    const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
+    const itemName = item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId;
+    message.info(`Showing calibration history for ${itemName}`);
+  };
   // Configuration for file upload component - customized for NC program files
   const uploadProps = {
     name: 'file',
@@ -575,19 +634,6 @@ const Planning = () => {
           
           // Refresh data after status change
           await fetchActiveParts();
-          
-          // Update the component state to trigger re-rendering
-          setDataSource(prevDataSource => 
-            prevDataSource.map(item => {
-              if (item.productionOrder === productionOrder) {
-                return {
-                  ...item,
-                  status: newStatus,
-                };
-              }
-              return item;
-            })
-          );
           
           message.success(`Status changed to ${newStatus} successfully`);
         } catch (error) {
@@ -1439,7 +1485,8 @@ const Planning = () => {
       const toolData = {
         ...values,
         order_id: selectedJob.id,
-        operation_id: values.operation_id
+        operation_id: values.operation_id,
+        tool_name: values.tool_name, // Ensure this is a string
       };
       
       const newTool = await addOrderTool(toolData);
@@ -2466,8 +2513,8 @@ const Planning = () => {
                   </Tabs>
                 </Card>
 
-                {/* Add Tool Modal */}
-                <Modal
+               {/* Add Tool Modal */}
+               <Modal
                   title="Add Tool"
                   visible={isAddToolModalVisible}
                   onOk={() => addToolForm.submit()}
@@ -2477,38 +2524,128 @@ const Planning = () => {
                   }}
                   confirmLoading={loading}
                 >
-                  <Form
+                 <Form
                     form={addToolForm}
                     layout="vertical"
-                    onFinish={handleAddTool}
+                    onFinish={async (values) => {
+                      try {
+                        // Prepare the tool data to be sent to the store
+                        const toolData = {
+                          tool_name: selectedSubcategoryName, // This should now be a string
+                          tool_number: values.tool_number || 'N/A', // Assuming you want to add this field
+                          bel_partnumber: selectedPartNumber,
+                          description: selectedPartDescription,
+                          quantity: values.quantity,
+                          order_id: selectedJob.id, // Assuming selectedJob.id is the order ID
+                          operation_id: values.operation_id,
+                        };
+
+                        // Call the addOrderTool function from the planning store
+                        const newTool = await usePlanningStore.getState().addOrderTool(toolData);
+                        console.log('New tool added:', newTool);
+                        message.success('Tool added successfully');
+                        setIsAddToolModalVisible(false);
+                        addToolForm.resetFields();
+                      } catch (error) {
+                        console.error('Error adding tool:', error);
+                        message.error('Failed to add tool');
+                      }
+                    }}
                   >
-                    <Form.Item
-                      name="tool_name"
-                      label="Tool Name"
-                      rules={[{ required: true, message: 'Please enter tool name' }]}
-                    >
-                      <Input />
+                  <Form.Item
+                    label="Selecet Tool"
+                    rules={[{ required: true, message: 'Please select an inventory item' }]}
+                  >
+                    <Cascader
+                      placeholder="Select Category > Subcategory > Item"
+                      loading={isLoading}
+                      style={{ width: '100%' }}
+                      options={categories.map(category => ({
+                        label: category.name,
+                        value: category.id,
+                        isLeaf: false,
+                        children: subcategories
+                          .filter(sub => sub.category_id === category.id)
+                          .map(subcategory => ({
+                            label: subcategory.name,
+                            value: subcategory.id,
+                            isLeaf: false,
+                            children: inventoryItems
+                              .filter(item => item.subcategory_id === subcategory.id)
+                              .map(item => ({
+                                label: item.dynamic_data["Instrument code"] 
+                                  ? `${item.dynamic_data["Instrument code"]}` 
+                                  : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
+                                value: item.id,
+                                isLeaf: true,
+                              }))
+                          }))
+                      }))}
+
+                      showSearch={{
+                        filter: (inputValue, path) =>
+                          path.some(option =>
+                            option.label.toLowerCase().includes(inputValue.toLowerCase())
+                          )
+                      }}
+                      // displayRender={(labels) => labels[1] || ''} 
+                      onChange={(value, selectedOptions) => {
+                        if (Array.isArray(value) && value.length === 3) {
+                          const selectedSubcategory = selectedOptions[1]; // The second option is the subcategory
+                          const subcategoryName = selectedSubcategory ? selectedSubcategory.label : '';
+
+                          // Set the form values
+                          form.setFieldsValue({
+                            tool_name: subcategoryName,  // Set the subcategory name as a string
+                            inventory_item_id: value[2],  // Set item ID if needed
+                          });
+
+                          // Set the selected subcategory name
+                          setSelectedSubcategoryName(subcategoryName);
+
+                          // Find the selected item to extract the part number and description
+                          const selectedItemData = inventoryItems.find(item => item.id === value[2]);
+
+                          if (selectedItemData) {
+                            setSelectedPartNumber(selectedItemData.dynamic_data["BEL Part Number "] || 'N/A');
+                            setSelectedPartDescription(selectedItemData.dynamic_data["BEL Part Description"] || 'N/A');
+                            
+                            // Optionally set description field as well (for backend)
+                            form.setFieldsValue({
+                              description: selectedItemData.dynamic_data["BEL Part Description"] || 'N/A',  // Description as string
+                            });
+                          } else {
+                            setSelectedPartNumber('');
+                            setSelectedPartDescription('');
+                            form.setFieldsValue({
+                              description: 'N/A',  // Fallback if no item is selected
+                            });
+                          }
+                        }
+                      }}
+                    />
+                  </Form.Item>
+
+                    <Form.Item label="Selected Subcategory">
+                      <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />
                     </Form.Item>
-                    <Form.Item
-                      name="tool_number"
-                      label="Tool Number"
-                      rules={[{ required: true, message: 'Please enter tool number' }]}
-                    >
-                      <Input />
+
+                    <Form.Item label="BEL Part Number">
+                      <Input 
+                        value={selectedPartNumber} 
+                        readOnly 
+                        className="bg-gray-100" 
+                      />
                     </Form.Item>
-                    <Form.Item
-                      name="bel_partnumber"
-                      label="BEL Part Number"
-                      rules={[{ required: true, message: 'Please enter BEL part number' }]}
-                    >
-                      <Input />
+
+                    <Form.Item label="BEL Part Description">
+                      <Input 
+                        value={selectedPartDescription} 
+                        readOnly 
+                        className="bg-gray-100" 
+                      />
                     </Form.Item>
-                    <Form.Item
-                      name="description"
-                      label="Description"
-                    >
-                      <Input.TextArea />
-                    </Form.Item>
+
                     <Form.Item
                       name="quantity"
                       label="Quantity"

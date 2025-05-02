@@ -33,10 +33,9 @@ const CapacityPlanning = () => {
   const [workCenters, setWorkCenters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [machines, setMachines] = useState([]);
-  // Set default date range - current month
   const [dateRange, setDateRange] = useState([
-    dayjs().startOf('month'), // Start of current month
-    dayjs() // Current date
+    dayjs().startOf('month'),
+    dayjs()
   ]);
   const [machineUtilizationData, setMachineUtilizationData] = useState([]);
   const [chartData, setChartData] = useState({
@@ -192,8 +191,7 @@ const CapacityPlanning = () => {
         opacity: 1,
         type: 'solid'
       },
-      // Updated colors for better visual distinction
-      colors: ['#3b82f6', '#ef4444', '#10b981'], // Blue, Red, Green
+      colors: ['#3b82f6', '#ef4444', '#10b981'],
       legend: {
         position: 'top',
         horizontalAlign: 'center',
@@ -222,20 +220,14 @@ const CapacityPlanning = () => {
         },
         custom: function({series, seriesIndex, dataPointIndex, w}) {
           const machine = w.globals.labels[dataPointIndex];
-          
-          // Get all three values for this machine
           const availableHours = series[0][dataPointIndex];
-          const utilizedHours = series[1] ? series[1][dataPointIndex] : 0;
+          const plannedHours = series[1] ? series[1][dataPointIndex] : 0;
           const remainingHours = series[2] ? series[2][dataPointIndex] : 0;
-          
-          // Get the colors from the chart
           const availableColor = w.globals.colors[0];
-          const utilizedColor = w.globals.colors[1]; 
+          const plannedColor = w.globals.colors[1];
           const remainingColor = w.globals.colors[2];
-          
-          // Calculate percentage of utilization
           const utilizationPercentage = availableHours > 0 
-            ? (utilizedHours / availableHours * 100).toFixed(1) 
+            ? (plannedHours / availableHours * 100).toFixed(1)
             : 0;
           
           return `
@@ -252,10 +244,10 @@ const CapacityPlanning = () => {
               
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center;">
-                  <span style="display: inline-block; width: 10px; height: 10px; background: ${utilizedColor}; margin-right: 8px; border-radius: 50%;"></span>
-                  <span style="color: #6b7280;">Utilized Hours:</span>
+                  <span style="display: inline-block; width: 10px; height: 10px; background: ${plannedColor}; margin-right: 8px; border-radius: 50%;"></span>
+                  <span style="color: #6b7280;">Planned Hours:</span>
                 </div>
-                <span style="font-weight: 600; color: #374151;">${utilizedHours.toFixed(0)}</span>
+                <span style="font-weight: 600; color: #374151;">${plannedHours.toFixed(0)}</span>
               </div>
               
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -269,8 +261,8 @@ const CapacityPlanning = () => {
               <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center;">
                 <span style="color: #6b7280;">Utilization:</span>
                 <span style="font-weight: 600; color: ${
-                  utilizedHours/availableHours > 0.8 ? '#ef4444' : 
-                  utilizedHours/availableHours > 0.5 ? '#f59e0b' : 
+                  plannedHours/availableHours > 0.8 ? '#ef4444' : 
+                  plannedHours/availableHours > 0.5 ? '#f59e0b' : 
                   '#10b981'
                 };">
                   ${utilizationPercentage}%
@@ -285,10 +277,8 @@ const CapacityPlanning = () => {
 
   const { fetchMachineUtilizationByDateRange, isLoading: storeLoading } = usePlanningStore();
 
-  // Update chart with machine utilization data
   const updateChartWithUtilizationData = (data) => {
     if (!Array.isArray(data) || data.length === 0) {
-      // Reset chart when no data
       setChartData(prev => ({
         ...prev,
         series: [],
@@ -303,20 +293,35 @@ const CapacityPlanning = () => {
       return;
     }
 
-    // Extract machine models/makes with cleaner names for display
-    const machines = data.map(item => {
-      // Use make and model but format nicely
-      return item.machine_make ? 
+    // Filter data to only include entries where work_center_bool is true
+    const filteredData = data.filter(item => item.work_center_bool === true);
+
+    if (filteredData.length === 0) {
+      message.info('No machine utilization data available for work centers');
+      setChartData(prev => ({
+        ...prev,
+        series: [],
+        options: {
+          ...prev.options,
+          xaxis: {
+            ...prev.options.xaxis,
+            categories: []
+          }
+        }
+      }));
+      return;
+    }
+
+    const machines = filteredData.map(item => {
+      return item.machine_make !== 'Default' ? 
         `${item.machine_make}${item.machine_model !== 'Default' ? ' ' + item.machine_model : ''}` 
-        : `Machine ${item.machine_id}`;
+        : `${item.work_center_name}`;
     });
     
-    // Prepare data for the chart
-    const availableHours = data.map(item => parseFloat(item.available_hours.toFixed(1)));
-    const utilizedHours = data.map(item => parseFloat(item.utilized_hours.toFixed(1)));
-    const remainingHours = data.map(item => parseFloat(item.remaining_hours.toFixed(1)));
+    const availableHours = filteredData.map(item => parseFloat(item.available_hours.toFixed(1)));
+    const utilizedHours = filteredData.map(item => parseFloat(item.utilized_hours.toFixed(1)));
+    const remainingHours = filteredData.map(item => parseFloat(item.remaining_hours.toFixed(1)));
     
-    // Create a new series configuration with proper stacking
     setChartData(prev => ({
       ...prev,
       series: [
@@ -326,7 +331,7 @@ const CapacityPlanning = () => {
           group: 'available'
         },
         {
-          name: 'Utilized Hours',
+          name: 'Planned Hours',
           data: utilizedHours,
           group: 'utilization'
         },
@@ -342,7 +347,6 @@ const CapacityPlanning = () => {
           ...prev.options.xaxis,
           categories: machines
         },
-        // The key settings for proper stacking
         chart: {
           ...prev.options.chart,
           stacked: true,
@@ -359,7 +363,6 @@ const CapacityPlanning = () => {
     }));
   };
 
-  // Fetch machine utilization data for the selected date range
   const fetchMachineData = async (startDate = dateRange[0], endDate = dateRange[1]) => {
     try {
       setLoading(true);
@@ -369,7 +372,7 @@ const CapacityPlanning = () => {
         updateChartWithUtilizationData(data);
       } else {
         setMachineUtilizationData([]);
-        updateChartWithUtilizationData([]); // Reset chart with empty data
+        updateChartWithUtilizationData([]);
         message.info('No machine utilization data available for the selected date range');
       }
     } catch (error) {
@@ -382,12 +385,9 @@ const CapacityPlanning = () => {
     }
   };
 
-  // Effect to fetch data when component mounts
   useEffect(() => {
-    // Fetch data for default date range when component mounts
     fetchMachineData(dateRange[0], dateRange[1]);
     
-    // Fetch work centers 
     const fetchWorkCentersList = async () => {
       try {
         const { fetchWorkCenters } = usePlanningStore.getState();
@@ -401,14 +401,12 @@ const CapacityPlanning = () => {
     fetchWorkCentersList();
   }, []);
 
-  // Handle date range change
   const handleDateRangeChange = (dates) => {
     if (dates && dates.length === 2) {
       setDateRange(dates);
     }
   };
 
-  // Function to handle refresh button click
   const handleRefreshClick = () => {
     if (dateRange && dateRange.length === 2) {
       fetchMachineData(dateRange[0], dateRange[1]);
@@ -417,7 +415,6 @@ const CapacityPlanning = () => {
     }
   };
 
-  // Format date for display
   const formatDate = (date) => {
     return date ? date.format('YYYY-MM-DD') : '';
   };
@@ -434,7 +431,6 @@ const CapacityPlanning = () => {
         </div>
       </div>
 
-      {/* Filter controls */}
       <Card 
         className="mb-6 shadow-sm hover:shadow-md transition-shadow"
         bordered={false}
@@ -491,7 +487,6 @@ const CapacityPlanning = () => {
         </Row>
       </Card>
 
-      {/* Utilization Chart */}
       <Card 
         className="mb-6"
         bodyStyle={{ padding: '24px' }}
@@ -557,4 +552,4 @@ const CapacityPlanning = () => {
   );
 };
 
-export default CapacityPlanning;
+export default CapacityPlanning; 

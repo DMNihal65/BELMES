@@ -2,18 +2,18 @@ import React from 'react';
 import { Card, Badge } from 'antd';
 
 // Component Legend Component
-export const ComponentLegend = ({ componentColors }) => {
+export const ComponentLegend = ({ componentColors, title = "Production Orders" }) => {
   return (
     <div className="component-legend">
-      <div className="legend-title">Part Numbers</div>
+      <div className="legend-title">{title}</div>
       <div className="legend-items">
-        {Object.entries(componentColors).map(([component, colors]) => (
-          <div key={component} className="legend-item">
+        {Object.entries(componentColors).map(([order, colors]) => (
+          <div key={order} className="legend-item">
             <span 
               className="color-box" 
               style={{ backgroundColor: colors.backgroundColor }}
             />
-            <span className="component-name">{component}</span>
+            <span className="component-name">{order}</span>
           </div>
         ))}
       </div>

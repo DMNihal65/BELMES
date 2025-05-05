@@ -157,11 +157,11 @@ const generateDistinctColors = (count) => {
 };
 
 const getComponentColors = (operations) => {
-  const uniqueProductionOrders = [...new Set(operations.map(op => op.production_order))];
-  const colors = generateDistinctColors(uniqueProductionOrders.length);
+  const uniqueComponents = [...new Set(operations.map(op => op.component))];
+  const colors = generateDistinctColors(uniqueComponents.length);
   
-  return uniqueProductionOrders.reduce((acc, order, index) => {
-    acc[order] = {
+  return uniqueComponents.reduce((acc, component, index) => {
+    acc[component] = {
       backgroundColor: colors[index],
       borderColor: colors[index],
       // Generate a lighter version for hover state
@@ -313,17 +313,18 @@ const Scheduling = () => {
             group: machineMapping.get(op.machine) || op.machine,  // Map to our internal machine ID
             content: `
               <div class="timeline-item">
-                <div class="item-header">${op.production_order}</div>
-                <div class="item-desc">${op.component} - ${op.description}</div>
+                <div class="item-header">${op.component}</div>
+                <div class="item-desc">${op.description}</div>
+                <div class="item-order">${op.production_order}</div>
               </div>
             `,
             start: new Date(op.start_time),
             end: new Date(op.end_time),
-            className: `order-${op.production_order.replace(/[^a-zA-Z0-9]/g, '-')}`,
+            className: `component-${op.component.replace(/[^a-zA-Z0-9]/g, '-')}`,
             operation: op,
             style: `
-              background-color: ${colors[op.production_order].backgroundColor};
-              border-color: ${colors[op.production_order].borderColor};
+              background-color: ${colors[op.component].backgroundColor};
+              border-color: ${colors[op.component].borderColor};
               color: white;
             `
           }))
@@ -352,12 +353,12 @@ const Scheduling = () => {
 
         // Add dynamic styles for components and machines
         const styles = `
-          ${Object.entries(colors).map(([order, colors]) => `
-            .order-${order.replace(/[^a-zA-Z0-9]/g, '-')} {
+          ${Object.entries(colors).map(([component, colors]) => `
+            .component-${component.replace(/[^a-zA-Z0-9]/g, '-')} {
               background-color: ${colors.backgroundColor} !important;
               border-color: ${colors.borderColor} !important;
             }
-            .order-${order.replace(/[^a-zA-Z0-9]/g, '-')}:hover {
+            .component-${component.replace(/[^a-zA-Z0-9]/g, '-')}:hover {
               background-color: ${colors.hoverColor} !important;
             }
           `).join('\n')}
@@ -922,19 +923,35 @@ const Scheduling = () => {
                         </Select>
 
                         <Select
-                          mode="multiple"
-                          placeholder="Select Part Number"
-                          value={selectedComponents}
-                          onChange={setSelectedComponents}
-                          style={{ minWidth: 200 }}
-                          allowClear
-                        >
-                          {availableComponents.map(component => (
-                            <Option key={component} value={component}>
-                              {component}
-                            </Option>
-                          ))}
-                        </Select>
+                            mode="multiple"
+                            placeholder="Select Part Number"
+                            value={selectedComponents}
+                            onChange={setSelectedComponents}
+                            style={{ minWidth: 200 }}
+                            allowClear
+                            optionLabelProp="label"
+                          >
+                            {availableComponents.map(component => {
+                              const color = componentColors?.[component]?.backgroundColor || '#1890ff';
+                              return (
+                                <Option 
+                                  key={component} 
+                                  value={component}
+                                  label={component}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ 
+                                      width: '16px', 
+                                      height: '16px', 
+                                      backgroundColor: color,
+                                      borderRadius: '4px'
+                                    }} />
+                                    {component}
+                                  </div>
+                                </Option>
+                              );
+                            })}
+                          </Select>
                       
                           <Select
                           mode="multiple"
@@ -943,28 +960,10 @@ const Scheduling = () => {
                           onChange={setSelectedProductionOrders}
                           style={{ minWidth: 200 }}
                           allowClear
-                          optionLabelProp="label"
                         >
-                          {availableProductionOrders.map(order => {
-                            const color = componentColors?.[order]?.backgroundColor || '#1890ff';
-                            return (
-                              <Option 
-                                key={order} 
-                                value={order}
-                                label={order}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <div style={{ 
-                                    width: '16px', 
-                                    height: '16px', 
-                                    backgroundColor: color,
-                                    borderRadius: '4px'
-                                  }} />
-                                  {order}
-                                </div>
-                              </Option>
-                            );
-                          })}
+                          {availableProductionOrders.map(order => (
+                            <Option key={order} value={order}>{order}</Option>
+                          ))}
                         </Select>
 
                         <Button.Group>
@@ -1028,10 +1027,7 @@ const Scheduling = () => {
                   </div>
 
                   {scheduleData && componentColors && (
-                    <ComponentLegend 
-                      componentColors={componentColors} 
-                      title="Production Orders"
-                    />
+                    <ComponentLegend componentColors={componentColors} />
                   )}
              
 

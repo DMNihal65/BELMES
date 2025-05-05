@@ -197,7 +197,7 @@ const OperationDetails = () => {
             setShowDrawer(true);
           }}
         >
-          Details
+          DetailsSSS
         </Button>
       ),
     }

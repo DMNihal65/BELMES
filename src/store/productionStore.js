@@ -185,7 +185,7 @@ const useProductionStore = create(
     // Fetch work centers for filtering schedulable machines
     fetchWorkCenters: async () => {
       try {
-        const response = await axios.get('http://172.18.7.88:9422/api/v1/master-order/workcenters/?skip=0&limit=100');
+        const response = await axios.get('http://172.18.7.88:6643/api/v1/master-order/workcenters/?skip=0&limit=100');
         const workcenters = response.data;
         
         // Filter only schedulable work centers

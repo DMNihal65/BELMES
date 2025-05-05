@@ -6,7 +6,6 @@ import { motion } from 'framer-motion';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useAccessControlStore } from '../../store/access-control-management';
-import useAuthStore from '../../store/auth-store';
 import MachinePasswordManagement from "../../pages/adminscreens/machineManagement/MachinePasswordManagement"; 
 import axios from 'axios';
 const { TabPane } = Tabs;
@@ -20,7 +19,6 @@ const AccessControlManagement = ({onSuccess }) => {
   const [isRegisterModalVisible, setIsRegisterModalVisible] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [registerForm] = Form.useForm();
-  const { isLoading, roles = [], fetchRoles, register } = useAuthStore();
   const [isMachinePasswordModalVisible, setMachinePasswordModalVisible] = useState(false);
   const [machineCredentials, setMachineCredentials] = useState([]);
   const [editMachineModalVisible, setEditMachineModalVisible] = useState(false);
@@ -30,13 +28,18 @@ const AccessControlManagement = ({onSuccess }) => {
   const [searchText, setSearchText] = useState('');
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [roles, setRoles] = useState([]);
+  const [isEditRoleModalVisible, setIsEditRoleModalVisible] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [roleForm] = Form.useForm();
+  const [isLoading, setIsLoading] = useState(false);
 
   const { registerUser } = useAccessControlStore();
 
     // Add this new function to fetch total count
     const fetchTotalUsersCount = async () => {
       try {
-        const response = await axios.get('http://172.18.7.88:9422/api/v1/auth/users-count');
+        const response = await axios.get('http://172.18.7.88:6643/api/v1/auth/users-count');
         if (response.data && response.data.count) {
           setTotalCount(response.data.count);
         }
@@ -83,7 +86,7 @@ const AccessControlManagement = ({onSuccess }) => {
 
   const fetchMachineCredentials = async () => {
     try {
-      const response = await axios.get('http://172.18.7.88:9422/api/v1/auth/get-machine-credentials');
+      const response = await axios.get('http://172.18.7.88:6643/api/v1/auth/get-machine-credentials');
       setMachineCredentials(response.data);
     } catch (error) {
       message.error('Failed to fetch machine credentials');
@@ -100,12 +103,19 @@ const AccessControlManagement = ({onSuccess }) => {
   
   const handleUpdateMachinePassword = async (values) => {
     try {
-      await axios.put(`http://172.18.7.88:9422/api/v1/auth/machine-credentials/${selectedMachine.machine_id}`, {
+      await axios.put(`http://172.18.7.88:6643/api/v1/auth/machine-credentials/${selectedMachine.machine_id}`, {
         password: values.password
       });
       message.success('Machine password updated successfully');
       setEditMachineModalVisible(false);
-      fetchMachineCredentials();
+      // Update the machineCredentials state in-place to keep the order
+      setMachineCredentials(prev =>
+        prev.map(machine =>
+          machine.machine_id === selectedMachine.machine_id
+            ? { ...machine, password: values.password }
+            : machine
+        )
+      );
     } catch (error) {
       message.error('Failed to update machine password');
     }
@@ -120,7 +130,7 @@ const AccessControlManagement = ({onSuccess }) => {
       cancelText: 'No',
       onOk: async () => {
         try {
-          await axios.delete(`http://172.18.7.88:9422/api/v1/auth/machine-credentials/${machineId}`);
+          await axios.delete(`http://172.18.7.88:6643/api/v1/auth/machine-credentials/${machineId}`);
           message.success('Machine credential deleted successfully');
           fetchMachineCredentials();
         } catch (error) {
@@ -131,7 +141,7 @@ const AccessControlManagement = ({onSuccess }) => {
   };
 
   useEffect(() => {
-    fetchRoles();
+    fetchRolesData();
   }, []);
 
   useEffect(() => {
@@ -152,7 +162,6 @@ const AccessControlManagement = ({onSuccess }) => {
     } else {
       fetchUsers((currentPage - 1) * pageSize, pageSize);
     }
-    fetchTotalUsersCount(); // Add this line
   };
 
   useEffect(() => {
@@ -175,7 +184,7 @@ const AccessControlManagement = ({onSuccess }) => {
       cancelText: 'No',
       onOk: async () => {
         try {
-          await axios.delete(`http://172.18.7.88:9422/api/v1/auth/users/${userId}`);
+          await axios.delete(`http://172.18.7.88:6643/api/v1/auth/users/${userId}`);
           message.success('User deleted successfully');
           handleRefresh(); // Refresh the user list after deletion
         } catch (error) {
@@ -190,10 +199,11 @@ const AccessControlManagement = ({onSuccess }) => {
 
   const handleRegister = async (values) => {
     try {
+      setIsLoading(true);
       const selectedRoleId = values.role;
       const selectedRole = roles.find(role => role.id === selectedRoleId);
 
-      await register({
+      await registerUser({
         email: values.email,
         username: values.username,
         password: values.password,
@@ -209,9 +219,11 @@ const AccessControlManagement = ({onSuccess }) => {
       setShowRegister(false);
       registerForm.resetFields();
       handleRefresh();
-      if (onSuccess) onSuccess();  // <- Call parent's callback
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -333,6 +345,86 @@ const AccessControlManagement = ({onSuccess }) => {
     },
   ];
 
+  // Add this new function to fetch roles
+  const fetchRolesData = async () => {
+    try {
+      const response = await axios.get('http://172.18.7.88:6643/api/v1/auth/roles');
+      setRoles(response.data);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      message.error('Failed to fetch roles');
+    }
+  };
+
+  // Add function to handle role edit
+  const handleEditRole = (record) => {
+    setSelectedRole(record);
+    roleForm.setFieldsValue({
+      role_name: record.role_name,
+      access_list: record.access_list
+    });
+    setIsEditRoleModalVisible(true);
+  };
+
+  // Add function to handle role update
+  const handleUpdateRole = async (values) => {
+    try {
+      await axios.put(`http://172.18.7.88:6643/api/v1/auth/roles/${selectedRole.id}`, {
+        role_name: values.role_name,
+        access_list: values.access_list
+      });
+      message.success('Role updated successfully');
+      setIsEditRoleModalVisible(false);
+      fetchRolesData(); // Refresh roles list
+    } catch (error) {
+      message.error('Failed to update role');
+    }
+  };
+
+  // Add Roles columns definition
+  const RolesColumns = [
+    {
+      title: 'Role Name',
+      dataIndex: 'role_name',
+      key: 'role_name',
+      width: '30%',
+      render: (role) => (
+        <Tag color="blue">
+          {role.charAt(0).toUpperCase() + role.slice(1)}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Access List',
+      dataIndex: 'access_list',
+      key: 'access_list',
+      width: '50%',
+      render: (accessList) => (
+        <Space>
+          {accessList.map((access, index) => (
+            <Tag key={index} color="green">{access}</Tag>
+          ))}
+        </Space>
+      ),
+    },
+    // {
+    //   title: 'Actions',
+    //   key: 'actions',
+    //   width: '20%',
+    //   render: (_, record) => (
+    //     <Space>
+    //       <Tooltip title="Edit">
+    //         <Button
+    //           type="text"
+    //           icon={<EditOutlined />}
+    //           onClick={() => handleEditRole(record)}
+    //         />
+    //       </Tooltip>
+    //     </Space>
+    //   ),
+    // },
+  ];
+
   return (
     <div className="p-6">
       <ToastContainer position="top-right" autoClose={3000} />
@@ -369,7 +461,7 @@ const AccessControlManagement = ({onSuccess }) => {
               pagination={{
                 current: currentPage,
                 pageSize: pageSize,
-                total: totalCount, // Use totalCount here
+                total: totalCount,
                 showSizeChanger: true,
                 showQuickJumper: true,
                 pageSizeOptions: ['5', '10', '20', '50'],
@@ -377,8 +469,7 @@ const AccessControlManagement = ({onSuccess }) => {
                 onChange: (page, size) => {
                   setCurrentPage(page);
                   setPageSize(size);
-                  const skip = (page - 1) * size;
-                  fetchUsers(skip, size);
+                  fetchUsers((page - 1) * size, size);
                 },
                 onShowSizeChange: (current, size) => {
                   setPageSize(size);
@@ -426,30 +517,30 @@ const AccessControlManagement = ({onSuccess }) => {
               bordered
             />
           </TabPane>
-          {/* <TabPane
+          <TabPane
             tab={
-              <Badge count={0} offset={[10, 0]}>
+              <Badge count={roles.length} offset={[10, 0]}>
                 <span>Roles</span>
               </Badge>
             }
             key="roles"
           >
             <Table
-              dataSource={[]}
+              dataSource={roles}
+              columns={RolesColumns}
               rowKey={(record) => record.id}
               pagination={{
-                current: currentPage,
-                total: 0,
+                pageSize: 10,
                 showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total) => `Total ${total} roles`,
-                position: ['bottomCenter'],
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                responsive: true
               }}
+              scroll={{ x: 'max-content' }}
+              className="responsive-table"
               size="middle"
               bordered
-              locale={{ emptyText: 'No roles available' }}
             />
-          </TabPane> */}
+          </TabPane>
           
           {/* Other tabs can be added here */}
         </Tabs>
@@ -587,6 +678,48 @@ const AccessControlManagement = ({onSuccess }) => {
           <Form.Item>
             <Button type="primary" htmlType="submit" block>
               Update Password
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Edit Role"
+        open={isEditRoleModalVisible}
+        onCancel={() => setIsEditRoleModalVisible(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={roleForm}
+          layout="vertical"
+          onFinish={handleUpdateRole}
+        >
+          <Form.Item
+            name="role_name"
+            label="Role Name"
+            rules={[{ required: true, message: 'Please enter role name!' }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="access_list"
+            label="Access List"
+            rules={[{ required: true, message: 'Please select access list!' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="Select access permissions"
+              style={{ width: '100%' }}
+            >
+              <Select.Option value="read">Read</Select.Option>
+              <Select.Option value="write">Write</Select.Option>
+              <Select.Option value="delete">Delete</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block>
+              Update Role
             </Button>
           </Form.Item>
         </Form>

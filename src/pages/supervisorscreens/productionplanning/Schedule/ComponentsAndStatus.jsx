@@ -91,12 +91,12 @@ export const MachineStatusCard = ({ machine, operations, componentStatus, compon
               <span 
                 className="inline-block flex-shrink-0 w-3 h-3 rounded-sm"
                 style={{ 
-                  backgroundColor: componentColors?.[currentOperation.component]?.backgroundColor || '#999',
+                  backgroundColor: componentColors?.[currentOperation.production_order]?.backgroundColor || '#999',
                 }} 
               />
             )}
-            <span className="font-normal text-base truncate" title={currentOperation ? currentOperation.component : 'No active operation'}>
-              {currentOperation ? currentOperation.component : 'No active operation'}
+            <span className="font-normal text-base truncate" title={currentOperation ? currentOperation.production_order : 'No active operation'}>
+              {currentOperation ? currentOperation.production_order : 'No active operation'}
             </span>
           </div>
         </div>

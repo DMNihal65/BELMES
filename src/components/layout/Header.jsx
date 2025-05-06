@@ -433,19 +433,21 @@ function Header() {
           onClick={() => navigate('/')}
         />
 
-        <Dropdown 
-          overlay={notificationContent} 
-          placement="bottomRight" 
-          trigger={['click']}
-        >
-          <Badge count={unreadCount} size="small" style={{ fontSize: '10px' }}>
-            <Button
-              type="text"
-              icon={<Bell size={20} />}
-              style={{ marginRight: '8px' }}
-            />
-          </Badge>
-        </Dropdown>
+        {(user?.role === 'admin' || user?.role === 'supervisor') && (
+          <Dropdown 
+            overlay={notificationContent} 
+            placement="bottomRight" 
+            trigger={['click']}
+          >
+            <Badge count={unreadCount} size="small" style={{ fontSize: '10px' }}>
+              <Button
+                type="text"
+                icon={<Bell size={20} />}
+                style={{ marginRight: '8px' }}
+              />
+            </Badge>
+          </Dropdown>
+        )}
 
         <Dropdown menu={{ items: profileMenuItems }} placement="bottomRight">
           <Space className="cursor-pointer">

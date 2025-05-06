@@ -4,8 +4,8 @@ import useAuthStore from '../../store/auth-store';
 import useStore from '../../store/useStore';
 import useNotificationStore from '../../store/notification';
 import { useNavigate } from 'react-router-dom';
-import belLogo from '../../assets/belKannada.png'
-// import belLogo1 from '../../assets/bel.png';
+// import belLogo from '../../assets/belKannada.png'
+import belLogo from '../../assets/bel.png';
 import { useEffect, useState } from 'react';
 
 const { Header: AntHeader } = Layout;

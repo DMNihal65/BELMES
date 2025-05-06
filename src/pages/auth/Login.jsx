@@ -7,8 +7,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
 import shopFloorBg from '../../../public/images/shop3.jpg';
 import { motion } from 'framer-motion';
-import belLogo from '../../../public/images/belLogo.png';
-// import belLogo from '../../../public/images/BEL_Logo.png';
+// import belLogo from '../../../public/images/belLogo.png';
+import belLogo from '../../../public/images/BEL_Logo.png';
 import cmtiLogo from '../../../public/images/CMTI_Logo2.png';
 import useAuthStore from '../../store/auth-store';
 

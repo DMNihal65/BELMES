@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Upload, message,
-  Typography, Tag, Tooltip, Form, Drawer, Descriptions, Cascader ,
+  Typography, Tag, Tooltip, Form, Drawer, Descriptions, Cascader,
   Badge, Alert, Spin, Progress, Divider, Collapse, DatePicker, Pagination, InputNumber
 } from 'antd';
 import {
@@ -11,8 +11,8 @@ import {
   CalendarOutlined, BarChartOutlined,
   ToolOutlined, DownloadOutlined, DeleteOutlined,
   ScheduleOutlined, ReloadOutlined, EyeOutlined,
-  AppstoreOutlined, CheckOutlined, RobotOutlined,
-  ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined,
+  AppstoreOutlined, CheckOutlined, RobotOutlined, CheckCircleOutlined,
+  ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined, CloseCircleOutlined,
   HistoryOutlined
 } from '@ant-design/icons';
 import {
@@ -143,7 +143,6 @@ const Planning = () => {
   const [editToolForm] = Form.useForm();
   const [addProgramForm] = Form.useForm();
   const [editProgramForm] = Form.useForm();
-
   // Store hooks
   const { 
     fetchAllOrders, 
@@ -172,7 +171,9 @@ const Planning = () => {
     fetchCncProgramDetails // Add this line
   } = usePlanningStore();
 
-    const [subcategories, setSubcategories] = useState([]);
+
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [subcategories, setSubcategories] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const { categories, fetchItems,  fetchCategories, fetchAllSubcategories } = useInventoryStore();
   const [selectedSubcategoryName, setSelectedSubcategoryName] = useState('');
@@ -229,7 +230,7 @@ const loadInventoryItems = async () => {
     const itemName = item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId;
     message.info(`Showing calibration history for ${itemName}`);
   };
-
+  
   // Configuration for file upload component - customized for NC program files
   const uploadProps = {
     name: 'file',
@@ -272,13 +273,10 @@ const loadInventoryItems = async () => {
     showUploadList: true,
   };
 
-  // Add new state for tracking file-operation mappings
-  const [fileOperationMappings, setFileOperationMappings] = useState({});
-
-  // Update documentUploadProps
+  // Update your existing uploadProps or add a new one for documents
   const documentUploadProps = {
     name: 'file',
-    multiple: true,
+    multiple: false,
     customRequest: ({ onSuccess }) => {
       setTimeout(() => {
         onSuccess("ok", null);
@@ -311,29 +309,14 @@ const loadInventoryItems = async () => {
       return true;
     },
     onChange(info) {
-      const { status, uid } = info.file;
+      const { status } = info.file;
       if (status === 'done') {
         message.success(`${info.file.name} ready for upload.`);
-        // Initialize operation mapping for new file
-        setFileOperationMappings(prev => ({
-          ...prev,
-          [uid]: null
-        }));
-      } else if (status === 'removed') {
-        // Remove operation mapping when file is removed
-        setFileOperationMappings(prev => {
-          const newMappings = { ...prev };
-          delete newMappings[uid];
-          return newMappings;
-        });
       } else if (status === 'error') {
         message.error(`${info.file.name} file upload failed.`);
       }
     },
-    showUploadList: {
-      showRemoveIcon: true,
-      showDownloadIcon: false
-    },
+    showUploadList: true,
   };
 
   // Load saved selection from localStorage on component mount
@@ -1497,63 +1480,28 @@ const loadInventoryItems = async () => {
     </Button>
   );
 
-// Add this useEffect to fetch tools when the component mounts or when selectedJob changes
-  useEffect(() => {
-  const fetchTools = async () => {
-      if (selectedJob?.id) {
-        try {
-          setLoading(true);
-        const toolsData = await fetchToolsByOrderId(selectedJob.id);
-        setTools(toolsData);
-      } catch (error) {
-        console.error('Error fetching tools:', error);
-        message.error('Failed to fetch tools');
-      } finally {
-        setLoading(false);
-      }
+  const handleAddTool = async (values) => {
+    try {
+      setLoading(true);
+      const toolData = {
+        ...values,
+        order_id: selectedJob.id,
+        operation_id: values.operation_id,
+        tool_name: values.tool_name, // Ensure this is a string
+      };
+      
+      const newTool = await addOrderTool(toolData);
+      setTools(prevTools => [...prevTools, newTool]);
+      message.success('Tool added successfully');
+      setIsAddToolModalVisible(false);
+      addToolForm.resetFields();
+    } catch (error) {
+      console.error('Error adding tool:', error);
+      message.error('Failed to add tool');
+    } finally {
+      setLoading(false);
     }
   };
-
-  fetchTools();
-}, [selectedJob?.id, fetchToolsByOrderId]);
-
-// Update the handleAddTool function
-const handleAddTool = async (values) => {
-  try {
-    setLoading(true);
-    const toolData = {
-      ...values,
-      order_id: selectedJob.id,
-      operation_id: values.operation_id,
-      tool_name: selectedSubcategoryName,
-      bel_partnumber: selectedPartNumber,
-      description: selectedPartDescription,
-      tool_number: selectedPartNumber || 'N/A', // Add tool_number field using BEL part number
-      quantity: values.quantity
-    };
-    
-    // Call the API to add the tool
-    await addOrderTool(toolData);
-    
-    // After successful addition, fetch the updated tools list
-    const updatedTools = await fetchToolsByOrderId(selectedJob.id);
-    setTools(updatedTools);
-    
-    message.success('Tool added successfully');
-    setIsAddToolModalVisible(false);
-    addToolForm.resetFields();
-    
-    // Reset the selected values
-    setSelectedSubcategoryName('');
-    setSelectedPartNumber('');
-    setSelectedPartDescription('');
-  } catch (error) {
-    console.error('Error adding tool:', error);
-    message.error('Failed to add tool');
-  } finally {
-    setLoading(false);
-  }
-};
 
   const handleUpdateTool = async (values) => {
     try {
@@ -1692,100 +1640,69 @@ const handleAddTool = async (values) => {
     }
   };
 
-  // Update handleAddDocument function
   const handleAddDocument = async (values) => {
     try {
       setLoading(true);
       
-      // Get all files from the Upload component
-      const files = values.file?.fileList || [];
-      if (files.length === 0) {
-        throw new Error('Please select files to upload');
+      // Get the file from the Upload component
+      const file = values.file?.fileList[0]?.originFileObj;
+      if (!file) {
+        throw new Error('Please select a file to upload');
       }
 
-      // Validate that all files have operations assigned
-      const unassignedFiles = files.filter(file => !fileOperationMappings[file.uid]);
-      if (unassignedFiles.length > 0) {
-        throw new Error('Please assign operations to all files');
-      }
-
-      // Upload each file with its assigned operation
-      const uploadPromises = files.map(fileInfo => {
-        const file = fileInfo.originFileObj;
-        const operationId = fileOperationMappings[fileInfo.uid];
-        const selectedOperation = selectedJob.operations.find(op => op.id === operationId);
-        
-        if (!selectedOperation) {
-          throw new Error(`Invalid operation for file ${file.name}`);
-        }
-
-        // Create FormData object for each file
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        // Use file name without extension as program name
-        const programName = file.name.split('.')[0];
-        formData.append('program_name', programName);
-        formData.append('description', programName); // Use filename as description
-        formData.append('version_number', '1'); // Default version
-        formData.append('part_number', selectedJob.part_number);
+      // Create FormData object
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('program_name', values.program_name);
+      formData.append('description', values.description || '');
+      formData.append('version_number', values.version || '1');
+      formData.append('part_number', selectedJob.part_number);
+      
+      // Get the operation number from the selected operation
+      const selectedOperation = selectedJob.operations.find(op => op.id === values.operation_id);
+      if (selectedOperation) {
         formData.append('operation_number', selectedOperation.operation_number);
+      }
 
-        // Return upload promise
-        return uploadCncProgram(formData);
-      });
-
-      // Wait for all uploads to complete
-      const responses = await Promise.all(uploadPromises);
+      // Upload the CNC program
+      const response = await uploadCncProgram(formData);
+      console.log('Upload response:', response);
       
-      // Process all responses and add to program documents
-      const newDocuments = responses.map((response, index) => {
-        if (response && response.id) {
-          const fileInfo = files[index];
-          const operationId = fileOperationMappings[fileInfo.uid];
-          return {
-            id: response.id,
-            name: response.name,
-            description: response.description,
-            type: 'CNC Program',
-            doc_type_id: response.doc_type_id,
-            part_number: response.part_number,
-            production_order_id: response.production_order_id,
-            created_at: response.created_at,
-            upload_date: response.created_at,
-            is_active: response.is_active,
-            latest_version: response.latest_version,
-            operation_number: response.latest_version?.metadata?.operation_number || '',
-            operation_id: operationId
-          };
-        }
-        return null;
-      }).filter(Boolean);
+      // Add the new document to the list
+      if (response && response.id) {
+        const newDocument = {
+          id: response.id,
+          name: response.name,
+          description: response.description,
+          type: 'CNC Program',
+          doc_type_id: response.doc_type_id,
+          part_number: response.part_number,
+          production_order_id: response.production_order_id,
+          created_at: response.created_at,
+          upload_date: response.created_at,
+          is_active: response.is_active,
+          latest_version: response.latest_version,
+          operation_number: response.latest_version?.metadata?.operation_number || '',
+          operation_id: selectedOperation ? selectedOperation.id : null
+        };
+        
+        setProgramDocuments(prevDocs => {
+          const updatedDocs = [...prevDocs, newDocument];
+          // Update localStorage
+          localStorage.setItem('programDocuments', JSON.stringify(updatedDocs));
+          return updatedDocs;
+        });
+      }
       
-      setProgramDocuments(prevDocs => {
-        const updatedDocs = [...prevDocs, ...newDocuments];
-        localStorage.setItem('programDocuments', JSON.stringify(updatedDocs));
-        return updatedDocs;
-      });
-      
-      message.success(`${files.length} CNC program(s) uploaded successfully`);
+      message.success('CNC program uploaded successfully');
       setIsAddDocumentModalVisible(false);
       addDocumentForm.resetFields();
-      setFileOperationMappings({}); // Reset mappings
     } catch (error) {
-      console.error('Error uploading CNC programs:', error);
-      message.error(`Failed to upload CNC programs: ${error.message}`);
+      console.error('Error uploading CNC program:', error);
+      message.error(`Failed to upload CNC program: ${error.message}`);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Add new function to handle operation selection for a file
-  const handleOperationSelect = (fileUid, operationId) => {
-    setFileOperationMappings(prev => ({
-      ...prev,
-      [fileUid]: operationId
-    }));
   };
 
   // Add this useEffect to set the form values when the modal opens
@@ -2597,11 +2514,7 @@ const handleAddTool = async (values) => {
                   </Tabs>
                 </Card>
 
-
-
-
-
-                {/* Add Tool Modal */}
+               {/* Add Tool Modal */}
                <Modal
                   title="Add Tool"
                   visible={isAddToolModalVisible}
@@ -2609,19 +2522,39 @@ const handleAddTool = async (values) => {
                   onCancel={() => {
                     setIsAddToolModalVisible(false);
                     addToolForm.resetFields();
-                    setSelectedSubcategoryName('');
-                    setSelectedPartNumber('');
-                    setSelectedPartDescription('');
                   }}
                   confirmLoading={loading}
                 >
                  <Form
                     form={addToolForm}
                     layout="vertical"
-                    onFinish={handleAddTool}
+                    onFinish={async (values) => {
+                      try {
+                        // Prepare the tool data to be sent to the store
+                        const toolData = {
+                          tool_name: selectedSubcategoryName, // This should now be a string
+                          tool_number: values.tool_number || 'N/A', // Assuming you want to add this field
+                          bel_partnumber: selectedPartNumber,
+                          description: selectedPartDescription,
+                          quantity: values.quantity,
+                          order_id: selectedJob.id, // Assuming selectedJob.id is the order ID
+                          operation_id: values.operation_id,
+                        };
+
+                        // Call the addOrderTool function from the planning store
+                        const newTool = await usePlanningStore.getState().addOrderTool(toolData);
+                        console.log('New tool added:', newTool);
+                        message.success('Tool added successfully');
+                        setIsAddToolModalVisible(false);
+                        addToolForm.resetFields();
+                      } catch (error) {
+                        console.error('Error adding tool:', error);
+                        message.error('Failed to add tool');
+                      }
+                    }}
                   >
                   <Form.Item
-                    label="Select Tool"
+                    label="Selecet Tool"
                     rules={[{ required: true, message: 'Please select an inventory item' }]}
                   >
                     <Cascader
@@ -3303,13 +3236,11 @@ const handleAddTool = async (values) => {
         onCancel={() => {
           setIsAddDocumentModalVisible(false);
           addDocumentForm.resetFields();
-          setFileOperationMappings({});
         }}
         footer={[
           <Button key="cancel" onClick={() => {
             setIsAddDocumentModalVisible(false);
             addDocumentForm.resetFields();
-            setFileOperationMappings({});
           }}>
             Cancel
           </Button>,
@@ -3333,72 +3264,52 @@ const handleAddTool = async (values) => {
       >
         <Form form={addDocumentForm} layout="vertical">
           <Form.Item
-            name="file"
-            label="Upload CNC Program Files"
-            rules={[{ required: true, message: 'Please select at least one file to upload' }]}
+            name="operation_id"
+            label="Operation"
+            rules={[{ required: true, message: 'Please select an operation' }]}
           >
-            <Upload.Dragger
-              {...documentUploadProps}
-              style={{ padding: '20px' }}
-              multiple={true}
-              maxCount={10}
-            >
-              <p className="ant-upload-drag-icon">
-                <UploadOutlined className="text-3xl text-blue-500" />
-              </p>
-              <p className="ant-upload-text font-medium">
-                Click or drag CNC program files to this area to upload
-              </p>
-              <p className="ant-upload-hint text-gray-500 text-sm">
-                Support for CNC program files (.nc, .txt, .cnc, etc.)
-                <br />
-                You can upload multiple files at once
-              </p>
-            </Upload.Dragger>
+            <Select placeholder="Select operation">
+              {selectedJob?.operations?.map((operation) => (
+                <Option key={operation.id} value={operation.id}>
+                  {operation.operation_number} - {operation.operation_description}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
-
-          {/* File Operation Mappings */}
-          {addDocumentForm.getFieldValue('file')?.fileList?.length > 0 && (
-            <div className="mt-4">
-              <Text strong>Assign Operations to Files</Text>
-              <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
-                {addDocumentForm.getFieldValue('file').fileList.map(file => (
-                  <div key={file.uid} className="flex items-center space-x-4 p-2 bg-gray-50 rounded">
-                    <div className="flex-1">
-                      <Text>{file.name}</Text>
-                    </div>
-                    <Form.Item
-                      className="mb-0 flex-1"
-                      validateStatus={!fileOperationMappings[file.uid] ? 'error' : ''}
-                      help={!fileOperationMappings[file.uid] ? 'Please select an operation' : ''}
-                    >
-                      <Select
-                        placeholder="Select operation"
-                        value={fileOperationMappings[file.uid]}
-                        onChange={(value) => handleOperationSelect(file.uid, value)}
-                        style={{ width: '100%' }}
-                      >
-                        {selectedJob?.operations?.map((operation) => (
-                          <Option key={operation.id} value={operation.id}>
-                            {operation.operation_number} - {operation.operation_description}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Form.Item>
-                  </div>
-                ))}
+          <Form.Item
+            name="program_name"
+            label="Program Name"
+            rules={[{ required: true, message: 'Please enter program name' }]}
+          >
+            <Input placeholder="Enter program name" />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="Description"
+          >
+            <Input.TextArea placeholder="Enter program description" />
+          </Form.Item>
+          <Form.Item
+            name="version"
+            label="Version"
+            initialValue="1"
+          >
+            <Input placeholder="Enter version (e.g., 1)" />
+          </Form.Item>
+          <Form.Item
+            name="file"
+            label="Upload CNC Program File"
+            rules={[{ required: true, message: 'Please select a file to upload' }]}
+          >
+            <Upload {...documentUploadProps} maxCount={1}>
+              <Button icon={<UploadOutlined />}>Click to Upload</Button>
+              <div className="mt-2 text-xs text-gray-500">
+                Support for CNC program files (.nc, .txt, .cnc, etc.)
               </div>
-            </div>
-          )}
+            </Upload>
+          </Form.Item>
         </Form>
       </Modal>
-
-
-
-
-
-
-      
 
       {/* Version Update Modal */}
       <Modal

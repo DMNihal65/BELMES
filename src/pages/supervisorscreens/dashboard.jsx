@@ -5,7 +5,8 @@ import {
   CheckCircleOutlined, ToolOutlined, DashboardOutlined, 
   CodeSandboxOutlined, BarcodeOutlined, BarChartOutlined, 
   MonitorOutlined, FileTextOutlined, ProjectOutlined, 
-  FullscreenOutlined, CompassOutlined, DesktopOutlined
+  FullscreenOutlined, CompassOutlined, DesktopOutlined,
+  AppstoreOutlined, BorderHorizontalOutlined
 } from '@ant-design/icons';
 import useDashboardStore from '../../store/dashboard';
 
@@ -24,8 +25,27 @@ const SupervisorDashboard = () => {
     return () => cleanup();
   }, []);
 
-  // Get the mapped machine data
-  const machines = getMappedMachineData();
+  // Get the mapped machine data and categorize it
+  const machines = getMappedMachineData().map((machine, index) => {
+    // Assign machine types based on naming convention or other attributes
+    // This is just a placeholder logic - adjust according to your actual data
+    let type = 'milling';
+    
+    if (machine.name?.toLowerCase().includes('turn') || 
+        machine.partDescription?.toLowerCase().includes('lathe') ||
+        index % 3 === 0) {
+      type = 'turning';
+    } else if (machine.name?.toLowerCase().includes('edm') || 
+               machine.name?.toLowerCase().includes('wire') ||
+               index % 7 === 6) {
+      type = 'edm';
+    }
+    
+    return {
+      ...machine,
+      type
+    };
+  });
 
   // Handle machine selection
   const handleMachineSelect = (machine) => {
@@ -36,8 +56,11 @@ const SupervisorDashboard = () => {
   // Camera view options
   const cameraViewOptions = [
     { label: <Tooltip title="Overview"><DesktopOutlined /></Tooltip>, value: 'overview' },
-    { label: <Tooltip title="Top Down"><FullscreenOutlined /></Tooltip>, value: 'topDown' },
+    { label: <Tooltip title="Top Down"><BorderHorizontalOutlined /></Tooltip>, value: 'topDown' },
     { label: <Tooltip title="First Person"><CompassOutlined /></Tooltip>, value: 'firstPerson' },
+    { label: <Tooltip title="Turning Section"><ToolOutlined /></Tooltip>, value: 'turningSection' },
+    { label: <Tooltip title="Milling Section"><AppstoreOutlined /></Tooltip>, value: 'millingSection' },
+    { label: <Tooltip title="EDM Room"><ProjectOutlined /></Tooltip>, value: 'edmRoom' },
   ];
 
   return (
@@ -195,8 +218,8 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
     >
       <div className="space-y-4">
         {/* Status Summary */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-3 rounded-xl shadow-sm border border-blue-100">
-          <div className="grid grid-cols-3 gap-3">
+        {/* <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-3 rounded-xl shadow-sm border border-blue-100"> */}
+          {/* <div className="grid grid-cols-3 gap-3">
             <Statistic
               title="OEE"
               value={oeeData?.average_oee || selectedMachine.oee || 0}
@@ -216,10 +239,10 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
               valueStyle={{ color: '#722ed1' }}
               prefix={<BarChartOutlined />}
             />
-          </div>
+          </div> */}
 
           {/* Progress bar */}
-          <div className="mt-3">
+          {/* <div className="mt-3">
             <div className="flex justify-between items-center text-xs mb-1">
               <span>Production Progress</span>
               <span className="font-medium">{completionPercentage}%</span>
@@ -237,8 +260,8 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
                   undefined
               }
             />
-          </div>
-        </div>
+          </div> */}
+        {/* </div> */}
 
         {/* OEE Components */}
         {oeeData && (

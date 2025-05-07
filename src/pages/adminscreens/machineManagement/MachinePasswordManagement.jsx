@@ -6,7 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 const { Option } = Select;
 
-const MachinePasswordManagement = () => {
+const MachinePasswordManagement = ({ onClose }) => {
   const [form] = Form.useForm();
   const [machines, setMachines] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,7 +20,7 @@ const MachinePasswordManagement = () => {
     setIsLoading(true);
     try {
       const response = await axios.get(
-        "http://172.18.7.88:4537/api/v1/master-order/all-machines/"
+        "http://172.18.7.88:8838/api/v1/master-order/all-machines/"
       );
       setMachines(response.data || []);
     } catch (error) {
@@ -37,11 +37,12 @@ const MachinePasswordManagement = () => {
     setSubmitLoading(true);
     try {
       const response = await axios.post(
-        `http://172.18.7.88:4537/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
+        `http://172.18.7.88:8838/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
       );
       message.success(response.data.status || "Password set successfully");
       toast.success(response.data.status || "Password set successfully");
       form.resetFields();
+      onClose();
     } catch (error) {
       console.error("Failed to set password:", error);
       message.error("Failed to set password");
@@ -51,6 +52,12 @@ const MachinePasswordManagement = () => {
     }
   };
 
+
+
+
+
+
+  
   return (
     <div className="flex justify-center items-center  p-4 ">
       <Card className="w-full max-w-md">

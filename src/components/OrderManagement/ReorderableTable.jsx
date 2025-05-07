@@ -264,7 +264,7 @@ const ReorderableTable = ({ orders = [] }) => {
         title={
           <div className="flex items-center gap-2">
             <SwapOutlined className="text-blue-500" />
-            <span>Confirm Position Swap</span>
+            <span>Confirm Priority Change</span>
           </div>
         }
         open={swapConfirmation.visible}
@@ -275,13 +275,13 @@ const ReorderableTable = ({ orders = [] }) => {
             Cancel
           </Button>,
           <Button key="submit" type="primary" onClick={handleSwapConfirm}>
-            Yes, Swap Positions
+            Yes, Change Priority
           </Button>
         ]}
         width={400}
         className="position-swap-modal"
       >
-        <p className="text-gray-600 mb-6">Are you sure you want to swap the following orders?</p>
+        <p className="text-gray-600 mb-6">Are you sure you want to change the priority of these orders?</p>
         
         <div className="flex justify-between items-center gap-4">
           <div className="flex-1 bg-gray-50 p-4 rounded-lg">
@@ -312,7 +312,7 @@ const ReorderableTable = ({ orders = [] }) => {
         </div>
 
         <div className="mt-6 bg-blue-50 p-3 rounded-lg text-sm text-gray-600">
-          This action will swap the positions of these orders while maintaining the positions of all other orders.
+          This action will update the priority of these orders while maintaining the priority of all other orders.
         </div>
       </Modal>
     </>

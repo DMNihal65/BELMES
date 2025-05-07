@@ -180,12 +180,6 @@ const JobDetails = () => {
   // Add this for idle timer display
   const [idleTime, setIdleTime] = useState(0);
 
-  // Add this state variable near the other state declarations
-  const [previousActiveJob, setPreviousActiveJob] = useState(null);
-  const [previousActiveOperation, setPreviousActiveOperation] = useState(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isDeactivating, setIsDeactivating] = useState(false);
-
   // Function to load all available jobs
   const loadAvailableJobs = useCallback(async () => {
     try {
@@ -242,61 +236,6 @@ const JobDetails = () => {
     }
   }, []);
 
-  // Add the deactivation function here, before activateSelectedJob
-  const deactivateCurrentJob = async () => {
-    try {
-      setIsDeactivating(true);
-      
-      const machineData = JSON.parse(localStorage.getItem('currentMachine')) || {};
-      const machineId = machineData.id;
-      
-      if (!machineId) {
-        throw new Error('Machine ID not found');
-      }
-      
-      const operationId = machineOperations?.inprogress?.[0]?.id;
-      
-      if (!operationId) {
-        throw new Error('No active operation found to deactivate');
-      }
-      
-      const response = await fetch('http://172.18.7.88:8838/api/v1/logs/machine-raw-live-deactive/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          machine_id: machineId,
-          operation_id: operationId
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to deactivate job');
-      }
-      
-      message.success('Job deactivated successfully');
-      
-      // Clear the current job selection
-      setPreviousActiveJob(null);
-      setPreviousActiveOperation(null);
-      setSelectedJob(null);
-      setSelectedOperation(null);
-      
-      // Refresh machine operations
-      await fetchMachineOperations(machineId);
-      
-      return true;
-    } catch (error) {
-      console.error('Error deactivating job:', error);
-      message.error(`Failed to deactivate job: ${error.message}`);
-      return false;
-    } finally {
-      setIsDeactivating(false);
-    }
-  };
-
   // Function to activate selected job and operation
   const activateSelectedJob = useCallback(async () => {
     if (!selectedJob || !selectedOperation) {
@@ -314,18 +253,7 @@ const JobDetails = () => {
         throw new Error('Machine ID not found');
       }
       
-      // Check if there's a currently active job that needs to be deactivated first
-      const hasActiveJob = machineOperations?.inprogress?.length > 0;
-      
-      if (hasActiveJob) {
-        const deactivateResult = await deactivateCurrentJob();
-        
-        if (!deactivateResult) {
-          throw new Error('Failed to deactivate current job');
-        }
-      }
-      
-      // Now activate the new job
+      // Call the store's activateJob method instead of direct API call
       const activationResult = await activateJob(machineId, selectedOperation.id);
       
       if (!activationResult.success) {
@@ -333,11 +261,6 @@ const JobDetails = () => {
       }
       
       message.success('Job activated successfully');
-      
-      // Update the previous active job reference
-      setPreviousActiveJob(selectedJob);
-      setPreviousActiveOperation(selectedOperation);
-      setHasUnsavedChanges(false);
       
       // Update the job data in the dashboard
       const jobDetails = await loadJobDetails(selectedJob.part_number);
@@ -360,7 +283,6 @@ const JobDetails = () => {
             completedParts: 0
           }
         });
-        console.log('Job data updated:', jobData);
         
         localStorage.setItem('currentJobData', JSON.stringify(jobDetails));
         
@@ -375,41 +297,15 @@ const JobDetails = () => {
       setIsActivatingJob(false);
       setShowActivationWarning(false);
     }
-  }, [selectedJob, selectedOperation, loadJobDetails, jobData, activateJob, setIsJobSelectorVisible, setIsActivatingJob, setShowActivationWarning, machineOperations, deactivateCurrentJob]);
+  }, [selectedJob, selectedOperation, loadJobDetails, jobData, activateJob, setIsJobSelectorVisible, setIsActivatingJob, setShowActivationWarning]);
 
   // Toggle job selector visibility
   const toggleJobSelector = () => {
     console.log('Toggle job selector called. Current visibility:', isJobSelectorVisible);
-    
-    // If we're opening the drawer, save current job/operation as previous
     if (!isJobSelectorVisible) {
-      // Store the current job and operation as previous
-      const currentActive = {
-        job: machineOperations?.inprogress?.[0]?.production_order ? {
-          production_order: machineOperations.inprogress[0].production_order,
-          part_number: machineOperations.inprogress[0].part_number,
-          // Add other needed properties
-        } : null,
-        operation: machineOperations?.inprogress?.[0] || null
-      };
-      
-      if (currentActive.job) {
-        setPreviousActiveJob(currentActive.job);
-        setPreviousActiveOperation(currentActive.operation);
-      }
-      
       console.log('Loading available jobs...');
       loadAvailableJobs();
-    } else {
-      // If closing without activating and there are unsaved changes,
-      // reset to the previous state
-      if (hasUnsavedChanges) {
-        setSelectedJob(previousActiveJob);
-        setSelectedOperation(previousActiveOperation);
-        setHasUnsavedChanges(false);
-      }
     }
-    
     setIsJobSelectorVisible(!isJobSelectorVisible);
     console.log('New visibility state set to:', !isJobSelectorVisible);
   };
@@ -720,15 +616,10 @@ const JobDetails = () => {
 
   const handleJobSelection = async (value) => {
     console.log('Job selected with ID:', value);
-    
-    // Mark that we have unsaved changes since we're selecting a new job
-    setHasUnsavedChanges(true);
-    
     const selectedJob = availableJobs.find(job => job.id === value);
     console.log('Selected job:', selectedJob);
     setSelectedJob(selectedJob);
     setSelectedOperation(null); // Reset operation when job changes
-    
     if (selectedJob) {
       const jobDetails = await loadJobDetails(selectedJob.part_number);
       console.log('Job details loaded:', jobDetails);
@@ -741,10 +632,6 @@ const JobDetails = () => {
 
   const handleOperationSelection = (value) => {
     console.log('Operation selected with ID:', value);
-    
-    // Mark that we have unsaved changes
-    setHasUnsavedChanges(true);
-    
     const selectedOp = availableOperations.find(op => op.id === value);
     console.log('Selected operation:', selectedOp);
     setSelectedOperation(selectedOp);
@@ -996,9 +883,9 @@ const JobDetails = () => {
                     {/* Material Description */}
                     <div className="bg-white rounded-lg p-3">
                       <div className="text-xs text-gray-500">Material Description</div>
-                      <Tooltip title={jobOrderData.part_description}>
+                      <Tooltip title={jobOrderData.material_description}>
                         <div className="text-sm font-medium truncate">
-                          {jobOrderData.part_description || 'N/A'}
+                          {jobOrderData.material_description || 'N/A'}
                         </div>
                       </Tooltip>
                     </div>
@@ -1009,13 +896,13 @@ const JobDetails = () => {
                         <div>
                           <div className="text-xs text-gray-500">Required Qty</div>
                           <div className="text-sm font-semibold text-blue-600">
-                            {jobOrderData.required_quantity}
+                            {jobOrderData.required_qty}
                           </div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500">Launched Qty</div>
                           <div className="text-sm font-semibold text-green-600">
-                            {jobOrderData.launched_quantity}
+                            {jobOrderData.launched_qty}
                           </div>
                         </div>
                       </div>
@@ -1054,13 +941,13 @@ const JobDetails = () => {
                     <div className="bg-white rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-xs text-gray-500">Project Details</div>
-                        <Tag color="blue">Total Ops: {jobOrderData.total_operations || 'N/A'}</Tag>
+                        <Tag color="blue">Total Ops: {jobOrderData.project_details?.total_operations || 'N/A'}</Tag>
                       </div>
-                      <div className="text-sm font-medium">{jobOrderData.project?.name || 'N/A'}</div>
+                      <div className="text-sm font-medium">{jobOrderData.project_details?.project_name || 'N/A'}</div>
                     </div>
 
                     {/* Operation Details */}
-                    {/* <div className="bg-white rounded-lg p-3">
+                    <div className="bg-white rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-xs text-gray-500">Current Operation</div>
                         {machineOperations?.inprogress?.length > 0 && (
@@ -1115,7 +1002,7 @@ const JobDetails = () => {
                           No operation in progress
                         </div>
                       )}
-                    </div> */}
+                    </div>
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8">
@@ -1501,33 +1388,12 @@ const JobDetails = () => {
         title="Select Job"
         placement="right"
         width={600}
-        onClose={() => {
-          // If we close without activating and there are unsaved changes,
-          // reset to the previous state
-          if (hasUnsavedChanges) {
-            setSelectedJob(previousActiveJob);
-            setSelectedOperation(previousActiveOperation);
-            setHasUnsavedChanges(false);
-          }
-          setIsJobSelectorVisible(false);
-        }}
+        onClose={() => setIsJobSelectorVisible(false)}
         open={isJobSelectorVisible}
         bodyStyle={{ paddingBottom: 80 }}
         extra={
           <Space>
-            <Button 
-              onClick={() => {
-                // Reset selections to previous active job if there are unsaved changes
-                if (hasUnsavedChanges) {
-                  setSelectedJob(previousActiveJob);
-                  setSelectedOperation(previousActiveOperation);
-                  setHasUnsavedChanges(false);
-                }
-                setIsJobSelectorVisible(false);
-              }}
-            >
-              Cancel
-            </Button>
+            <Button onClick={() => setIsJobSelectorVisible(false)}>Cancel</Button>
             <Button
               type="primary"
               disabled={!selectedJob || !selectedOperation}
@@ -1552,58 +1418,7 @@ const JobDetails = () => {
           {jobSelectionMode === 'custom' && (
             <div className="space-y-6">
               <div>
-                <div className="mb-2 font-medium">Search by Part Number</div>
-                <Space.Compact style={{ width: '100%' }}>
-                  <Input 
-                    placeholder="Enter part number"
-                    value={inputValue}
-                    onChange={e => setInputValue(e.target.value)}
-                  />
-                  <Button 
-                    type="primary"
-                    onClick={async () => {
-                      if (inputValue) {
-                        try {
-                          // Mark that we have unsaved changes
-                          setHasUnsavedChanges(true);
-                          
-                          const response = await fetch(`http://172.18.7.88:8838/api/v1/planning/search_order?part_number=${inputValue}`);
-                          if (!response.ok) {
-                            throw new Error('Failed to fetch job details');
-                          }
-                          
-                          const data = await response.json();
-                          
-                          if (data.orders && data.orders.length > 0) {
-                            const jobDetails = data.orders[0];
-                            // Update selected job
-                            setSelectedJob(jobDetails);
-                            
-                            // Update available operations
-                            if (jobDetails.operations) {
-                              setAvailableOperations(jobDetails.operations.sort((a, b) => 
-                                a.operation_number - b.operation_number
-                              ));
-                            }
-                          } else {
-                            message.warning('No jobs found for the entered part number');
-                          }
-                        } catch (error) {
-                          console.error('Error:', error);
-                          message.error('Failed to search for job');
-                        }
-                      } else {
-                        message.warning('Please enter a part number');
-                      }
-                    }}
-                  >
-                    Search
-                  </Button>
-                </Space.Compact>
-              </div>
-              
-              <div>
-                <div className="mb-2 font-medium">Or Select from Available Jobs</div>
+                <div className="mb-2 font-medium">Select Job</div>
                 <Select
                   className="w-full"
                   placeholder="Select a job"
@@ -1666,64 +1481,34 @@ const JobDetails = () => {
           {selectedJob && (
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <div className="text-sm font-medium">Selected Job Information</div>
-              <div className="mt-2 space-y-3">
+              <div className="mt-2 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="text-xs text-gray-500">Part Number</div>
-                    <div className="font-medium">{selectedJob.part_number}</div>
-                  </div>
                   <div>
                     <div className="text-xs text-gray-500">Production Order</div>
                     <div className="font-medium">{selectedJob.production_order}</div>
                   </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Part Number</div>
+                    <div className="font-medium">{selectedJob.part_number}</div>
+                  </div>
                 </div>
-                
                 <div>
-                  <div className="text-xs text-gray-500">Material Description</div>
-                  <div className="font-medium">{selectedJob.part_description || selectedJob.material_description}</div>
+                  <div className="text-xs text-gray-500">Description</div>
+                  <div className="font-medium">{selectedJob.part_description}</div>
                 </div>
-                
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <div className="text-xs text-gray-500">Required Qty</div>
-                    <div className="font-medium">{selectedJob.required_quantity || selectedJob.required_qty}</div>
+                    <div className="font-medium">{selectedJob.required_quantity}</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500">Launched Qty</div>
-                    <div className="font-medium">{selectedJob.launched_quantity || selectedJob.launched_qty}</div>
+                    <div className="font-medium">{selectedJob.launched_quantity}</div>
                   </div>
                 </div>
-                
                 <div>
-                  <div className="text-xs text-gray-500">Sales Order</div>
-                  <div className="font-medium">{selectedJob.sale_order || selectedJob.sales_order}</div>
-                </div>
-                
-                <div>
-                  <div className="text-xs text-gray-500">WBS Element</div>
-                  <Tooltip title={selectedJob.wbs_element}>
-                    <div className="font-medium truncate">{selectedJob.wbs_element}</div>
-                  </Tooltip>
-                </div>
-                
-                <div>
-                  <div className="text-xs text-gray-500">Project Details</div>
-                  <div className="font-medium">{selectedJob.project?.name || selectedJob.project_details?.project_name || 'N/A'}</div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="text-xs text-gray-500">Priority</div>
-                    <Tag color={selectedJob.priority > 3 ? 'red' : 'blue'}>
-                      Priority {selectedJob.priority || 'N/A'}
-                    </Tag>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Current Operation</div>
-                    <div className="font-medium">
-                      {selectedOperation ? `OP${selectedOperation.operation_number}` : 'Not selected'}
-                    </div>
-                  </div>
+                  <div className="text-xs text-gray-500">Project</div>
+                  <div className="font-medium">{selectedJob.project?.name || 'N/A'}</div>
                 </div>
               </div>
             </div>
@@ -1749,10 +1534,10 @@ const JobDetails = () => {
             key="activate"
             type="primary"
             danger
-            loading={isActivatingJob || isDeactivating}
+            loading={isActivatingJob}
             onClick={activateSelectedJob}
           >
-            {machineOperations?.inprogress?.length > 0 ? 'Deactivate Current & Activate New' : 'Confirm Activation'}
+            Confirm Activation
           </Button>
         ]}
       >

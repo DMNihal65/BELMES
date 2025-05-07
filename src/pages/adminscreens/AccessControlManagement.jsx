@@ -39,7 +39,7 @@ const AccessControlManagement = ({onSuccess }) => {
     // Add this new function to fetch total count
     const fetchTotalUsersCount = async () => {
       try {
-        const response = await axios.get('http://172.18.7.88:4537/api/v1/auth/users-count');
+        const response = await axios.get('http://172.18.7.88:8838/api/v1/auth/users-count');
         if (response.data && response.data.count) {
           setTotalCount(response.data.count);
         }
@@ -47,6 +47,12 @@ const AccessControlManagement = ({onSuccess }) => {
         console.error('Error fetching total users:', error);
       }
     };
+
+    const handleClose = () => {
+      setMachinePasswordModalVisible(false);
+      fetchMachineCredentials(); // Refresh the machine credentials list after closing
+    };
+  
   
     // Add useEffect to fetch total count when component mounts
     useEffect(() => {
@@ -86,7 +92,7 @@ const AccessControlManagement = ({onSuccess }) => {
 
   const fetchMachineCredentials = async () => {
     try {
-      const response = await axios.get('http://172.18.7.88:4537/api/v1/auth/get-machine-credentials');
+      const response = await axios.get('http://172.18.7.88:8838/api/v1/auth/get-machine-credentials');
       setMachineCredentials(response.data);
     } catch (error) {
       message.error('Failed to fetch machine credentials');
@@ -103,7 +109,7 @@ const AccessControlManagement = ({onSuccess }) => {
   
   const handleUpdateMachinePassword = async (values) => {
     try {
-      await axios.put(`http://172.18.7.88:4537/api/v1/auth/machine-credentials/${selectedMachine.machine_id}`, {
+      await axios.put(`http://172.18.7.88:8838/api/v1/auth/machine-credentials/${selectedMachine.machine_id}`, {
         password: values.password
       });
       message.success('Machine password updated successfully');
@@ -130,7 +136,7 @@ const AccessControlManagement = ({onSuccess }) => {
       cancelText: 'No',
       onOk: async () => {
         try {
-          await axios.delete(`http://172.18.7.88:4537/api/v1/auth/machine-credentials/${machineId}`);
+          await axios.delete(`http://172.18.7.88:8838/api/v1/auth/machine-credentials/${machineId}`);
           message.success('Machine credential deleted successfully');
           fetchMachineCredentials();
         } catch (error) {
@@ -184,7 +190,7 @@ const AccessControlManagement = ({onSuccess }) => {
       cancelText: 'No',
       onOk: async () => {
         try {
-          await axios.delete(`http://172.18.7.88:4537/api/v1/auth/users/${userId}`);
+          await axios.delete(`http://172.18.7.88:8838/api/v1/auth/users/${userId}`);
           message.success('User deleted successfully');
           handleRefresh(); // Refresh the user list after deletion
         } catch (error) {
@@ -348,7 +354,7 @@ const AccessControlManagement = ({onSuccess }) => {
   // Add this new function to fetch roles
   const fetchRolesData = async () => {
     try {
-      const response = await axios.get('http://172.18.7.88:4537/api/v1/auth/roles');
+      const response = await axios.get('http://172.18.7.88:8838/api/v1/auth/roles');
       setRoles(response.data);
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -369,7 +375,7 @@ const AccessControlManagement = ({onSuccess }) => {
   // Add function to handle role update
   const handleUpdateRole = async (values) => {
     try {
-      await axios.put(`http://172.18.7.88:4537/api/v1/auth/roles/${selectedRole.id}`, {
+      await axios.put(`http://172.18.7.88:8838/api/v1/auth/roles/${selectedRole.id}`, {
         role_name: values.role_name,
         access_list: values.access_list
       });
@@ -653,7 +659,7 @@ const AccessControlManagement = ({onSuccess }) => {
         width={600}
         destroyOnClose
       >
-        <MachinePasswordManagement />
+        <MachinePasswordManagement onClose={handleClose} />
       </Modal>
 
       <Modal

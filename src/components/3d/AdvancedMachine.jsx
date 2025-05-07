@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Html } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { Badge, Progress, Tooltip } from 'antd';
 
 // Advanced machine model component with realistic appearance and animations
@@ -13,111 +14,144 @@ const AdvancedMachine = ({
   isSelected = false 
 }) => {
   const machineRef = useRef();
-  const spindleRef = useRef();
-  const doorRef = useRef();
-  const screenRef = useRef();
+  const modelRef = useRef();
   const statusLightRef = useRef();
   const [hovered, setHovered] = useState(false);
+  const [modelLoaded, setModelLoaded] = useState(false);
   
-  // Animation state
-  const animationRef = useRef({ 
-    spindle: 0, 
-    door: 0,
-    doorOpen: false,
-    doorDirection: 0, // -1: closing, 0: static, 1: opening
-    doorPosition: 0, // 0: closed, 1: open
-  });
+  // Determine which model to load based on machine type
+  const modelPath = machine.type === 'turning' ? '/turning.glb' : 
+                    machine.type === 'edm' ? '/wireedm.glb' : 
+                    '/machine.glb';
   
-  // Pulse animation for selected machines and machine parts
+  // Load the appropriate GLTF model
+  let model = null;
+  try {
+    model = useLoader(GLTFLoader, modelPath);
+  } catch (error) {
+    console.warn(`Failed to load model ${modelPath}:`, error);
+  }
+  
+  // Set up model and animations
+  useEffect(() => {
+    if (model && modelRef.current) {
+      // Clone the model to avoid shared materials issues
+      const clonedScene = model.scene.clone();
+      
+      // Apply materials and shadows
+      clonedScene.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          
+          // If machine is OFF, make materials slightly transparent
+          if (machine.status === 'OFF' && node.material) {
+            const material = node.material.clone();
+            material.transparent = true;
+            material.opacity = 0.8;
+            node.material = material;
+          }
+        }
+      });
+      
+      // Clear any existing children and add the cloned model
+      while (modelRef.current.children.length > 0) {
+        modelRef.current.remove(modelRef.current.children[0]);
+      }
+      
+      modelRef.current.add(clonedScene);
+      setModelLoaded(true);
+    }
+  }, [model, machine.status]);
+  
+  // Get status-specific colors
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'PRODUCTION': return '#10b981'; // Green
+      case 'ON': return '#f59e0b';         // Amber/yellow
+      case 'IDLE': return '#3b82f6';       // Blue
+      case 'SETUP': return '#8b5cf6';      // Purple
+      case 'ERROR': return '#ef4444';      // Red
+      case 'MAINTENANCE': return '#6366f1'; // Indigo
+      case 'OFF': default: return '#6b7280'; // Gray
+    }
+  };
+  
+  // Get status-specific pulsing rate
+  const getStatusPulseRate = (status) => {
+    switch (status) {
+      case 'PRODUCTION': return 1;  // Normal pulse
+      case 'ON': return 0.5;        // Slow pulse
+      case 'ERROR': return 3;       // Fast pulse
+      case 'MAINTENANCE': return 2; // Medium-fast pulse
+      default: return 0;            // No pulse
+    }
+  };
+  
+  // Enhanced animation and effects
   useFrame((state) => {
     if (!machineRef.current) return;
     
     const time = state.clock.getElapsedTime();
     
-    // Animate machine elements based on status
-    if (machine.status === 'PRODUCTION') {
-      // Rotate spindle in production mode
-      if (spindleRef.current) {
-        spindleRef.current.rotation.z += 0.1;
-      }
-      
-      // Animate door occasionally
-      const doorAnim = animationRef.current;
-      if (doorRef.current) {
-        // Trigger door animation randomly
-        if (doorAnim.doorDirection === 0 && Math.random() < 0.001) {
-          doorAnim.doorDirection = doorAnim.doorOpen ? -1 : 1;
-        }
-        
-        // Apply door animation
-        if (doorAnim.doorDirection !== 0) {
-          doorAnim.doorPosition += doorAnim.doorDirection * 0.02;
-          
-          // Clamp door position
-          if (doorAnim.doorPosition >= 1) {
-            doorAnim.doorPosition = 1;
-            doorAnim.doorDirection = 0;
-            doorAnim.doorOpen = true;
-          } else if (doorAnim.doorPosition <= 0) {
-            doorAnim.doorPosition = 0;
-            doorAnim.doorDirection = 0;
-            doorAnim.doorOpen = false;
-          }
-          
-          // Apply door position
-          doorRef.current.position.x = doorAnim.doorPosition * -1.5;
-        }
-      }
-      
-      // Simulate machining vibration
-      machineRef.current.position.y = position[1] + Math.sin(time * 30) * 0.01;
-    }
+    // Status indicator animation - pulse based on machine status
+    const pulseRate = getStatusPulseRate(machine.status);
     
-    // Screen animation
-    if (screenRef.current && screenRef.current.material) {
-      // Animate screen brightness when machine is on
-      if (machine.status !== 'OFF') {
-        const screenPulse = 0.6 + Math.sin(time * 2) * 0.1;
-        screenRef.current.material.emissiveIntensity = screenPulse;
-      }
-    }
-    
-    // Status light animation
-    if (statusLightRef.current && statusLightRef.current.material) {
-      if (machine.status === 'PRODUCTION') {
-        // Pulse green light when in production
-        statusLightRef.current.material.emissiveIntensity = 0.8 + Math.sin(time * 4) * 0.2;
-      } else if (machine.status === 'ON') {
-        // Pulse amber light when on but not producing
-        statusLightRef.current.material.emissiveIntensity = 0.6 + Math.sin(time * 2) * 0.1;
-      }
-    }
-    
-    // Selection indicator animation
     if (isSelected) {
-      const glowIntensity = 0.5 + Math.sin(time * 2) * 0.2;
-      machineRef.current.scale.set(
-        1.05 + Math.sin(time * 3) * 0.01,
-        1.05 + Math.sin(time * 3) * 0.01,
-        1.05 + Math.sin(time * 3) * 0.01
-      );
+      // Selection effect - scale up and down slightly
+      const scale = 1.05 + Math.sin(time * 3) * 0.01;
+      machineRef.current.scale.set(scale, scale, scale);
+      
+      // Add additional glow effect when selected
+      if (modelRef.current) {
+        modelRef.current.traverse((node) => {
+          if (node.isMesh && node.material) {
+            if (!node.userData.originalEmissive) {
+              // Store original emissive color
+              node.userData.originalEmissive = node.material.emissive.clone();
+            }
+            
+            // Add slight glow to the machine
+            const emissiveIntensity = 0.1 + Math.sin(time * 2) * 0.05;
+            node.material.emissive.set(0.1, 0.1, 0.2);
+            node.material.emissiveIntensity = emissiveIntensity;
+          }
+        });
+      }
     } else {
+      // Reset scale when not selected
       machineRef.current.scale.set(1, 1, 1);
+      
+      // Reset emissive effect when not selected
+      if (modelRef.current) {
+        modelRef.current.traverse((node) => {
+          if (node.isMesh && node.material && node.userData.originalEmissive) {
+            node.material.emissive.copy(node.userData.originalEmissive);
+            node.material.emissiveIntensity = 0;
+          }
+        });
+      }
+    }
+    
+    // Simple animation for machines in production
+    if (machine.status === 'PRODUCTION' && modelRef.current) {
+      // Small vibration effect
+      modelRef.current.position.y = Math.sin(time * 20) * 0.01;
+    }
+    
+    // Add status light pulsing effect
+    if (statusLightRef.current && statusLightRef.current.material) {
+      if (pulseRate > 0) {
+        // Only pulse if the machine has a pulsing status
+        statusLightRef.current.material.emissiveIntensity = 
+          0.5 + Math.sin(time * pulseRate * Math.PI) * 0.5;
+      } else {
+        // Static intensity for non-pulsing statuses
+        statusLightRef.current.material.emissiveIntensity = 
+          machine.status === 'OFF' ? 0.1 : 0.7;
+      }
     }
   });
-  
-  // Get status-specific colors and effects
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'PRODUCTION': return '#10b981'; // Green
-      case 'ON': return '#f59e0b';         // Amber/yellow
-      case 'OFF': default: return '#6b7280'; // Gray
-    }
-  };
-  
-  const getMachineOpacity = (status) => {
-    return status === 'OFF' ? 0.8 : 1;
-  };
   
   // Calculate completion percentage
   const completionPercentage = 
@@ -125,9 +159,17 @@ const AdvancedMachine = ({
       ? Math.round((machine.totalCount / machine.targetCount) * 100) 
       : 0;
   
-  // Create a more realistic CNC machine model
-  const baseDimensions = [5, 3, 5]; // Width, height, depth
   const statusColor = getStatusColor(machine.status);
+  
+  // Default scale based on machine type
+  const modelScale = machine.type === 'turning' ? 0.2 : 
+                    machine.type === 'edm' ? 0.9 : 
+                    1.0;
+  
+  // Adjust status indicator height based on machine type and scale
+  const statusHeight = machine.type === 'turning' ? 0.2 : 
+                      machine.type === 'edm' ? 0.2 : 
+                      0.8;
   
   return (
     <group 
@@ -140,132 +182,74 @@ const AdvancedMachine = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      {/* Machine body */}
+      {/* Main machine with loaded model */}
       <group 
         ref={machineRef}
-        position={[0, baseDimensions[1]/2, 0]}
+        position={[0, 0, 0]}
       >
-        {/* Main machine body */}
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={baseDimensions} />
-          <meshStandardMaterial 
-            color="#f8fafc" 
-            metalness={0.6}
-            roughness={0.2}
-            opacity={getMachineOpacity(machine.status)}
-            transparent={machine.status === 'OFF'}
-          />
-        </mesh>
+        {/* 3D Model container - will be filled with the loaded model */}
+        <group 
+          ref={modelRef} 
+          position={[0, 0, 0]}
+          scale={[modelScale, modelScale, modelScale]}
+        />
         
-        {/* Machine base */}
-        <mesh position={[0, -baseDimensions[1]/2-0.25, 0]} receiveShadow>
-          <boxGeometry args={[baseDimensions[0]+1, 0.5, baseDimensions[2]+1]} />
-          <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.2} />
-        </mesh>
+        {/* Fallback if model fails to load */}
+        {!modelLoaded && (
+          <>
+            {/* Simple machine shape as fallback */}
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[4, 3, 4]} />
+              <meshStandardMaterial 
+                color="#f8fafc" 
+                metalness={0.6}
+                roughness={0.2}
+                opacity={machine.status === 'OFF' ? 0.8 : 1}
+                transparent={machine.status === 'OFF'}
+              />
+            </mesh>
+            
+            {/* Simple base */}
+            <mesh position={[0, -1.75, 0]} receiveShadow>
+              <boxGeometry args={[5, 0.5, 5]} />
+              <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.2} />
+            </mesh>
+          </>
+        )}
         
-        {/* Control panel */}
-        <mesh position={[baseDimensions[0]/2+0.1, 0, -baseDimensions[2]/3]} castShadow>
-          <boxGeometry args={[0.8, 2, 1.5]} />
-          <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
-        </mesh>
-        
-        {/* Display screen */}
-        <mesh 
-          ref={screenRef}
-          position={[baseDimensions[0]/2+0.15, 0.3, -baseDimensions[2]/3]} 
-          castShadow
-        >
-          <boxGeometry args={[0.1, 1, 1]} />
-          <meshStandardMaterial 
-            color={machine.status === 'OFF' ? '#1e293b' : '#38bdf8'} 
-            emissive={machine.status === 'OFF' ? '#1e293b' : '#38bdf8'}
-            emissiveIntensity={machine.status === 'OFF' ? 0 : 0.5}
-            metalness={0.1} 
-            roughness={0.3} 
-          />
-        </mesh>
-        
-        {/* Machine door - front */}
-        <mesh 
-          ref={doorRef}
-          position={[0, 0, baseDimensions[2]/2+0.05]} 
-          castShadow
-        >
-          <boxGeometry args={[baseDimensions[0]-1, baseDimensions[1]-0.5, 0.2]} />
-          <meshStandardMaterial 
-            color="#94a3b8" 
-            metalness={0.2}
-            roughness={0.3}
-            transparent
-            opacity={0.7}
-          />
-        </mesh>
-        
-        {/* Viewing window */}
-        <mesh position={[0, 0.5, baseDimensions[2]/2+0.1]} castShadow>
-          <boxGeometry args={[baseDimensions[0]-1.5, baseDimensions[1]-1.5, 0.05]} />
-          <meshStandardMaterial 
-            color="#cbd5e1" 
-            metalness={0.1}
-            roughness={0.1}
-            transparent
-            opacity={0.6}
-          />
-        </mesh>
-        
-        {/* Spindle system - visible when door opens */}
-        <group position={[0, 0, 0]}>
-          {/* Main spindle body */}
-          <mesh position={[0, 0.5, 0]}>
-            <cylinderGeometry args={[0.5, 0.5, 1.5, 16]} />
-            <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.2} />
-          </mesh>
-          
-          {/* Spindle rotating part */}
-          <mesh ref={spindleRef} position={[0, -0.4, 0]}>
-            <cylinderGeometry args={[0.3, 0.2, 0.8, 16]} />
-            <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.1} />
-          </mesh>
-          
-          {/* Cutting tool */}
-          <mesh position={[0, -1, 0]}>
-            <cylinderGeometry args={[0.1, 0.05, 0.5, 8]} />
-            <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.1} />
-          </mesh>
-        </group>
-        
-        {/* Status indicator light */}
+        {/* Status indicator light - always visible */}
         <mesh 
           ref={statusLightRef}
-          position={[baseDimensions[0]/2-0.5, baseDimensions[1]/2+0.2, 0]} 
+          position={[0, statusHeight, 0]} 
           castShadow
         >
-          <sphereGeometry args={[0.3, 16, 16]} />
+          <sphereGeometry args={[0.5, 16, 16]} />
           <meshStandardMaterial 
             color={statusColor}
             emissive={statusColor}
-            emissiveIntensity={machine.status === 'OFF' ? 0.1 : 0.8}
+            emissiveIntensity={machine.status === 'OFF' ? 0.1 : (isSelected ? 0.8 : 0.5)}
             metalness={0.1}
             roughness={0.3}
           />
         </mesh>
         
-        {/* Machine details - coolant system, etc */}
-        <mesh position={[-baseDimensions[0]/2+0.5, 0, baseDimensions[2]/3]}>
-          <boxGeometry args={[0.8, 1.5, 0.8]} />
-          <meshStandardMaterial color="#475569" metalness={0.5} roughness={0.3} />
-        </mesh>
-        
-        {/* Pipes and cables */}
-        <mesh position={[-baseDimensions[0]/2+0.1, baseDimensions[1]/3, 0]}>
-          <cylinderGeometry args={[0.15, 0.15, baseDimensions[2]-1, 8]} rotation={[Math.PI/2, 0, 0]} />
-          <meshStandardMaterial color="#64748b" metalness={0.4} roughness={0.6} />
+        {/* Status ring around light */}
+        <mesh 
+          position={[0, statusHeight, 0]} 
+          rotation={[Math.PI/2, 0, 0]}
+        >
+          <torusGeometry args={[0.8, 0.1, 16, 32]} />
+          <meshStandardMaterial 
+            color="#1e293b"
+            metalness={0.7}
+            roughness={0.2}
+          />
         </mesh>
       </group>
       
       {/* Information panel */}
       <Html
-        position={[0, baseDimensions[1] + 1.5, 0]}
+        position={[0, statusHeight + 0.2, 0]}
         center
         distanceFactor={15}
         className={`transition-all duration-300 ${isSelected ? 'scale-110' : 'scale-100'}`}
@@ -280,25 +264,29 @@ const AdvancedMachine = ({
               status={
                 machine.status === 'PRODUCTION' ? 'success' : 
                 machine.status === 'ON' ? 'warning' : 
+                machine.status === 'ERROR' ? 'error' :
+                machine.status === 'MAINTENANCE' ? 'processing' :
+                machine.status === 'IDLE' ? 'default' :
                 'default'
               }
               text={machine.status}
             />
             
             <div className="text-xs font-medium">
-              OEE: {machine.oee}%
+              OEE: {machine.oee || 0}%
             </div>
           </div>
           
           <div className="mt-2">
             <div className="flex justify-between items-center text-xs mb-1">
               <span>Progress</span>
-              <span className="font-medium">{machine.totalCount}/{machine.targetCount}</span>
+              <span className="font-medium">{machine.totalCount || 0}/{machine.targetCount || 0}</span>
             </div>
             <Progress 
               percent={completionPercentage} 
               size="small" 
               status={
+                machine.status === 'ERROR' ? 'exception' :
                 machine.status === 'OFF' ? 'normal' :
                 completionPercentage >= 100 ? 'success' :
                 machine.status === 'PRODUCTION' ? 'active' : 'normal'
@@ -306,6 +294,12 @@ const AdvancedMachine = ({
               strokeColor={
                 machine.status === 'PRODUCTION' ? 
                   {from: '#10b981', to: '#059669'} : 
+                machine.status === 'ERROR' ?
+                  {from: '#ef4444', to: '#b91c1c'} :
+                machine.status === 'MAINTENANCE' ?
+                  {from: '#6366f1', to: '#4f46e5'} :
+                machine.status === 'ON' ?
+                  {from: '#f59e0b', to: '#d97706'} :
                   undefined
               }
             />

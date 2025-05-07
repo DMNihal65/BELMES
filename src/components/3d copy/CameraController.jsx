@@ -13,15 +13,10 @@ const CameraController = ({
   const cameraRef = useRef();
   const { camera, scene } = useThree();
   
-  // Define better camera positions for the new shop floor layout
   const viewPositions = {
-    overview: { position: [0, 10, 43], target: [0, 0, 0] },
-    topDown: { position: [0, 70, 0], target: [0, 0, 0] },
-    firstPerson: { position: [0, 5, 30], target: [0, 2, -10] },
-    turningSection: { position: [-30, 15, 0], target: [-20, 3, 0] },
-    millingSection: { position: [30, 15, 0], target: [20, 3, 0] },
-    edmRoom: { position: [0, 8, -20], target: [0, 3, -30] },
-    centerAisle: { position: [0, 8, 15], target: [0, 0, 0] },
+    overview: { position: [-50, 10, 10], target: [0, 0, 0] },
+    topDown: { position: [0, 60, 0], target: [0, 0, 0] },
+    firstPerson: { position: [0, 5, 30], target: [0, 5, 0] },
     focusMachine: { position: [0, 8, 12], target: [0, 0, 0] }, // This will be adjusted based on selectedMachine
   };
   
@@ -36,37 +31,6 @@ const CameraController = ({
     duration: 1.5 // seconds
   });
   
-  // Get machine position based on machine type and id
-  const getMachinePosition = (machine) => {
-    if (!machine) return [0, 0, 0];
-    
-    // If machine has direct position property
-    if (machine.position && Array.isArray(machine.position)) {
-      return machine.position;
-    }
-    
-    // Determine position based on type and id
-    const type = machine.type || 'milling';
-    const id = machine.id || 0;
-    
-    switch(type) {
-      case 'turning':
-        // Left side row
-        const turningIndex = id % 7;
-        return [-20, 2.3, -15 + turningIndex * 6];
-      case 'milling':
-        // Right side row
-        const millingIndex = id % 5;
-        return [20, 4, -12 + millingIndex * 7];
-      case 'edm':
-        // EDM room at back
-        const edmIndex = id % 2;
-        return [-5 + edmIndex * 10, 4, -30];
-      default:
-        return [0, 0, 0];
-    }
-  };
-  
   // Update camera when view or selected machine changes
   useEffect(() => {
     if (!controlsRef.current || !camera) return;
@@ -76,55 +40,18 @@ const CameraController = ({
     
     // Determine target position and look-at point based on view type
     if (view === 'focusMachine' && selectedMachine) {
-      // For focused machine view, determine machine position
-      const machinePos = getMachinePosition(selectedMachine);
-      
-      // Calculate offset based on machine type for better viewing angle
-      const offsetMultiplier = selectedMachine.type === 'turning' ? 1.2 : 
-                              selectedMachine.type === 'edm' ? 1.5 : 1;
-      
-      // Position camera at an offset from the machine for a good view
-      // Place camera in front of the machine based on its implied rotation
-      if (selectedMachine.type === 'turning') {
-        // For turning machines (left side)
-        targetPosition = [
-          machinePos[0] + 10, 
-          machinePos[1] + 5, 
-          machinePos[2]
-        ];
-      } else if (selectedMachine.type === 'milling') {
-        // For milling machines (right side)
-        targetPosition = [
-          machinePos[0] - 10, 
-          machinePos[1] + 5, 
-          machinePos[2]
-        ];
-      } else if (selectedMachine.type === 'edm') {
-        // For EDM machines (back)
-        targetPosition = [
-          machinePos[0], 
-          machinePos[1] + 5, 
-          machinePos[2] + 10
-        ];
-      } else {
-        // Default positioning
-        targetPosition = [
-          machinePos[0] + 8 * offsetMultiplier, 
-          machinePos[1] + 5, 
-          machinePos[2] + 8 * offsetMultiplier
-        ];
-      }
-      
-      // Look at the machine, slightly above ground level for better composition
-      targetLookAt = [
-        machinePos[0],
-        machinePos[1] + 2,
-        machinePos[2]
+      // Set position relative to selected machine
+      const machinePos = selectedMachine.position || [0, 0, 0];
+      targetPosition = [
+        machinePos[0] + 8, 
+        machinePos[1] + 8, 
+        machinePos[2] + 8
       ];
+      targetLookAt = machinePos;
     } else {
       // Use predefined view position
-      targetPosition = viewPositions[view]?.position || viewPositions.overview.position;
-      targetLookAt = viewPositions[view]?.target || viewPositions.overview.target;
+      targetPosition = viewPositions[view].position;
+      targetLookAt = viewPositions[view].target;
     }
     
     if (enableTransitions) {
@@ -204,7 +131,7 @@ const CameraController = ({
         enableRotate={true}
         minDistance={5}
         maxDistance={100}
-        maxPolarAngle={Math.PI / 2 - 0.1}
+        maxPolarAngle={Math.PI / 2}
         minPolarAngle={Math.PI / 12}
         dampingFactor={0.1}
         rotateSpeed={0.5}

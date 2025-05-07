@@ -16,6 +16,11 @@ const useWebSocketStore = create((set, get) => ({
   maintenanceLoading: false,
   machineOperations: null,
   jobData: null,
+  operationDocuments: null,
+  documentLoading: false,
+  documentError: null,
+  userSelectedOperation: null,
+  isOperationActive: false,
 
   initializeWebSocket: (machineId) => {
     if (!machineId) {
@@ -47,7 +52,7 @@ const useWebSocketStore = create((set, get) => ({
       }
     }
 
-    const ws = new WebSocket('ws://172.18.7.88:4537/production_monitoring/ws/live-status/');
+    const ws = new WebSocket('ws://172.18.7.88:8838/production_monitoring/ws/live-status/');
     
     ws.onmessage = (event) => {
       try {
@@ -66,53 +71,34 @@ const useWebSocketStore = create((set, get) => ({
 
           // Updated idle timer logic
           if (newStatus === 'ON' && !isInProduction) {
-            // Start idle timer only when machine is ON and not in production
-            // console.log('Starting idle timer - Machine ON but not in production');
             if (!get().idleStartTime) {
               set({ idleStartTime: Date.now() });
             }
           } else if (newStatus === 'OFF') {
-            // Stop timer when machine is OFF
-            // console.log('Stopping idle timer - Machine OFF');
             set({ idleStartTime: null });
           } else if (isInProduction || newStatus === 'PRODUCTION') {
-            // Reset timer when in production
-            // console.log('Resetting idle timer - Machine in production');
             set({ idleStartTime: null });
           }
 
-          // Format the machine status data with all fields
-          const formattedStatus = {
-            machine_id: currentMachineData.machine_id,
-            machine_name: currentMachineData.machine_name,
-            status: currentMachineData.status || 'N/A',
-            active_program: currentMachineData.active_program || 'x', // Keep 'x' as is
-            job_in_progress: currentMachineData.job_in_progress,
-            job_status: currentMachineData.job_status,
-            launched_quantity: currentMachineData.launched_quantity,
-            last_updated: currentMachineData.last_updated,
-            operation_description: currentMachineData.operation_description,
-            operation_number: currentMachineData.operation_number,
-            part_count: currentMachineData.part_count,
-            part_description: currentMachineData.part_description,
-            part_number: currentMachineData.part_number,
-            production_order: currentMachineData.production_order,
-            program_number: currentMachineData.program_number,
-            required_quantity: currentMachineData.required_quantity,
-            selected_program: currentMachineData.selected_program
-          };
-
-          // Update state while preserving other data
+          // Only update machine status, not operation data
           set(state => ({ 
             machineStatus: {
-              ...state.machineStatus, // Keep existing state
-              ...formattedStatus // Update with new data
+              ...state.machineStatus,
+              machine_id: currentMachineData.machine_id,
+              machine_name: currentMachineData.machine_name,
+              status: currentMachineData.status || 'N/A',
+              last_updated: currentMachineData.last_updated
             },
             lastUpdate: new Date().toISOString()
           }));
 
-          // Store in localStorage for persistence
-          localStorage.setItem('machineStatus', JSON.stringify(formattedStatus));
+          // Store only machine status in localStorage
+          localStorage.setItem('machineStatus', JSON.stringify({
+            machine_id: currentMachineData.machine_id,
+            machine_name: currentMachineData.machine_name,
+            status: currentMachineData.status || 'N/A',
+            last_updated: currentMachineData.last_updated
+          }));
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -120,7 +106,7 @@ const useWebSocketStore = create((set, get) => ({
     };
 
     ws.onopen = () => {
-      // console.log('WebSocket Connected Successfully');
+      console.log('WebSocket Connected Successfully');
       set({ 
         isConnected: true, 
         socket: ws, 
@@ -135,14 +121,14 @@ const useWebSocketStore = create((set, get) => ({
     };
 
     ws.onclose = (event) => {
-      // console.log(`WebSocket Disconnected: ${event.code} ${event.reason}`);
+      console.log(`WebSocket Disconnected: ${event.code} ${event.reason}`);
       set({ isConnected: false, socket: null });
       
       // Only attempt to reconnect if it wasn't intentionally closed
       const { reconnectAttempts, maxReconnectAttempts, reconnectDelay } = get();
       
       if (reconnectAttempts < maxReconnectAttempts) {
-        // console.log(`Attempting to reconnect (${reconnectAttempts + 1}/${maxReconnectAttempts})...`);
+        console.log(`Attempting to reconnect (${reconnectAttempts + 1}/${maxReconnectAttempts})...`);
         setTimeout(() => {
           set(state => ({ reconnectAttempts: state.reconnectAttempts + 1 }));
           get().initializeWebSocket(machineId);
@@ -158,7 +144,7 @@ const useWebSocketStore = create((set, get) => ({
   closeWebSocket: () => {
     const { socket } = get();
     if (socket) {
-      // console.log('Closing WebSocket connection');
+      console.log('Closing WebSocket connection');
       socket.close(1000, 'User navigated away');
       set({ 
         socket: null, 
@@ -219,7 +205,7 @@ const useWebSocketStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.18.7.88:4537/api/v1/operator/machines/${machineId}/operations`
+        `http://172.18.7.88:8838/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -376,7 +362,7 @@ const useWebSocketStore = create((set, get) => ({
     };
 
     try {
-      const response = await fetch('http://172.18.7.88:4537/api/v1/maintainance/downtimes/', {
+      const response = await fetch('http://172.18.7.88:8838/api/v1/maintainance/downtimes/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -415,7 +401,7 @@ const useWebSocketStore = create((set, get) => ({
         return;
       }
       const response = await fetch(
-        `http://172.18.7.88:4537/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://172.18.7.88:8838/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -476,7 +462,7 @@ const useWebSocketStore = create((set, get) => ({
       set({ maintenanceLoading: true });
       
       const response = await fetch(
-        `http://172.18.7.88:4537/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://172.18.7.88:8838/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -523,15 +509,13 @@ const useWebSocketStore = create((set, get) => ({
     }
   },
 
-  
-
   fetchDocuments: async (partNumber) => {
     try {
       set({ loading: true });
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:4537/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:8838/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -567,7 +551,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:4537/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        `http://172.18.7.88:8838/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -598,7 +582,7 @@ const useWebSocketStore = create((set, get) => ({
   fetchMppDetails: async (partNumber, operationNumber) => {
     try {
       const response = await fetch(
-        `http://172.18.7.88:4537/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
+        `http://172.18.7.88:8838/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
       );
 
       if (!response.ok) {
@@ -617,31 +601,449 @@ const useWebSocketStore = create((set, get) => ({
         error: error.message
       };
     }
-  }
+  },
+
+  fetchOperationDocuments: async (partNumber, operationNumber) => {
+    try {
+      set({ documentLoading: true, documentError: null });
+      
+      if (!partNumber) {
+        throw new Error('Part number is required');
+      }
+
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      console.log(`Fetching documents for part: ${partNumber}, operation: ${operationNumber}`);
+      
+      // First try to fetch documents from documents API
+      const response = await fetch(
+        `http://172.18.7.88:8838/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Session expired. Please log in again.');
+        }
+        throw new Error(`Failed to fetch documents: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Documents API response:', data);
+      
+      // Check if all document types are null and there are no documents in all_documents array
+      const hasDocuments = data.mpp_document || 
+                          data.ipid_document || 
+                          data.engineering_drawing_document || 
+                          data.oarc_document || 
+                          data.fixture_document ||
+                          (data.all_documents && data.all_documents.length > 0);
+      
+      let mppData = null;
+      
+      // If operation number is provided and no MPP document found, try to fetch MPP data directly
+      if (!data.mpp_document && operationNumber) {
+        try {
+          console.log(`Fetching MPP data directly for part ${partNumber}, operation ${operationNumber}`);
+          const mppResponse = await fetch(
+            `http://172.18.7.88:8838/api/v1/mpp/by-part/${partNumber}/${operationNumber}`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+              }
+            }
+          );
+          
+          if (mppResponse.ok) {
+            const mppResult = await mppResponse.json();
+            if (mppResult && mppResult.length > 0) {
+              mppData = mppResult[0]; // Get first entry
+              console.log('MPP data fetched successfully from direct API:', mppData);
+            } else {
+              console.log('No MPP data found from direct API');
+            }
+          } else {
+            console.log(`MPP data API returned status: ${mppResponse.status}`);
+          }
+        } catch (mppError) {
+          console.error('Error fetching MPP details from direct API:', mppError);
+          // Don't throw, just log the error and continue with null mppData
+        }
+      }
+
+      const formattedDocs = {
+        mpp: data.mpp_document || null,
+        ipid: data.ipid_document || null,
+        engineering: data.engineering_drawing_document || null,
+        oarc: data.oarc_document || null,
+        fixture: data.fixture_document || null,
+        hasDocuments: hasDocuments,
+        mppData: mppData // Add MPP data to the response
+      };
+
+      set({ 
+        operationDocuments: formattedDocs,
+        documentLoading: false 
+      });
+
+      return {
+        success: true,
+        data: formattedDocs
+      };
+    } catch (error) {
+      console.error('Error fetching operation documents:', error);
+      set({ 
+        documentError: error.message,
+        documentLoading: false 
+      });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  clearOperationDocuments: () => {
+    set({ 
+      operationDocuments: null,
+      documentError: null 
+    });
+  },
+
+  fetchOperationDetails: async (machineId, operationNumber, partNumber) => {
+    try {
+      set({ loading: true, documentError: null });
+      
+      const token = useAuthStore.getState().token;
+
+      // Fetch both operation and document data in parallel
+      const [operationsResponse, documentsResponse] = await Promise.all([
+        fetch(`http://172.18.7.88:8838/api/v1/operator/machines/${machineId}/operations`),
+        fetch(
+          `http://172.18.7.88:8838/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+      ]);
+
+      if (!operationsResponse.ok || !documentsResponse.ok) {
+        throw new Error('Failed to fetch operation details');
+      }
+
+      const [operationsData, documentsData] = await Promise.all([
+        operationsResponse.json(),
+        documentsResponse.json()
+      ]);
+
+      // Find the specific operation
+      const operation = [
+        ...(operationsData.operations.completed || []),
+        ...(operationsData.operations.inprogress || []),
+        ...(operationsData.operations.scheduled || [])
+      ].find(op => op.operation_number === operationNumber);
+
+      if (!operation) {
+        throw new Error('Operation not found');
+      }
+
+      // Combine operation and document data
+      const combinedData = {
+        operation: {
+          ...operation,
+          documents: {
+            mpp: documentsData.mpp_document,
+            ipid: documentsData.ipid_document,
+            engineering: documentsData.engineering_drawing_document,
+            oarc: documentsData.oarc_document,
+            fixture: documentsData.fixture_document
+          }
+        }
+      };
+
+      set({
+        operationDocuments: combinedData.operation.documents,
+        loading: false
+      });
+
+      return {
+        success: true,
+        data: combinedData
+      };
+
+    } catch (error) {
+      console.error('Error fetching operation details:', error);
+      set({ 
+        documentError: error.message,
+        loading: false 
+      });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  downloadDocumentById: async (documentId) => {
+    try {
+      set({ documentLoading: true });
+      
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      console.log(`Downloading document with ID: ${documentId}`);
+      
+      // Make sure we're using the correct endpoint URL with token
+      const endpoint = `http://172.18.7.88:8838/api/v1/document-management/documents/${documentId}/download-latest`;
+      console.log(`Making request to: ${endpoint}`);
+      
+      // Instead of using window.open, use fetch with proper authentication headers
+      try {
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': '*/*'
+          }
+        });
+
+        if (!response.ok) {
+          console.error(`Download failed with status: ${response.status}`);
+          if (response.status === 401) {
+            throw new Error('Session expired. Please log in again.');
+          }
+          throw new Error(`Failed to download document: ${response.statusText}`);
+        }
+
+        console.log('Download response received, creating blob...');
+        // Create a blob from the response and download it
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        
+        // Try to open in a new tab first
+        const newWindow = window.open(url, '_blank');
+        
+        // If opening in new tab fails, download as file
+        if (!newWindow) {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `document_${documentId}.pdf`;  // Default name
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        
+        window.URL.revokeObjectURL(url);
+
+        console.log('Document download completed successfully');
+        set({ documentLoading: false });
+        
+        return {
+          success: true,
+          message: 'Document downloaded successfully'
+        };
+      } catch (fetchError) {
+        console.error('Error during document fetch:', fetchError);
+        throw fetchError;
+      }
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      set({ 
+        documentError: error.message,
+        documentLoading: false 
+      });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  openDocumentInNewTab: async (documentId) => {
+    try {
+      set({ documentLoading: true });
+      
+      const token = useAuthStore.getState().token;
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      console.log(`Opening document with ID: ${documentId} in new tab`);
+      
+      // Create the endpoint URL - same as in downloadDocumentById
+      const endpoint = `http://172.18.7.88:8838/api/v1/document-management/documents/${documentId}/download-latest`;
+      
+      // Open in new tab and handle the request there
+      const newWindow = window.open('', '_blank');
+      
+      if (newWindow) {
+        newWindow.document.write(`
+          <html>
+            <head>
+              <title>Loading Document...</title>
+              <style>
+                body { display: flex; justify-content: center; align-items: center; height: 100vh; font-family: Arial, sans-serif; }
+                .loader { border: 5px solid #f3f3f3; border-radius: 50%; border-top: 5px solid #3498db; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+              </style>
+            </head>
+            <body>
+              <div class="loader"></div>
+              <script>
+                fetch('${endpoint}', {
+                  headers: {
+                    'Authorization': 'Bearer ${token}'
+                  }
+                })
+                .then(response => {
+                  if (!response.ok) throw new Error('Failed to load document');
+                  return response.blob();
+                })
+                .then(blob => {
+                  const objectUrl = URL.createObjectURL(blob);
+                  window.location.href = objectUrl;
+                })
+                .catch(error => {
+                  document.body.innerHTML = '<div style="color:red">Error loading document: ' + error.message + '</div>';
+                });
+              </script>
+            </body>
+          </html>
+        `);
+        
+        set({ documentLoading: false });
+        return { success: true };
+      } else {
+        throw new Error('Could not open new tab. Please check browser settings.');
+      }
+    } catch (error) {
+      console.error('Error opening document in new tab:', error);
+      set({ 
+        documentError: error.message,
+        documentLoading: false 
+      });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  setUserSelectedOperation: (operation) => {
+    set({ userSelectedOperation: operation });
+  },
+
+  setOperationActive: (isActive) => {
+    set({ isOperationActive: isActive });
+  },
+
+  deactivateOperation: () => {
+    set({ 
+      userSelectedOperation: null,
+      isOperationActive: false
+    });
+  },
+
+  // Function to directly open a document URL in a new tab
+  openDocumentUrl: (url) => {
+    try {
+      // If URL doesn't already have a token parameter, add it
+      if (!url.includes('token=')) {
+        const token = useAuthStore.getState().token;
+        if (token) {
+          const separator = url.includes('?') ? '&' : '?';
+          url = `${url}${separator}token=${token}`;
+        }
+      }
+      
+      // Instead of directly opening the URL, create a new window with a fetch request
+      const newWindow = window.open('', '_blank');
+      
+      if (newWindow) {
+        // Write a temporary loading page
+        newWindow.document.write(`
+          <html>
+            <head>
+              <title>Loading Document...</title>
+              <style>
+                body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f5f5f5; }
+                .loader { border: 5px solid #f3f3f3; border-radius: 50%; border-top: 5px solid #3498db; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-right: 20px; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                .loading-text { font-size: 18px; color: #333; }
+              </style>
+            </head>
+            <body>
+              <div style="text-align: center;">
+                <div class="loader"></div>
+                <div class="loading-text">Loading document, please wait...</div>
+              </div>
+              <script>
+                // Get the token from the URL
+                const token = "${useAuthStore.getState().token}";
+                
+                // Fetch the document using Authorization header
+                fetch('${url}', {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Accept': '*/*'
+                  }
+                })
+                .then(response => {
+                  if (!response.ok) {
+                    if (response.status === 401) {
+                      throw new Error('Authentication failed. Please log in again.');
+                    }
+                    throw new Error('Failed to load document: ' + response.status);
+                  }
+                  return response.blob();
+                })
+                .then(blob => {
+                  // Create object URL and redirect
+                  const objectUrl = URL.createObjectURL(blob);
+                  window.location.href = objectUrl;
+                })
+                .catch(error => {
+                  document.body.innerHTML = '<div style="color: red; text-align: center; padding: 20px;"><h3>Error</h3><p>' + error.message + '</p><p>Please close this tab and try again.</p></div>';
+                  console.error('Error:', error);
+                });
+              </script>
+            </body>
+          </html>
+        `);
+      } else {
+        // Fallback if window.open is blocked
+        console.error('Failed to open new window. Pop-up might be blocked.');
+        return { success: false, error: 'Pop-up blocked. Please allow pop-ups for this site.' };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error opening document URL:', error);
+      return { success: false, error: error.message };
+    }
+  },
 }));
 
 export default useWebSocketStore; 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

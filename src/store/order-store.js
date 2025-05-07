@@ -6,8 +6,8 @@ import { LoadingOutlined } from '@ant-design/icons';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.88:8838',
-  QUALITY_URL: 'http://172.18.7.88:8838',
+  BASE_URL: 'http://172.18.7.88:5454',
+  QUALITY_URL: 'http://172.18.7.88:5454',
   PLANNING_URL: 'http://172.18.7.85:9671',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
@@ -144,7 +144,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.88:8838/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:5454/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -229,7 +229,7 @@ const useOrderStore = create((set, get) => ({
 
       // Use the orderNumber parameter instead of hardcoded value
       const response = await fetch(
-        `http://172.18.7.88:8838/api/v1/planning/update_order/${payload.orderNumber}`,
+        `http://172.18.7.88:5454/api/v1/planning/update_order/${payload.orderNumber}`,
         {
           method: 'PUT',
           headers: {
@@ -494,7 +494,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.88:8838/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.88:5454/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -725,14 +725,16 @@ const useOrderStore = create((set, get) => ({
         if (hasDrawing) {
           details.push(`Engineering Drawing (Version: ${data.engineering_drawing_document.latest_version?.version_number || 'N/A'})`);
         }
-
+  
         message.info({
           content: `Found existing documents for Part Number: ${partNumber}\n\n${details.join('\n')}`,
           duration: 5,
           style: { 
             whiteSpace: 'pre-line',
+            position: 'absolute',
+            left: '60%',
             width: '400px',
-            marginTop: '-20vh', // Adjust message position to be more centered
+          // / marginTop:-6-60vh', // Adjust message position to be more centered
             textAlign: 'left',
             padding: '16px',
             boxShadow: '0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08)',
@@ -742,12 +744,14 @@ const useOrderStore = create((set, get) => ({
         });
       } else {
         message.warning({
-          content: `No documents found for Part Number: ${partNumber}\n\nMPP Document: Not found\nEngineering Drawing: Not found`,
+          content: `No documents found for Part        {partNumber}\n\nMPP Document: Not found\nEngineering Drawing: Not found`,
           duration: 5,
           style: { 
             whiteSpace: 'pre-line',
+            position: 'absolute',
+            left: '60%',
             width: '400px',
-            marginTop: '-20vh', // Adjust message position to be more centered
+            // marginTop: '-20vh', // Adjust message position to be more centered
             textAlign: 'left',
             padding: '16px',
             boxShadow: '0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08)',
@@ -873,7 +877,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.18.7.88:8838/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.18.7.88:5454/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -930,7 +934,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.88:8838/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.18.7.88:5454/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -1237,7 +1241,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.18.7.88:8838/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:5454/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

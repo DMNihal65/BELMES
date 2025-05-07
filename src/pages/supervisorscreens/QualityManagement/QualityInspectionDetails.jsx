@@ -58,6 +58,7 @@ const QualityInspectionDetails = ({
   const [approvingIds, setApprovingIds] = useState({});
   const [approvedStatus, setApprovedStatus] = useState({});
   const [isApprovingAll, setIsApprovingAll] = useState(false);
+  const [isFinalInspectionModalVisible, setIsFinalInspectionModalVisible] = useState(false);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
 
@@ -200,6 +201,33 @@ const QualityInspectionDetails = ({
           })}
         </Space>
       )
+    },
+    {
+      title: 'Final Inspection',
+      key: 'final_inspection',
+      width: '15%',
+      render: (_, record) => {
+        // Check if we have operation groups with op_no 999
+        const hasFinalInspection = inspectionDetails?.operation_groups?.some(
+          group => group.op_no === 999
+        );
+
+        return (
+          <Button
+            type={hasFinalInspection ? 'primary' : 'default'}
+            icon={<FileSearchOutlined />}
+            onClick={() => handleFinalInspectionClick()}
+            className={`
+              transition-all duration-300
+              ${hasFinalInspection 
+                ? 'bg-blue-100 hover:bg-blue-200 border-blue-200 hover:border-blue-300 text-blue-700' 
+                : 'bg-gray-100 hover:bg-gray-200 border-gray-200 hover:border-gray-300 text-gray-700'}
+            `}
+          >
+            View Measurements
+          </Button>
+        );
+      }
     }
   ];
 
@@ -1255,6 +1283,104 @@ const QualityInspectionDetails = ({
     }
   };
 
+  // Add handler for final inspection click
+  const handleFinalInspectionClick = () => {
+    setIsFinalInspectionModalVisible(true);
+  };
+
+  // Add function to get final inspection data
+  const getFinalInspectionData = () => {
+    if (!inspectionDetails?.operation_groups) return [];
+    
+    return inspectionDetails.operation_groups
+      .filter(group => group.op_no === 999)
+      .map((group, index) => ({
+        key: index,
+        zone: group.details?.zone || '',
+        dimension_type: group.details?.dimension_type || '',
+        nominal: group.details?.nominal || '',
+        uppertol: group.details?.uppertol || '',
+        lowertol: group.details?.lowertol || '',
+        measured_instrument: group.details?.measured_instrument || ''
+      }));
+  };
+
+  // Add final inspection modal render function
+  const renderFinalInspectionModal = () => {
+    const finalInspectionData = getFinalInspectionData();
+    
+    const columns = [
+      {
+        title: 'Zone',
+        dataIndex: 'zone',
+        key: 'zone',
+        width: 100,
+      },
+      {
+        title: 'Description',
+        dataIndex: 'dimension_type',
+        key: 'dimension_type',
+        width: 150,
+      },
+      {
+        title: 'Nominal',
+        dataIndex: 'nominal',
+        key: 'nominal',
+        width: 100,
+      },
+      {
+        title: 'Upper Tol',
+        dataIndex: 'uppertol',
+        key: 'uppertol',
+        width: 100,
+      },
+      {
+        title: 'Lower Tol',
+        dataIndex: 'lowertol',
+        key: 'lowertol',
+        width: 100,
+      },
+      {
+        title: 'Instrument',
+        dataIndex: 'measured_instrument',
+        key: 'measured_instrument',
+        width: 150,
+      }
+    ];
+
+    return (
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <FileSearchOutlined className="text-blue-500" />
+            <span>Final Inspection Measurements</span>
+          </div>
+        }
+        visible={isFinalInspectionModalVisible}
+        onCancel={() => setIsFinalInspectionModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsFinalInspectionModalVisible(false)}>
+            Close
+          </Button>
+        ]}
+        width={1200}
+      >
+        <div className="mb-4">
+          <Text strong>Operation: 999</Text>
+          <br />
+          <Text strong>IPID: {inspectionDetails?.operation_groups?.[0]?.ipid || 'No IPID'}</Text>
+        </div>
+        <Table
+          columns={columns}
+          dataSource={finalInspectionData}
+          pagination={false}
+          scroll={{ x: 800, y: 400 }}
+          size="small"
+        />
+      </Modal>
+    );
+  };
+
   // Update styles to include more specific styles for the measured data modal
   const styles = `
     @keyframes progress {
@@ -1604,6 +1730,9 @@ const QualityInspectionDetails = ({
           className="bg-white rounded-lg shadow-sm"
           items={items}
         />
+
+        {/* Add the final inspection modal */}
+        {renderFinalInspectionModal()}
 
         {/* QMS Launch Modal */}
         {renderQmsModal()}

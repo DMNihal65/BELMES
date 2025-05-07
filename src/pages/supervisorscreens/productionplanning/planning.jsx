@@ -263,9 +263,9 @@ const loadInventoryItems = async () => {
         message.error('Please upload a valid program file (.nc, .prt, .mpf, .cnc)');
       }
       
-      if (!isLessThan20MB) {
-        message.error('File must be smaller than 20MB!');
-      }
+      // if (!isLessThan20MB) {
+      //   message.error('File must be smaller than 20MB!');
+      // }
       
       return (isValidFileType && isLessThan20MB) || Upload.LIST_IGNORE;
     },
@@ -1884,13 +1884,13 @@ const handleAddTool = async (values) => {
       align: 'center',
       render: (_, record) => (
         <Space>
-          <Tooltip title="Download Document">
+          {/* <Tooltip title="Download Document">
             <Button 
               type="link" 
               icon={<DownloadOutlined />}
               onClick={() => handleDownloadDocument(record)}
             />
-          </Tooltip>
+          </Tooltip> */}
           <Tooltip title="View Version History">
             <Button
               type="link"
@@ -3029,7 +3029,7 @@ const handleAddTool = async (values) => {
                             {/* Left column with program details - with scrollable container */}
                             <div className="w-full md:w-1/2 md:max-h-[600px] md:overflow-y-auto pr-2">
                               {/* CNC Program Details */}
-                              <Card 
+                              {/* <Card 
                                 title={
                                   <div className="flex items-center">
                                     <ToolOutlined className="text-blue-500 mr-2" />
@@ -3074,7 +3074,7 @@ const handleAddTool = async (values) => {
                                     version: program.version || 'v1'
                                   }))}
                                 />
-                              </Card>
+                              </Card> */}
 
                               {/* CMM Program Details */}
                               <Card 

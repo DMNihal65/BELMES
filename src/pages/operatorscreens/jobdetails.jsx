@@ -127,6 +127,10 @@ const JobDetails = () => {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [totalHours, setTotalHours] = useState(0);
+  const [quantityCompleted, setQuantityCompleted] = useState(0);
+  const [quantityRejected, setQuantityRejected] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [isSubmittingLog, setIsSubmittingLog] = useState(false);
 
   const [showIssueModal, setShowIssueModal] = useState(false);
 
@@ -189,7 +193,7 @@ const JobDetails = () => {
   // Function to load all available jobs
   const loadAvailableJobs = useCallback(async () => {
     try {
-      const response = await fetch('http://172.18.7.88:8838/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.88:5454/api/v1/planning/all_orders');
       
       if (!response.ok) {
         throw new Error('Failed to fetch available jobs');
@@ -207,7 +211,7 @@ const JobDetails = () => {
   const loadJobDetails = useCallback(async (partNumber) => {
     try {
       setIsLoadingJobData(true);
-      const response = await fetch(`http://172.18.7.88:8838/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.88:5454/api/v1/planning/search_order?part_number=${partNumber}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch job details');
@@ -260,7 +264,7 @@ const JobDetails = () => {
         throw new Error('No active operation found to deactivate');
       }
       
-      const response = await fetch('http://172.18.7.88:8838/api/v1/logs/machine-raw-live-deactive/', {
+      const response = await fetch('http://172.18.7.88:5454/api/v1/logs/machine-raw-live-deactive/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -750,6 +754,144 @@ const JobDetails = () => {
     setSelectedOperation(selectedOp);
   };
 
+  const submitOperatorLog = async () => {
+    if (!startDate || !endDate) {
+      message.error('Please select start and end times');
+      return;
+    }
+
+    try {
+      setIsSubmittingLog(true);
+      
+      // Get operator ID from localStorage - improved parsing
+      const authStorageData = localStorage.getItem('auth-storage');
+      let operatorId = 0;
+      
+      if (authStorageData) {
+        try {
+          const authData = JSON.parse(authStorageData);
+          console.log('Auth data:', authData);
+          // Access the user id correctly based on the structure
+          operatorId = authData?.state?.user_id || 
+                      authData?.user_id || 
+                      0;
+          console.log('Operator ID retrieved:', operatorId);
+        } catch (error) {
+          console.error('Error parsing auth storage data:', error);
+        }
+      }
+      
+      // Get machine ID from localStorage
+      const storedMachine = localStorage.getItem('currentMachine');
+      let machineId = 0;
+      
+      if (storedMachine) {
+        try {
+          const machineData = JSON.parse(storedMachine);
+          machineId = machineData.id || 0;
+          console.log('Machine ID retrieved:', machineId);
+        } catch (error) {
+          console.error('Error parsing machine data:', error);
+        }
+      }
+      
+      // Get operation ID for the currently active job
+      let operationId = 0;
+      
+      // First check if there's an active operation in machineOperations
+      if (machineOperations?.inprogress?.length > 0) {
+        operationId = machineOperations.inprogress[0].id || 0;
+        console.log('Operation ID from machine operations:', operationId);
+      } 
+      // If no active operation but selectedOperation exists (from job selector)
+      else if (selectedOperation && selectedOperation.id) {
+        operationId = selectedOperation.id;
+        console.log('Operation ID from selected operation:', operationId);
+      }
+      // If jobOrderData has operations, use the first one
+      else if (jobOrderData && jobOrderData.operations && jobOrderData.operations.length > 0) {
+        operationId = jobOrderData.operations[0].id;
+        console.log('Operation ID from job order data:', operationId);
+      }
+      
+      // If still no operation ID, look for it in the current job data
+      if (!operationId && jobData) {
+        if (jobData.currentOperation && jobData.currentOperation.id) {
+          operationId = jobData.currentOperation.id;
+        }
+      }
+      
+      // Last resort - check localStorage for any saved operation ID
+      if (!operationId) {
+        const currentJobData = localStorage.getItem('currentJobData');
+        if (currentJobData) {
+          try {
+            const parsedJobData = JSON.parse(currentJobData);
+            if (parsedJobData.operations && parsedJobData.operations.length > 0) {
+              operationId = parsedJobData.operations[0].id;
+              console.log('Operation ID from localStorage job data:', operationId);
+            }
+          } catch (error) {
+            console.error('Error parsing job data from localStorage:', error);
+          }
+        }
+      }
+      
+      if (!operationId) {
+        console.warn('No operation ID found, defaulting to 0');
+      }
+      
+      if (!operatorId) {
+        console.warn('No operator ID found, defaulting to 0');
+      }
+      
+      const payload = {
+        operator_id: operatorId,
+        operation_id: operationId,
+        machine_id: machineId,
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
+        quantity_completed: parseInt(quantityCompleted) || 0,
+        quantity_rejected: parseInt(quantityRejected) || 0,
+        notes: notes || ""
+      };
+      
+      console.log('Submitting operator log payload:', payload);
+      
+      const response = await fetch('http://172.18.7.88:5454/api/v1/logs/operator-log', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to submit operator log');
+      }
+      
+      const responseData = await response.json();
+      console.log('Operator log response:', responseData);
+      
+      message.success('Operator log submitted successfully');
+      
+      // Reset form fields
+      setStartDate(null);
+      setEndDate(null);
+      setTotalHours(0);
+      setQuantityCompleted(0);
+      setQuantityRejected(0);
+      setNotes('');
+      
+    } catch (error) {
+      console.error('Error submitting operator log:', error);
+      message.error(`Failed to submit operator log: ${error.message}`);
+    } finally {
+      setIsSubmittingLog(false);
+    }
+  };
+
   return (
     <Layout className="h-screen flex flex-col bg-gray-50">
       {/* Top Header Bar */}
@@ -1192,7 +1334,7 @@ const JobDetails = () => {
                     Production Timeline
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 mb-3">
                     <DatePicker
                       placeholder="Start Date"
                       className="w-full"
@@ -1216,35 +1358,56 @@ const JobDetails = () => {
                   </div>
 
                   {totalHours > 0 && (
-                    <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-lg mt-2">
+                    <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-lg mb-3">
                       <Clock className="w-4 h-4 text-blue-600" />
                       <span className="text-sm">
                         Total Time: <strong>{totalHours} hours</strong>
                       </span>
                     </div>
                   )}
-                </div>
-
-                {/* Part Count Update */}
-                <div className="bg-white rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-2">Update Part Count</div>
-                  <Space.Compact className="w-full">
-                    <Input 
-                      placeholder="Enter count"
-                      value={inputValue}
-                      onChange={e => setInputValue(e.target.value)}
-                      type="number"
-                      max={jobData.batchSize}
-                      className="flex-1"
+                  
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Quantity Completed</div>
+                      <Input 
+                        type="number" 
+                        min={0}
+                        value={quantityCompleted}
+                        onChange={(e) => setQuantityCompleted(e.target.value)}
+                        placeholder="Completed"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Quantity Rejected</div>
+                      <Input 
+                        type="number"
+                        min={0}
+                        value={quantityRejected}
+                        onChange={(e) => setQuantityRejected(e.target.value)}
+                        placeholder="Rejected"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <div className="text-xs text-gray-500 mb-1">Notes</div>
+                    <Input.TextArea
+                      rows={2}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Additional notes..."
                     />
-                    <Button 
-                      type="primary"
-                      onClick={handleUpdate}
-                      className="bg-blue-500"
-                    >
-                      Update
-                    </Button>
-                  </Space.Compact>
+                  </div>
+                  
+                  <Button
+                    type="primary"
+                    className="w-full bg-blue-500"
+                    onClick={submitOperatorLog}
+                    loading={isSubmittingLog}
+                    disabled={!startDate || !endDate}
+                  >
+                    Submit Time Log
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1404,7 +1567,12 @@ const JobDetails = () => {
         width={800}
         className="quality-modal"
       >
-        <PokaYokeChecklist jobId={jobData.jobId} />
+        <PokaYokeChecklist 
+          jobId={jobData.jobId} 
+          machineId={currentMachine?.id}
+          visible={showPokaYoke}
+          onClose={() => setShowPokaYoke(false)}
+        />
       </Modal>
 
       {/* Feedback History Modal */}
@@ -1567,7 +1735,7 @@ const JobDetails = () => {
                           // Mark that we have unsaved changes
                           setHasUnsavedChanges(true);
                           
-                          const response = await fetch(`http://172.18.7.88:8838/api/v1/planning/search_order?part_number=${inputValue}`);
+                          const response = await fetch(`http://172.18.7.88:5454/api/v1/planning/search_order?part_number=${inputValue}`);
                           if (!response.ok) {
                             throw new Error('Failed to fetch job details');
                           }

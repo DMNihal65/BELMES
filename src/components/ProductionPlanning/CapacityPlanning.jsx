@@ -222,6 +222,7 @@ const CapacityPlanning = () => {
         },
         custom: function({series, seriesIndex, dataPointIndex, w}) {
           const machine = w.globals.labels[dataPointIndex];
+          const machineData = machineUtilizationData[dataPointIndex];
           
           // Get all three values for this machine
           const availableHours = series[0][dataPointIndex];
@@ -241,6 +242,9 @@ const CapacityPlanning = () => {
           return `
             <div class="apexcharts-tooltip-box" style="padding: 10px; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: none; min-width: 220px; border-radius: 8px;">
               <div style="margin-bottom: 10px; font-weight: 600; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">${machine}</div>
+              <div style="margin-bottom: 8px; font-size: 12px; color: #6b7280;">
+                Work Center: <span style="font-weight: 500; color: #1f2937">${machineData?.work_center_name || 'Unknown'}</span>
+              </div>
               
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center;">
@@ -253,7 +257,7 @@ const CapacityPlanning = () => {
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center;">
                   <span style="display: inline-block; width: 10px; height: 10px; background: ${utilizedColor}; margin-right: 8px; border-radius: 50%;"></span>
-                  <span style="color: #6b7280;">Utilized Hours:</span>
+                  <span style="color: #6b7280;">Planned Hours:</span>
                 </div>
                 <span style="font-weight: 600; color: #374151;">${utilizedHours.toFixed(0)}</span>
               </div>
@@ -316,6 +320,9 @@ const CapacityPlanning = () => {
     const utilizedHours = data.map(item => parseFloat(item.utilized_hours.toFixed(1)));
     const remainingHours = data.map(item => parseFloat(item.remaining_hours.toFixed(1)));
     
+    // Determine if we have many machines (adjust layout for mobile)
+    const hasManyMachines = machines.length > 5;
+    
     // Create a new series configuration with proper stacking
     setChartData(prev => ({
       ...prev,
@@ -326,7 +333,7 @@ const CapacityPlanning = () => {
           group: 'available'
         },
         {
-          name: 'Utilized Hours',
+          name: 'Planned Hours',
           data: utilizedHours,
           group: 'utilization'
         },
@@ -340,7 +347,16 @@ const CapacityPlanning = () => {
         ...prev.options,
         xaxis: {
           ...prev.options.xaxis,
-          categories: machines
+          categories: machines,
+          labels: {
+            ...prev.options.xaxis.labels,
+            rotate: hasManyMachines ? -45 : 0,
+            trim: hasManyMachines,
+            style: {
+              ...prev.options.xaxis.labels.style,
+              fontSize: hasManyMachines ? '10px' : '12px'
+            }
+          }
         },
         // The key settings for proper stacking
         chart: {
@@ -352,7 +368,17 @@ const CapacityPlanning = () => {
           ...prev.options.plotOptions,
           bar: {
             ...prev.options.plotOptions.bar,
-            columnWidth: '55%'
+            columnWidth: hasManyMachines ? '80%' : '55%'
+          }
+        },
+        // Responsive legend settings
+        legend: {
+          ...prev.options.legend,
+          position: window.innerWidth < 768 ? 'bottom' : 'top',
+          fontSize: '12px',
+          itemMargin: {
+            horizontal: window.innerWidth < 768 ? 8 : 15,
+            vertical: window.innerWidth < 768 ? 8 : 5
           }
         }
       }
@@ -365,11 +391,20 @@ const CapacityPlanning = () => {
       setLoading(true);
       const data = await fetchMachineUtilizationByDateRange(startDate, endDate);
       if (Array.isArray(data) && data.length > 0) {
-        setMachineUtilizationData(data);
-        updateChartWithUtilizationData(data);
+        // Filter machines to only include those with work_center_bool = true
+        const filteredData = data.filter(machine => machine.work_center_bool === true);
+        
+        if (filteredData.length > 0) {
+          setMachineUtilizationData(filteredData);
+          updateChartWithUtilizationData(filteredData);
+        } else {
+          setMachineUtilizationData([]);
+          updateChartWithUtilizationData([]);
+          message.info('No work center machines available for the selected date range');
+        }
       } else {
         setMachineUtilizationData([]);
-        updateChartWithUtilizationData([]); // Reset chart with empty data
+        updateChartWithUtilizationData([]);
         message.info('No machine utilization data available for the selected date range');
       }
     } catch (error) {
@@ -399,7 +434,28 @@ const CapacityPlanning = () => {
     };
 
     fetchWorkCentersList();
+    
+    // Add resize listener to update chart on window resize
+    const handleResize = () => {
+      if (machineUtilizationData.length > 0) {
+        updateChartWithUtilizationData(machineUtilizationData);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
+
+  // Effect to update chart when machine data changes
+  useEffect(() => {
+    if (machineUtilizationData.length > 0) {
+      updateChartWithUtilizationData(machineUtilizationData);
+    }
+  }, [machineUtilizationData]);
 
   // Handle date range change
   const handleDateRangeChange = (dates) => {
@@ -423,13 +479,16 @@ const CapacityPlanning = () => {
   };
 
   return (
-    <div className="capacity-planning">
-      <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm">
-        <div className="flex items-center">
-          <DashboardOutlined className="text-blue-500 text-2xl mr-3" />
+    <div className="capacity-planning px-2 sm:px-4 md:px-6">
+      <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 md:p-6 rounded-xl shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center">
+          <DashboardOutlined className="text-blue-500 text-2xl mb-2 md:mb-0 md:mr-3" />
           <div>
             <Title level={4} style={{ margin: 0, color: '#374151' }}>Machine Capacity Planning</Title>
             <Text type="secondary">Monitor and analyze machine utilization across the shop floor</Text>
+            <div className="mt-2">
+              <Tag color="blue" icon={<AlertOutlined />}>Only work center machines are displayed</Tag>
+            </div>
           </div>
         </div>
       </div>
@@ -440,16 +499,16 @@ const CapacityPlanning = () => {
         bordered={false}
         bodyStyle={{ padding: '16px 24px' }}
       >
-        <Row gutter={16} align="middle">
-          <Col xs={24} md={16}>
-            <Space size="middle" align="center">
+        <Row gutter={[16, 16]} align="middle">
+          <Col xs={24} lg={16}>
+            <Space size="middle" align="center" wrap className="w-full justify-center md:justify-start">
               <div>
                 <label className="block text-sm text-gray-600 mb-1 font-medium">Select Date Range</label>
                 <RangePicker
                   value={dateRange}
                   onChange={handleDateRangeChange}
                   allowClear={false}
-                  style={{ width: 280 }}
+                  style={{ width: '100%', minWidth: '240px' }}
                   className="rounded-md"
                   ranges={{
                     'Today': [dayjs(), dayjs()],
@@ -474,11 +533,11 @@ const CapacityPlanning = () => {
               </div>
             </Space>
           </Col>
-          <Col xs={24} md={8} className="text-right">
-            <Text type="secondary">
-              Showing data for: 
-            </Text>
-            <div className="mt-1">
+          <Col xs={24} lg={8} className="text-center lg:text-right">
+            <div className="flex items-center justify-center lg:justify-end mt-1 md:mt-0">
+              <Text type="secondary" className="mr-2 whitespace-nowrap">
+                Showing data for:
+              </Text>
               <Tag 
                 color="blue" 
                 className="text-sm rounded-md py-1 px-2"
@@ -494,7 +553,7 @@ const CapacityPlanning = () => {
       {/* Utilization Chart */}
       <Card 
         className="mb-6"
-        bodyStyle={{ padding: '24px' }}
+        bodyStyle={{ padding: '16px', overflow: 'auto' }}
         bordered={false}
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)', borderRadius: '0.75rem' }}
       >
@@ -504,8 +563,8 @@ const CapacityPlanning = () => {
           </div>
         ) : machineUtilizationData.length > 0 ? (
           <div>
-            <div className="flex justify-between items-center mb-6 px-2">
-              <div>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 px-2">
+              <div className="mb-3 md:mb-0">
                 <Title level={5} style={{ margin: 0, fontWeight: 600, color: '#374151' }}>
                   Machine Utilization Chart
                 </Title>
@@ -513,8 +572,8 @@ const CapacityPlanning = () => {
                   Hours distribution per machine for the selected period
                 </Text>
               </div>
-              <Space>
-                <Tooltip title="The chart shows available hours, utilized hours, and remaining hours for each machine">
+              <Space className="self-start md:self-auto">
+                <Tooltip title="The chart shows available hours, Planned Hours, and remaining hours for each machine">
                   <Button type="text" icon={<AlertOutlined />} />
                 </Tooltip>
                 <Button 
@@ -526,12 +585,15 @@ const CapacityPlanning = () => {
                 </Button>
               </Space>
             </div>
-            <ReactApexChart 
-              options={chartData.options} 
-              series={chartData.series} 
-              type="bar" 
-              height={450} 
-            />
+            <div className="overflow-x-auto min-w-full">
+              <ReactApexChart 
+                options={chartData.options} 
+                series={chartData.series} 
+                type="bar" 
+                height={450}
+                width="100%"
+              />
+            </div>
           </div>
         ) : (
           <Empty 

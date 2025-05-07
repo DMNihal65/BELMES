@@ -8,12 +8,22 @@ const MAX_DATA_POINTS = 20; // Increase the number of points to show more histor
 
 // Create axios instance with custom config
 const api = axios.create({
-    baseURL: 'http://172.18.7.91:7777',
+    // Use relative URLs to avoid CORS issues - these will go through the development proxy
+    baseURL: '/api',
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     }
 });
+
+// Define some dummy data for when the API is unavailable
+const DUMMY_MACHINES = [
+  { id: 1, machine_name: "CNC Machine 1", workshop_name: "Workshop A" },
+  { id: 2, machine_name: "Lathe Machine 2", workshop_name: "Workshop A" },
+  { id: 3, machine_name: "Milling Machine 3", workshop_name: "Workshop B" },
+  { id: 4, machine_name: "Drill Press 4", workshop_name: "Workshop B" },
+  { id: 5, machine_name: "Grinder 5", workshop_name: "Workshop C" }
+];
 
 // Helper functions for localStorage
 const saveToLocalStorage = (key, value) => {

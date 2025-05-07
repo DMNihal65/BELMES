@@ -247,12 +247,6 @@ const QualityInspectionDetails = ({
               <Typography.Title level={4} className="mb-0">
                 Inspection Details
               </Typography.Title>
-              <Tag 
-                color={hasData ? "success" : "error"} 
-                className="px-3 py-1"
-              >
-                {hasData ? "Data Available" : "No Data"}
-              </Tag>
             </div>
           }
         >

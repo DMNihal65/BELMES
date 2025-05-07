@@ -99,7 +99,7 @@ const InspectionReport = () => {
         // If it's a document, add it to our reports list
         if (item.type === 'document') {
           extractedReports.push({
-            key: item.id,
+            key: item.id, // This is the document ID we need for download
             name: item.name,
             type: 'REPORT',
             date: item.created_at,
@@ -188,17 +188,23 @@ const InspectionReport = () => {
 
   // Handle downloading a report
   const handleDownloadReport = async (report) => {
-    // Only proceed if we have a file path
-    if (!report.file_path) {
-      message.error('No file available for download');
+    // Check if we have a valid document ID and version info
+    if (!report.key) {
+      message.error('Missing document information for download');
       return;
     }
     
     message.loading({ content: 'Preparing download...', key: 'download' });
     
     try {
-      // Call the download method from the quality store
-      const downloadData = await qualityStore.downloadReport(report.file_path);
+      const documentId = report.key;
+      // Extract version number from the report data, default to "1.0" if not available
+      const versionNumber = report.version || "1.0";
+      
+      console.log(`Downloading document ID: ${documentId}, version: ${versionNumber}`);
+      
+      // Call the new download method from the quality store
+      const downloadData = await qualityStore.downloadReportById(documentId, versionNumber);
       
       // Create a link and click it to download
       const a = document.createElement('a');
@@ -340,14 +346,14 @@ const InspectionReport = () => {
               className="hover:bg-red-50" 
             />
           </Tooltip>
-          <Tooltip title={record.file_path ? "Download PDF" : "No file available"}>
+          <Tooltip title={record.key ? "Download PDF" : "No document available"}>
             <Button 
               type="primary"
               icon={<DownloadOutlined />}
               onClick={() => handleDownloadReport(record)}
-              disabled={!record.file_path}
+              disabled={!record.key}
               size="middle"
-              className={!record.file_path ? "opacity-50" : ""}
+              className={!record.key ? "opacity-50" : ""}
             >
               PDF
             </Button>

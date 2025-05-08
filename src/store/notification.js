@@ -20,6 +20,45 @@ const API_ENDPOINTS = {
   materialWs: `ws://${API_BASE_URL.replace('http://', '')}/notification/ws/material-notifications`,
 };
 
+// Utility function to play notification sound
+const playNotificationSound = (() => {
+  // Access the global flag from the Header component if possible
+  // If window exists, add a flag to track whether notification has played
+  if (typeof window !== 'undefined' && !window.hasPlayedNotificationSound) {
+    window.hasPlayedNotificationSound = false;
+  }
+  
+  return () => {
+    try {
+      // Check if notification has already been played in this session
+      if (typeof window !== 'undefined' && window.hasPlayedNotificationSound) {
+        console.log('Notification sound already played');
+        return;
+      }
+      
+      // Check if already speaking
+      if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        console.log('Speech synthesis already speaking, skipping');
+        return;
+      }
+      
+      // Play voice notification
+      const utterance = new SpeechSynthesisUtterance("You have a new notification");
+      utterance.volume = 1;
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      window.speechSynthesis.speak(utterance);
+      
+      // Mark as played for this session
+      if (typeof window !== 'undefined') {
+        window.hasPlayedNotificationSound = true;
+      }
+    } catch (error) {
+      console.error('Error playing notification sound:', error);
+    }
+  };
+})();
+
 /**
  * Helper function to generate a consistent unique ID for a notification
  * @param {Object} notification - The notification object
@@ -611,35 +650,81 @@ const useNotificationStore = create((set, get) => ({
 }));
 
 // Helper function to show machine notification toast
-const showMachineNotification = (notification) => {
-  const key = `machine-${notification.id || notification.machine_id}-${Date.now()}`;
+const showMachineNotification = (() => {
+  // Set to track which notifications we've already shown
+  const shownNotifications = new Set();
   
-  message.info({
-    key,
-    content: `Machine Update: ${notification.status_name} - ${notification.description || 'No description'} (${notification.machine_make} #${notification.machine_id})`,
-    duration: 10,
-    style: {
-      borderLeft: '4px solid #1890ff',
-      padding: '12px',
-      marginTop: '12px'
+  return (notification) => {
+    // Generate a unique identifier for this notification
+    const notificationId = `machine-${notification.id || notification.machine_id}-${notification.updated_at}`;
+    
+    // Check if we've already shown this notification
+    if (shownNotifications.has(notificationId)) {
+      console.log('This notification has already been shown:', notificationId);
+      return;
     }
-  });
-};
+    
+    // Add to shown set
+    shownNotifications.add(notificationId);
+    
+    // Generate toast key
+    const key = `machine-${notification.id || notification.machine_id}-${Date.now()}`;
+    
+    // Play notification sound only on first notification
+    if (shownNotifications.size === 1) {
+      playNotificationSound();
+    }
+    
+    message.info({
+      key,
+      content: `Machine Update: ${notification.status_name} - ${notification.description || 'No description'} (${notification.machine_make} #${notification.machine_id})`,
+      duration: 10,
+      style: {
+        borderLeft: '4px solid #1890ff',
+        padding: '12px',
+        marginTop: '12px'
+      }
+    });
+  };
+})();
 
 // Helper function to show material notification toast
-const showMaterialNotification = (notification) => {
-  const key = `material-${notification.id || notification.part_number}-${Date.now()}`;
+const showMaterialNotification = (() => {
+  // Set to track which notifications we've already shown
+  const shownNotifications = new Set();
   
-  message.info({
-    key,
-    content: `Material Update: ${notification.status_name} - ${notification.description || 'No description'} (Part #${notification.part_number})`,
-    duration: 10,
-    style: {
-      borderLeft: '4px solid #52c41a',
-      padding: '12px',
-      marginTop: '12px'
+  return (notification) => {
+    // Generate a unique identifier for this notification
+    const notificationId = `material-${notification.id || notification.part_number}-${notification.updated_at}`;
+    
+    // Check if we've already shown this notification
+    if (shownNotifications.has(notificationId)) {
+      console.log('This notification has already been shown:', notificationId);
+      return;
     }
-  });
-};
+    
+    // Add to shown set
+    shownNotifications.add(notificationId);
+    
+    // Generate toast key
+    const key = `material-${notification.id || notification.part_number}-${Date.now()}`;
+    
+    // Play notification sound only on first notification
+    if (shownNotifications.size === 1) {
+      playNotificationSound();
+    }
+    
+    message.info({
+      key,
+      content: `Material Update: ${notification.status_name} - ${notification.description || 'No description'} (Part #${notification.part_number})`,
+      duration: 10,
+      style: {
+        borderLeft: '4px solid #52c41a',
+        padding: '12px',
+        marginTop: '12px'
+      }
+    });
+  };
+})();
 
 export default useNotificationStore; 

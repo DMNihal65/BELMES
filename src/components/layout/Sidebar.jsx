@@ -17,7 +17,12 @@ import {
   Box,
   Bell,
   ScrollText,
-  LockKeyhole
+  LockKeyhole,
+  List, Factory,
+BarChart3,
+CalendarClock,
+BarChartBig, Monitor , LineChart , Boxes, Warehouse ,
+FileBarChart,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -78,10 +83,12 @@ function Sidebar() {
       children: [
         {
           key: '/supervisor/order-management/',
+          icon: <List size={18} />,
           label: 'Order Lists',
         },
         {
           key: '/supervisor/configuration',
+          icon: <Factory size={18} />,
           label: 'Work Center',
         },
       ]
@@ -89,25 +96,27 @@ function Sidebar() {
 
     {
       key: 'production-planning',
-      icon: <Calendar size={20} />,
+      icon: <Calendar size={18} />,
       label: 'Process Engineering Cell',
       children: [
         {
           key: '/supervisor/production-planning/planning',
+          icon: <ClipboardList size={18} />,
           label: 'Process Planning',
         },
         {
           key: '/supervisor/production-planning/capacity_planning',
+          icon: <BarChart3 size={18} />,
           label: "Capacity Planning"
         },
         {
           key: '/supervisor/machine_availability',
-    
-          // icon: <Gauge  size={20} />,
+          icon: <Gauge  size={18} />,
           label: 'Assets Availability',
         },
         {
           key: '/supervisor/production-planning/scheduling',
+          icon: <CalendarClock size={18} />,
           label: 'Machine Scheduling',
         },
       ],
@@ -119,10 +128,12 @@ function Sidebar() {
       children: [
         {
           key: '/supervisor/production-monitoring/dashboard',
+          icon: <Monitor size={18} />,
           label: 'Live Monitoring',
         },
         {
           key: '/supervisor/production-monitoring/production-vs-actual',
+          icon: <BarChartBig size={18} />,
           label: 'Production vs Actual',
         },
         // {
@@ -131,14 +142,17 @@ function Sidebar() {
         // },
         {
           key: '/supervisor/production-monitoring/oee-overview',
+          icon: <Gauge size={18} />,
           label: 'OEE Overview',
         },
         {
           key: '/supervisor/production-monitoring/analytics',
+          icon: <LineChart size={18} />,
           label: 'Analytics',
         },
         {
           key: '/supervisor/pokayoke',
+          icon: <CheckSquare size={18} />,
           label: 'PokaYoke Checklists',
         },
       ],
@@ -169,7 +183,7 @@ function Sidebar() {
     //   ],
     // },
     {
-      key: 'inventory_data_management',
+      key: '/supervisor/inventory_data_management',
       icon: <Archive size={20} />,
       label: 'Inventory Management',
       children: [
@@ -179,10 +193,12 @@ function Sidebar() {
         // },
         {
           key: '/supervisor/inventory_data_management/inventory_all_data',
+          icon: <Warehouse size={18} />,
           label: 'Inventery Master ',
         },
         {
           key: '/supervisor/inventory_data_management/inventory_analytics',
+          icon: <FileBarChart size={18} />,
           label: 'Overview Data',
         },
       ],
@@ -244,10 +260,12 @@ function Sidebar() {
       children: [
         {
           key: '/admin/order-management/',
+          icon: <List size={18} />,
           label: 'Order Lists',
         },
         {
           key: '/admin/configuration',
+          icon: <Factory size={18} />,
           label: 'Work Center',
         },
       ]
@@ -259,20 +277,22 @@ function Sidebar() {
       children: [
         {
           key: '/admin/production-planning/planning',
+          icon: <ClipboardList size={18} />,
           label: 'Process Planning',
         },
         {
           key: '/admin/production-planning/capacity_planning',
+          icon: <BarChart3 size={18} />,
           label: "Capacity Planning"
         },
         {
-          key: '/supervisor/machine_availability',
-    
-          // icon: <Gauge  size={20} />,
+          key: '/admin/machine_availability',
+          icon: <Gauge  size={18} />,
           label: 'Assets Availability',
         },
         {
           key: '/admin/production-planning/scheduling',
+          icon: <CalendarClock size={18} />,
           label: 'Machine Scheduling',
         },
       ],
@@ -284,22 +304,31 @@ function Sidebar() {
       children: [
         {
           key: '/admin/production-monitoring/dashboard',
+          icon: <Monitor size={18} />,
           label: 'Live Monitoring',
         },
         {
           key: '/admin/production-monitoring/production-vs-actual',
+          icon: <BarChartBig size={18} />,
           label: 'Production vs Actual',
         },
+        // {
+        //   key: '/admin/production-monitoring/order-analysis',
+        //   label: 'Order Analysis',
+        // },
         {
           key: '/admin/production-monitoring/oee-overview',
+          icon: <Gauge size={18} />,
           label: 'OEE Overview',
         },
         {
           key: '/admin/production-monitoring/analytics',
+          icon: <LineChart size={18} />,
           label: 'Analytics',
         },
         {
-          key: '/admin/pokayoke',
+          key: '/supervisor/pokayoke',
+          icon: <CheckSquare size={18} />,
           label: 'PokaYoke Checklists',
         },
       ],
@@ -310,16 +339,18 @@ function Sidebar() {
       label: 'Quality Management',
     },
     {
-      key: 'inventory_data_management',
+      key: '/admin/inventory_data_management',
       icon: <Archive size={20} />,
       label: 'Inventory Management',
       children: [
         {
           key: '/admin/inventory_data_management/inventory_all_data',
+          icon: <Warehouse size={18} />,
           label: 'Inventery Master ',
         },
         {
           key: '/admin/inventory_data_management/inventory_analytics',
+          icon: <FileBarChart size={18} />,
           label: 'Overview Data',
         },
       ],

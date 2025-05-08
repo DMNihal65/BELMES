@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert, message } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, PlusCircleOutlined, CloseOutlined, DatabaseOutlined, UserOutlined, ClockCircleOutlined, LoadingOutlined } from '@ant-design/icons';
+import { Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -155,15 +156,28 @@ function InspectionResult() {
 
   const handleLaunchQMS = async () => {
     try {
+      setIsLaunching(true);
+      
       // Use the custom protocol handler to launch QMS
       window.location.href = "belmes://launch-qms";
       
-      // Close the QMS modal
-      setIsQmsModalVisible(false);
+      // Show success message
+      message.success('Launching QMS software...');
+      
+      // Set a timeout to reset the launching state after a few seconds
+      setTimeout(() => {
+        setIsLaunching(false);
+        
+        // Close the QMS modal if it's open
+        if (isQmsModalVisible) {
+          setIsQmsModalVisible(false);
+        }
+      }, 3000);
 
     } catch (error) {
       console.error('Failed to launch QMS:', error);
       message.error('Failed to launch QMS software');
+      setIsLaunching(false);
     }
   };
 
@@ -352,25 +366,26 @@ function InspectionResult() {
       title: 'Order ID',
       dataIndex: 'order_id',
       key: 'order_id',
-      width: '10%',
+      width: '8%',
+      fixed: 'left',
     },
     {
       title: 'Production Order',
       dataIndex: 'production_order',
       key: 'production_order',
-      width: '15%',
+      width: '12%',
     },
     {
       title: 'Part Number',
       dataIndex: 'part_number',
       key: 'part_number',
-      width: '15%',
+      width: '12%',
     },
     {
       title: 'Operations',
       dataIndex: 'operations',
       key: 'operations',
-      width: '30%',
+      width: '28%',
       render: (operations, record) => (
         <Space wrap>
           {operations.map((op) => {
@@ -391,13 +406,24 @@ function InspectionResult() {
                   transition-all duration-300
                   ${hasData ? 'hover:shadow-md' : 'hover:border-blue-400'}
                 `}
+                size="small"
               >
                 OP {op}
                 {hasData ? (
                   <Tag color="success" className="ml-2">
                     {record.inspection_data.find(d => d.operation_number === op)?.inspections.length || 0}
                   </Tag>
-                ) : null}
+                ) : (
+                  <Tooltip title="Launch QMS Software">
+                    <Tag color="warning" className="ml-2 cursor-pointer" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleLaunchQMS();
+                      }}>
+                      QMS
+                    </Tag>
+                  </Tooltip>
+                )}
               </Button>
             );
           })}
@@ -408,18 +434,59 @@ function InspectionResult() {
       title: 'Inspection Data',
       dataIndex: 'inspection_data',
       key: 'inspection_data',
-      width: '30%',
+      width: '20%',
+      fixed: 'right',
       render: (inspectionData) => {
         if (!inspectionData || inspectionData.length === 0) {
-          return <Tag color="warning">No inspection data</Tag>;
+          return (
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <Tag color="warning">No inspection data</Tag>
+              <Button 
+                type="primary" 
+                size="small"
+                icon={<Wrench size={14} />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLaunchQMS();
+                }}
+                loading={isLaunching}
+                style={{ 
+                  background: '#1890ff', 
+                  borderRadius: '4px',
+                  boxShadow: '0 2px 0 rgba(0, 0, 0, 0.045)' 
+                }}
+              >
+                Open QMS Software
+              </Button>
+            </Space>
+          );
         }
         return (
-          <Space direction="vertical">
-            {inspectionData.map((item, index) => (
-              <Tag key={index} color="processing">
-                {`Inspection ${index + 1}`}
-              </Tag>
-            ))}
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Space direction="vertical" size="small">
+              {inspectionData.map((item, index) => (
+                <Tag key={index} color="processing">
+                  {`Inspection ${index + 1}`}
+                </Tag>
+              ))}
+            </Space>
+            <Button 
+              type="primary" 
+              size="small"
+              icon={<Wrench size={14} />}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLaunchQMS();
+              }}
+              loading={isLaunching}
+              style={{ 
+                background: '#1890ff', 
+                borderRadius: '4px',
+                boxShadow: '0 2px 0 rgba(0, 0, 0, 0.045)' 
+              }}
+            >
+              Open QMS Software
+            </Button>
           </Space>
         );
       },
@@ -1175,13 +1242,18 @@ function InspectionResult() {
                 <Spin size="large" />
               </div>
             ) : inspectionData && inspectionData.length > 0 ? (
-              <Table
-                columns={columns}
-                dataSource={inspectionData}
-                pagination={false}
-                scroll={{ x: 'max-content' }}
-                className="custom-table"
-              />
+              <div style={{ maxWidth: '90%', margin: '0 auto' }}>
+                <Table
+                  columns={columns}
+                  dataSource={inspectionData}
+                  pagination={false}
+                  scroll={{ x: 1200 }}
+                  className="custom-table"
+                  bordered
+                  size="middle"
+                  sticky
+                />
+              </div>
             ) : (
               <Empty 
                 description={
@@ -1318,20 +1390,29 @@ const styles = `
     background: #f1f5f9;
   }
 
+  /* Fixed column styling */
+  .custom-table .ant-table-cell-fix-right {
+    background: #fff;
+    box-shadow: -6px 0 6px -4px rgba(0, 0, 0, 0.1);
+  }
+
+  .custom-table .ant-table-cell-fix-left {
+    background: #fff;
+    box-shadow: 6px 0 6px -4px rgba(0, 0, 0, 0.1);
+  }
+
+  .custom-table .ant-table-tbody > tr:hover .ant-table-cell-fix-left,
+  .custom-table .ant-table-tbody > tr:hover .ant-table-cell-fix-right {
+    background: #f1f5f9;
+  }
+
+  .custom-table .ant-table-sticky-scroll {
+    display: none;
+  }
+
   .custom-modal .ant-modal-content {
     border-radius: 12px;
     padding: 0;
-  }
-
-  .custom-modal .ant-modal-header {
-    border-radius: 12px 12px 0 0;
-    padding: 16px 24px;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  .custom-modal .ant-modal-body {
-    padding: 24px;
   }
 
   .ant-btn-primary {
@@ -1601,6 +1682,17 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .custom-modal .ant-modal-header {
+    border-radius: 12px 12px 0 0;
+    padding: 16px 24px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  
+  .custom-modal .ant-modal-body {
+    padding: 24px;
   }
 `;
 

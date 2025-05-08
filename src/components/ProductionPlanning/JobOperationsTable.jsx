@@ -1275,7 +1275,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
                 Cancel
               </Button>
               <Button type="primary" htmlType="submit">
-                Save Changes
+                Save Changess
               </Button>
             </div>
           </Form>

@@ -309,7 +309,7 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
           </div>
         </Card>
 
-        {/* Operation Images */}
+        {/* Operation Images
         <Card 
           title={
             <Input
@@ -332,7 +332,7 @@ const OperationMPPDetails = ({ operation, partNumber, onSave }) => {
               <div style={{ marginTop: 8 }}>Upload</div>
             </div>
           </Upload>
-        </Card>
+        </Card> */}
 
         {/* Save Changes Button */}
         <div className="flex justify-end mt-6">

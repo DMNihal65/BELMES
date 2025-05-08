@@ -723,13 +723,16 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     try {
       if (!selectedOperationForMachine) return;
 
+      const currentProductionOrder = productionOrder || orderNumber;
+
       // Include all required fields in the request data
       const currentData = {
         operation_description: selectedOperationForMachine.operation_description,
         setup_time: selectedOperationForMachine.setup_time,
         ideal_cycle_time: selectedOperationForMachine.ideal_cycle_time,
         work_center_code: selectedOperationForMachine.work_center,
-        machine_id: machineId
+        machine_id: machineId,
+        production_order: currentProductionOrder // Add production order here
       };
 
       await updateOperationMachine(

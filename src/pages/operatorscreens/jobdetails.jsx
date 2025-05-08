@@ -1719,7 +1719,7 @@ const JobDetails = () => {
           
           {jobSelectionMode === 'custom' && (
             <div className="space-y-6">
-              <div>
+              {/* <div>
                 <div className="mb-2 font-medium">Search by Part Number</div>
                 <Space.Compact style={{ width: '100%' }}>
                   <Input 
@@ -1769,7 +1769,7 @@ const JobDetails = () => {
                   </Button>
                 </Space.Compact>
               </div>
-              
+               */}
               <div>
                 <div className="mb-2 font-medium">Or Select from Available Jobs</div>
                 <Select

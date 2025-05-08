@@ -520,6 +520,7 @@ const Workcenter = () => {
         description: values.description.trim(),
         operation: values.operation.trim(),
         is_active: true,
+        is_schedulable:true,
         type: "MACHINE",
         work_center_name: values.workcenterName?.trim() || values.workcenterCode.trim()
       };
@@ -1115,6 +1116,7 @@ const Workcenter = () => {
               <Form.Item
                 name="cnc_controller"
                 label="CNC Controller"
+                rules={[{ required: true, message: 'Please enter CNC Controller' }]}
               >
                 <Input placeholder="Enter CNC Controller" />
               </Form.Item>
@@ -1122,6 +1124,7 @@ const Workcenter = () => {
               <Form.Item
                 name="cnc_controller_series"
                 label="Controller Series"
+                rules={[{ required: true, message: 'Please enter Controller Series' }]}
               >
                 <Input placeholder="Enter Controller Series" />
               </Form.Item>
@@ -1145,6 +1148,7 @@ const Workcenter = () => {
               <Form.Item
                 name="last_maintenance_date"
                 label="Last Maintenance Date"
+                rules={[{ required: true, message: 'Please select Last Maintenance Date' }]}
               >
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
@@ -1153,6 +1157,7 @@ const Workcenter = () => {
                 name="remarks"
                 label="Remarks"
                 className="col-span-2"
+                rules={[{ required: true, message: 'Please Enter Remarks or any other Related information' }]}
               >
                 <Input.TextArea rows={2} placeholder="Enter Remarks" />
               </Form.Item>
@@ -1356,7 +1361,7 @@ const Workcenter = () => {
         </Modal>
 
         <Modal
-          title="Add New Workcenter"
+          title="Add New Workcenterss"
           open={isAddModalVisible}
           onOk={handleAddWorkcenter}
           onCancel={() => {

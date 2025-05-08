@@ -239,6 +239,7 @@ const useWorkcenterStore = create((set, get) => ({
         description: workcenterData.description,
         operation: workcenterData.operation,
         is_active: true,
+        is_schedulable: true,
         type: "MACHINE",
         work_center_name: workcenterData.work_center_name
       };

@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { useState, useEffect } from 'react';
 import { Spin, Tooltip } from 'antd';
@@ -417,7 +416,8 @@ const usePlanningStore = create((set) => ({
         setup_time: parseFloat(updateData.setup_time),
         ideal_cycle_time: parseFloat(updateData.ideal_cycle_time),
         work_center_code: updateData.work_center_code,
-        machine_id: updateData.machine_id
+        machine_id: updateData.machine_id,
+        production_order: updateData.production_order
       };
 
       console.log('Sending machine update data:', formattedData);

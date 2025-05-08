@@ -440,7 +440,7 @@ const InspectionReport = () => {
             <span>Date Range</span>
           </div>
           <DatePicker.RangePicker 
-            className="w-full rounded-md shadow-sm"
+            className="w-full"
             placeholder={['Start date', 'End date']}
             size="middle"
           />
@@ -451,7 +451,7 @@ const InspectionReport = () => {
             <span>Report Type</span>
           </div>
           <Select
-            className="w-full rounded-md shadow-sm"
+            className="w-full"
             defaultValue="all"
             onChange={setSelectedReportType}
             options={[
@@ -464,31 +464,18 @@ const InspectionReport = () => {
           />
         </Col>
         <Col span={8}>
-          <Space direction="vertical" className="w-full">
-            <div className="font-medium mb-2 flex items-center">
-              <FileSearchOutlined className="mr-2 text-blue-500" />
-              <span>Export Actions</span>
-            </div>
-            <Space size="middle">
-              <Radio.Group defaultValue="pdf" buttonStyle="solid">
-                <Radio.Button value="pdf" className="flex items-center">
-                  <FilePdfOutlined className="mr-1" /> PDF
-                </Radio.Button>
-                <Radio.Button value="excel" className="flex items-center">
-                  <FileExcelOutlined className="mr-1" /> Excel
-                </Radio.Button>
-                <Radio.Button value="csv">CSV</Radio.Button>
-              </Radio.Group>
-              <Button 
-                type="primary"
-                icon={<AppstoreOutlined />}
-                onClick={handleLaunchQMS}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 border-none shadow-md hover:shadow-lg"
-              >
-                Launch QMS
-              </Button>
-            </Space>
-          </Space>
+          <div className="font-medium mb-2 flex items-center">
+            <AppstoreOutlined className="mr-2 text-blue-500" />
+            <span>Actions</span>
+          </div>
+          <Button 
+            type="primary"
+            icon={<AppstoreOutlined />}
+            onClick={handleLaunchQMS}
+            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 border-none shadow-sm hover:shadow-md transition-all"
+          >
+            Launch QMS
+          </Button>
         </Col>
       </Row>
 

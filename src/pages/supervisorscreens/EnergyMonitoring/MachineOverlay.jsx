@@ -246,12 +246,16 @@ function MachineOverlay({ machineId, machineName, onBack }) {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: '#f0f2f5',
+      backgroundColor: 'rgba(240, 242, 245, 0.8)',
       zIndex: 1000,
       padding: '24px',
       borderRadius: '8px',
       overflowY: 'auto'
     }}>
+      <div style={{ color: 'red', fontWeight: 'bold', marginBottom: '10px' }}>
+        DEBUG: Machine Overlay for ID: {machineId}, Name: {machineName}
+      </div>
+      
       <div style={{ marginBottom: '20px' }}>
         <Space align="center" style={{ marginBottom: '16px' }}>
           <Button 

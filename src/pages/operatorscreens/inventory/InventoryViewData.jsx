@@ -750,7 +750,7 @@ const InventoryViewData = () => {
   return (
     <div className="bg-white p-4 lg:p-6 xl:p-8 rounded-lg shadow min-h-screen">
       <div className="flex flex-col h-full">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+        {/* <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
           <Title level={4} className="m-0">Inventory Master Data</Title>
           <Space wrap className="self-start lg:self-auto">
             <Button 
@@ -765,7 +765,7 @@ const InventoryViewData = () => {
               Add Category
             </Button>
           </Space>
-        </div>
+        </div> */}
 
         <Divider className="my-2" />
         

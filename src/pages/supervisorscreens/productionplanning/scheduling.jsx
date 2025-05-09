@@ -476,6 +476,10 @@ const Scheduling = () => {
                         ? `<div class="info-row">
                             <span class="label">Start:</span>
                             <span class="value">${new Date(op.start_time).toLocaleString()}</span>
+                          </div>
+                          <div class="info-row">
+                            <span class="label">PDC of Operation:</span>
+                            <span class="value">${new Date(groupOperations[groupOperations.length - 1].end_time).toLocaleString()}</span>
                           </div>`
                         : isLastOperation
                         ? `<div class="info-row">
@@ -488,64 +492,6 @@ const Scheduling = () => {
                 </div>
               `;
             }
-            // template: function(item) {
-            //   const op = item.operation;
-            //   if (!op) return '';
-            //   // Group by component, machine, production_order, and description
-            //   const groupOperations = scheduleData.scheduled_operations
-            //     .filter(o =>
-            //       o.component === op.component &&
-            //       o.machine === op.machine &&
-            //       o.production_order === op.production_order &&
-            //       o.description === op.description
-            //     )
-            //     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-            
-            //   const isFirstOperation = groupOperations[0]?.id === op.id;
-            //   const isLastOperation = groupOperations[groupOperations.length - 1]?.id === op.id;
-            
-            //   return `
-            //     <div class="timeline-tooltip">
-            //       <div class="tooltip-header">
-            //         <div class="info-row">
-            //           <span class="label">Part Number:</span>
-            //           <span class="component">${op.component}</span>
-            //         </div>
-            //         <div class="info-row">
-            //           <span class="label">Machine:</span>
-            //           <span class="value">${op.machine}</span>
-            //         </div>
-            //         <div class="info-row">
-            //           <span class="label">Production Order:</span>
-            //           <span class="value">${op.production_order}</span>
-            //         </div>
-            //       </div>
-            //       <div class="tooltip-body">
-            //         <div class="info-row">
-            //           <span class="label">Operation:</span>
-            //           <span class="value">${op.description}</span>
-            //         </div>
-            //         <div class="info-row">
-            //           <span class="label">Quantity:</span>
-            //           <span class="value">${op.quantity}</span>
-            //         </div>
-            //         ${
-            //           isFirstOperation
-            //             ? `<div class="info-row">
-            //                 <span class="label">Start:</span>
-            //                 <span class="value">${new Date(op.start_time).toLocaleString()}</span>
-            //               </div>`
-            //             : isLastOperation
-            //             ? `<div class="info-row">
-            //                 <span class="label">End:</span>
-            //                 <span class="value">${new Date(op.end_time).toLocaleString()}</span>
-            //               </div>`
-            //             : ''
-            //         }
-            //       </div>
-            //     </div>
-            //   `;
-            // }
           },
           timeAxis: { 
             scale: getTimeAxisScale(viewType),

@@ -99,6 +99,12 @@ function Sidebar() {
       icon: <Calendar size={18} />,
       label: 'Process Engineering Cell',
       children: [
+
+         {
+          key: '/supervisor/machine_availability',
+          icon: <Gauge  size={18} />,
+          label: 'Assets Availability',
+        },
         {
           key: '/supervisor/production-planning/planning',
           icon: <ClipboardList size={18} />,
@@ -109,11 +115,7 @@ function Sidebar() {
           icon: <BarChart3 size={18} />,
           label: "Capacity Planning"
         },
-        {
-          key: '/supervisor/machine_availability',
-          icon: <Gauge  size={18} />,
-          label: 'Assets Availability',
-        },
+       
         {
           key: '/supervisor/production-planning/scheduling',
           icon: <CalendarClock size={18} />,
@@ -213,11 +215,11 @@ function Sidebar() {
       icon: <BarChart2 size={20} />,
       label: 'Energy Monitoring',
     },
-    // {
-    //   key: '/supervisor/energy-monitoring-bel',
-    //   icon: <BarChart2 size={20} />,
-    //   label: 'Energy Monitoring BEL',
-    // },
+    {
+      key: '/supervisor/energy-monitoring-bel',
+      icon: <BarChart2 size={20} />,
+      label: 'Energy Monitoring BEL',
+    },
     // {
     //   key: '/supervisor/machine_availability',
 
@@ -276,6 +278,11 @@ function Sidebar() {
       label: 'Process Engineering Cell',
       children: [
         {
+          key: '/admin/machine_availability',
+          icon: <Gauge  size={18} />,
+          label: 'Assets Availability',
+        },
+        {
           key: '/admin/production-planning/planning',
           icon: <ClipboardList size={18} />,
           label: 'Process Planning',
@@ -285,11 +292,7 @@ function Sidebar() {
           icon: <BarChart3 size={18} />,
           label: "Capacity Planning"
         },
-        {
-          key: '/admin/machine_availability',
-          icon: <Gauge  size={18} />,
-          label: 'Assets Availability',
-        },
+       
         {
           key: '/admin/production-planning/scheduling',
           icon: <CalendarClock size={18} />,
@@ -364,6 +367,11 @@ function Sidebar() {
       key: '/admin/energy-monitoring',
       icon: <BarChart2 size={20} />,
       label: 'Energy Monitoring',
+    },
+    {
+      key: '/admin/energy-monitoring-bel',
+      icon: <BarChart2 size={20} />,
+      label: 'Energy Monitoring BEL',
     },
     // {
     //   key: '/admin/machine_availability',

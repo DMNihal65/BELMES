@@ -3020,23 +3020,17 @@ const handleAddTool = async (values) => {
 
                         {/* Program Details Section with improved styling */}
                         <div className="bg-gray-50 p-4 rounded-lg shadow-sm mb-4">
-                          <div className="flex items-center mb-4">
-                            <FileTextOutlined className="text-blue-500 text-xl mr-2" />
-                            <Text strong className="text-lg">Program Configuration Matrix</Text>
-                          </div>
-                          
-                          <div className="flex flex-col md:flex-row gap-6">
-                            {/* Left column with program details - with scrollable container */}
-                            <div className="w-full md:w-1/2 md:max-h-[600px] md:overflow-y-auto pr-2">
-                              {/* CNC Program Details */}
-                              {/* <Card 
+                          <div className="flex flex-col gap-6">
+                            {/* Program Documents Section - Full Width */}
+                            <div className="w-full">
+                              <Card 
                                 title={
                                   <div className="flex items-center">
-                                    <ToolOutlined className="text-blue-500 mr-2" />
-                                    <span>CNC Program Details</span>
+                                    <FileTextOutlined className="text-blue-500 mr-2" />
+                                    <span>Program Documents</span>
                                   </div>
                                 }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
+                                className="shadow-md hover:shadow-lg transition-shadow duration-300"
                                 headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
                                 bodyStyle={{ padding: '12px' }}
                               >
@@ -3046,102 +3040,80 @@ const handleAddTool = async (values) => {
                                   pagination={{ pageSize: 5, size: 'small' }}
                                   columns={[
                                     {
-                                      title: 'Program Name',
-                                      dataIndex: 'program_name',
-                                      key: 'program_name',
-                                      width: '50%',
+                                      title: 'Name',
+                                      dataIndex: 'name',
+                                      key: 'name',
+                                      width: '25%',
                                       ellipsis: true
                                     },
                                     {
-                                      title: 'Program Number',
-                                      dataIndex: 'program_number',
-                                      key: 'program_number',
+                                      title: 'Description',
+                                      dataIndex: 'description',
+                                      key: 'description',
                                       width: '25%',
-                                      align: 'center'
+                                      ellipsis: true
+                                    },
+                                    {
+                                      title: 'Operation',
+                                      dataIndex: 'operation_number',
+                                      key: 'operation_number',
+                                      width: '20%',
+                                      render: (operationNumber, record) => {
+                                        if (!operationNumber) return 'N/A';
+                                        const operation = selectedJob?.operations?.find(op => op.operation_number === operationNumber);
+                                        return operation 
+                                          ? `${operation.operation_number} - ${operation.operation_description}`
+                                          : `${operationNumber}`;
+                                      }
                                     },
                                     {
                                       title: 'Version',
-                                      dataIndex: 'version',
+                                      dataIndex: ['latest_version', 'version_number'],
                                       key: 'version',
-                                      width: '25%',
-                                      align: 'center'
+                                      width: '10%',
+                                      align: 'center',
+                                      render: (version) => version || 'N/A'
+                                    },
+                                    {
+                                      title: 'Upload Date',
+                                      dataIndex: 'created_at',
+                                      key: 'created_at',
+                                      width: '10%',
+                                      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
+                                    },
+                                    {
+                                      title: 'Actions',
+                                      key: 'actions',
+                                      width: '10%',
+                                      align: 'center',
+                                      render: (_, record) => (
+                                        <Space>
+                                          <Button
+                                            type="link"
+                                            icon={<DownloadOutlined />}
+                                            onClick={() => handleDownloadDocument(record)}
+                                          />
+                                          <Button
+                                            type="link"
+                                            icon={<EyeOutlined />}
+                                            onClick={() => handleViewDrawing(record.id)}
+                                          />
+                                          <Button
+                                            type="link"
+                                            icon={<HistoryOutlined />}
+                                            onClick={() => handleViewVersionHistory(record)}
+                                          />
+                                        </Space>
+                                      )
                                     }
                                   ]}
-                                  dataSource={programs.map(program => ({
-                                    key: program.id,
-                                    program_name: program.program_name || program.description,
-                                    program_number: program.program_number || program.programNo,
-                                    version: program.version || 'v1'
-                                  }))}
+                                  dataSource={programDocuments}
                                 />
-                              </Card> */}
-
-                              {/* CMM Program Details */}
-                              <Card 
-                                title={
-                                  <div className="flex items-center">
-                                    <RobotOutlined className="text-blue-500 mr-2" />
-                                    <span>CMM Program Details</span>
-                                  </div>
-                                }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
-                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                                bodyStyle={{ padding: '12px' }}
-                              >
-                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
-                                  <RobotOutlined className="text-blue-400 text-4xl mb-2" />
-                                  <Text strong className="text-base mb-1">Coming Soon</Text>
-                                  <Text type="secondary" className="text-center text-xs">
-                                    CMM Program Management
-                                  </Text>
-                                </div>
-                              </Card>
-
-                              {/* VMS Program Details */}
-                              <Card 
-                                title={
-                                  <div className="flex items-center">
-                                    <ExperimentOutlined className="text-blue-500 mr-2" />
-                                    <span>VMS Program Details</span>
-                                  </div>
-                                }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
-                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                                bodyStyle={{ padding: '12px' }}
-                              >
-                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
-                                  <ExperimentOutlined className="text-blue-400 text-4xl mb-2" />
-                                  <Text strong className="text-base mb-1">Coming Soon</Text>
-                                  <Text type="secondary" className="text-center text-xs">
-                                    Vision Measurement System
-                                  </Text>
-                                </div>
-                              </Card>
-
-                              {/* Manual/Visual Inspection Plan Details */}
-                              <Card 
-                                title={
-                                  <div className="flex items-center">
-                                    <FileSearchOutlined className="text-blue-500 mr-2" />
-                                    <span>Manual/Visual Inspection</span>
-                                  </div>
-                                }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300"
-                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                                bodyStyle={{ padding: '12px' }}
-                              >
-                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
-                                  <FileSearchOutlined className="text-blue-400 text-4xl mb-2" />
-                                  <Text strong className="text-base mb-1">Coming Soon</Text>
-                                  <Text type="secondary" className="text-center text-xs">
-                                    Inspection Plan Management
-                                  </Text>
-                                </div>
                               </Card>
                             </div>
-                            
-                            {/* Right column with Engineering Drawings - with fixed height and scrolling */}
-                            <div className="w-full md:w-1/2 md:h-[600px]">
+
+                            {/* Engineering Drawings Section - Full Width */}
+                            <div className="w-full">
                               <Card 
                                 title={
                                   <div className="flex items-center">
@@ -3149,15 +3121,9 @@ const handleAddTool = async (values) => {
                                     <span>Engineering Drawings</span>
                                   </div>
                                 }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300 h-full"
+                                className="shadow-md hover:shadow-lg transition-shadow duration-300"
                                 headStyle={{ background: '#f0fff0', borderBottom: '2px solid #52c41a' }}
-                                bodyStyle={{ 
-                                  padding: '12px', 
-                                  height: 'calc(100% - 56px)', 
-                                  overflow: 'hidden',
-                                  display: 'flex',
-                                  flexDirection: 'column'
-                                }}
+                                bodyStyle={{ padding: '12px' }}
                                 loading={drawingsLoading}
                               >
                                 {engineeringDrawings.length > 0 ? (
@@ -3170,13 +3136,12 @@ const handleAddTool = async (values) => {
                                       position: ['bottomCenter'],
                                       showTotal: (total) => `Total ${total} drawings` 
                                     }}
-                                    scroll={{ y: 500 }}
                                     columns={[
                                       {
-                                        title: 'Name',
+                                        title: 'Drawing Name',
                                         dataIndex: 'name',
                                         key: 'name',
-                                        width: '50%',
+                                        width: '60%',
                                         ellipsis: true,
                                         render: (text) => (
                                           <Tooltip title={text}>
@@ -3186,22 +3151,16 @@ const handleAddTool = async (values) => {
                                       },
                                       {
                                         title: 'Version',
-                                        dataIndex: 'version',
+                                        dataIndex: ['latest_version', 'version_number'],
                                         key: 'version',
-                                        width: '15%',
-                                        align: 'center'
-                                      },
-                                      {
-                                        title: 'Date',
-                                        dataIndex: 'created_at',
-                                        key: 'created_at',
                                         width: '20%',
-                                        render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
+                                        align: 'center',
+                                        render: (version) => version || 'v1'
                                       },
                                       {
                                         title: 'Action',
                                         key: 'action',
-                                        width: '15%',
+                                        width: '20%',
                                         align: 'center',
                                         render: (_, record) => (
                                           <Button 
@@ -3212,16 +3171,19 @@ const handleAddTool = async (values) => {
                                         )
                                       }
                                     ]}
-                                    dataSource={engineeringDrawings.map(drawing => ({
+                                    dataSource={engineeringDrawings.filter(doc => 
+                                      doc.doc_type === 'drawing' || 
+                                      doc.name.toLowerCase().includes('.pdf') ||
+                                      doc.name.toLowerCase().includes('.dwg')
+                                    ).map(drawing => ({
                                       key: drawing.id,
                                       id: drawing.id,
                                       name: drawing.name,
-                                      version: drawing.latest_version?.version_number || 'v1',
-                                      created_at: drawing.latest_version?.created_at || drawing.created_at
+                                      latest_version: drawing.latest_version
                                     }))}
                                   />
                                 ) : (
-                                  <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg">
+                                  <div className="flex flex-col items-center justify-center h-[200px] bg-gray-50 rounded-lg">
                                     <FileTextOutlined className="text-green-400 text-5xl mb-4" />
                                     <Text strong className="text-lg mb-2">No Drawings Available</Text>
                                     <Text type="secondary" className="text-center">

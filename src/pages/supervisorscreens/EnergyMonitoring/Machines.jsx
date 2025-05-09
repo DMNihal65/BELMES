@@ -372,6 +372,9 @@ const Machines = ({ onBack }) => {
 
   const handleMachineClick = (machineId) => {
     const selectedMachine = machines.find(machine => machine.id === machineId);
+    console.log("Selected machine:", selectedMachine);
+    console.log("Setting machineId:", machineId);
+    console.log("Setting machineName:", selectedMachine?.machine_name);
     setSelectedMachineId(machineId);
     setSelectedMachineName(selectedMachine?.machine_name);
     // Reset the tab state to 'overview' when opening a new machine
@@ -425,16 +428,7 @@ const Machines = ({ onBack }) => {
         height: 'calc(100vh - 150px)',
         position: 'relative'
       }}>
-        {selectedMachineId ? (
-          <MachineOverlay 
-            machineId={selectedMachineId}
-            machineName={selectedMachineName}
-            onBack={() => {
-              setSelectedMachineId(null);
-              setSelectedMachineName(null);
-            }}
-          />
-        ) : (
+        {!selectedMachineId ? (
           <>
             <StatusLegend />
             <Canvas
@@ -486,7 +480,17 @@ const Machines = ({ onBack }) => {
                   })}
                 </RotatingMachines>
 
-                <Environment preset="city" />
+                {/* Replace Environment with a simpler setup */}
+                {/* <Environment preset="city" /> */}
+                <ambientLight intensity={0.8} />
+                <directionalLight 
+                  position={[10, 10, 5]} 
+                  intensity={1} 
+                  castShadow 
+                  shadow-mapSize-width={2048} 
+                  shadow-mapSize-height={2048}
+                />
+
                 <OrbitControls 
                   enableZoom={true}
                   enablePan={true}
@@ -499,6 +503,15 @@ const Machines = ({ onBack }) => {
               </Suspense>
             </Canvas>
           </>
+        ) : (
+          <MachineOverlay 
+            machineId={selectedMachineId}
+            machineName={selectedMachineName}
+            onBack={() => {
+              setSelectedMachineId(null);
+              setSelectedMachineName(null);
+            }}
+          />
         )}
       </div>
     </div>

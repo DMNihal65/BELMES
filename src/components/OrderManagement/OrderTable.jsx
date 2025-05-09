@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { Table, Tag, Badge, Button, Space, Tooltip } from 'antd';
-import { EyeOutlined } from '@ant-design/icons';
+import { Table, Tag, Badge, Button, Space, Tooltip, Popconfirm } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
 import { message } from 'antd';
 import dayjs from 'dayjs';
+import useOrderStore from '../../store/order-store';
 
 const OrderTable = ({ orders, onRefresh }) => {
+  const { deleteOrder } = useOrderStore();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [deletingOrder, setDeletingOrder] = useState(null);
 
   // Add useEffect for initial load and polling
   React.useEffect(() => {
@@ -25,10 +28,21 @@ const OrderTable = ({ orders, onRefresh }) => {
     return () => clearInterval(intervalId);
   }, [onRefresh]);
 
-  // Handle view action
-  const handleViewDetails = (record) => {
-    message.info(`Viewing details for order ${record.orderNumber}`);
-    // Implement view logic
+  // Handle delete action
+  const handleDelete = async (record) => {
+    try {
+      setDeletingOrder(record.id);
+      await deleteOrder(record.id);
+      message.success(`Order ${record.production_order} deleted successfully`);
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      message.error('Failed to delete order: ' + error.message);
+    } finally {
+      setDeletingOrder(null);
+    }
   };
 
   const columns = [
@@ -130,23 +144,30 @@ const OrderTable = ({ orders, onRefresh }) => {
       ],
       onFilter: (value, record) => record.status === value,
     },
-    // {
-    //   title: 'Actions',
-    //   key: 'actions',
-    //   width: 100,
-    //   fixed: 'right',
-    //   render: (_, record) => (
-    //     <Space>
-    //       <Tooltip title="View Details">
-    //         <Button
-    //           icon={<EyeOutlined />}
-    //           size="small"
-    //           onClick={() => handleViewDetails(record)}
-    //         />
-    //       </Tooltip>
-    //     </Space>
-    //   ),
-    // },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 80,
+      fixed: 'right',
+      render: (_, record) => (
+        <Tooltip title="Delete Order">
+          <Popconfirm
+            title="Are you sure you want to delete this order?"
+            onConfirm={() => handleDelete(record)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              loading={deletingOrder === record.id}
+            />
+          </Popconfirm>
+        </Tooltip>
+      ),
+    },
   ];
 
   // Helper function to determine priority tag color

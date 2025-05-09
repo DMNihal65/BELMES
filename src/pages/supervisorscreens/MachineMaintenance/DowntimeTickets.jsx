@@ -152,9 +152,9 @@ const DowntimeTickets = () => {
       key: 'id',
     },
     {
-      title: 'Machine ID',
-      dataIndex: 'machine_id',
-      key: 'machine_id',
+      title: 'Machine Name',
+      dataIndex: 'machine_name',
+      key: 'machine_name',
     },
     {
       title: 'Category',

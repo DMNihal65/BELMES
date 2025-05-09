@@ -166,6 +166,9 @@ const DynamicSchedulingGraph2 = () => {
     fetchScheduleData();
   }, []);
 
+
+  
+
   // Initialize timeline when container is ready
   useEffect(() => {
     if (!timelineContainerRef || !scheduleData) return;
@@ -181,59 +184,65 @@ const DynamicSchedulingGraph2 = () => {
     const items = new DataSet();
     const groups = new DataSet();
 
-    
-    
-    // Create a mapping of machine IDs to their full names
+    // Create a mapping of machine IDs to their full names and vice versa
     const machineMapping = {};
+    const machineNameToId = {};
     scheduleData.work_centers.forEach(wc => {
-      wc.machines.forEach(machine => {
-        const machineFullName = `${wc.work_center_code}-${machine.name}`;
-        machineMapping[machine.id] = machineFullName;
-      });
+      // Only process work centers that are schedulable
+      if (wc.is_schedulable) {
+        wc.machines.forEach(machine => {
+          const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
+          machineMapping[machine.id] = machineFullName;
+          machineNameToId[machineFullName] = machine.id;
+        });
+      }
     });
 
     // Add groups for each machine with subgroups
     scheduleData.work_centers.forEach(wc => {
-      wc.machines.forEach(machine => {
-        const machineFullName = `${wc.work_center_code}-${machine.name}`;
-        const machineLabel = `${wc.work_center_code} - ${machine.name}`;
-        
-        // Add machine header group
-        groups.add({
-          id: machineFullName,
-          content: `<strong>${machineLabel}</strong>`,
-          title: wc.work_center_name,
-          nestedGroups: [
-            `${machineFullName}-planned`,
-            `${machineFullName}-actual`,
-            `${machineFullName}-rescheduled`
-          ],
-          showNested: true
-        });
+      // Only add groups for schedulable work centers
+      if (wc.is_schedulable) {
+        wc.machines.forEach(machine => {
+          const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
+          const machineLabel = `${wc.work_center_code} - ${machine.name}`;
+          
+          // Add machine header group
+          groups.add({
+            id: machineFullName,
+            content: `<strong>${machineLabel}</strong>`,
+            title: wc.work_center_name,
+            nestedGroups: [
+              `${machineFullName}-planned`,
+              `${machineFullName}-actual`,
+              `${machineFullName}-rescheduled`
+            ],
+            showNested: true
+          });
 
-        // Add subgroups for each type in order
-        groups.add({
-          id: `${machineFullName}-planned`,
-          content: 'Planned',
-          className: 'planned-group',
-          title: 'Planned Operations',
-          order: 1
+          // Add subgroups for each type in order
+          groups.add({
+            id: `${machineFullName}-planned`,
+            content: 'Planned',
+            className: 'planned-group',
+            title: 'Planned Operations',
+            order: 1
+          });
+          groups.add({
+            id: `${machineFullName}-actual`,
+            content: 'Actual',
+            className: 'actual-group',
+            title: 'Actual Production',
+            order: 2
+          });
+          groups.add({
+            id: `${machineFullName}-rescheduled`,
+            content: 'Rescheduled',
+            className: 'rescheduled-group',
+            title: 'Rescheduled Operations',
+            order: 3
+          });
         });
-        groups.add({
-          id: `${machineFullName}-actual`,
-          content: 'Actual',
-          className: 'actual-group',
-          title: 'Actual Production',
-          order: 2
-        });
-        groups.add({
-          id: `${machineFullName}-rescheduled`,
-          content: 'Rescheduled',
-          className: 'rescheduled-group',
-          title: 'Rescheduled Operations',
-          order: 3
-        });
-      });
+      }
     });
 
     // Update the filter operation function to handle machine filtering
@@ -260,14 +269,17 @@ const DynamicSchedulingGraph2 = () => {
       if (selectedMachine) {
         switch (type) {
           case 'planned':
-            if (op.machine !== selectedMachine) return false;
+            // For planned operations, we need to find the machine ID from the name
+            const plannedMachineId = Object.entries(machineNameToId).find(([key]) => key.includes(op.machine))?.[1];
+            if (plannedMachineId !== selectedMachine) return false;
             break;
           case 'actual':
-            if (op.machine_name !== selectedMachine) return false;
+            // For actual operations, we need to find the machine ID from the name
+            const actualMachineId = Object.entries(machineNameToId).find(([key]) => key.includes(op.machine_name))?.[1];
+            if (actualMachineId !== selectedMachine) return false;
             break;
           case 'rescheduled':
-            const machineName = machineMapping[op.machine_id.toString()];
-            if (machineName !== selectedMachine) return false;
+            if (op.machine_id.toString() !== selectedMachine) return false;
             break;
         }
       }
@@ -278,59 +290,69 @@ const DynamicSchedulingGraph2 = () => {
     // Add scheduled operations (Planned) with filters
     scheduleData.scheduled_operations.forEach((op, index) => {
       if (filterOperation(op, 'planned')) {
-        items.add({
-          id: `planned-${index}`,
-          group: `${op.machine}-planned`,
-          start: new Date(op.start_time),
-          end: new Date(op.end_time),
-          content: '',
-          className: 'planned-bar',
-          title: `
-            <div>
-              <strong>Planned Operation</strong><br/>
-              Part Number: ${op.component}<br/>
-              Production Order: ${op.production_order}<br/>
-              Description: ${op.description}<br/>
-              Quantity: ${op.quantity}<br/>
-              Start: ${moment(op.start_time).format('DD/MM/YYYY HH:mm')}<br/>
-              End: ${moment(op.end_time).format('DD/MM/YYYY HH:mm')}
-            </div>
-          `
-        });
+        // Find the machine ID for this operation
+        const machineId = Object.entries(machineNameToId).find(([key]) => key.includes(op.machine))?.[1];
+        if (machineId) {
+          const machineFullName = machineMapping[machineId];
+          items.add({
+            id: `planned-${index}`,
+            group: `${machineFullName}-planned`,
+            start: new Date(op.start_time),
+            end: new Date(op.end_time),
+            content: '',
+            className: 'planned-bar',
+            title: `
+              <div>
+                <strong>Planned Operation</strong><br/>
+                Part Number: ${op.component}<br/>
+                Production Order: ${op.production_order}<br/>
+                Description: ${op.description}<br/>
+                Quantity: ${op.quantity}<br/>
+                Start: ${moment(op.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+                End: ${moment(op.end_time).format('DD/MM/YYYY HH:mm')}
+              </div>
+            `
+          });
+        }
       }
     });
 
     // Add production logs (Actual) with filters
     scheduleData.production_logs.forEach((log, index) => {
       if (filterOperation(log, 'actual')) {
-        items.add({
-          id: `actual-${index}`,
-          group: `${log.machine_name}-actual`,
-          start: new Date(log.start_time),
-          end: new Date(log.end_time),
-          content: '',
-          className: 'actual-bar',
-          title: `
-            <div>
-              <strong>Actual Production</strong><br/>
-              Part Number: ${log.part_number}<br/>
-              Production Order: ${log.production_order}<br/>
-              Operation: ${log.operation_description}<br/>
-              Completed: ${log.quantity_completed}<br/>
-              Rejected: ${log.quantity_rejected}<br/>
-              Notes: ${log.notes}<br/>
-              Start: ${moment(log.start_time).format('DD/MM/YYYY HH:mm')}<br/>
-              End: ${moment(log.end_time).format('DD/MM/YYYY HH:mm')}
-            </div>
-          `
-        });
+        // Find the machine ID for this operation
+        const machineId = Object.entries(machineNameToId).find(([key]) => key.includes(log.machine_name))?.[1];
+        if (machineId) {
+          const machineFullName = machineMapping[machineId];
+          items.add({
+            id: `actual-${index}`,
+            group: `${machineFullName}-actual`,
+            start: new Date(log.start_time),
+            end: new Date(log.end_time),
+            content: '',
+            className: 'actual-bar',
+            title: `
+              <div>
+                <strong>Actual Production</strong><br/>
+                Part Number: ${log.part_number}<br/>
+                Production Order: ${log.production_order}<br/>
+                Operation: ${log.operation_description}<br/>
+                Completed: ${log.quantity_completed}<br/>
+                Rejected: ${log.quantity_rejected}<br/>
+                Notes: ${log.notes}<br/>
+                Start: ${moment(log.start_time).format('DD/MM/YYYY HH:mm')}<br/>
+                End: ${moment(log.end_time).format('DD/MM/YYYY HH:mm')}
+              </div>
+            `
+          });
+        }
       }
     });
 
     // Add rescheduled operations with filters
     scheduleData.reschedule.forEach((reschedule, index) => {
-      const machineName = machineMapping[reschedule.machine_id.toString()];
-      if (machineName && filterOperation(reschedule, 'rescheduled')) {
+      const machineFullName = machineMapping[reschedule.machine_id.toString()];
+      if (machineFullName && filterOperation(reschedule, 'rescheduled')) {
         // Find matching PDC data
         const matchingPDC = pdcData?.find(
           pdc => pdc.part_number === reschedule.part_number && 
@@ -339,7 +361,7 @@ const DynamicSchedulingGraph2 = () => {
 
         items.add({
           id: `rescheduled-${index}`,
-          group: `${machineName}-rescheduled`,
+          group: `${machineFullName}-rescheduled`,
           start: new Date(reschedule.start_time),
           end: new Date(reschedule.end_time),
           content: '',
@@ -660,13 +682,15 @@ const DynamicSchedulingGraph2 = () => {
             style={{ width: 200 }}
             allowClear
           >
-            {scheduleData?.work_centers.map(wc => 
-              wc.machines.map(machine => (
-                <Option key={`${wc.work_center_code}-${machine.name}`} value={`${wc.work_center_code}-${machine.name}`}>
-                  {`${wc.work_center_code} - ${machine.name}`}
-                </Option>
-              ))
-            )}
+            {scheduleData?.work_centers
+              .filter(wc => wc.is_schedulable) // Only show schedulable work centers
+              .map(wc => 
+                wc.machines.map(machine => (
+                  <Option key={machine.id} value={machine.id}>
+                    {`${wc.work_center_code} - ${machine.name}`}
+                  </Option>
+                ))
+              )}
           </Select>
 
           <Select

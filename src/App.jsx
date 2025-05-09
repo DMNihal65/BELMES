@@ -32,10 +32,10 @@ import Notifications from './pages/supervisorscreens/Notifications';
 import MaintenanceNotifications from './pages/supervisorscreens/MachineMaintenance/Notifications';
 
 import Machines from './pages/supervisorscreens/EnergyMonitoring/Machines';
-
+import MachinesVisualization from './pages/supervisorscreens/EnergyMonitoringBEL/machines';
 import MachineOverlay from './pages/supervisorscreens/EnergyMonitoring/MachineOverlay';
-
 import Report from './pages/supervisorscreens/EnergyMonitoring/Report';
+import Reportnew from './pages/supervisorscreens/EnergyMonitoringBEL/Reportnew';
 
 import InspectionReport from './pages/supervisorscreens/QualityManagement/InspectionReport';
 
@@ -53,6 +53,7 @@ const App = () => {
   console.log("Deployed on 09-04-2025")
   return (
     <ConfigProvider>
+      {/* basename="/belmes" this should be added in the deployment mode */}
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -85,6 +86,9 @@ const App = () => {
             <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
             <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
             <Route path="energy-monitoring" element={<EnergyMonitoring />} />
+            <Route path="energy-monitoring-bel" element={<MachinesVisualization />} />
+            <Route path="energy-monitoring-bel/machines" element={<Machines />} />
+            <Route path="energy-monitoring-bel/report" element={<Reportnew />} />
 
             <Route path="quality-management/inspection-details" element={<QualityInspectionDetails />} />
 
@@ -125,6 +129,9 @@ const App = () => {
             <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
             <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
             <Route path="energy-monitoring" element={<EnergyMonitoring />} />
+            <Route path="energy-monitoring-bel" element={<MachinesVisualization />} />
+            <Route path="energy-monitoring-bel/machines" element={<Machines />} />
+            <Route path="energy-monitoring-bel/report" element={<Reportnew />} />
 
             <Route path="quality-management/inspection-details" element={<QualityInspectionDetails />} />
 

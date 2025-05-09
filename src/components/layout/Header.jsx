@@ -422,8 +422,21 @@ function Header() {
 
        
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <div className="flex justify-between items-center mr-16 mt-2">
-          <h1 className="text-2xl font-semibold">Fabrication Components</h1>
+        <div style={{ 
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          textAlign: 'center'
+        }}>
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: '600',
+            color: '#000000',
+            margin: 0,
+            padding: 0
+          }}>
+            Fabrication Components
+          </h1>
         </div>
 
         <img

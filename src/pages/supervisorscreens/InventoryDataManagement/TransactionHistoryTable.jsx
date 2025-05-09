@@ -375,9 +375,9 @@ const TransactionHistoryTable = () => {
               <Descriptions.Item label="Transaction ID">
                 {selectedTransaction.id}
               </Descriptions.Item>
-              <Descriptions.Item label="Item Code">
+              {/* <Descriptions.Item label="Item Code">
                 {selectedTransaction.item_code}
-              </Descriptions.Item>
+              </Descriptions.Item> */}
               <Descriptions.Item label="Issued Quantity">
                 {selectedTransaction.quantity}
               </Descriptions.Item>

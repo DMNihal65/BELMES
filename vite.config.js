@@ -12,6 +12,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api\/v5/, '/api/v5')
+      },
+      '/proxy': {
+        target: 'http://172.18.100.214:8006',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/proxy/, '')
       }
     }
   }

@@ -601,11 +601,11 @@ const Login = () => {
                         icon: <SafetyCertificateOutlined />
                       }
                     ] : [
-                      { 
-                        title: 'Verify', 
-                        description: 'Supervisor PIN',
-                        icon: <NumberOutlined />
-                      },
+                      // { 
+                      //   title: 'Verify', 
+                      //   description: 'Supervisor PIN',
+                      //   icon: <NumberOutlined />
+                      // },
                       { 
                         title: 'Login', 
                         description: 'Credentials',

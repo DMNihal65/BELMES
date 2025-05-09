@@ -2106,7 +2106,7 @@ const InventoryAllData = () => {
 
       <Modal
         title={modalType === 'item' ? 
-          (form.getFieldValue('id') ? 'Edit Item' : 'Add Row') :
+          (form.getFieldValue('id') ? 'Edit Item' : 'Add Subcategory Data') :
           (modalType === 'category' ? 'Add Category' : 
           rightClickedNode?.data?.id ? 'Add Subcategory' : 'Add Subcategory to ' + rightClickedNode?.data?.name)}
         open={isModalVisible}

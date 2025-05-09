@@ -196,7 +196,7 @@ const DynamicSchedulingGraph2 = () => {
     scheduleData.work_centers.forEach(wc => {
       wc.machines.forEach(machine => {
         const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
-        const machineLabel = `${wc.work_center_code} - ${machine.name} (ID: ${machine.id})`;
+        const machineLabel = `${wc.work_center_code} - ${machine.name}`;
         
         // Add machine header group
         groups.add({
@@ -676,7 +676,7 @@ const DynamicSchedulingGraph2 = () => {
             {scheduleData?.work_centers.map(wc => 
               wc.machines.map(machine => (
                 <Option key={machine.id} value={machine.id}>
-                  {`${wc.work_center_code} - ${machine.name} (ID: ${machine.id})`}
+                  {`${wc.work_center_code} - ${machine.name}`}
                 </Option>
               ))
             )}

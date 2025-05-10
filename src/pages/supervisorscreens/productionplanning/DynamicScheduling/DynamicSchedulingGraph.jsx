@@ -166,6 +166,9 @@ const DynamicSchedulingGraph2 = () => {
     fetchScheduleData();
   }, []);
 
+
+  
+
   // Initialize timeline when container is ready
   useEffect(() => {
     if (!timelineContainerRef || !scheduleData) return;
@@ -185,55 +188,62 @@ const DynamicSchedulingGraph2 = () => {
     const machineMapping = {};
     const machineNameToId = {};
     scheduleData.work_centers.forEach(wc => {
-      wc.machines.forEach(machine => {
-        const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
-        machineMapping[machine.id] = machineFullName;
-        machineNameToId[machineFullName] = machine.id;
-      });
+      // Only process work centers that are schedulable
+      if (wc.is_schedulable) {
+        wc.machines.forEach(machine => {
+          const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
+          machineMapping[machine.id] = machineFullName;
+          machineNameToId[machineFullName] = machine.id;
+        });
+      }
     });
 
     // Add groups for each machine with subgroups
     scheduleData.work_centers.forEach(wc => {
-      wc.machines.forEach(machine => {
-        const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
-        const machineLabel = `${wc.work_center_code} - ${machine.name}`;
-        
-        // Add machine header group
-        groups.add({
-          id: machineFullName,
-          content: `<strong>${machineLabel}</strong>`,
-          title: wc.work_center_name,
-          nestedGroups: [
-            `${machineFullName}-planned`,
-            `${machineFullName}-actual`,
-            `${machineFullName}-rescheduled`
-          ],
-          showNested: true
-        });
+      // Only add groups for schedulable work centers
+      if (wc.is_schedulable) {
+        wc.machines.forEach(machine => {
+          const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
+          const machineLabel = `${wc.work_center_code} - ${machine.name}`;
+          
+          
+          // Add machine header group
+          groups.add({
+            id: machineFullName,
+            content: `<strong>${machineLabel}</strong>`,
+            title: wc.work_center_name,
+            nestedGroups: [
+              `${machineFullName}-planned`,
+              `${machineFullName}-actual`,
+              `${machineFullName}-rescheduled`
+            ],
+            showNested: true
+          });
 
-        // Add subgroups for each type in order
-        groups.add({
-          id: `${machineFullName}-planned`,
-          content: 'Planned',
-          className: 'planned-group',
-          title: 'Planned Operations',
-          order: 1
+          // Add subgroups for each type in order
+          groups.add({
+            id: `${machineFullName}-planned`,
+            content: 'Planned',
+            className: 'planned-group',
+            title: 'Planned Operations',
+            order: 1
+          });
+          groups.add({
+            id: `${machineFullName}-actual`,
+            content: 'Actual',
+            className: 'actual-group',
+            title: 'Actual Production',
+            order: 2
+          });
+          groups.add({
+            id: `${machineFullName}-rescheduled`,
+            content: 'Rescheduled',
+            className: 'rescheduled-group',
+            title: 'Rescheduled Operations',
+            order: 3
+          });
         });
-        groups.add({
-          id: `${machineFullName}-actual`,
-          content: 'Actual',
-          className: 'actual-group',
-          title: 'Actual Production',
-          order: 2
-        });
-        groups.add({
-          id: `${machineFullName}-rescheduled`,
-          content: 'Rescheduled',
-          className: 'rescheduled-group',
-          title: 'Rescheduled Operations',
-          order: 3
-        });
-      });
+      }
     });
 
     // Update the filter operation function to handle machine filtering
@@ -673,13 +683,15 @@ const DynamicSchedulingGraph2 = () => {
             style={{ width: 200 }}
             allowClear
           >
-            {scheduleData?.work_centers.map(wc => 
-              wc.machines.map(machine => (
-                <Option key={machine.id} value={machine.id}>
-                  {`${wc.work_center_code} - ${machine.name}`}
-                </Option>
-              ))
-            )}
+            {scheduleData?.work_centers
+              .filter(wc => wc.is_schedulable) // Only show schedulable work centers
+              .map(wc => 
+                wc.machines.map(machine => (
+                  <Option key={machine.id} value={machine.id}>
+                    {`${wc.work_center_code} - ${machine.name}`}
+                  </Option>
+                ))
+              )}
           </Select>
 
           <Select

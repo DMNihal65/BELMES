@@ -21,7 +21,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.88:8899/api/v1/planning/all_orders',
+        'http://172.18.7.88:2327/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -43,7 +43,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.88:8899/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.88:2327/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -78,7 +78,7 @@ class QualityStore {
       
       const config = {
         method: 'get',
-        url: `http://172.18.7.88:8899/api/v1/quality/master-boc/ipids/${orderId}`,
+        url: `http://172.18.7.88:2327/api/v1/quality/master-boc/ipids/${orderId}`,
         ...this.getAuthHeaders()
       };
 
@@ -127,7 +127,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://172.18.7.88:8899/api/v1/quality/run',
+        'http://172.18.7.88:2327/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;
@@ -144,7 +144,7 @@ class QualityStore {
   async fetchBalloonedDrawing(drawingId, operationId) {
     try {
       const response = await axios.get(
-        `http://172.18.7.88:8899/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
+        `http://172.18.7.88:2327/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
         {
           ...this.getAuthHeaders(),
           responseType: 'blob' // Important: set responseType to blob for PDF data
@@ -179,7 +179,7 @@ class QualityStore {
           
           const response = await axios({
             method: method,
-            url: `http://172.18.7.88:8899/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
+            url: `http://172.18.7.88:2327/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
             ...this.getAuthHeaders(),
             timeout: 5000
           });
@@ -222,7 +222,7 @@ class QualityStore {
       // Try to ping the server with a HEAD request
       await axios({
         method: 'head',
-        url: 'http://172.18.7.88:8899/api/v1/health', // Use a health endpoint if available
+        url: 'http://172.18.7.88:2327/api/v1/health', // Use a health endpoint if available
         timeout: 5000 // 5 second timeout
       });
       
@@ -233,7 +233,7 @@ class QualityStore {
       try {
         await axios({
           method: 'head',
-          url: 'http://172.18.7.88:8899/',
+          url: 'http://172.18.7.88:2327/',
           timeout: 5000
         });
         
@@ -251,7 +251,7 @@ class QualityStore {
       console.log('Fetching report structure data...');
       
       const response = await axios.get(
-        `http://172.18.7.88:8899/api/v1/document-management/report/structure/?force_refresh=${forceRefresh}`,
+        `http://172.18.7.88:2327/api/v1/document-management/report/structure/?force_refresh=${forceRefresh}`,
         this.getAuthHeaders()
       );
       
@@ -272,7 +272,7 @@ class QualityStore {
       console.log(`Downloading report from path: ${filePath}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:8899/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`,
+        `http://172.18.7.88:2327/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`,
         {
           ...this.getAuthHeaders(),
           responseType: 'blob' // Important: set responseType to blob for file data
@@ -305,7 +305,7 @@ class QualityStore {
       console.log(`Downloading report with document ID: ${documentId}, version: ${versionNumber}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:8899/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`,
+        `http://172.18.7.88:2327/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`,
         {
           ...this.getAuthHeaders(),
           responseType: 'blob' // Important: set responseType to blob for file data
@@ -334,7 +334,7 @@ class QualityStore {
       console.log(`Fetching detailed inspection data for ID: ${inspectionId}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:8899/api/v1/quality/inspection/${inspectionId}/detailed`,
+        `http://172.18.7.88:2327/api/v1/quality/inspection/${inspectionId}/detailed`,
         this.getAuthHeaders()
       );
       

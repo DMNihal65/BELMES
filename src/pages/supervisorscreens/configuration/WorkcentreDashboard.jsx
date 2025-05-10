@@ -15,18 +15,18 @@ import {
 } from 'antd';
 import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import useWorkcenterStore from '../../../store/workcenter-store';
-import { fetchAllMachines, createMachine, fetchMachineDetails } from '../../../store/workcenter-store';
+import useWorkcentreStore from '../../../store/workcentre-store';
+import { fetchAllMachines, createMachine, fetchMachineDetails } from '../../../store/workcentre-store';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
 
-const Workcenter = () => {
+const Workcentre = () => {
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
   const [editingKey, setEditingKey] = useState('');
   const [data, setData] = useState([]);
-  const [selectedWorkcenter, setSelectedWorkcenter] = useState(null);
+  const [selectedWorkcentre, setSelectedWorkcentre] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -39,29 +39,29 @@ const Workcenter = () => {
   const [machineModalStep, setMachineModalStep] = useState('select');
   const [addMachineForm] = Form.useForm();
   const [machines, setMachines] = useState([]);
-  const [selectedWorkcenterId, setSelectedWorkcenterId] = useState(null);
+  const [selectedWorkcentreId, setSelectedWorkcentreId] = useState(null);
   const [selectedMachineDetails, setSelectedMachineDetails] = useState([]);
-  const [workcenterOptions, setWorkcenterOptions] = useState([]);
+  const [workcentreOptions, setWorkcentreOptions] = useState([]);
 
   const { 
-    fetchWorkcenters, 
-    updateWorkcenter, 
-    createWorkcenter,
-    workcenters, 
+    fetchWorkcentres, 
+    updateWorkcentre, 
+    createWorkcentre,
+    workcentres, 
     isLoading,
-    workcenterCodes,
+    workcentreCodes,
     machineNames
-  } = useWorkcenterStore();
+  } = useWorkcentreStore();
 
   useEffect(() => {
-    console.log('Fetching workcenters...');
-    fetchWorkcenters();
-  }, [fetchWorkcenters]);
+    console.log('Fetching workcentres...');
+    fetchWorkcentres();
+  }, [fetchWorkcentres]);
 
   useEffect(() => {
-    console.log('Workcenters updated:', workcenters);
-    setData(workcenters || []);
-  }, [workcenters]);
+    console.log('Workcentres updated:', workcentres);
+    setData(workcentres || []);
+  }, [workcentres]);
 
   const isEditing = (record) => record.id === editingKey;
 
@@ -92,7 +92,7 @@ const Workcenter = () => {
       
       const updatedItem = {
         id: currentRecord.id,
-        work_center_id: currentRecord.work_center_id,
+        work_centre_id: currentRecord.work_centre_id,
         type: row.type?.trim() || '',
         make: row.make?.trim() || '',
         model: row.model?.trim() || '',
@@ -107,10 +107,10 @@ const Workcenter = () => {
 
       console.log('Updating machine with data:', updatedItem);
 
-      await updateWorkcenter(updatedItem);
+      await updateWorkcentre(updatedItem);
       setEditingKey('');
       message.success('Machine updated successfully');
-      await fetchWorkcenters(); // Refresh the table data
+      await fetchWorkcentres(); // Refresh the table data
     } catch (errInfo) {
       console.error('Save failed:', errInfo);
       message.error(errInfo.message || 'Failed to update machine');
@@ -122,11 +122,11 @@ const Workcenter = () => {
     setEditingRecord(record);
     setIsEditModalVisible(true);
     form.setFieldsValue({
-      workcenterCode: record.work_center?.code,
+      workcentreCode: record.work_centre?.code,
       machineIds: record.machine_ids,
-      description: record.work_center?.description,
-      operation: record.work_center?.operation,
-      plant_id: record.work_center?.plant_id || 'PLANT001'
+      description: record.work_centre?.description,
+      operation: record.work_centre?.operation,
+      plant_id: record.work_centre?.plant_id || 'PLANT001'
     });
   };
 
@@ -135,12 +135,12 @@ const Workcenter = () => {
       const values = await form.validateFields();
       console.log('Submitting edit with values:', values);
       
-      await updateWorkcenter({
+      await updateWorkcentre({
         ...editingRecord,
         ...values,
-        work_center: {
-          ...editingRecord.work_center,
-          code: values.workcenterCode,
+        work_centre: {
+          ...editingRecord.work_centre,
+          code: values.workcentreCode,
           description: values.description,
           operation: values.operation,
           plant_id: values.plant_id
@@ -150,22 +150,22 @@ const Workcenter = () => {
       setIsEditModalVisible(false);
       setEditingRecord(null);
       form.resetFields();
-      await fetchWorkcenters();
+      await fetchWorkcentres();
     } catch (error) {
       console.error('Edit failed:', error);
-      message.error('Failed to update workcenter: ' + error.message);
+      message.error('Failed to update workcentre: ' + error.message);
     }
   };
 
   const columns = [
     {
-      title: 'Workcenter ID',
-      dataIndex: 'work_center_id',
+      title: 'Workcentre ID',
+      dataIndex: 'work_centre_id',
       width: 120,
       sorter: (a, b) => {
         // Extract numeric values if possible
-        const numA = parseInt(String(a.work_center_id).replace(/\D/g, ''));
-        const numB = parseInt(String(b.work_center_id).replace(/\D/g, ''));
+        const numA = parseInt(String(a.work_centre_id).replace(/\D/g, ''));
+        const numB = parseInt(String(b.work_centre_id).replace(/\D/g, ''));
         
         // If both are valid numbers, compare numerically
         if (!isNaN(numA) && !isNaN(numB)) {
@@ -173,14 +173,14 @@ const Workcenter = () => {
         }
         
         // Otherwise, compare as strings
-        return String(a.work_center_id || '').localeCompare(String(b.work_center_id || ''));
+        return String(a.work_centre_id || '').localeCompare(String(b.work_centre_id || ''));
       },
       sortDirections: ['ascend'],
       defaultSortOrder: 'ascend',
       sortOrder: 'ascend',
       render: (text) => text,
       filters: [...new Set(data
-        .map(item => item.work_center_id)
+        .map(item => item.work_centre_id)
         .filter(Boolean)
       )]
       .sort((a, b) => {
@@ -193,18 +193,18 @@ const Workcenter = () => {
       filterMode: 'menu',
       filterSearch: true,
       onFilter: (value, record) => {
-        if (!record.work_center_id) return false;
-        return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
+        if (!record.work_centre_id) return false;
+        return String(record.work_centre_id).toLowerCase().includes(String(value).toLowerCase());
       },
       className: 'filter-column',
       showSorterTooltip: { title: 'Click to sort' }
     },
     {
-      title: 'Workcenter Code',
-      dataIndex: ['work_center', 'code'],
+      title: 'Workcentre Code',
+      dataIndex: ['work_centre', 'code'],
       width: 150,
       render: (text) => text || '-',
-      sorter: (a, b) => (a.work_center?.code || '').localeCompare(b.work_center?.code || ''),
+      sorter: (a, b) => (a.work_centre?.code || '').localeCompare(b.work_centre?.code || ''),
     },
     {
       title: 'Machine Type',
@@ -479,7 +479,7 @@ const Workcenter = () => {
   });
 
   const handleView = (record) => {
-    setSelectedWorkcenter(record);
+    setSelectedWorkcentre(record);
     setIsViewModalVisible(true);
   };
 
@@ -504,34 +504,34 @@ const Workcenter = () => {
     return (pageNumber - 1) * pageSize + 1;
   };
 
-  const handleAddWorkcenter = async () => {
+  const handleAddWorkcentre = async () => {
     try {
       const values = await addForm.validateFields();
       console.log('Form values:', values);
       
-      if (!values.workcenterCode || !values.description || !values.operation) {
+      if (!values.workcentreCode || !values.description || !values.operation) {
         message.error('Please fill in all required fields');
         return;
       }
 
-      const workcenterData = {
-        code: values.workcenterCode.trim(),
+      const workcentreData = {
+        code: values.workcentreCode.trim(),
         plant_id: "PLANT001",
         description: values.description.trim(),
         operation: values.operation.trim(),
         is_active: true,
         is_schedulable:true,
         type: "MACHINE",
-        work_center_name: values.workcenterName?.trim() || values.workcenterCode.trim()
+        work_centre_name: values.workcentreName?.trim() || values.workcentreCode.trim()
       };
 
-      console.log('Creating workcenter with data:', workcenterData);
+      console.log('Creating workcentre with data:', workcentreData);
       
-      await createWorkcenter(workcenterData);
+      await createWorkcentre(workcentreData);
       
       setIsAddModalVisible(false);
       addForm.resetFields();
-      message.success('Workcenter added successfully');
+      message.success('Workcentre added successfully');
       
       // The store will automatically refresh both lists
     } catch (error) {
@@ -540,7 +540,7 @@ const Workcenter = () => {
         const errorMessages = error.errorFields.map(field => field.errors.join(', '));
         message.error('Validation failed: ' + errorMessages.join('; '));
       } else {
-        message.error('Failed to add new workcenter: ' + (error.message || 'Unknown error'));
+        message.error('Failed to add new workcentre: ' + (error.message || 'Unknown error'));
       }
     }
   };
@@ -561,11 +561,11 @@ const Workcenter = () => {
       if (machineModalStep === 'existing_form') {
         // Handle existing machine selection
         const selectedMachines = values.machine_names;
-        const workcenterId = values.work_center_id;
+        const workcentreId = values.work_centre_id;
 
         const machinePromises = selectedMachines.map(machineName => {
           const machineData = {
-            work_center_id: workcenterId,
+            work_centre_id: workcentreId,
             type: machineName,
             make: "Default",
             model: "Default",
@@ -582,7 +582,7 @@ const Workcenter = () => {
       } else if (machineModalStep === 'new') {
         // Handle new machine creation
         const machineData = {
-          work_center_id: values.work_center_id,
+          work_centre_id: values.work_centre_id,
           type: values.machine_name?.trim(),
           make: values.make?.trim(),
           model: values.model?.trim(),
@@ -603,14 +603,14 @@ const Workcenter = () => {
       setIsAddMachineModalVisible(false);
       setMachineModalStep('select');
       addMachineForm.resetFields();
-      fetchWorkcenters(); // Refresh the workcenter list
+      fetchWorkcentres(); // Refresh the workcentre list
     } catch (error) {
       console.error('Error adding machine:', error);
       message.error('Failed to add machine. Please try again.');
     }
   };
 
-  const addWorkcenterForm = (
+  const addWorkcentreForm = (
     <Form
       form={addForm}
       layout="vertical"
@@ -619,31 +619,31 @@ const Workcenter = () => {
       }}
     >
       <Form.Item
-        name="workcenterCode"
-        label="Workcenter Code"
+        name="workcentreCode"
+        label="Workcentre Code"
         rules={[
-          { required: true, message: 'Please enter Workcenter Code' },
-          { whitespace: true, message: 'Workcenter Code cannot be empty' },
-          { max: 20, message: 'Workcenter Code cannot be longer than 20 characters' }
+          { required: true, message: 'Please enter Workcentre Code' },
+          { whitespace: true, message: 'Workcentre Code cannot be empty' },
+          { max: 20, message: 'Workcentre Code cannot be longer than 20 characters' }
         ]}
       >
         <Input 
-          placeholder="Enter Workcenter Code" 
+          placeholder="Enter Workcentre Code" 
           maxLength={20}
         />
       </Form.Item>
 
       <Form.Item
-        name="workcenterName"
-        label="Workcenter Name"
+        name="workcentreName"
+        label="Workcentre Name"
         rules={[
-          { required: true, message: 'Please enter Workcenter Name' },
-          { whitespace: true, message: 'Workcenter Name cannot be empty' },
-          { max: 50, message: 'Workcenter Name cannot be longer than 50 characters' }
+          { required: true, message: 'Please enter Workcentre Name' },
+          { whitespace: true, message: 'Workcentre Name cannot be empty' },
+          { max: 50, message: 'Workcentre Name cannot be longer than 50 characters' }
         ]}
       >
         <Input 
-          placeholder="Enter Workcenter Name" 
+          placeholder="Enter Workcentre Name" 
           maxLength={50}
         />
       </Form.Item>
@@ -684,47 +684,47 @@ const Workcenter = () => {
     </Form>
   );
 
-  const handleWorkcenterSelect = async (value, option) => {
+  const handleWorkcentreSelect = async (value, option) => {
     if (!value || !option.data?.id) {
-      setSelectedWorkcenterId(null);
+      setSelectedWorkcentreId(null);
       return;
     }
-    console.log('Selected workcenter:', { value, id: option.data?.id });
-    setSelectedWorkcenterId(option.data?.id);
+    console.log('Selected workcentre:', { value, id: option.data?.id });
+    setSelectedWorkcentreId(option.data?.id);
     addMachineForm.setFieldsValue({ 
-      work_center_id: option.data?.id,
-      work_center_code: value 
+      work_centre_id: option.data?.id,
+      work_centre_code: value 
     });
   };
 
   const handleNextStep = async () => {
     try {
       // Validate the form before proceeding
-      await addMachineForm.validateFields(['work_center_code']);
+      await addMachineForm.validateFields(['work_centre_code']);
       setMachineModalStep('existing');
     } catch (error) {
       console.error('Validation failed:', error);
     }
   };
 
-  const fetchWorkcenterOptions = async () => {
+  const fetchWorkcentreOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:2327/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:2327/api/v1/master-order/workcentres/?skip=0&limit=100');
       if (!response.ok) {
-        throw new Error('Failed to fetch workcenters');
+        throw new Error('Failed to fetch workcentres');
       }
       const data = await response.json();
-      console.log('Fetched workcenter options:', data);
-      setWorkcenterOptions(data);
+      console.log('Fetched workcentre options:', data);
+      setWorkcentreOptions(data);
     } catch (error) {
-      console.error('Error fetching workcenter options:', error);
-      message.error('Failed to load workcenter options');
+      console.error('Error fetching workcentre options:', error);
+      message.error('Failed to load workcentre options');
     }
   };
 
   useEffect(() => {
     if (isAddMachineModalVisible && machineModalStep === 'select') {
-      fetchWorkcenterOptions();
+      fetchWorkcentreOptions();
     }
   }, [isAddMachineModalVisible, machineModalStep]);
 
@@ -733,26 +733,26 @@ const Workcenter = () => {
       return (
         <div className="flex flex-col gap-6">
           {/* Progress Steps */}
-          <div className="flex items-center mb-8 px-4">
+          <div className="flex items-centre mb-8 px-4">
             <div className="flex-1 relative">
-              <div className={`h-0.5 ${selectedWorkcenterId ? 'bg-blue-500' : 'bg-gray-200'}`} />
+              <div className={`h-0.5 ${selectedWorkcentreId ? 'bg-blue-500' : 'bg-gray-200'}`} />
               <div className="absolute -top-3 -left-1">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium ${
-                  selectedWorkcenterId ? 'bg-blue-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-500'
+                <div className={`w-6 h-6 rounded-full flex items-centre justify-centre text-sm font-medium ${
+                  selectedWorkcentreId ? 'bg-blue-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-500'
                 }`}>
                   1
                 </div>
                 <div className="absolute top-6 -left-8 text-xs text-gray-500 whitespace-nowrap">
-                  Select Workcenter
+                  Select Workcentre
                 </div>
               </div>
             </div>
             
             <div className="w-32 relative">
-              <div className={`h-0.5 transition-colors duration-300 ${selectedWorkcenterId ? 'bg-blue-500' : 'bg-gray-200'}`} />
+              <div className={`h-0.5 transition-colors duration-300 ${selectedWorkcentreId ? 'bg-blue-500' : 'bg-gray-200'}`} />
               <div className="absolute -top-3 -right-1">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
-                  selectedWorkcenterId ? 'bg-blue-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-500'
+                <div className={`w-6 h-6 rounded-full flex items-centre justify-centre text-sm font-medium transition-colors duration-300 ${
+                  selectedWorkcentreId ? 'bg-blue-500 text-white' : 'bg-white border-2 border-gray-200 text-gray-500'
                 }`}>
                   2
                 </div>
@@ -768,21 +768,21 @@ const Workcenter = () => {
             layout="vertical"
           >
             <Form.Item
-              name="work_center_code"
-              label="Workcenter Code"
-              rules={[{ required: true, message: 'Please select Workcenter Code' }]}
+              name="work_centre_code"
+              label="Workcentre Code"
+              rules={[{ required: true, message: 'Please select Workcentre Code' }]}
             >
               <Select 
-                placeholder="Select Workcenter Code"
+                placeholder="Select Workcentre Code"
                 showSearch
                 optionFilterProp="children"
                 size="large"
-                onChange={handleWorkcenterSelect}
+                onChange={handleWorkcentreSelect}
                 onClear={() => {
-                  setSelectedWorkcenterId(null);
+                  setSelectedWorkcentreId(null);
                   addMachineForm.setFieldsValue({ 
-                    work_center_id: null,
-                    work_center_code: null 
+                    work_centre_id: null,
+                    work_centre_code: null 
                   });
                 }}
                 allowClear
@@ -797,7 +797,7 @@ const Workcenter = () => {
                 style={{
                   width: '100%'
                 }}
-                options={workcenterOptions
+                options={workcentreOptions
                   .filter(wc => wc.is_schedulable)
                   .map(wc => ({
                     value: wc.code,
@@ -843,7 +843,7 @@ const Workcenter = () => {
             <Button 
               type="primary" 
               size="large"
-              disabled={!selectedWorkcenterId}
+              disabled={!selectedWorkcentreId}
               onClick={handleNextStep}
             >
               Next
@@ -857,15 +857,15 @@ const Workcenter = () => {
       return (
         <div className="flex flex-col gap-6">
           {/* Progress Steps */}
-          <div className="flex items-center mb-8 px-4">
+          <div className="flex items-centre mb-8 px-4">
             <div className="flex-1 relative">
               <div className={`h-0.5 bg-blue-500`} />
               <div className="absolute -top-3 -left-1">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium bg-blue-500 text-white`}>
+                <div className={`w-6 h-6 rounded-full flex items-centre justify-centre text-sm font-medium bg-blue-500 text-white`}>
                   1
                 </div>
                 <div className="absolute top-6 -left-8 text-xs text-gray-500 whitespace-nowrap">
-                  Select Workcenter
+                  Select Workcentre
                 </div>
               </div>
             </div>
@@ -873,7 +873,7 @@ const Workcenter = () => {
             <div className="w-32 relative">
               <div className={`h-0.5 bg-blue-500`} />
               <div className="absolute -top-3 -right-1">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium bg-blue-500 text-white`}>
+                <div className={`w-6 h-6 rounded-full flex items-centre justify-centre text-sm font-medium bg-blue-500 text-white`}>
                   2
                 </div>
                 <div className="absolute top-6 -left-8 text-xs text-gray-500 whitespace-nowrap">
@@ -883,7 +883,7 @@ const Workcenter = () => {
             </div>
           </div>
 
-          <div className="flex justify-center gap-4 mt-4">
+          <div className="flex justify-centre gap-4 mt-4">
             <Button 
               type="primary" 
               size="large"
@@ -920,15 +920,15 @@ const Workcenter = () => {
       return (
         <div className="flex flex-col gap-6">
           {/* Progress Steps */}
-          <div className="flex items-center mb-8 px-4">
+          <div className="flex items-centre mb-8 px-4">
             <div className="flex-1 relative">
               <div className={`h-0.5 bg-blue-500`} />
               <div className="absolute -top-3 -left-1">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium bg-blue-500 text-white`}>
+                <div className={`w-6 h-6 rounded-full flex items-centre justify-centre text-sm font-medium bg-blue-500 text-white`}>
                   1
                 </div>
                 <div className="absolute top-6 -left-8 text-xs text-gray-500 whitespace-nowrap">
-                  Select Workcenter
+                  Select Workcentre
                 </div>
               </div>
             </div>
@@ -936,7 +936,7 @@ const Workcenter = () => {
             <div className="w-32 relative">
               <div className={`h-0.5 bg-blue-500`} />
               <div className="absolute -top-3 -right-1">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium bg-blue-500 text-white`}>
+                <div className={`w-6 h-6 rounded-full flex items-centre justify-centre text-sm font-medium bg-blue-500 text-white`}>
                   2
                 </div>
                 <div className="absolute top-6 -left-8 text-xs text-gray-500 whitespace-nowrap">
@@ -950,10 +950,10 @@ const Workcenter = () => {
             form={addMachineForm}
             layout="vertical"
             onFinish={handleAddMachine}
-            initialValues={{ work_center_id: selectedWorkcenterId }}
+            initialValues={{ work_centre_id: selectedWorkcentreId }}
           >
             <Form.Item
-              name="work_center_id"
+              name="work_centre_id"
               hidden
             >
               <Input />
@@ -1034,15 +1034,15 @@ const Workcenter = () => {
       return (
         <div className="flex flex-col gap-6">
           {/* Progress Steps */}
-          <div className="flex items-center mb-8 px-4">
+          <div className="flex items-centre mb-8 px-4">
             <div className="flex-1 relative">
               <div className={`h-0.5 bg-blue-500`} />
               <div className="absolute -top-3 -left-1">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium bg-blue-500 text-white`}>
+                <div className={`w-6 h-6 rounded-full flex items-centre justify-centre text-sm font-medium bg-blue-500 text-white`}>
                   1
                 </div>
                 <div className="absolute top-6 -left-8 text-xs text-gray-500 whitespace-nowrap">
-                  Select Workcenter
+                  Select Workcentre
                 </div>
               </div>
             </div>
@@ -1050,7 +1050,7 @@ const Workcenter = () => {
             <div className="w-32 relative">
               <div className={`h-0.5 bg-blue-500`} />
               <div className="absolute -top-3 -right-1">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium bg-blue-500 text-white`}>
+                <div className={`w-6 h-6 rounded-full flex items-centre justify-centre text-sm font-medium bg-blue-500 text-white`}>
                   2
                 </div>
                 <div className="absolute top-6 -left-8 text-xs text-gray-500 whitespace-nowrap">
@@ -1064,10 +1064,10 @@ const Workcenter = () => {
             form={addMachineForm}
             layout="vertical"
             onFinish={handleAddMachine}
-            initialValues={{ work_center_id: selectedWorkcenterId }}
+            initialValues={{ work_centre_id: selectedWorkcentreId }}
           >
             <Form.Item
-              name="work_center_id"
+              name="work_centre_id"
               hidden
             >
               <Input />
@@ -1226,19 +1226,19 @@ const Workcenter = () => {
     }
   };
 
-  const viewModalContent = selectedWorkcenter && (
+  const viewModalContent = selectedWorkcentre && (
     <Form layout="vertical">
-      <Form.Item label="Workcenter Code">
-        <Input value={selectedWorkcenter.work_center.code} readOnly />
+      <Form.Item label="Workcentre Code">
+        <Input value={selectedWorkcentre.work_centre.code} readOnly />
       </Form.Item>
       <Form.Item label="Plant ID">
-        <Input value={selectedWorkcenter.work_center.plant_id} readOnly />
+        <Input value={selectedWorkcentre.work_centre.plant_id} readOnly />
       </Form.Item>
       <Form.Item label="Description">
-        <Input.TextArea value={selectedWorkcenter.work_center.description} readOnly />
+        <Input.TextArea value={selectedWorkcentre.work_centre.description} readOnly />
       </Form.Item>
       <Form.Item label="Operation">
-        <Input.TextArea value={selectedWorkcenter.work_center.operation} readOnly />
+        <Input.TextArea value={selectedWorkcentre.work_centre.operation} readOnly />
       </Form.Item>
     </Form>
   );
@@ -1249,10 +1249,10 @@ const Workcenter = () => {
       <Card className="shadow-sm">
         {/* Header Section */}
         <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-centre mb-4">
             <div>
-              <Title level={4} className="!mb-1">Work Center Machine Linking</Title>
-              <Text type="secondary">Link and configure work centers with their respective machines</Text>
+              <Title level={4} className="!mb-1">Work centre Machine Linking</Title>
+              <Text type="secondary">Link and configure work centres with their respective machines</Text>
             </div>
             <div className="flex gap-3">
               <Button 
@@ -1267,19 +1267,19 @@ const Workcenter = () => {
                 icon={<PlusOutlined />}
                 onClick={() => setIsAddModalVisible(true)}
               >
-                Add Workcenter
+                Add Workcentre
               </Button>
             </div>
           </div>
           
           {/* Tabs for future expansion */}
           <Tabs 
-            defaultActiveKey="workcenter" 
+            defaultActiveKey="workcentre" 
             className="mb-4"
             items={[
               {
-                key: 'workcenter',
-                label: 'Work Center',
+                key: 'workcentre',
+                label: 'Work centre',
                 children: (
                   <div className="border rounded-lg bg-white">
                     <Form form={form} component={false}>
@@ -1291,7 +1291,7 @@ const Workcenter = () => {
                         }}
                         dataSource={data.map((item, index) => ({
                           ...item,
-                          key: `${item.work_center_id}_${index}`,
+                          key: `${item.work_centre_id}_${index}`,
                           sequential_id: index + 1,
                         }))}
                         columns={mergedColumns}
@@ -1305,7 +1305,7 @@ const Workcenter = () => {
                           total: data.length,
                           showSizeChanger: false,
                           showQuickJumper: true,
-                          position: ['bottomCenter'],
+                          position: ['bottomcentre'],
                           showTotal: (total, range) => (
                             <span className="text-gray-600">
                               Showing {range[0]}-{range[1]} of {total} items
@@ -1324,16 +1324,16 @@ const Workcenter = () => {
                         bordered
                         className="ant-table-striped"
                         size="middle"
-                        rowKey={(record) => `${record.work_center_id}_${record.sequential_id}`}
-                        defaultSortField="work_center_id"
+                        rowKey={(record) => `${record.work_centre_id}_${record.sequential_id}`}
+                        defaultSortField="work_centre_id"
                         defaultSortOrder="ascend"
                         onChange={(pagination, filters, sorter) => {
                           handleTableChange(pagination, filters, sorter);
-                          // Ensure work_center_id stays sorted in ascending order
+                          // Ensure work_centre_id stays sorted in ascending order
                           if (!sorter.field) {
                             const sortedData = [...data].sort((a, b) => {
-                              const valueA = String(a.work_center_id || '');
-                              const valueB = String(b.work_center_id || '');
+                              const valueA = String(a.work_centre_id || '');
+                              const valueB = String(b.work_centre_id || '');
                               return valueA.localeCompare(valueB);
                             });
                             setData(sortedData);
@@ -1351,7 +1351,7 @@ const Workcenter = () => {
 
         {/* Keep all your existing modals */}
         <Modal
-          title={`Workcenter Details - ${selectedWorkcenter?.work_center?.code}`}
+          title={`Workcentre Details - ${selectedWorkcentre?.work_centre?.code}`}
           visible={isViewModalVisible}
           onOk={handleViewModalOk}
           onCancel={handleViewModalOk}
@@ -1361,9 +1361,9 @@ const Workcenter = () => {
         </Modal>
 
         <Modal
-          title="Add New Workcenterss"
+          title="Add New Workcentress"
           open={isAddModalVisible}
-          onOk={handleAddWorkcenter}
+          onOk={handleAddWorkcentre}
           onCancel={() => {
             setIsAddModalVisible(false);
             addForm.resetFields();
@@ -1371,11 +1371,11 @@ const Workcenter = () => {
           width={500}
           className="top-20"
         >
-          {addWorkcenterForm}
+          {addWorkcentreForm}
         </Modal>
 
         <Modal
-          title="Edit Workcenter"
+          title="Edit Workcentre"
           open={isEditModalVisible}
           onOk={handleEditSubmit}
           onCancel={() => {
@@ -1390,12 +1390,12 @@ const Workcenter = () => {
             layout="vertical"
           >
             <Form.Item
-              name="workcenterCode"
-              label="Workcenter Code"
-              rules={[{ required: true, message: 'Please select Workcenter Code' }]}
+              name="workcentreCode"
+              label="Workcentre Code"
+              rules={[{ required: true, message: 'Please select Workcentre Code' }]}
             >
-              <Select placeholder="Select Workcenter Code">
-                {workcenterCodes.map(code => (
+              <Select placeholder="Select Workcentre Code">
+                {workcentreCodes.map(code => (
                   <Option key={code} value={code}>
                     {code}
                   </Option>
@@ -1453,7 +1453,7 @@ const Workcenter = () => {
           open={isAddMachineModalVisible}
           onOk={() => {
             if (machineModalStep === 'select') {
-              if (selectedWorkcenterId) {
+              if (selectedWorkcentreId) {
                 setMachineModalStep('existing');
               }
               return;
@@ -1550,4 +1550,4 @@ const tableStyles = {
   }
 };
 
-export default Workcenter;
+export default Workcentre;

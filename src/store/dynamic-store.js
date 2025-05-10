@@ -15,7 +15,7 @@ const useDynamicStore = create((set) => ({
 
   fetchPDCData: async () => {
     try {
-      const response = await axios.get('http://172.18.7.88:8899/api/v1/scheduling/part-production-pdc');
+      const response = await axios.get('http://172.18.7.88:2327/api/v1/scheduling/part-production-pdc');
       set({ pdcData: response.data });
       return response.data;
     } catch (error) {
@@ -25,10 +25,13 @@ const useDynamicStore = create((set) => ({
     }
   },
 
+
+  
+
   fetchDynamicScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.get('http://172.18.7.88:8899/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://172.18.7.88:2327/api/v1/rescheduling/reschedule-actual-planned-combined');
       set({ 
         scheduleData: response.data,
         loading: false,
@@ -46,13 +49,14 @@ const useDynamicStore = create((set) => ({
   },
 
   
+  
   // Add this function to fetch orders
   // fetchAllOrders: async () => {
   //   try {
   //     const token = useAuthStore.getState().token;
   //     set({ isLoadingOrders: true });
 
-  //     const response = await fetch('http://172.18.7.88:8899/planning/all_orders', {
+  //     const response = await fetch('http://172.18.7.88:2327/planning/all_orders', {
   //       headers: {
   //         'Authorization': `Bearer ${token}`,
   //         'Accept': 'application/json'

@@ -477,6 +477,7 @@ const Scheduling = () => {
                             <span class="label">Start:</span>
                             <span class="value">${new Date(op.start_time).toLocaleString()}</span>
                           </div>
+                          
                           <div class="info-row">
                             <span class="label">PDC of Operation:</span>
                             <span class="value">${new Date(groupOperations[groupOperations.length - 1].end_time).toLocaleString()}</span>

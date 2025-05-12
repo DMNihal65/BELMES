@@ -11,9 +11,13 @@ import {
   DatePicker,
   Typography,
   Card,
-  Tabs
+  Tabs,
+  Tag,
+  Switch
 } from 'antd';
 import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import dayjs from 'dayjs';
 import useWorkcenterStore from '../../../store/workcenter-store';
 import { fetchAllMachines, createMachine, fetchMachineDetails } from '../../../store/workcenter-store';
@@ -26,6 +30,7 @@ const Workcenter = () => {
   const [addForm] = Form.useForm();
   const [editingKey, setEditingKey] = useState('');
   const [data, setData] = useState([]);
+  const [configData, setConfigData] = useState([]);
   const [selectedWorkcenter, setSelectedWorkcenter] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
@@ -42,12 +47,16 @@ const Workcenter = () => {
   const [selectedWorkcenterId, setSelectedWorkcenterId] = useState(null);
   const [selectedMachineDetails, setSelectedMachineDetails] = useState([]);
   const [workcenterOptions, setWorkcenterOptions] = useState([]);
+  const [editingConfigKey, setEditingConfigKey] = useState('');
 
   const { 
     fetchWorkcenters, 
     updateWorkcenter, 
     createWorkcenter,
+    fetchWorkcenterConfig,
+    updateWorkcenterSchedulable,
     workcenters, 
+    workcenterConfig,
     isLoading,
     workcenterCodes,
     machineNames
@@ -56,12 +65,20 @@ const Workcenter = () => {
   useEffect(() => {
     console.log('Fetching workcenters...');
     fetchWorkcenters();
-  }, [fetchWorkcenters]);
+    fetchWorkcenterConfig();
+  }, [fetchWorkcenters, fetchWorkcenterConfig]);
 
   useEffect(() => {
     console.log('Workcenters updated:', workcenters);
     setData(workcenters || []);
   }, [workcenters]);
+
+  useEffect(() => {
+    console.log('Workcenter config updated:', workcenterConfig);
+    // Sort the data by ID before setting it
+    const sortedData = [...(workcenterConfig || [])].sort((a, b) => a.id - b.id);
+    setConfigData(sortedData);
+  }, [workcenterConfig]);
 
   const isEditing = (record) => record.id === editingKey;
 
@@ -109,11 +126,11 @@ const Workcenter = () => {
 
       await updateWorkcenter(updatedItem);
       setEditingKey('');
-      message.success('Machine updated successfully');
+      toast.success('Machine updated successfully');
       await fetchWorkcenters(); // Refresh the table data
     } catch (errInfo) {
       console.error('Save failed:', errInfo);
-      message.error(errInfo.message || 'Failed to update machine');
+      toast.error(errInfo.message || 'Failed to update machine');
     }
   };
 
@@ -153,7 +170,7 @@ const Workcenter = () => {
       await fetchWorkcenters();
     } catch (error) {
       console.error('Edit failed:', error);
-      message.error('Failed to update workcenter: ' + error.message);
+      toast.error('Failed to update workcenter: ' + error.message);
     }
   };
 
@@ -510,7 +527,7 @@ const Workcenter = () => {
       console.log('Form values:', values);
       
       if (!values.workcenterCode || !values.description || !values.operation) {
-        message.error('Please fill in all required fields');
+        toast.error('Please fill in all required fields');
         return;
       }
 
@@ -531,16 +548,15 @@ const Workcenter = () => {
       
       setIsAddModalVisible(false);
       addForm.resetFields();
-      message.success('Workcenter added successfully');
+      toast.success('Workcenter added successfully');
       
-      // The store will automatically refresh both lists
     } catch (error) {
       console.error('Add failed:', error);
       if (error.errorFields) {
         const errorMessages = error.errorFields.map(field => field.errors.join(', '));
-        message.error('Validation failed: ' + errorMessages.join('; '));
+        toast.error('Validation failed: ' + errorMessages.join('; '));
       } else {
-        message.error('Failed to add new workcenter: ' + (error.message || 'Unknown error'));
+        toast.error('Failed to add new workcenter: ' + (error.message || 'Unknown error'));
       }
     }
   };
@@ -578,7 +594,7 @@ const Workcenter = () => {
         });
 
         await Promise.all(machinePromises);
-        message.success('Existing machines added successfully');
+        toast.success('Existing machines added successfully');
       } else if (machineModalStep === 'new') {
         // Handle new machine creation
         const machineData = {
@@ -597,16 +613,16 @@ const Workcenter = () => {
 
         console.log('Creating new machine with data:', machineData);
         await createMachine(machineData);
-        message.success('New machine added successfully');
+        toast.success('New machine added successfully');
       }
 
       setIsAddMachineModalVisible(false);
       setMachineModalStep('select');
       addMachineForm.resetFields();
-      fetchWorkcenters(); // Refresh the workcenter list
+      fetchWorkcenters();
     } catch (error) {
       console.error('Error adding machine:', error);
-      message.error('Failed to add machine. Please try again.');
+      toast.error('Failed to add machine. Please try again.');
     }
   };
 
@@ -709,7 +725,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:2327/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -718,7 +734,7 @@ const Workcenter = () => {
       setWorkcenterOptions(data);
     } catch (error) {
       console.error('Error fetching workcenter options:', error);
-      message.error('Failed to load workcenter options');
+      toast.error('Failed to load workcenter options');
     }
   };
 
@@ -1193,12 +1209,12 @@ const Workcenter = () => {
       if (Array.isArray(machinesData) && machinesData.length > 0) {
         setMachines(machinesData);
       } else {
-        message.warning('No machines found. The server might be unavailable.');
+        toast.warning('No machines found. The server might be unavailable.');
         setMachines([]);
       }
     } catch (error) {
       console.error('Error fetching machines:', error);
-      message.error('Failed to fetch machines. Please try again later.');
+      toast.error('Failed to fetch machines. Please try again later.');
       setMachines([]);
     }
   };
@@ -1222,7 +1238,7 @@ const Workcenter = () => {
       setSelectedMachineDetails(details);
     } catch (error) {
       console.error('Error fetching machine details:', error);
-      message.error('Failed to fetch machine details');
+      toast.error('Failed to fetch machine details');
     }
   };
 
@@ -1243,11 +1259,148 @@ const Workcenter = () => {
     </Form>
   );
 
+  const handleSchedulableToggle = async (record) => {
+    try {
+      await updateWorkcenterSchedulable(record.id, !record.is_schedulable);
+    } catch (error) {
+      console.error('Error toggling schedulable status:', error);
+    }
+  };
+
+  const isConfigEditing = (record) => record.id === editingConfigKey;
+
+  const handleConfigEdit = (record) => {
+    setEditingConfigKey(record.id);
+  };
+
+  const handleConfigCancel = () => {
+    setEditingConfigKey('');
+  };
+
+  const handleConfigSave = async (record) => {
+    try {
+      await updateWorkcenterSchedulable(record.id, record.is_schedulable);
+      setEditingConfigKey('');
+      toast.success('Workcenter status updated successfully');
+    } catch (error) {
+      console.error('Error saving config:', error);
+      toast.error('Failed to update workcenter status');
+    }
+  };
+
+  const configColumns = [
+    // {
+    //   title: 'ID',
+    //   dataIndex: 'id',
+    //   width: 80,
+    //   sorter: (a, b) => a.id - b.id,
+    // },
+    {
+      title: 'Work Center Name',
+      dataIndex: 'code',
+      width: 120,
+      sorter: (a, b) => a.code.localeCompare(b.code),
+    },
+    {
+      title: 'Plant ID',
+      dataIndex: 'plant_id',
+      width: 120,
+    },
+    // {
+    //   title: 'Work Center Name',
+    //   dataIndex: 'work_center_name',
+    //   width: 150,
+    // },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      width: 200,
+    },
+    {
+      title: 'Schedulable',
+      dataIndex: 'is_schedulable',
+      width: 120,
+      render: (isSchedulable, record) => {
+        const editable = isConfigEditing(record);
+        return editable ? (
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={isSchedulable}
+              onChange={(checked) => {
+                const updatedRecord = { ...record, is_schedulable: checked };
+                setConfigData(configData.map(item => 
+                  item.id === record.id ? updatedRecord : item
+                ));
+              }}
+              checkedChildren="TRUE"
+              unCheckedChildren="FALSE"
+            />
+            <Tag color={isSchedulable ? 'success' : 'error'}>
+              {isSchedulable ? 'TRUE' : 'FALSE'}
+            </Tag>
+          </div>
+        ) : (
+          <Tag color={isSchedulable ? 'success' : 'error'}>
+            {isSchedulable ? 'TRUE' : 'FALSE'}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 150,
+      render: (_, record) => {
+        const editable = isConfigEditing(record);
+        return editable ? (
+          <Space>
+            <Button
+              type="link"
+              icon={<SaveOutlined />}
+              onClick={() => handleConfigSave(record)}
+              className="text-green-600 hover:text-green-700"
+            >
+              Save
+            </Button>
+            <Button
+              type="link"
+              icon={<CloseOutlined />}
+              onClick={handleConfigCancel}
+              className="text-red-600 hover:text-red-700"
+            >
+              Cancel
+            </Button>
+          </Space>
+        ) : (
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            disabled={editingConfigKey !== ''}
+            onClick={() => handleConfigEdit(record)}
+            className="text-blue-600 hover:text-blue-700"
+          >
+            Edit
+          </Button>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Main Content Card */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
       <Card className="shadow-sm">
-        {/* Header Section */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -1272,7 +1425,6 @@ const Workcenter = () => {
             </div>
           </div>
           
-          {/* Tabs for future expansion */}
           <Tabs 
             defaultActiveKey="workcenter" 
             className="mb-4"
@@ -1329,7 +1481,6 @@ const Workcenter = () => {
                         defaultSortOrder="ascend"
                         onChange={(pagination, filters, sorter) => {
                           handleTableChange(pagination, filters, sorter);
-                          // Ensure work_center_id stays sorted in ascending order
                           if (!sorter.field) {
                             const sortedData = [...data].sort((a, b) => {
                               const valueA = String(a.work_center_id || '');
@@ -1344,12 +1495,43 @@ const Workcenter = () => {
                   </div>
                 ),
               },
-              // Add more tabs here in the future
+              {
+                key: 'configure',
+                label: 'Configure Workcentre',
+                children: (
+                  <div className="border rounded-lg bg-white">
+                    <Table
+                      dataSource={configData}
+                      columns={configColumns}
+                      loading={isLoading}
+                      pagination={{
+                        pageSize: 6,
+                        showSizeChanger: false,
+                        showQuickJumper: true,
+                        position: ['bottomCenter'],
+                        showTotal: (total, range) => (
+                          <span className="text-gray-600">
+                            Showing {range[0]}-{range[1]} of {total} items
+                          </span>
+                        ),
+                      }}
+                      scroll={{ 
+                        x: 'max-content',
+                        y: 'calc(100vh - 460px)'
+                      }}
+                      sticky
+                      bordered
+                      className="ant-table-striped"
+                      size="middle"
+                      rowKey="id"
+                    />
+                  </div>
+                ),
+              },
             ]}
           />
         </div>
 
-        {/* Keep all your existing modals */}
         <Modal
           title={`Workcenter Details - ${selectedWorkcenter?.work_center?.code}`}
           visible={isViewModalVisible}

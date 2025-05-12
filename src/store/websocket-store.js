@@ -52,7 +52,7 @@ const useWebSocketStore = create((set, get) => ({
       }
     }
 
-    const ws = new WebSocket('ws://172.18.7.88:2327/production_monitoring/ws/live-status/');
+    const ws = new WebSocket('ws://172.18.7.88:3425/production_monitoring/ws/live-status/');
     
     ws.onmessage = (event) => {
       try {
@@ -80,25 +80,71 @@ const useWebSocketStore = create((set, get) => ({
             set({ idleStartTime: null });
           }
 
-          // Only update machine status, not operation data
-          set(state => ({ 
-            machineStatus: {
-              ...state.machineStatus,
-              machine_id: currentMachineData.machine_id,
-              machine_name: currentMachineData.machine_name,
-              status: currentMachineData.status || 'N/A',
-              last_updated: currentMachineData.last_updated
-            },
-            lastUpdate: new Date().toISOString()
-          }));
+          // Get any existing job data from localStorage
+          let existingJobData = null;
+          const storedJobData = localStorage.getItem('jobData');
+          if (storedJobData) {
+            try {
+              existingJobData = JSON.parse(storedJobData);
+            } catch (error) {
+              console.error('Error parsing stored job data:', error);
+            }
+          }
 
-          // Store only machine status in localStorage
-          localStorage.setItem('machineStatus', JSON.stringify({
+          // Prepare the updated machine status
+          const updatedMachineStatus = {
             machine_id: currentMachineData.machine_id,
             machine_name: currentMachineData.machine_name,
             status: currentMachineData.status || 'N/A',
-            last_updated: currentMachineData.last_updated
+            last_updated: currentMachineData.last_updated,
+            active_program: currentMachineData.active_program,
+            job_in_progress: currentMachineData.job_in_progress,
+            job_status: currentMachineData.job_status,
+            launched_quantity: currentMachineData.launched_quantity,
+            part_count: currentMachineData.part_count,
+            production_order: currentMachineData.production_order,
+            part_number: currentMachineData.part_number,
+            part_description: currentMachineData.part_description,
+            operation_number: currentMachineData.operation_number,
+            operation_description: currentMachineData.operation_description
+          };
+
+          // Only update machine status, not operation data
+          set(state => ({ 
+            machineStatus: updatedMachineStatus,
+            lastUpdate: new Date().toISOString()
           }));
+
+          // If we have existing job data, only update the machine status part
+          if (existingJobData && existingJobData.machine) {
+            const updatedJobData = {
+              ...existingJobData,
+              machine: {
+                ...existingJobData.machine,
+                status: currentMachineData.status || existingJobData.machine.status,
+                completedParts: currentMachineData.part_count || existingJobData.machine.completedParts
+              }
+            };
+            
+            // Only update localStorage if there are meaningful changes
+            if (JSON.stringify(updatedJobData) !== storedJobData) {
+              localStorage.setItem('jobData', JSON.stringify(updatedJobData));
+            }
+          }
+
+          // Store machine status in localStorage
+          localStorage.setItem('machineStatus', JSON.stringify(updatedMachineStatus));
+
+          // If there's an operation/job change detected, trigger an event
+          if (currentMachineData.production_order && 
+              (currentMachineData.production_order !== get().machineStatus?.production_order ||
+               currentMachineData.operation_number !== get().machineStatus?.operation_number)) {
+            // Operation change detected, refresh operations data
+            const currentMachineId = get().getMachineId();
+            if (currentMachineId) {
+              get().fetchMachineOperations(currentMachineId);
+            }
+          }
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -204,8 +250,9 @@ const useWebSocketStore = create((set, get) => ({
         }
       }
 
+      console.log(`Fetching machine operations for machine ID: ${machineId}`);
       const response = await fetch(
-        `http://172.18.7.88:2327/api/v1/operator/machines/${machineId}/operations`
+        `http://172.18.7.88:3425/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -213,26 +260,27 @@ const useWebSocketStore = create((set, get) => ({
       }
 
       const data = await response.json();
+      console.log('Machine operations API response:', data);
       
-      // Format operations data
+      // Format operations data - handle case where operations might be undefined or empty
       const formattedOperations = {
-        completed: data.operations.completed.map(op => ({
+        completed: (data.operations.completed || []).map(op => ({
           ...op,
           status: 'completed',
-          planned_start_time: op.schedule_info.planned_start_time,
-          planned_end_time: op.schedule_info.planned_end_time
+          planned_start_time: op.schedule_info?.planned_start_time,
+          planned_end_time: op.schedule_info?.planned_end_time
         })),
-        inprogress: data.operations.inprogress.map(op => ({
+        inprogress: (data.operations.inprogress || []).map(op => ({
           ...op,
           status: 'inprogress',
-          planned_start_time: op.schedule_info.planned_start_time,
-          planned_end_time: op.schedule_info.planned_end_time
+          planned_start_time: op.schedule_info?.planned_start_time,
+          planned_end_time: op.schedule_info?.planned_end_time
         })),
-        scheduled: data.operations.scheduled.map(op => ({
+        scheduled: (data.operations.scheduled || []).map(op => ({
           ...op,
           status: 'scheduled',
-          planned_start_time: op.schedule_info.planned_start_time,
-          planned_end_time: op.schedule_info.planned_end_time
+          planned_start_time: op.schedule_info?.planned_start_time,
+          planned_end_time: op.schedule_info?.planned_end_time
         }))
       };
 
@@ -240,8 +288,18 @@ const useWebSocketStore = create((set, get) => ({
       localStorage.setItem('operationsData', JSON.stringify(formattedOperations));
       
       let currentJob = null;
+      // Only create job data if there are orders
       if (data.orders && data.orders.length > 0) {
         const order = data.orders[0];
+        
+        // Get machine status from localStorage
+        const storedMachineStatus = localStorage.getItem('machineStatus');
+        const machineStatus = storedMachineStatus ? JSON.parse(storedMachineStatus) : null;
+        
+        // Try to get any existing job data
+        const storedJobData = localStorage.getItem('jobData');
+        const existingJobData = storedJobData ? JSON.parse(storedJobData) : null;
+        
         currentJob = {
           jobId: `JOB-${order.production_order}`,
           part_number: order.part_number,
@@ -279,26 +337,56 @@ const useWebSocketStore = create((set, get) => ({
             }
           },
           machine: {
-            ...data.machine,
-            status: 'IDLE',
+            ...(existingJobData?.machine || {}),
+            id: parseInt(machineId),
+            name: data.machine?.name || 'Unknown Machine',
+            status: machineStatus?.status || 'IDLE',
             efficiency: 92,
             currentCycle: '02:45',
             nextMaintenance: '4hrs',
             alerts: 0,
             totalParts: order.required_qty,
-            completedParts: Math.floor(order.required_qty * 0.6)
+            completedParts: machineStatus?.part_count || Math.floor(order.required_qty * 0.6)
           },
           quality: {
             inspectionPoints: 5,
             completedInspections: 3,
             lastInspection: '11:30 AM',
             deviations: 0
-          }
+          },
+          // Store the active operation if present
+          currentOperation: formattedOperations.inprogress.length > 0 ? formattedOperations.inprogress[0] : null,
+          operations: [...formattedOperations.completed, ...formattedOperations.inprogress, ...formattedOperations.scheduled]
         };
 
         // Store job data
-        localStorage.setItem('currentJobData', JSON.stringify(currentJob));
+        localStorage.setItem('currentJobData', JSON.stringify(order));
+        localStorage.setItem('jobData', JSON.stringify(currentJob));
+        
+        // If there's an active operation, store it separately
+        if (formattedOperations.inprogress.length > 0) {
+          localStorage.setItem('activeOperation', JSON.stringify(formattedOperations.inprogress[0]));
+        }
+      } else {
+        console.log('No orders found in machine operations response');
+        // If there are scheduled operations but no orders, we need to store them separately
+        if (formattedOperations.scheduled.length > 0) {
+          localStorage.setItem('scheduledOperations', JSON.stringify(formattedOperations.scheduled));
+        }
       }
+
+      // Always notify that we've updated the operations data, even if there are no orders
+      window.dispatchEvent(new CustomEvent('operationsDataUpdated', { 
+        detail: { 
+          operations: formattedOperations,
+          machine: data.machine,
+          totals: data.totals || {
+            completed: formattedOperations.completed.length,
+            inprogress: formattedOperations.inprogress.length,
+            scheduled: formattedOperations.scheduled.length
+          }
+        } 
+      }));
 
       set({ 
         machineOperations: formattedOperations,
@@ -310,8 +398,9 @@ const useWebSocketStore = create((set, get) => ({
         success: true,
         data: {
           operations: formattedOperations,
-          orders: data.orders,
-          jobData: currentJob
+          orders: data.orders || [],
+          jobData: currentJob,
+          machine: data.machine
         }
       };
     } catch (error) {
@@ -319,15 +408,35 @@ const useWebSocketStore = create((set, get) => ({
       
       // Try to load from localStorage on error
       const storedOperations = localStorage.getItem('operationsData');
-      const storedJobData = localStorage.getItem('currentJobData');
+      const storedJobData = localStorage.getItem('jobData');
+      const storedCurrentJobData = localStorage.getItem('currentJobData');
       
-      if (storedOperations && storedJobData) {
-        const parsedOperations = JSON.parse(storedOperations);
-        const parsedJobData = JSON.parse(storedJobData);
+      let parsedOperations = null;
+      let parsedJobData = null;
+      let parsedCurrentJobData = null;
+      
+      try {
+        if (storedOperations) {
+          parsedOperations = JSON.parse(storedOperations);
+        }
         
+        if (storedJobData) {
+          parsedJobData = JSON.parse(storedJobData);
+        }
+        
+        if (storedCurrentJobData) {
+          parsedCurrentJobData = JSON.parse(storedCurrentJobData);
+        }
+      } catch (parseError) {
+        console.error('Error parsing stored data:', parseError);
+      }
+      
+      // If we have operations data but no job data, it could be because there are only scheduled operations
+      // In this case, return the operations data anyway
+      if (parsedOperations) {
         set({
           machineOperations: parsedOperations,
-          jobData: parsedJobData,
+          jobData: parsedJobData || null,
           loading: false
         });
         
@@ -335,8 +444,8 @@ const useWebSocketStore = create((set, get) => ({
           success: true,
           data: {
             operations: parsedOperations,
-            jobData: parsedJobData,
-            orders: [parsedJobData] // Include orders for consistency
+            jobData: parsedJobData || null,
+            orders: parsedCurrentJobData ? [parsedCurrentJobData] : []
           }
         };
       }
@@ -362,7 +471,7 @@ const useWebSocketStore = create((set, get) => ({
     };
 
     try {
-      const response = await fetch('http://172.18.7.88:2327/api/v1/maintainance/downtimes/', {
+      const response = await fetch('http://172.18.7.88:3425/api/v1/maintainance/downtimes/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -401,7 +510,7 @@ const useWebSocketStore = create((set, get) => ({
         return;
       }
       const response = await fetch(
-        `http://172.18.7.88:2327/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://172.18.7.88:3425/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -462,7 +571,7 @@ const useWebSocketStore = create((set, get) => ({
       set({ maintenanceLoading: true });
       
       const response = await fetch(
-        `http://172.18.7.88:2327/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://172.18.7.88:3425/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -515,7 +624,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:2327/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:3425/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -551,7 +660,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:2327/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        `http://172.18.7.88:3425/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -582,7 +691,7 @@ const useWebSocketStore = create((set, get) => ({
   fetchMppDetails: async (partNumber, operationNumber) => {
     try {
       const response = await fetch(
-        `http://172.18.7.88:2327/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
+        `http://172.18.7.88:3425/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
       );
 
       if (!response.ok) {
@@ -621,7 +730,7 @@ const useWebSocketStore = create((set, get) => ({
       
       // First try to fetch documents from documents API
       const response = await fetch(
-        `http://172.18.7.88:2327/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:3425/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           method: 'GET',
           headers: {
@@ -657,7 +766,7 @@ const useWebSocketStore = create((set, get) => ({
         try {
           console.log(`Fetching MPP data directly for part ${partNumber}, operation ${operationNumber}`);
           const mppResponse = await fetch(
-            `http://172.18.7.88:2327/api/v1/mpp/by-part/${partNumber}/${operationNumber}`,
+            `http://172.18.7.88:3425/api/v1/mpp/by-part/${partNumber}/${operationNumber}`,
             {
               method: 'GET',
               headers: {
@@ -731,9 +840,9 @@ const useWebSocketStore = create((set, get) => ({
 
       // Fetch both operation and document data in parallel
       const [operationsResponse, documentsResponse] = await Promise.all([
-        fetch(`http://172.18.7.88:2327/api/v1/operator/machines/${machineId}/operations`),
+        fetch(`http://172.18.7.88:3425/api/v1/operator/machines/${machineId}/operations`),
         fetch(
-          `http://172.18.7.88:2327/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+          `http://172.18.7.88:3425/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -814,7 +923,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Downloading document with ID: ${documentId}`);
       
       // Make sure we're using the correct endpoint URL with token
-      const endpoint = `http://172.18.7.88:2327/api/v1/document-management/documents/${documentId}/download-latest`;
+      const endpoint = `http://172.18.7.88:3425/api/v1/document-management/documents/${documentId}/download-latest`;
       console.log(`Making request to: ${endpoint}`);
       
       // Instead of using window.open, use fetch with proper authentication headers
@@ -892,7 +1001,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Opening document with ID: ${documentId} in new tab`);
       
       // Create the endpoint URL - same as in downloadDocumentById
-      const endpoint = `http://172.18.7.88:2327/api/v1/document-management/documents/${documentId}/download-latest`;
+      const endpoint = `http://172.18.7.88:3425/api/v1/document-management/documents/${documentId}/download-latest`;
       
       // Open in new tab and handle the request there
       const newWindow = window.open('', '_blank');

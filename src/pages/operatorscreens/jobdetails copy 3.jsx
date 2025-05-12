@@ -127,6 +127,10 @@ const JobDetails = () => {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [totalHours, setTotalHours] = useState(0);
+  const [quantityCompleted, setQuantityCompleted] = useState(0);
+  const [quantityRejected, setQuantityRejected] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [isSubmittingLog, setIsSubmittingLog] = useState(false);
 
   const [showIssueModal, setShowIssueModal] = useState(false);
 
@@ -179,6 +183,12 @@ const JobDetails = () => {
 
   // Add this for idle timer display
   const [idleTime, setIdleTime] = useState(0);
+
+  // Add this state variable near the other state declarations
+  const [previousActiveJob, setPreviousActiveJob] = useState(null);
+  const [previousActiveOperation, setPreviousActiveOperation] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
 
   // Function to load all available jobs
   const loadAvailableJobs = useCallback(async () => {
@@ -236,6 +246,61 @@ const JobDetails = () => {
     }
   }, []);
 
+  // Add the deactivation function here, before activateSelectedJob
+  const deactivateCurrentJob = async () => {
+    try {
+      setIsDeactivating(true);
+      
+      const machineData = JSON.parse(localStorage.getItem('currentMachine')) || {};
+      const machineId = machineData.id;
+      
+      if (!machineId) {
+        throw new Error('Machine ID not found');
+      }
+      
+      const operationId = machineOperations?.inprogress?.[0]?.id;
+      
+      if (!operationId) {
+        throw new Error('No active operation found to deactivate');
+      }
+      
+      const response = await fetch('http://172.18.7.88:3425/api/v1/logs/machine-raw-live-deactive/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          machine_id: machineId,
+          operation_id: operationId
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to deactivate job');
+      }
+      
+      message.success('Job deactivated successfully');
+      
+      // Clear the current job selection
+      setPreviousActiveJob(null);
+      setPreviousActiveOperation(null);
+      setSelectedJob(null);
+      setSelectedOperation(null);
+      
+      // Refresh machine operations
+      await fetchMachineOperations(machineId);
+      
+      return true;
+    } catch (error) {
+      console.error('Error deactivating job:', error);
+      message.error(`Failed to deactivate job: ${error.message}`);
+      return false;
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
+
   // Function to activate selected job and operation
   const activateSelectedJob = useCallback(async () => {
     if (!selectedJob || !selectedOperation) {
@@ -253,7 +318,18 @@ const JobDetails = () => {
         throw new Error('Machine ID not found');
       }
       
-      // Call the store's activateJob method instead of direct API call
+      // Check if there's a currently active job that needs to be deactivated first
+      const hasActiveJob = machineOperations?.inprogress?.length > 0;
+      
+      if (hasActiveJob) {
+        const deactivateResult = await deactivateCurrentJob();
+        
+        if (!deactivateResult) {
+          throw new Error('Failed to deactivate current job');
+        }
+      }
+      
+      // Now activate the new job
       const activationResult = await activateJob(machineId, selectedOperation.id);
       
       if (!activationResult.success) {
@@ -262,11 +338,16 @@ const JobDetails = () => {
       
       message.success('Job activated successfully');
       
+      // Update the previous active job reference
+      setPreviousActiveJob(selectedJob);
+      setPreviousActiveOperation(selectedOperation);
+      setHasUnsavedChanges(false);
+      
       // Update the job data in the dashboard
       const jobDetails = await loadJobDetails(selectedJob.part_number);
       if (jobDetails) {
-        setJobData({
-          ...jobData,
+        // Construct a consolidated job data object
+        const consolidatedJobData = {
           jobId: `JOB-${jobDetails.production_order}`,
           part_number: jobDetails.part_number,
           production_order: jobDetails.production_order,
@@ -279,12 +360,35 @@ const JobDetails = () => {
           plant_id: jobDetails.plant_id,
           project: jobDetails.project,
           machine: {
-            ...jobData.machine,
+            ...(jobData.machine || {}),
+            id: machineId,
+            name: machineData.name || 'Unknown Machine',
+            status: machineStatus?.status || 'IDLE',
             completedParts: 0
-          }
-        });
+          },
+          // Include operation details
+          currentOperation: selectedOperation,
+          operations: jobDetails.operations || []
+        };
         
+        // Update state
+        setJobData(consolidatedJobData);
+        setJobOrderData(jobDetails);
+        
+        // Store in localStorage consistently - the key source of truth
         localStorage.setItem('currentJobData', JSON.stringify(jobDetails));
+        localStorage.setItem('jobData', JSON.stringify(consolidatedJobData));
+        localStorage.setItem('activeOperation', JSON.stringify(selectedOperation));
+        
+        // Also update job order in a separate event to ensure components refresh
+        window.dispatchEvent(new CustomEvent('jobActivated', { 
+          detail: { 
+            job: jobDetails,
+            operation: selectedOperation
+          } 
+        }));
+        
+        console.log('Job data updated:', consolidatedJobData);
         
         // Close the job selector
         setIsJobSelectorVisible(false);
@@ -297,15 +401,41 @@ const JobDetails = () => {
       setIsActivatingJob(false);
       setShowActivationWarning(false);
     }
-  }, [selectedJob, selectedOperation, loadJobDetails, jobData, activateJob, setIsJobSelectorVisible, setIsActivatingJob, setShowActivationWarning]);
+  }, [selectedJob, selectedOperation, loadJobDetails, jobData, activateJob, setIsJobSelectorVisible, setIsActivatingJob, setShowActivationWarning, machineOperations, deactivateCurrentJob, machineStatus]);
 
   // Toggle job selector visibility
   const toggleJobSelector = () => {
     console.log('Toggle job selector called. Current visibility:', isJobSelectorVisible);
+    
+    // If we're opening the drawer, save current job/operation as previous
     if (!isJobSelectorVisible) {
+      // Store the current job and operation as previous
+      const currentActive = {
+        job: machineOperations?.inprogress?.[0]?.production_order ? {
+          production_order: machineOperations.inprogress[0].production_order,
+          part_number: machineOperations.inprogress[0].part_number,
+          // Add other needed properties
+        } : null,
+        operation: machineOperations?.inprogress?.[0] || null
+      };
+      
+      if (currentActive.job) {
+        setPreviousActiveJob(currentActive.job);
+        setPreviousActiveOperation(currentActive.operation);
+      }
+      
       console.log('Loading available jobs...');
       loadAvailableJobs();
+    } else {
+      // If closing without activating and there are unsaved changes,
+      // reset to the previous state
+      if (hasUnsavedChanges) {
+        setSelectedJob(previousActiveJob);
+        setSelectedOperation(previousActiveOperation);
+        setHasUnsavedChanges(false);
+      }
     }
+    
     setIsJobSelectorVisible(!isJobSelectorVisible);
     console.log('New visibility state set to:', !isJobSelectorVisible);
   };
@@ -327,10 +457,37 @@ const JobDetails = () => {
             console.log('Machine operations result:', result);
             
             if (result?.success) {
+              // Check if there's an active job
+              const hasActiveJob = result.data?.operations?.inprogress?.length > 0;
+              
               // Update job data
               if (result.data?.jobData) {
                 setJobData(result.data.jobData);
                 setJobOrderData(result.data.orders?.[0] || null);
+                
+                // Store updated data in localStorage
+                localStorage.setItem('jobData', JSON.stringify(result.data.jobData));
+                localStorage.setItem('currentJobData', JSON.stringify(result.data.orders?.[0] || null));
+                
+                if (hasActiveJob) {
+                  // Set active operation
+                  const activeOp = result.data.operations.inprogress[0];
+                  setSelectedOperation(activeOp);
+                  localStorage.setItem('activeOperation', JSON.stringify(activeOp));
+                }
+              } else if (!hasActiveJob) {
+                // If no active job, check if we have a previously selected job
+                const storedJobData = localStorage.getItem('currentJobData');
+                const storedJobDetails = localStorage.getItem('jobData');
+                
+                if (storedJobData && storedJobDetails) {
+                  try {
+                    setJobOrderData(JSON.parse(storedJobData));
+                    setJobData(JSON.parse(storedJobDetails));
+                  } catch (parseError) {
+                    console.error('Error parsing stored job data:', parseError);
+                  }
+                }
               }
             }
           }
@@ -345,7 +502,7 @@ const JobDetails = () => {
     return () => {
       closeWebSocket();
     };
-  }, []);
+  }, [initializeWebSocket, fetchMachineOperations, closeWebSocket]);
 
   // Monitor changes to job selector visibility
   useEffect(() => {
@@ -616,10 +773,15 @@ const JobDetails = () => {
 
   const handleJobSelection = async (value) => {
     console.log('Job selected with ID:', value);
+    
+    // Mark that we have unsaved changes since we're selecting a new job
+    setHasUnsavedChanges(true);
+    
     const selectedJob = availableJobs.find(job => job.id === value);
     console.log('Selected job:', selectedJob);
     setSelectedJob(selectedJob);
     setSelectedOperation(null); // Reset operation when job changes
+    
     if (selectedJob) {
       const jobDetails = await loadJobDetails(selectedJob.part_number);
       console.log('Job details loaded:', jobDetails);
@@ -632,9 +794,169 @@ const JobDetails = () => {
 
   const handleOperationSelection = (value) => {
     console.log('Operation selected with ID:', value);
+    
+    // Mark that we have unsaved changes
+    setHasUnsavedChanges(true);
+    
     const selectedOp = availableOperations.find(op => op.id === value);
     console.log('Selected operation:', selectedOp);
     setSelectedOperation(selectedOp);
+  };
+
+  const submitOperatorLog = async () => {
+    if (!startDate || !endDate) {
+      message.error('Please select start and end times');
+      return;
+    }
+
+    try {
+      setIsSubmittingLog(true);
+      
+      // Get operator ID from localStorage - improved parsing
+      const authStorageData = localStorage.getItem('auth-storage');
+      let operatorId = 0;
+      
+      if (authStorageData) {
+        try {
+          const authData = JSON.parse(authStorageData);
+          console.log('Auth data:', authData);
+          // Access the user id correctly based on the structure
+          operatorId = authData?.state?.user_id || 
+                      authData?.user_id || 
+                      0;
+          console.log('Operator ID retrieved:', operatorId);
+        } catch (error) {
+          console.error('Error parsing auth storage data:', error);
+        }
+      }
+      
+      // Get machine ID from localStorage
+      const storedMachine = localStorage.getItem('currentMachine');
+      let machineId = 0;
+      
+      if (storedMachine) {
+        try {
+          const machineData = JSON.parse(storedMachine);
+          machineId = machineData.id || 0;
+          console.log('Machine ID retrieved:', machineId);
+        } catch (error) {
+          console.error('Error parsing machine data:', error);
+        }
+      }
+      
+      // Get operation ID for the currently active job
+      let operationId = 0;
+      
+      // First check if there's an active operation in machineOperations
+      if (machineOperations?.inprogress?.length > 0) {
+        operationId = machineOperations.inprogress[0].id || 0;
+        console.log('Operation ID from machine operations:', operationId);
+      } 
+      // If no active operation but selectedOperation exists (from job selector)
+      else if (selectedOperation && selectedOperation.id) {
+        operationId = selectedOperation.id;
+        console.log('Operation ID from selected operation:', operationId);
+      }
+      // If jobOrderData has operations, use the first one
+      else if (jobOrderData && jobOrderData.operations && jobOrderData.operations.length > 0) {
+        operationId = jobOrderData.operations[0].id;
+        console.log('Operation ID from job order data:', operationId);
+      }
+      
+      // If still no operation ID, look for it in the current job data
+      if (!operationId && jobData) {
+        if (jobData.currentOperation && jobData.currentOperation.id) {
+          operationId = jobData.currentOperation.id;
+        }
+      }
+      
+      // Last resort - check localStorage for any saved operation ID
+      if (!operationId) {
+        const currentJobData = localStorage.getItem('currentJobData');
+        if (currentJobData) {
+          try {
+            const parsedJobData = JSON.parse(currentJobData);
+            if (parsedJobData.operations && parsedJobData.operations.length > 0) {
+              operationId = parsedJobData.operations[0].id;
+              console.log('Operation ID from localStorage job data:', operationId);
+            }
+          } catch (error) {
+            console.error('Error parsing job data from localStorage:', error);
+          }
+        }
+      }
+      
+      if (!operationId) {
+        console.warn('No operation ID found, defaulting to 0');
+      }
+      
+      if (!operatorId) {
+        console.warn('No operator ID found, defaulting to 0');
+      }
+      
+      const payload = {
+        operator_id: operatorId,
+        operation_id: operationId,
+        machine_id: machineId,
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
+        quantity_completed: parseInt(quantityCompleted) || 0,
+        quantity_rejected: parseInt(quantityRejected) || 0,
+        notes: notes || ""
+      };
+      
+      console.log('Submitting operator log payload:', payload);
+      
+      const response = await fetch('http://172.18.7.88:3425/api/v1/logs/operator-log', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to submit operator log');
+      }
+      
+      const responseData = await response.json();
+      console.log('Operator log response:', responseData);
+      
+      message.success('Operator log submitted successfully');
+      
+      // Reset form fields
+      setStartDate(null);
+      setEndDate(null);
+      setTotalHours(0);
+      setQuantityCompleted(0);
+      setQuantityRejected(0);
+      setNotes('');
+      
+    } catch (error) {
+      console.error('Error submitting operator log:', error);
+      message.error(`Failed to submit operator log: ${error.message}`);
+    } finally {
+      setIsSubmittingLog(false);
+    }
+  };
+
+  // Add a function to switch to scheduled jobs mode
+  const switchToScheduledJobs = () => {
+    // Clear any active job selection
+    setPreviousActiveJob(null);
+    setPreviousActiveOperation(null);
+    setSelectedJob(null);
+    setSelectedOperation(null);
+    
+    // Set job selection mode to scheduled
+    setJobSelectionMode('scheduled');
+    
+    // Open the job selector
+    setIsJobSelectorVisible(true);
+    
+    // Load available jobs
+    loadAvailableJobs();
   };
 
   return (
@@ -660,14 +982,23 @@ const JobDetails = () => {
           </div>
         </div>
         
-        {/* Job Selection Button */}
-        <Button
-          type="primary"
-          onClick={toggleJobSelector}
-          className="bg-blue-500"
-        >
-          Select Job
-        </Button>
+        {/* Job Selection Buttons */}
+        <div className="flex gap-2">
+          <Button
+            type="default"
+            onClick={switchToScheduledJobs}
+            icon={<FileTextOutlined />}
+          >
+            Scheduled Jobs
+          </Button>
+          <Button
+            type="primary"
+            onClick={toggleJobSelector}
+            className="bg-blue-500"
+          >
+            Select Job
+          </Button>
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -883,9 +1214,9 @@ const JobDetails = () => {
                     {/* Material Description */}
                     <div className="bg-white rounded-lg p-3">
                       <div className="text-xs text-gray-500">Material Description</div>
-                      <Tooltip title={jobOrderData.material_description}>
+                      <Tooltip title={jobOrderData.part_description}>
                         <div className="text-sm font-medium truncate">
-                          {jobOrderData.material_description || 'N/A'}
+                          {jobOrderData.part_description || 'N/A'}
                         </div>
                       </Tooltip>
                     </div>
@@ -896,13 +1227,13 @@ const JobDetails = () => {
                         <div>
                           <div className="text-xs text-gray-500">Required Qty</div>
                           <div className="text-sm font-semibold text-blue-600">
-                            {jobOrderData.required_qty}
+                            {jobOrderData.required_quantity}
                           </div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500">Launched Qty</div>
                           <div className="text-sm font-semibold text-green-600">
-                            {jobOrderData.launched_qty}
+                            {jobOrderData.launched_quantity}
                           </div>
                         </div>
                       </div>
@@ -941,13 +1272,13 @@ const JobDetails = () => {
                     <div className="bg-white rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-xs text-gray-500">Project Details</div>
-                        <Tag color="blue">Total Ops: {jobOrderData.project_details?.total_operations || 'N/A'}</Tag>
+                        <Tag color="blue">Total Ops: {jobOrderData.total_operations || 'N/A'}</Tag>
                       </div>
-                      <div className="text-sm font-medium">{jobOrderData.project_details?.project_name || 'N/A'}</div>
+                      <div className="text-sm font-medium">{jobOrderData.project?.name || 'N/A'}</div>
                     </div>
 
                     {/* Operation Details */}
-                    <div className="bg-white rounded-lg p-3">
+                    {/* <div className="bg-white rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-xs text-gray-500">Current Operation</div>
                         {machineOperations?.inprogress?.length > 0 && (
@@ -1002,7 +1333,7 @@ const JobDetails = () => {
                           No operation in progress
                         </div>
                       )}
-                    </div>
+                    </div> */}
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8">
@@ -1079,7 +1410,7 @@ const JobDetails = () => {
                     Production Timeline
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 mb-3">
                     <DatePicker
                       placeholder="Start Date"
                       className="w-full"
@@ -1103,35 +1434,56 @@ const JobDetails = () => {
                   </div>
 
                   {totalHours > 0 && (
-                    <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-lg mt-2">
+                    <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-lg mb-3">
                       <Clock className="w-4 h-4 text-blue-600" />
                       <span className="text-sm">
                         Total Time: <strong>{totalHours} hours</strong>
                       </span>
                     </div>
                   )}
-                </div>
-
-                {/* Part Count Update */}
-                <div className="bg-white rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-2">Update Part Count</div>
-                  <Space.Compact className="w-full">
-                    <Input 
-                      placeholder="Enter count"
-                      value={inputValue}
-                      onChange={e => setInputValue(e.target.value)}
-                      type="number"
-                      max={jobData.batchSize}
-                      className="flex-1"
+                  
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Quantity Completed</div>
+                      <Input 
+                        type="number" 
+                        min={0}
+                        value={quantityCompleted}
+                        onChange={(e) => setQuantityCompleted(e.target.value)}
+                        placeholder="Completed"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Quantity Rejected</div>
+                      <Input 
+                        type="number"
+                        min={0}
+                        value={quantityRejected}
+                        onChange={(e) => setQuantityRejected(e.target.value)}
+                        placeholder="Rejected"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <div className="text-xs text-gray-500 mb-1">Notes</div>
+                    <Input.TextArea
+                      rows={2}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Additional notes..."
                     />
-                    <Button 
-                      type="primary"
-                      onClick={handleUpdate}
-                      className="bg-blue-500"
-                    >
-                      Update
-                    </Button>
-                  </Space.Compact>
+                  </div>
+                  
+                  <Button
+                    type="primary"
+                    className="w-full bg-blue-500"
+                    onClick={submitOperatorLog}
+                    loading={isSubmittingLog}
+                    disabled={!startDate || !endDate}
+                  >
+                    Submit Time Log
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1291,7 +1643,12 @@ const JobDetails = () => {
         width={800}
         className="quality-modal"
       >
-        <PokaYokeChecklist jobId={jobData.jobId} />
+        <PokaYokeChecklist 
+          jobId={jobData.jobId} 
+          machineId={currentMachine?.id}
+          visible={showPokaYoke}
+          onClose={() => setShowPokaYoke(false)}
+        />
       </Modal>
 
       {/* Feedback History Modal */}
@@ -1388,12 +1745,33 @@ const JobDetails = () => {
         title="Select Job"
         placement="right"
         width={600}
-        onClose={() => setIsJobSelectorVisible(false)}
+        onClose={() => {
+          // If we close without activating and there are unsaved changes,
+          // reset to the previous state
+          if (hasUnsavedChanges) {
+            setSelectedJob(previousActiveJob);
+            setSelectedOperation(previousActiveOperation);
+            setHasUnsavedChanges(false);
+          }
+          setIsJobSelectorVisible(false);
+        }}
         open={isJobSelectorVisible}
         bodyStyle={{ paddingBottom: 80 }}
         extra={
           <Space>
-            <Button onClick={() => setIsJobSelectorVisible(false)}>Cancel</Button>
+            <Button 
+              onClick={() => {
+                // Reset selections to previous active job if there are unsaved changes
+                if (hasUnsavedChanges) {
+                  setSelectedJob(previousActiveJob);
+                  setSelectedOperation(previousActiveOperation);
+                  setHasUnsavedChanges(false);
+                }
+                setIsJobSelectorVisible(false);
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               type="primary"
               disabled={!selectedJob || !selectedOperation}
@@ -1417,8 +1795,59 @@ const JobDetails = () => {
           
           {jobSelectionMode === 'custom' && (
             <div className="space-y-6">
+              {/* <div>
+                <div className="mb-2 font-medium">Search by Part Number</div>
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input 
+                    placeholder="Enter part number"
+                    value={inputValue}
+                    onChange={e => setInputValue(e.target.value)}
+                  />
+                  <Button 
+                    type="primary"
+                    onClick={async () => {
+                      if (inputValue) {
+                        try {
+                          // Mark that we have unsaved changes
+                          setHasUnsavedChanges(true);
+                          
+                          const response = await fetch(`http://172.18.7.88:3425/api/v1/planning/search_order?part_number=${inputValue}`);
+                          if (!response.ok) {
+                            throw new Error('Failed to fetch job details');
+                          }
+                          
+                          const data = await response.json();
+                          
+                          if (data.orders && data.orders.length > 0) {
+                            const jobDetails = data.orders[0];
+                            // Update selected job
+                            setSelectedJob(jobDetails);
+                            
+                            // Update available operations
+                            if (jobDetails.operations) {
+                              setAvailableOperations(jobDetails.operations.sort((a, b) => 
+                                a.operation_number - b.operation_number
+                              ));
+                            }
+                          } else {
+                            message.warning('No jobs found for the entered part number');
+                          }
+                        } catch (error) {
+                          console.error('Error:', error);
+                          message.error('Failed to search for job');
+                        }
+                      } else {
+                        message.warning('Please enter a part number');
+                      }
+                    }}
+                  >
+                    Search
+                  </Button>
+                </Space.Compact>
+              </div>
+               */}
               <div>
-                <div className="mb-2 font-medium">Select Job</div>
+                <div className="mb-2 font-medium">Or Select from Available Jobs</div>
                 <Select
                   className="w-full"
                   placeholder="Select a job"
@@ -1481,34 +1910,64 @@ const JobDetails = () => {
           {selectedJob && (
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <div className="text-sm font-medium">Selected Job Information</div>
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 space-y-3">
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="text-xs text-gray-500">Production Order</div>
-                    <div className="font-medium">{selectedJob.production_order}</div>
-                  </div>
                   <div>
                     <div className="text-xs text-gray-500">Part Number</div>
                     <div className="font-medium">{selectedJob.part_number}</div>
                   </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Production Order</div>
+                    <div className="font-medium">{selectedJob.production_order}</div>
+                  </div>
                 </div>
+                
                 <div>
-                  <div className="text-xs text-gray-500">Description</div>
-                  <div className="font-medium">{selectedJob.part_description}</div>
+                  <div className="text-xs text-gray-500">Material Description</div>
+                  <div className="font-medium">{selectedJob.part_description || selectedJob.material_description}</div>
                 </div>
+                
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <div className="text-xs text-gray-500">Required Qty</div>
-                    <div className="font-medium">{selectedJob.required_quantity}</div>
+                    <div className="font-medium">{selectedJob.required_quantity || selectedJob.required_qty}</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500">Launched Qty</div>
-                    <div className="font-medium">{selectedJob.launched_quantity}</div>
+                    <div className="font-medium">{selectedJob.launched_quantity || selectedJob.launched_qty}</div>
                   </div>
                 </div>
+                
                 <div>
-                  <div className="text-xs text-gray-500">Project</div>
-                  <div className="font-medium">{selectedJob.project?.name || 'N/A'}</div>
+                  <div className="text-xs text-gray-500">Sales Order</div>
+                  <div className="font-medium">{selectedJob.sale_order || selectedJob.sales_order}</div>
+                </div>
+                
+                <div>
+                  <div className="text-xs text-gray-500">WBS Element</div>
+                  <Tooltip title={selectedJob.wbs_element}>
+                    <div className="font-medium truncate">{selectedJob.wbs_element}</div>
+                  </Tooltip>
+                </div>
+                
+                <div>
+                  <div className="text-xs text-gray-500">Project Details</div>
+                  <div className="font-medium">{selectedJob.project?.name || selectedJob.project_details?.project_name || 'N/A'}</div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-500">Priority</div>
+                    <Tag color={selectedJob.priority > 3 ? 'red' : 'blue'}>
+                      Priority {selectedJob.priority || 'N/A'}
+                    </Tag>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Current Operation</div>
+                    <div className="font-medium">
+                      {selectedOperation ? `OP${selectedOperation.operation_number}` : 'Not selected'}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1534,10 +1993,10 @@ const JobDetails = () => {
             key="activate"
             type="primary"
             danger
-            loading={isActivatingJob}
+            loading={isActivatingJob || isDeactivating}
             onClick={activateSelectedJob}
           >
-            Confirm Activation
+            {machineOperations?.inprogress?.length > 0 ? 'Deactivate Current & Activate New' : 'Confirm Activation'}
           </Button>
         ]}
       >

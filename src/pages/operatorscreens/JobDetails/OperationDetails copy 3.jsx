@@ -495,23 +495,6 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
     };
   }, [refreshOperationsData]);
 
-  // Add listener for operations data update event
-  useEffect(() => {
-    const handleOperationsDataUpdate = (event) => {
-      if (event.detail && event.detail.operations) {
-        console.log('Operations data updated event received:', event.detail);
-        // We don't need to call fetchMachineOperations here as the data is already in the event
-        // Just update the store via the set function if needed
-      }
-    };
-
-    window.addEventListener('operationsDataUpdated', handleOperationsDataUpdate);
-
-    return () => {
-      window.removeEventListener('operationsDataUpdated', handleOperationsDataUpdate);
-    };
-  }, []);
-
   const columns = useMemo(() => [
     {
       title: 'Op. No',
@@ -595,24 +578,12 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
     
     // Then check if we have operations from WebSocket store
     if (machineOperations) {
-      // Create a set of all operations
-      const allOps = new Set();
+      const operations = [
+        ...(machineOperations.completed || []),
+        ...(machineOperations.inprogress || []),
+        ...(machineOperations.scheduled || [])
+      ];
       
-      // Add operations from each category
-      if (machineOperations.completed) {
-        machineOperations.completed.forEach(op => allOps.add(JSON.stringify(op)));
-      }
-      
-      if (machineOperations.inprogress) {
-        machineOperations.inprogress.forEach(op => allOps.add(JSON.stringify(op)));
-      }
-      
-      if (machineOperations.scheduled) {
-        machineOperations.scheduled.forEach(op => allOps.add(JSON.stringify(op)));
-      }
-      
-      // Convert back to objects and sort
-      const operations = Array.from(allOps).map(op => JSON.parse(op));
       return operations.sort((a, b) => a.operation_number - b.operation_number);
     }
     
@@ -625,38 +596,16 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
     
     // Try to load from localStorage as last resort
     try {
-      // First check for scheduled operations specifically
-      const storedScheduledOps = localStorage.getItem('scheduledOperations');
-      if (storedScheduledOps) {
-        const scheduledOps = JSON.parse(storedScheduledOps);
-        if (Array.isArray(scheduledOps) && scheduledOps.length > 0) {
-          return scheduledOps.sort((a, b) => a.operation_number - b.operation_number);
-        }
-      }
-      
-      // Then check all operations
       const storedOperations = localStorage.getItem('operationsData');
       if (storedOperations) {
         const parsedOperations = JSON.parse(storedOperations);
         if (parsedOperations) {
-          const allOps = new Set();
-          
-          if (parsedOperations.completed) {
-            parsedOperations.completed.forEach(op => allOps.add(JSON.stringify(op)));
-          }
-          
-          if (parsedOperations.inprogress) {
-            parsedOperations.inprogress.forEach(op => allOps.add(JSON.stringify(op)));
-          }
-          
-          if (parsedOperations.scheduled) {
-            parsedOperations.scheduled.forEach(op => allOps.add(JSON.stringify(op)));
-          }
-          
-          const operations = Array.from(allOps).map(op => JSON.parse(op));
-          if (operations.length > 0) {
-            return operations.sort((a, b) => a.operation_number - b.operation_number);
-          }
+          const allOps = [
+            ...(parsedOperations.completed || []),
+            ...(parsedOperations.inprogress || []),
+            ...(parsedOperations.scheduled || [])
+          ];
+          return allOps.sort((a, b) => a.operation_number - b.operation_number);
         }
       }
     } catch (error) {
@@ -701,7 +650,7 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
   return (
     <div className="p-6 space-y-6">
       {/* Active Order Alert */}
-      {(jobOrderData || currentActiveOrder || jobData) ? (
+      {(jobOrderData || currentActiveOrder || jobData) && (
         <Alert
           message={
             <div className="flex items-center justify-between">
@@ -746,63 +695,6 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
             </div>
           }
           type="info"
-          showIcon
-          className="mb-4"
-        />
-      ) : machineOperations?.scheduled?.length > 0 ? (
-        <Alert
-          message={
-            <div className="flex items-center justify-between">
-              <span>
-                Scheduled Operations
-              </span>
-              <Tag color="orange">SCHEDULED</Tag>
-            </div>
-          }
-          description={
-            <div>
-              <p>There are {machineOperations.scheduled.length} operations scheduled for this machine.</p>
-              <p>You can view the details below or select a job to activate it.</p>
-              
-              {/* Show refresh button */}
-              <div className="mt-2">
-                <Button 
-                  size="small" 
-                  onClick={refreshOperationsData} 
-                  loading={isRefreshingData}
-                  icon={<InfoCircleOutlined />}
-                >
-                  Refresh Operations Data
-                </Button>
-              </div>
-            </div>
-          }
-          type="info"
-          showIcon
-          className="mb-4"
-        />
-      ) : (
-        <Alert
-          message="No Active or Scheduled Jobs"
-          description={
-            <div>
-              <p>There are no active or scheduled operations for this machine.</p>
-              <p>Click the "Select Job" button to choose a job to activate.</p>
-              
-              {/* Show refresh button */}
-              <div className="mt-2">
-                <Button 
-                  size="small" 
-                  onClick={refreshOperationsData} 
-                  loading={isRefreshingData}
-                  icon={<InfoCircleOutlined />}
-                >
-                  Refresh Operations Data
-                </Button>
-              </div>
-            </div>
-          }
-          type="warning"
           showIcon
           className="mb-4"
         />

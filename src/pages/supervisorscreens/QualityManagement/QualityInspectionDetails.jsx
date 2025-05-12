@@ -793,51 +793,6 @@ const QualityInspectionDetails = ({
                 key: 'operator',
                 width: 100,
                 render: (operator) => operator?.username || '-'
-              },
-              {
-                title: 'Status',
-                key: 'action',
-                width: 110,
-                fixed: 'right',
-                render: (_, record) => {
-                  // Check if we already have a status for this record
-                  const status = approvedStatus[record.id];
-                  const isLoading = approvingIds[record.id];
-                  
-                  // If item is loading, show loading spinner
-                  if (isLoading) {
-                    return <Spin size="small" />;
-                  }
-                  
-                  // Get the correct checked state based on record data or local state
-                  let isChecked = false;
-                  
-                  // First check if record has direct is_done value
-                  if (record.is_done === true) {
-                    isChecked = true;
-                  } else if (record.is_done === false) {
-                    isChecked = false;
-                  } 
-                  // Then check local state if no direct value
-                  else if (status === 'approved') {
-                    isChecked = true;
-                  } else if (status === 'rejected') {
-                    isChecked = false;
-                  }
-                  
-                  // Return a single switch with appropriate checked state
-                  return (
-                    <div className="status-switch-container">
-                      <Switch
-                        checked={isChecked}
-                        onChange={(checked) => handleApproveReject(record.id, checked)}
-                        checkedChildren="Done"
-                        unCheckedChildren="Not Done"
-                        className="status-switch"
-                      />
-                    </div>
-                  );
-                }
               }
             ]}
             dataSource={filteredData}

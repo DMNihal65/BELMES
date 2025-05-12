@@ -59,11 +59,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   const [workCenters, setWorkCenters] = useState([]);
   const [ipidStatusMap, setIpidStatusMap] = useState({});
   const [isIpidStatusLoading, setIsIpidStatusLoading] = useState(true);
-  const [ipidVersions, setIpidVersions] = useState([]);
-  const [existingIpidDocument, setExistingIpidDocument] = useState(null);
-  const [isUploadingVersion, setIsUploadingVersion] = useState(false);
-  const [versionNumber, setVersionNumber] = useState('1');
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (initialOperations && initialOperations.length > 0) {
@@ -213,30 +208,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
     }
   }, [operations.length]);
-
-  // Add an additional useEffect to load IPID status from localStorage as a fallback
-  useEffect(() => {
-    const loadIpidStatusFromLocalStorage = () => {
-      const currentProductionOrder = productionOrder || orderNumber;
-      if (!currentProductionOrder) return;
-      
-      try {
-        const savedStatus = localStorage.getItem(`ipid_status_${currentProductionOrder}`);
-        if (savedStatus) {
-          const parsedStatus = JSON.parse(savedStatus);
-          console.log('Loaded IPID status from localStorage:', parsedStatus);
-          setIpidStatusMap(prevMap => ({
-            ...prevMap,
-            ...parsedStatus
-          }));
-        }
-      } catch (error) {
-        console.error('Error loading IPID status from localStorage:', error);
-      }
-    };
-    
-    loadIpidStatusFromLocalStorage();
-  }, [productionOrder, orderNumber]);
 
   const isEditing = (record) => record.key === editingKey;
 
@@ -555,120 +526,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     setIsModalVisible(false);
   };
 
-  // Function to fetch IPID document details and versions
-  const fetchIpidDocumentDetails = async (operationNumber) => {
-    try {
-      const currentProductionOrder = productionOrder || orderNumber;
-      console.log(`Fetching IPID details for order ${currentProductionOrder}, operation ${operationNumber}`);
-      
-      // This is just a placeholder - in the real implementation, you would add an API endpoint
-      // to fetch IPID document details and versions
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      // Example API call to get document details - replace with actual implementation
-      const response = await fetch(
-        `http://172.18.7.88:3425/api/v1/document-management/ipid/details?production_order=${currentProductionOrder}&operation_number=${operationNumber}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'accept': 'application/json'
-          }
-        }
-      );
-
-      if (response.status === 404) {
-        console.log('No IPID document found');
-        setExistingIpidDocument(null);
-        setIpidVersions([]);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch IPID document details');
-      }
-
-      const data = await response.json();
-      console.log('IPID document details:', data);
-      
-      // Set document details and versions
-      setExistingIpidDocument(data.document);
-      setIpidVersions(data.versions || []);
-      
-      // Set next version number
-      if (data.versions && data.versions.length > 0) {
-        const latestVersion = Math.max(...data.versions.map(v => parseFloat(v.version_number)));
-        setVersionNumber((latestVersion + 1).toString());
-      } else {
-        setVersionNumber('1');
-      }
-    } catch (error) {
-      console.error('Error fetching IPID document details:', error);
-      // If API fails, just assume no document exists
-      setExistingIpidDocument(null);
-      setIpidVersions([]);
-      setVersionNumber('1');
-    }
-  };
-
-  // Handle version upload
-  const handleVersionUpload = async (values) => {
-    try {
-      setIsLoading(true);
-      const file = values.file?.fileList[0]?.originFileObj;
-      
-      if (!file) {
-        throw new Error('Please select a file to upload');
-      }
-
-      if (!existingIpidDocument?.id) {
-        throw new Error('No existing IPID document found');
-      }
-
-      const currentProductionOrder = productionOrder || orderNumber;
-
-      // Create form data for version upload
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('version_number', values.versionNumber || versionNumber);
-      formData.append('document_id', existingIpidDocument.id);
-      formData.append('description', values.description || '');
-      
-      // Call API to upload new version - replace with actual implementation
-      const response = await fetch(
-        `http://172.18.7.88:3425/api/v1/document-management/ipid/${existingIpidDocument.id}/versions`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: formData
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to upload IPID version');
-      }
-
-      message.success('IPID version uploaded successfully');
-      
-      // Update versions
-      await fetchIpidDocumentDetails(selectedOperation.operation_number);
-      
-      setIsLoading(false);
-      setIsUploadingVersion(false);
-      ipidForm.resetFields();
-    } catch (error) {
-      console.error('Error uploading IPID version:', error);
-      message.error(error.message || 'Failed to upload IPID version');
-      setIsLoading(false);
-    }
-  };
-
-  // Update handleIpidUpload
+  // Modify the handleIpidUpload function to persistently save status after upload
   const handleIpidUpload = async (values) => {
     try {
       const file = values.file?.fileList[0]?.originFileObj;
@@ -687,12 +545,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         throw new Error('Operation number is required');
       }
 
-      // If uploading a new version to existing document
-      if (isUploadingVersion && existingIpidDocument) {
-        return handleVersionUpload(values);
-      }
-
-      // Otherwise upload a new document
       const response = await uploadIpidDocument(
         file,
         currentProductionOrder,
@@ -738,9 +590,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         );
         
         console.log(`Updated IPID status after upload for operation ${selectedOperation.operation_number}: ${updatedStatus}`);
-        
-        // Fetch the document details to get the versions
-        await fetchIpidDocumentDetails(selectedOperation.operation_number);
       }
     } catch (error) {
       console.error('Error uploading IPID:', error);
@@ -748,47 +597,29 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     }
   };
 
-  // Update modal open handling
-  const handleOpenIpidModal = (record) => {
-    setSelectedOperation(record);
-    // Fetch IPID document details when opening the modal
-    fetchIpidDocumentDetails(record.operation_number);
-    setIsIpidModalVisible(true);
-    setIsUploadingVersion(false); // Default to new document upload
-  };
-
-  // Update IPID modal
-  // Replace the existing modal with this updated version
-  // In the render part of the component, update the IPID modal:
-
-  // Update the IPID Upload button in the Actions column
-  const renderIpidButton = (record) => {
-    const hasIpid = ipidStatusMap[record.operation_number];
+  // Add an additional useEffect to load IPID status from localStorage as a fallback
+  useEffect(() => {
+    const loadIpidStatusFromLocalStorage = () => {
+      const currentProductionOrder = productionOrder || orderNumber;
+      if (!currentProductionOrder) return;
+      
+      try {
+        const savedStatus = localStorage.getItem(`ipid_status_${currentProductionOrder}`);
+        if (savedStatus) {
+          const parsedStatus = JSON.parse(savedStatus);
+          console.log('Loaded IPID status from localStorage:', parsedStatus);
+          setIpidStatusMap(prevMap => ({
+            ...prevMap,
+            ...parsedStatus
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading IPID status from localStorage:', error);
+      }
+    };
     
-    return (
-      <Tooltip title={isIpidStatusLoading ? 'Checking IPID status...' : 
-                       hasIpid ? 'Manage IPID Documents' : 'Upload IPID File'}>
-        <Button 
-          type="link" 
-          icon={<UploadOutlined />} 
-          onClick={() => {
-            if (isIpidStatusLoading) {
-              message.info('Please wait while we check IPID status');
-              return;
-            }
-            handleOpenIpidModal(record);
-          }}
-          style={{ 
-            color: hasIpid ? '#52c41a' : undefined,
-            cursor: isIpidStatusLoading ? 'not-allowed' : 'pointer',
-            opacity: isIpidStatusLoading ? 0.7 : 1,
-          }}
-          disabled={isIpidStatusLoading}
-          loading={isIpidStatusLoading}
-        />
-      </Tooltip>
-    );
-  };
+    loadIpidStatusFromLocalStorage();
+  }, [productionOrder, orderNumber]);
 
   // Function to fetch machines when work center changes
   const handleWorkCenterChange = async (workCenterCode) => {
@@ -1111,7 +942,32 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
             </Tooltip>
 
             {/* IPID Upload button with loading state */}
-            {renderIpidButton(record)}
+            <Tooltip title={isIpidStatusLoading ? 'Checking IPID status...' : 
+                              hasIpid ? 'IPID already uploaded' : 'Upload IPID File'}>
+              <Button 
+                type="link" 
+                icon={<UploadOutlined />} 
+                onClick={() => {
+                  if (isIpidStatusLoading) {
+                    message.info('Please wait while we check IPID status');
+                    return;
+                  }
+                  if (hasIpid) {
+                    message.info('IPID has already been uploaded for this operation');
+                    return;
+                  }
+                  setSelectedOperation(record);
+                  setIsIpidModalVisible(true);
+                }}
+                style={{ 
+                  color: hasIpid ? '#52c41a' : undefined,
+                  cursor: hasIpid || isIpidStatusLoading ? 'not-allowed' : 'pointer',
+                  opacity: hasIpid || isIpidStatusLoading ? 0.7 : 1,
+                }}
+                disabled={hasIpid || isIpidStatusLoading}
+                loading={isIpidStatusLoading}
+              />
+            </Tooltip>
 
             {/* Machine Linking button */}
             <Tooltip title="Change Machine">
@@ -1275,145 +1131,26 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       {/* Add this modal to your JSX */}
       <Modal
-        title={isUploadingVersion ? "Upload New IPID Version" : "Upload IPID Document"}
+        title="Upload IPID Document"
         open={isIpidModalVisible}
         onCancel={() => {
           setIsIpidModalVisible(false);
           ipidForm.resetFields();
         }}
         footer={null}
-        width={600}
+        width={500}
       >
-        {/* Show IPID document and versions if exists */}
-        {selectedOperation && ipidStatusMap[selectedOperation.operation_number] && existingIpidDocument ? (
-          <div>
-            <div className="bg-gray-50 p-4 rounded-lg mb-4">
-              <h4 className="text-lg font-medium mb-2">Current IPID Document</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-gray-600">Document Name</label>
-                  <div className="font-medium">{existingIpidDocument.name}</div>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600">Latest Version</label>
-                  <div className="font-medium">
-                    {ipidVersions.length > 0 
-                      ? Math.max(...ipidVersions.map(v => parseFloat(v.version_number)))
-                      : '1'}
-                  </div>
-                </div>
-              </div>
-              
-              {ipidVersions.length > 0 && (
-                <div className="mt-4">
-                  <label className="text-sm text-gray-600 block mb-2">Document Versions</label>
-                  <div className="max-h-40 overflow-y-auto">
-                    <table className="min-w-full border-collapse">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="p-2 text-left text-sm">Version</th>
-                          <th className="p-2 text-left text-sm">Date</th>
-                          <th className="p-2 text-left text-sm">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...ipidVersions].sort((a, b) => 
-                          parseFloat(b.version_number) - parseFloat(a.version_number)
-                        ).map(version => (
-                          <tr key={version.id} className="border-t border-gray-200">
-                            <td className="p-2 text-sm">{version.version_number}</td>
-                            <td className="p-2 text-sm">
-                              {new Date(version.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="p-2 text-sm">
-                              <Button 
-                                type="link" 
-                                size="small"
-                                onClick={() => {
-                                  // Call the download function
-                                  const downloadDocument = usePlanningStore.getState().downloadDocument;
-                                  downloadDocument(version.id);
-                                }}
-                              >
-                                Download
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-              
-              <div className="mt-4 flex justify-end">
-                <Button
-                  type="primary"
-                  onClick={() => setIsUploadingVersion(true)}
-                >
-                  Upload New Version
-                </Button>
-              </div>
+        {/* Check if IPID already exists for the selected operation */}
+        {selectedOperation && ipidStatusMap[selectedOperation.operation_number] ? (
+          <div className="text-center p-4">
+            <div style={{ fontSize: '64px', color: '#52c41a', marginBottom: '16px' }}>
+              <UploadOutlined />
             </div>
-            
-            {isUploadingVersion && (
-              <Form
-                form={ipidForm}
-                layout="vertical"
-                onFinish={handleIpidUpload}
-              >
-                <Form.Item
-                  name="versionNumber"
-                  label="Version Number"
-                  initialValue={versionNumber}
-                >
-                  <Input placeholder="Enter version number" disabled />
-                </Form.Item>
-                
-                <Form.Item
-                  name="description"
-                  label="Description"
-                  rules={[{ required: true, message: 'Please enter description' }]}
-                >
-                  <Input.TextArea 
-                    rows={3} 
-                    placeholder="Enter changes in this version"
-                  />
-                </Form.Item>
-                
-                <Form.Item
-                  name="file"
-                  label="IPID Document"
-                  rules={[{ required: true, message: 'Please select a file' }]}
-                >
-                  <Upload.Dragger
-                    name="file"
-                    maxCount={1}
-                    beforeUpload={() => false}
-                    accept=".pdf,.doc,.docx"
-                  >
-                    <p className="ant-upload-drag-icon">
-                      <InboxOutlined />
-                    </p>
-                    <p className="ant-upload-text">Click or drag file to this area to upload</p>
-                    <p className="ant-upload-hint">
-                      Support for PDF, DOC, DOCX files
-                    </p>
-                  </Upload.Dragger>
-                </Form.Item>
-                
-                <Form.Item className="mb-0 text-right">
-                  <Space>
-                    <Button onClick={() => setIsUploadingVersion(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="primary" htmlType="submit" loading={isLoading}>
-                      Upload Version
-                    </Button>
-                  </Space>
-                </Form.Item>
-              </Form>
-            )}
+            <h3>IPID Already Uploaded</h3>
+            <p>An IPID document has already been uploaded for this operation.</p>
+            <Button type="primary" onClick={() => setIsIpidModalVisible(false)}>
+              Close
+            </Button>
           </div>
         ) : (
           <Form
@@ -1466,7 +1203,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
                 }}>
                   Cancel
                 </Button>
-                <Button type="primary" htmlType="submit" loading={isLoading}>
+                <Button type="primary" htmlType="submit">
                   Upload
                 </Button>
               </Space>

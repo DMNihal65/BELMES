@@ -12,6 +12,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
   machineNames: [], // Store the machine names from the API
   isLoading: false,
   error: null,
+  filteredHistoryData: null, // Add state for filtered history data
   
   // Fetch machine names from the API
   fetchMachineNames: async () => {
@@ -189,6 +190,86 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
         isLoading: false 
       });
       return null;
+    }
+  },
+  
+  // Fetch filtered history data for a specific machine, parameter and date range
+  fetchFilteredHistoryData: async (machineId, startDate, endDate, parameterName) => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      // Format dates for API
+      const formattedStartDate = startDate.format('YYYY-MM-DD');
+      const formattedEndDate = endDate.format('YYYY-MM-DD');
+      
+      // Map frontend parameter name to API parameter name
+      const apiParamMap = {
+        'phaseAVoltage': 'phase_a_voltage',
+        'phaseBVoltage': 'phase_b_voltage',
+        'phaseCVoltage': 'phase_c_voltage',
+        'avgPhaseVoltage': 'avg_phase_voltage',
+        'lineABVoltage': 'line_ab_voltage',
+        'lineBCVoltage': 'line_bc_voltage',
+        'lineCAVoltage': 'line_ca_voltage',
+        'avgLineVoltage': 'avg_line_voltage',
+        'phaseACurrent': 'phase_a_current',
+        'phaseBCurrent': 'phase_b_current',
+        'phaseCCurrent': 'phase_c_current',
+        'avgThreePhaseCurrent': 'avg_three_phase_current',
+        'powerFactor': 'power_factor',
+        'frequency': 'frequency',
+        'totalInstantaneousPower': 'total_instantaneous_power',
+        'activeEnergyDelivered': 'active_energy_delivered'
+      };
+      
+      const apiParamName = apiParamMap[parameterName] || parameterName;
+      
+      // Create URL with proxy if needed
+      const isDevEnvironment = process.env.NODE_ENV === 'development';
+      const baseUrl = isDevEnvironment 
+        ? `/proxy/ems/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}` 
+        : `http://172.18.100.214:8006/ems/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      
+      console.log(`Attempting to fetch filtered history data from ${baseUrl}`);
+      
+      try {
+        const response = await fetchWithRetry(baseUrl, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          timeout: API_TIMEOUT
+        });
+        
+        console.log('API Response for filtered history data:', response.data);
+        
+        if (response.data && (response.data.data || response.data.length > 0)) {
+          // Store the raw API response
+          set({ 
+            filteredHistoryData: response.data,
+            isLoading: false 
+          });
+          return response.data;
+        } else {
+          console.log('Empty data received from API, falling back to mock data');
+          throw new Error('Empty data received');
+        }
+      } catch (error) {
+        console.error('API call failed, falling back to mock data:', error);
+        throw error; // Propagate to the outer catch block
+      }
+    } catch (error) {
+      console.error('Error in fetchFilteredHistoryData:', error);
+      
+      // Generate mock data for this specific machine
+      console.log(`Using fallback filtered history data for machine ${machineId} and parameter ${parameterName}`);
+      const mockData = generateMockFilteredHistoryData(machineId, parameterName);
+      set({ 
+        filteredHistoryData: mockData,
+        isLoading: false, 
+        error: error.message 
+      });
+      return mockData;
     }
   }
 }));
@@ -572,3 +653,148 @@ function generateMockLiveData(machineId) {
 }
 
 export default useEnergyMonitoringBelStore; 
+
+// Helper function to generate mock filtered history data
+function generateMockFilteredHistoryData(machineId, parameterName) {
+  console.log('Generating mock filtered history data for:', { machineId, parameterName });
+  
+  // Create a 24-hour time series with readings every 30 minutes
+  const dataPoints = [];
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setDate(startDate.getDate() - 1); // 24 hours back
+  
+  // Map the parameter name from frontend format to API format
+  const apiParamMap = {
+    'phaseAVoltage': 'phase_a_voltage',
+    'phaseBVoltage': 'phase_b_voltage',
+    'phaseCVoltage': 'phase_c_voltage',
+    'avgPhaseVoltage': 'avg_phase_voltage',
+    'lineABVoltage': 'line_ab_voltage',
+    'lineBCVoltage': 'line_bc_voltage',
+    'lineCAVoltage': 'line_ca_voltage',
+    'avgLineVoltage': 'avg_line_voltage',
+    'phaseACurrent': 'phase_a_current',
+    'phaseBCurrent': 'phase_b_current',
+    'phaseCCurrent': 'phase_c_current',
+    'avgThreePhaseCurrent': 'avg_three_phase_current',
+    'powerFactor': 'power_factor',
+    'frequency': 'frequency',
+    'totalInstantaneousPower': 'total_instantaneous_power',
+    'activeEnergyDelivered': 'active_energy_delivered'
+  };
+  
+  // Get base value ranges for different parameter types
+  let baseValue, minVariation, maxVariation;
+  
+  switch(apiParamMap[parameterName] || parameterName) {
+    case 'phase_a_voltage':
+    case 'phase_b_voltage':
+    case 'phase_c_voltage':
+    case 'avg_phase_voltage':
+      baseValue = 220;
+      minVariation = -10;
+      maxVariation = 10;
+      break;
+    case 'line_ab_voltage':
+    case 'line_bc_voltage':
+    case 'line_ca_voltage':
+    case 'avg_line_voltage':
+      baseValue = 380;
+      minVariation = -15;
+      maxVariation = 15;
+      break;
+    case 'phase_a_current':
+    case 'phase_b_current':
+    case 'phase_c_current':
+    case 'avg_three_phase_current':
+      baseValue = 10;
+      minVariation = -3;
+      maxVariation = 5;
+      break;
+    case 'power_factor':
+      baseValue = 0.92;
+      minVariation = -0.1;
+      maxVariation = 0.08;
+      break;
+    case 'frequency':
+      baseValue = 50;
+      minVariation = -0.2;
+      maxVariation = 0.2;
+      break;
+    case 'total_instantaneous_power':
+      baseValue = 8;
+      minVariation = -3;
+      maxVariation = 4;
+      break;
+    case 'active_energy_delivered':
+      baseValue = 350;
+      minVariation = -50;
+      maxVariation = 100;
+      break;
+    default:
+      console.log('Using default values for unknown parameter:', parameterName);
+      baseValue = 100;
+      minVariation = -20;
+      maxVariation = 20;
+  }
+  
+  // Generate data points every 30 minutes for 24 hours
+  for (let i = 0; i < 48; i++) {
+    const timestamp = new Date(startDate);
+    timestamp.setMinutes(timestamp.getMinutes() + (i * 30));
+    
+    // Add some randomness with trends
+    const hourOfDay = timestamp.getHours();
+    let trendFactor = 0;
+    
+    // Add a daily pattern - higher during work hours, lower at night
+    if (hourOfDay >= 9 && hourOfDay < 18) {
+      trendFactor = 0.7; // Higher during work hours
+    } else if (hourOfDay >= 18 && hourOfDay < 22) {
+      trendFactor = 0.3; // Moderate in evening
+    } else {
+      trendFactor = -0.3; // Lower at night
+    }
+    
+    // Calculate the value with randomness and trend
+    const randomVariation = minVariation + Math.random() * (maxVariation - minVariation);
+    const trendVariation = trendFactor * Math.abs(maxVariation - minVariation) * 0.5;
+    const value = baseValue + randomVariation + trendVariation;
+    
+    // Ensure the value makes sense (not negative for most parameters)
+    const finalValue = parameterName === 'powerFactor' ? 
+      Math.max(0, Math.min(1, value)) : 
+      Math.max(0, value);
+    
+    dataPoints.push({
+      timestamp: timestamp.toISOString(),
+      value: Number(finalValue.toFixed(2))
+    });
+  }
+  
+  // Ensure we have at least some data
+  if (dataPoints.length === 0) {
+    console.warn('No data points generated, adding fallback points');
+    for (let i = 0; i < 5; i++) {
+      const timestamp = new Date();
+      timestamp.setHours(timestamp.getHours() - i);
+      dataPoints.push({
+        timestamp: timestamp.toISOString(),
+        value: baseValue + (Math.random() * 10 - 5)
+      });
+    }
+  }
+  
+  const result = {
+    machine_id: parseInt(machineId),
+    parameter: apiParamMap[parameterName] || parameterName,
+    data: dataPoints
+  };
+  
+  console.log('Generated mock data with', dataPoints.length, 'points');
+  console.log('First data point:', dataPoints[0]);
+  console.log('Last data point:', dataPoints[dataPoints.length - 1]);
+  
+  return result;
+} 

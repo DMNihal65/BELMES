@@ -1,4 +1,3 @@
-//workcenter-store.js
 import { create } from 'zustand';
 import { message } from 'antd';
 
@@ -28,10 +27,6 @@ export const fetchMachineDetails = async (machineId) => {
   }
 };
 
-
-
-
-
 export const createMachine = async (machineData) => {
   try {
     const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/machines/', {
@@ -56,7 +51,6 @@ const useWorkcenterStore = create((set, get) => ({
   workcenterCodes: [],
   machineNames: [],
   workcentersList: [],
-  workcenterConfig: [],
   isLoading: false,
   error: null,
 
@@ -300,62 +294,6 @@ const useWorkcenterStore = create((set, get) => ({
       console.error('Error creating workcenter:', error);
       set({ error: error.message, isLoading: false });
       message.error(error.message || 'Failed to create workcenter');
-      throw error;
-    }
-  },
-
-  fetchWorkcenterConfig: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/workcenters');
-      if (!response.ok) {
-        throw new Error('Failed to fetch workcenter configuration');
-      }
-      const data = await response.json();
-      console.log('Fetched workcenter configuration:', data);
-
-      set({ 
-        workcenterConfig: data,
-        isLoading: false 
-      });
-    } catch (err) {
-      console.error('Error fetching workcenter configuration:', err);
-      set({ error: err.message, isLoading: false });
-    }
-  },
-
-  updateWorkcenterSchedulable: async (workcenterId, isSchedulable) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await fetch(`http://172.18.7.88:3425/api/v1/master-order/workcenters/${workcenterId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ is_schedulable: isSchedulable })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update workcenter schedulable status');
-      }
-
-      const updatedData = await response.json();
-      console.log('Updated workcenter:', updatedData);
-
-      // Update the local state with the new data
-      set(state => ({
-        workcenterConfig: state.workcenterConfig.map(wc => 
-          wc.id === workcenterId ? { ...wc, is_schedulable: isSchedulable } : wc
-        ),
-        isLoading: false
-      }));
-
-      message.success('Workcenter status updated successfully');
-      return updatedData;
-    } catch (error) {
-      console.error('Error updating workcenter status:', error);
-      set({ error: error.message, isLoading: false });
-      message.error('Failed to update workcenter status');
       throw error;
     }
   },

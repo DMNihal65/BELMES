@@ -745,7 +745,7 @@ const useOrderStore = create((set, get) => ({
         });
       } else {
         message.warning({
-          content: `No documents found for Part Number: ${partNumber}\n\nMPP Document: Not found\nEngineering Drawing: Not found`,
+          content: `No documents found for Part        {partNumber}\n\nMPP Document: Not found\nEngineering Drawing: Not found`,
           duration: 5,
           style: { 
             whiteSpace: 'pre-line',
@@ -1080,21 +1080,6 @@ const useOrderStore = create((set, get) => ({
   // Update the uploadDocumentByType function to fix the 422 error
   uploadDocumentByType: async (file, docName, docType, partNumber, description = '', version = 'v1') => {
     try {
-      console.log('Uploading document with details:', {
-        fileName: file.name,
-        fileSize: file.size,
-        docName,
-        docType,
-        partNumber,
-        description,
-        version
-      });
-
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
       const formData = new FormData();
       formData.append('file', file.originFileObj || file);
       formData.append('name', docName);
@@ -1103,39 +1088,23 @@ const useOrderStore = create((set, get) => ({
       formData.append('description', description);
       formData.append('version', version);
 
-      // Log FormData entries for verification
-      for (let pair of formData.entries()) {
-        console.log('FormData entry:', pair[0], 
-          typeof pair[1] === 'object' ? `File: ${pair[1].name}, type: ${pair[1].type}, size: ${pair[1].size}` : pair[1]);
-      }
-
-      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.uploadDocumentByType}`;
-      console.log('Uploading to URL:', url);
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      console.log('Upload response status:', response.status);
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.uploadDocumentByType}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: formData
+        }
+      );
 
       if (!response.ok) {
-        let errorMessage = 'Failed to upload document';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.detail || errorData.message || `Error ${response.status}: ${errorMessage}`;
-          console.error('Error response data:', errorData);
-        } catch (e) {
-          errorMessage = `Server error (${response.status}): ${errorMessage}`;
-        }
-        throw new Error(errorMessage);
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload document');
       }
 
       const data = await response.json();
-      console.log('Upload successful, response:', data);
       return data;
     } catch (error) {
       console.error('Error uploading document:', error);
@@ -1271,9 +1240,6 @@ const useOrderStore = create((set, get) => ({
         throw new Error('Authentication token not found');
       }
 
-      // Log the API call for debugging
-      console.log(`Checking documents for part number: ${partNumber}`);
-
       // Call the documents endpoint
       const response = await fetch(
         `http://172.18.7.88:3425/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
@@ -1285,13 +1251,10 @@ const useOrderStore = create((set, get) => ({
       );
 
       if (!response.ok) {
-        const statusText = response.statusText || `Error ${response.status}`;
-        console.error(`Document check failed: ${statusText}`);
-        throw new Error(`Failed to fetch documents (${statusText})`);
+        throw new Error('Failed to fetch documents');
       }
 
       const data = await response.json();
-      console.log('Document check response:', data);
       
       // Check if any documents exist
       const hasMpp = !!data.mpp_document;
@@ -1299,11 +1262,6 @@ const useOrderStore = create((set, get) => ({
 
       // Show result after loading
       if (hasMpp || hasDrawing) {
-        console.log('Documents found:', {
-          hasMppDoc: hasMpp,
-          hasDrawingDoc: hasDrawing
-        });
-        
         message.success({
           content: '✅ Documents exist for this part number',
           key: loadingKey,
@@ -1319,10 +1277,8 @@ const useOrderStore = create((set, get) => ({
           }
         });
       } else {
-        console.log('No documents found for part number:', partNumber);
-        
         message.warning({
-          content: `⚠️ No documents found for part number: ${partNumber}`,
+          content: '⚠️ No documents found for this part number',
           key: loadingKey,
           className: 'custom-message-notification',
           style: {
@@ -1345,19 +1301,14 @@ const useOrderStore = create((set, get) => ({
           oarc_document: data.oarc_document,
           ipid_document: data.ipid_document,
           all_documents: data.all_documents || []
-        },
-        documentLoadingStates: {
-          mpp: false,
-          engineering: false
-        },
-        documentError: null // Clear any previous errors
+        }
       });
 
       return data;
     } catch (error) {
       console.error('Error checking documents:', error);
       message.error({
-        content: `❌ ${error.message || 'Failed to check documents'}`,
+        content: '❌ Failed to check documents',
         key: loadingKey,
         className: 'custom-message-notification',
         style: {
@@ -1379,11 +1330,7 @@ const useOrderStore = create((set, get) => ({
           ipid_document: null,
           all_documents: []
         },
-        documentError: error.message,
-        documentLoadingStates: {
-          mpp: false,
-          engineering: false
-        }
+        documentError: error.message
       });
       throw error;
     }

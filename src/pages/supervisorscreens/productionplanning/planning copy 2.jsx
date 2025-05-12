@@ -596,7 +596,6 @@ const loadInventoryItems = async () => {
           setDrawingsLoading(true);
           const drawingsData = await fetchEngineeringDrawings(selectedJob.part_number);
           console.log('Fetched engineering drawings:', drawingsData);
-          console.log('Items from API:', drawingsData.items); // Log the items
           setEngineeringDrawings(drawingsData.items || []);
         } catch (error) {
           console.error('Error fetching engineering drawings:', error);
@@ -1685,20 +1684,10 @@ const handleAddTool = async (values) => {
   // Handle viewing/downloading a drawing
   const handleViewDrawing = async (documentId) => {
     try {
-      console.log('Attempting to download document ID:', documentId);
-      
-      if (!documentId) {
-        message.error('Invalid document ID');
-        return;
-      }
-      
-      // Try to download the document
-      const result = await downloadDocument(documentId);
-      console.log('Download result:', result);
-      message.success('Drawing downloaded successfully');
+      await downloadDocument(documentId);
     } catch (error) {
-      console.error('Error viewing/downloading drawing:', error);
-      message.error('Failed to download drawing: ' + (error.message || 'Unknown error'));
+      console.error('Error viewing drawing:', error);
+      message.error('Failed to view drawing');
     }
   };
 
@@ -1723,16 +1712,10 @@ const handleAddTool = async (values) => {
       const uploadPromises = files.map(fileInfo => {
         const file = fileInfo.originFileObj;
         const operationId = fileOperationMappings[fileInfo.uid];
-        
-        console.log('File:', file.name, 'Operation ID:', operationId);
-        console.log('Available operations:', selectedJob.operations.map(op => ({id: op.id, number: op.operation_number})));
-        
-        // Use string comparison to ensure type compatibility
-        const selectedOperation = selectedJob.operations.find(op => String(op.id) === String(operationId));
+        const selectedOperation = selectedJob.operations.find(op => op.id === operationId);
         
         if (!selectedOperation) {
-          console.error(`No matching operation found for ID ${operationId}`);
-          throw new Error(`Invalid operation for file ${file.name}. Operation ID ${operationId} not found.`);
+          throw new Error(`Invalid operation for file ${file.name}`);
         }
 
         // Create FormData object for each file
@@ -1798,7 +1781,6 @@ const handleAddTool = async (values) => {
 
   // Add new function to handle operation selection for a file
   const handleOperationSelect = (fileUid, operationId) => {
-    console.log(`Assigning operation ID ${operationId} to file ${fileUid}`);
     setFileOperationMappings(prev => ({
       ...prev,
       [fileUid]: operationId
@@ -3453,28 +3435,9 @@ const handleAddTool = async (values) => {
                             <div className="w-full">
                               <Card 
                                 title={
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                      <FileTextOutlined className="text-green-500 mr-2" />
-                                      <span>Engineering Drawings</span>
-                                    </div>
-                                    {/* Add a refresh button to manually fetch drawings */}
-                                    <Button 
-                                      type="text" 
-                                      icon={<ReloadOutlined />} 
-                                      onClick={() => {
-                                        if (selectedJob?.part_number) {
-                                          setDrawingsLoading(true);
-                                          fetchEngineeringDrawings(selectedJob.part_number)
-                                            .then(data => {
-                                              console.log('Manually fetched drawings:', data);
-                                              setEngineeringDrawings(data.items || []);
-                                            })
-                                            .catch(err => console.error('Manual fetch error:', err))
-                                            .finally(() => setDrawingsLoading(false));
-                                        }
-                                      }}
-                                    />
+                                  <div className="flex items-center">
+                                    <FileTextOutlined className="text-green-500 mr-2" />
+                                    <span>Engineering Drawings</span>
                                   </div>
                                 }
                                 className="shadow-md hover:shadow-lg transition-shadow duration-300"
@@ -3482,7 +3445,7 @@ const handleAddTool = async (values) => {
                                 bodyStyle={{ padding: '12px' }}
                                 loading={drawingsLoading}
                               >
-                                {engineeringDrawings && engineeringDrawings.length > 0 ? (
+                                {engineeringDrawings.length > 0 ? (
                                   <Table
                                     size="small"
                                     bordered
@@ -3527,19 +3490,24 @@ const handleAddTool = async (values) => {
                                         )
                                       }
                                     ]}
-                                    dataSource={engineeringDrawings}
+                                    dataSource={engineeringDrawings.filter(doc => 
+                                      doc.doc_type === 'drawing' || 
+                                      doc.name.toLowerCase().includes('.pdf') ||
+                                      doc.name.toLowerCase().includes('.dwg')
+                                    ).map(drawing => ({
+                                      key: drawing.id,
+                                      id: drawing.id,
+                                      name: drawing.name,
+                                      latest_version: drawing.latest_version
+                                    }))}
                                   />
                                 ) : (
                                   <div className="flex flex-col items-center justify-center h-[200px] bg-gray-50 rounded-lg">
                                     <FileTextOutlined className="text-green-400 text-5xl mb-4" />
                                     <Text strong className="text-lg mb-2">No Drawings Available</Text>
-                                    <Text type="secondary" className="text-center mb-4">
+                                    <Text type="secondary" className="text-center">
                                       No engineering drawings found for this part
                                     </Text>
-                                    {/* Add debug info */}
-                                    <div className="text-xs text-gray-500 mt-2">
-                                      Part Number: {selectedJob?.part_number || 'None selected'}
-                                    </div>
                                   </div>
                                 )}
                               </Card>

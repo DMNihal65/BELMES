@@ -1,4 +1,3 @@
-//WorkcenterDashboard
 import React, { useState, useEffect } from 'react';
 import { 
   Table, 
@@ -13,15 +12,13 @@ import {
   Typography,
   Card,
   Tabs,
-  Tag,
-  Switch
+  Popconfirm
 } from 'antd';
-import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import useWorkcenterStore from '../../../store/workcenter-store';
 import { fetchAllMachines, createMachine, fetchMachineDetails } from '../../../store/workcenter-store';
+import useOrderStore from '../../../store/order-store';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -31,7 +28,6 @@ const Workcenter = () => {
   const [addForm] = Form.useForm();
   const [editingKey, setEditingKey] = useState('');
   const [data, setData] = useState([]);
-  const [configData, setConfigData] = useState([]);
   const [selectedWorkcenter, setSelectedWorkcenter] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
@@ -48,38 +44,28 @@ const Workcenter = () => {
   const [selectedWorkcenterId, setSelectedWorkcenterId] = useState(null);
   const [selectedMachineDetails, setSelectedMachineDetails] = useState([]);
   const [workcenterOptions, setWorkcenterOptions] = useState([]);
-  const [editingConfigKey, setEditingConfigKey] = useState('');
 
   const { 
     fetchWorkcenters, 
     updateWorkcenter, 
     createWorkcenter,
-    fetchWorkcenterConfig,
-    updateWorkcenterSchedulable,
     workcenters, 
-    workcenterConfig,
     isLoading,
     workcenterCodes,
     machineNames
   } = useWorkcenterStore();
 
+  const { deleteMachine } = useOrderStore();
+
   useEffect(() => {
     console.log('Fetching workcenters...');
     fetchWorkcenters();
-    fetchWorkcenterConfig();
-  }, [fetchWorkcenters, fetchWorkcenterConfig]);
+  }, [fetchWorkcenters]);
 
   useEffect(() => {
     console.log('Workcenters updated:', workcenters);
     setData(workcenters || []);
   }, [workcenters]);
-
-  useEffect(() => {
-    console.log('Workcenter config updated:', workcenterConfig);
-    // Sort the data by ID before setting it
-    const sortedData = [...(workcenterConfig || [])].sort((a, b) => a.id - b.id);
-    setConfigData(sortedData);
-  }, [workcenterConfig]);
 
   const isEditing = (record) => record.id === editingKey;
 
@@ -127,11 +113,11 @@ const Workcenter = () => {
 
       await updateWorkcenter(updatedItem);
       setEditingKey('');
-      toast.success('Machine updated successfully');
+      message.success('Machine updated successfully');
       await fetchWorkcenters(); // Refresh the table data
     } catch (errInfo) {
       console.error('Save failed:', errInfo);
-      toast.error(errInfo.message || 'Failed to update machine');
+      message.error(errInfo.message || 'Failed to update machine');
     }
   };
 
@@ -171,7 +157,18 @@ const Workcenter = () => {
       await fetchWorkcenters();
     } catch (error) {
       console.error('Edit failed:', error);
-      toast.error('Failed to update workcenter: ' + error.message);
+      message.error('Failed to update workcenter: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (record) => {
+    try {
+      await deleteMachine(record.id);
+      // Refresh the workcenters list after successful deletion
+      await fetchWorkcenters();
+    } catch (error) {
+      // Error is now handled in the deleteMachine function
+      console.error('Delete operation failed:', error);
     }
   };
 
@@ -433,7 +430,7 @@ const Workcenter = () => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 150,
+      width: 200,
       render: (_, record) => {
         const editable = isEditing(record);
         return editable ? (
@@ -475,6 +472,29 @@ const Workcenter = () => {
             >
               View
             </Button>
+            <Popconfirm
+              title="Delete Machine"
+              description={
+                <div>
+                  <p>Are you sure you want to delete this machine?</p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    Note: Machine must be unlinked from workcenters before deletion.
+                  </p>
+                </div>
+              }
+              onConfirm={() => handleDelete(record)}
+              okText="Yes"
+              cancelText="No"
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                type="link"
+                icon={<DeleteOutlined />}
+                className="text-red-600 hover:text-red-700"
+              >
+                Delete
+              </Button>
+            </Popconfirm>
           </Space>
         );
       },
@@ -528,7 +548,7 @@ const Workcenter = () => {
       console.log('Form values:', values);
       
       if (!values.workcenterCode || !values.description || !values.operation) {
-        toast.error('Please fill in all required fields');
+        message.error('Please fill in all required fields');
         return;
       }
 
@@ -549,15 +569,16 @@ const Workcenter = () => {
       
       setIsAddModalVisible(false);
       addForm.resetFields();
-      toast.success('Workcenter added successfully');
+      message.success('Workcenter added successfully');
       
+      // The store will automatically refresh both lists
     } catch (error) {
       console.error('Add failed:', error);
       if (error.errorFields) {
         const errorMessages = error.errorFields.map(field => field.errors.join(', '));
-        toast.error('Validation failed: ' + errorMessages.join('; '));
+        message.error('Validation failed: ' + errorMessages.join('; '));
       } else {
-        toast.error('Failed to add new workcenter: ' + (error.message || 'Unknown error'));
+        message.error('Failed to add new workcenter: ' + (error.message || 'Unknown error'));
       }
     }
   };
@@ -595,7 +616,7 @@ const Workcenter = () => {
         });
 
         await Promise.all(machinePromises);
-        toast.success('Existing machines added successfully');
+        message.success('Existing machines added successfully');
       } else if (machineModalStep === 'new') {
         // Handle new machine creation
         const machineData = {
@@ -614,16 +635,16 @@ const Workcenter = () => {
 
         console.log('Creating new machine with data:', machineData);
         await createMachine(machineData);
-        toast.success('New machine added successfully');
+        message.success('New machine added successfully');
       }
 
       setIsAddMachineModalVisible(false);
       setMachineModalStep('select');
       addMachineForm.resetFields();
-      fetchWorkcenters();
+      fetchWorkcenters(); // Refresh the workcenter list
     } catch (error) {
       console.error('Error adding machine:', error);
-      toast.error('Failed to add machine. Please try again.');
+      message.error('Failed to add machine. Please try again.');
     }
   };
 
@@ -735,7 +756,7 @@ const Workcenter = () => {
       setWorkcenterOptions(data);
     } catch (error) {
       console.error('Error fetching workcenter options:', error);
-      toast.error('Failed to load workcenter options');
+      message.error('Failed to load workcenter options');
     }
   };
 
@@ -1210,12 +1231,12 @@ const Workcenter = () => {
       if (Array.isArray(machinesData) && machinesData.length > 0) {
         setMachines(machinesData);
       } else {
-        toast.warning('No machines found. The server might be unavailable.');
+        message.warning('No machines found. The server might be unavailable.');
         setMachines([]);
       }
     } catch (error) {
       console.error('Error fetching machines:', error);
-      toast.error('Failed to fetch machines. Please try again later.');
+      message.error('Failed to fetch machines. Please try again later.');
       setMachines([]);
     }
   };
@@ -1239,7 +1260,7 @@ const Workcenter = () => {
       setSelectedMachineDetails(details);
     } catch (error) {
       console.error('Error fetching machine details:', error);
-      toast.error('Failed to fetch machine details');
+      message.error('Failed to fetch machine details');
     }
   };
 
@@ -1260,148 +1281,11 @@ const Workcenter = () => {
     </Form>
   );
 
-  const handleSchedulableToggle = async (record) => {
-    try {
-      await updateWorkcenterSchedulable(record.id, !record.is_schedulable);
-    } catch (error) {
-      console.error('Error toggling schedulable status:', error);
-    }
-  };
-
-  const isConfigEditing = (record) => record.id === editingConfigKey;
-
-  const handleConfigEdit = (record) => {
-    setEditingConfigKey(record.id);
-  };
-
-  const handleConfigCancel = () => {
-    setEditingConfigKey('');
-  };
-
-  const handleConfigSave = async (record) => {
-    try {
-      await updateWorkcenterSchedulable(record.id, record.is_schedulable);
-      setEditingConfigKey('');
-      toast.success('Workcenter status updated successfully');
-    } catch (error) {
-      console.error('Error saving config:', error);
-      toast.error('Failed to update workcenter status');
-    }
-  };
-
-  const configColumns = [
-    // {
-    //   title: 'ID',
-    //   dataIndex: 'id',
-    //   width: 80,
-    //   sorter: (a, b) => a.id - b.id,
-    // },
-    {
-      title: 'Work Center Name',
-      dataIndex: 'code',
-      width: 120,
-      sorter: (a, b) => a.code.localeCompare(b.code),
-    },
-    {
-      title: 'Plant ID',
-      dataIndex: 'plant_id',
-      width: 120,
-    },
-    // {
-    //   title: 'Work Center Name',
-    //   dataIndex: 'work_center_name',
-    //   width: 150,
-    // },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      width: 200,
-    },
-    {
-      title: 'Schedulable',
-      dataIndex: 'is_schedulable',
-      width: 120,
-      render: (isSchedulable, record) => {
-        const editable = isConfigEditing(record);
-        return editable ? (
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={isSchedulable}
-              onChange={(checked) => {
-                const updatedRecord = { ...record, is_schedulable: checked };
-                setConfigData(configData.map(item => 
-                  item.id === record.id ? updatedRecord : item
-                ));
-              }}
-              checkedChildren="TRUE"
-              unCheckedChildren="FALSE"
-            />
-            <Tag color={isSchedulable ? 'success' : 'error'}>
-              {isSchedulable ? 'TRUE' : 'FALSE'}
-            </Tag>
-          </div>
-        ) : (
-          <Tag color={isSchedulable ? 'success' : 'error'}>
-            {isSchedulable ? 'TRUE' : 'FALSE'}
-          </Tag>
-        );
-      },
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 150,
-      render: (_, record) => {
-        const editable = isConfigEditing(record);
-        return editable ? (
-          <Space>
-            <Button
-              type="link"
-              icon={<SaveOutlined />}
-              onClick={() => handleConfigSave(record)}
-              className="text-green-600 hover:text-green-700"
-            >
-              Save
-            </Button>
-            <Button
-              type="link"
-              icon={<CloseOutlined />}
-              onClick={handleConfigCancel}
-              className="text-red-600 hover:text-red-700"
-            >
-              Cancel
-            </Button>
-          </Space>
-        ) : (
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            disabled={editingConfigKey !== ''}
-            onClick={() => handleConfigEdit(record)}
-            className="text-blue-600 hover:text-blue-700"
-          >
-            Edit
-          </Button>
-        );
-      },
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
+      {/* Main Content Card */}
       <Card className="shadow-sm">
+        {/* Header Section */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -1426,6 +1310,7 @@ const Workcenter = () => {
             </div>
           </div>
           
+          {/* Tabs for future expansion */}
           <Tabs 
             defaultActiveKey="workcenter" 
             className="mb-4"
@@ -1482,6 +1367,7 @@ const Workcenter = () => {
                         defaultSortOrder="ascend"
                         onChange={(pagination, filters, sorter) => {
                           handleTableChange(pagination, filters, sorter);
+                          // Ensure work_center_id stays sorted in ascending order
                           if (!sorter.field) {
                             const sortedData = [...data].sort((a, b) => {
                               const valueA = String(a.work_center_id || '');
@@ -1496,43 +1382,12 @@ const Workcenter = () => {
                   </div>
                 ),
               },
-              {
-                key: 'configure',
-                label: 'Configure Workcentre',
-                children: (
-                  <div className="border rounded-lg bg-white">
-                    <Table
-                      dataSource={configData}
-                      columns={configColumns}
-                      loading={isLoading}
-                      pagination={{
-                        pageSize: 6,
-                        showSizeChanger: false,
-                        showQuickJumper: true,
-                        position: ['bottomCenter'],
-                        showTotal: (total, range) => (
-                          <span className="text-gray-600">
-                            Showing {range[0]}-{range[1]} of {total} items
-                          </span>
-                        ),
-                      }}
-                      scroll={{ 
-                        x: 'max-content',
-                        y: 'calc(100vh - 460px)'
-                      }}
-                      sticky
-                      bordered
-                      className="ant-table-striped"
-                      size="middle"
-                      rowKey="id"
-                    />
-                  </div>
-                ),
-              },
+              // Add more tabs here in the future
             ]}
           />
         </div>
 
+        {/* Keep all your existing modals */}
         <Modal
           title={`Workcenter Details - ${selectedWorkcenter?.work_center?.code}`}
           visible={isViewModalVisible}

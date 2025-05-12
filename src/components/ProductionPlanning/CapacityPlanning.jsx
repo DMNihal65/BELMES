@@ -238,12 +238,15 @@ const CapacityPlanning = () => {
           const utilizationPercentage = availableHours > 0 
             ? (utilizedHours / availableHours * 100).toFixed(1) 
             : 0;
+
+          // Get work center name
+          const workCenterName = machineData ? machineData.work_center_name : 'Unknown';
           
           return `
             <div class="apexcharts-tooltip-box" style="padding: 10px; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: none; min-width: 220px; border-radius: 8px;">
               <div style="margin-bottom: 10px; font-weight: 600; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">${machine}</div>
-              <div style="margin-bottom: 8px; font-size: 12px; color: #6b7280;">
-                Work Center: <span style="font-weight: 500; color: #1f2937">${machineData?.work_center_name || 'Unknown'}</span>
+              <div style="margin-bottom: 8px; font-size: 13px; color: #1f2937; font-weight: 500;">
+                Work Center: <span style="color: #3b82f6">${workCenterName}</span>
               </div>
               
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -289,10 +292,43 @@ const CapacityPlanning = () => {
 
   const { fetchMachineUtilizationByDateRange, isLoading: storeLoading } = usePlanningStore();
 
+  // Fetch machine utilization data for the selected date range
+  const fetchMachineData = async (startDate = dateRange[0], endDate = dateRange[1]) => {
+    try {
+      setLoading(true);
+      const data = await fetchMachineUtilizationByDateRange(startDate, endDate);
+      if (Array.isArray(data) && data.length > 0) {
+        // Filter machines to only include those with work_center_bool = true
+        const filteredData = data.filter(machine => machine.work_center_bool === true);
+        
+        if (filteredData.length > 0) {
+          // Store the full machine data first
+          setMachineUtilizationData(filteredData);
+          // Then update the chart
+          updateChartWithUtilizationData(filteredData);
+        } else {
+          setMachineUtilizationData([]);
+          updateChartWithUtilizationData([]);
+          message.info('No work center machines available for the selected date range');
+        }
+      } else {
+        setMachineUtilizationData([]);
+        updateChartWithUtilizationData([]);
+        message.info('No machine utilization data available for the selected date range');
+      }
+    } catch (error) {
+      console.error('Error fetching machine utilization data:', error);
+      message.error('Failed to fetch machine utilization data');
+      setMachineUtilizationData([]);
+      updateChartWithUtilizationData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Update chart with machine utilization data
   const updateChartWithUtilizationData = (data) => {
     if (!Array.isArray(data) || data.length === 0) {
-      // Reset chart when no data
       setChartData(prev => ({
         ...prev,
         series: [],
@@ -310,9 +346,10 @@ const CapacityPlanning = () => {
     // Extract machine models/makes with cleaner names for display
     const machines = data.map(item => {
       // Use make and model but format nicely
-      return item.machine_make ? 
+      const machineName = item.machine_make && item.machine_make !== 'Default' ? 
         `${item.machine_make}${item.machine_model !== 'Default' ? ' ' + item.machine_model : ''}` 
         : `Machine ${item.machine_id}`;
+      return machineName;
     });
     
     // Prepare data for the chart
@@ -322,7 +359,7 @@ const CapacityPlanning = () => {
     
     // Determine if we have many machines (adjust layout for mobile)
     const hasManyMachines = machines.length > 5;
-    
+
     // Create a new series configuration with proper stacking
     setChartData(prev => ({
       ...prev,
@@ -358,7 +395,76 @@ const CapacityPlanning = () => {
             }
           }
         },
-        // The key settings for proper stacking
+        tooltip: {
+          ...prev.options.tooltip,
+          custom: function({series, seriesIndex, dataPointIndex, w}) {
+            const machine = w.globals.labels[dataPointIndex];
+            const machineData = data[dataPointIndex]; // Use data directly instead of machineUtilizationData
+            
+            // Get all three values for this machine
+            const availableHours = series[0][dataPointIndex];
+            const utilizedHours = series[1] ? series[1][dataPointIndex] : 0;
+            const remainingHours = series[2] ? series[2][dataPointIndex] : 0;
+            
+            // Get the colors from the chart
+            const availableColor = w.globals.colors[0];
+            const utilizedColor = w.globals.colors[1]; 
+            const remainingColor = w.globals.colors[2];
+            
+            // Calculate percentage of utilization
+            const utilizationPercentage = availableHours > 0 
+              ? (utilizedHours / availableHours * 100).toFixed(1) 
+              : 0;
+
+            // Get work center name directly from the data
+            const workCenterName = machineData.work_center_name;
+            
+            return `
+              <div class="apexcharts-tooltip-box" style="padding: 10px; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: none; min-width: 220px; border-radius: 8px;">
+                <div style="margin-bottom: 10px; font-weight: 600; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">${machine}</div>
+                <div style="margin-bottom: 8px; font-size: 13px; color: #1f2937; font-weight: 500;">
+                  Work Center: <span style="color: #3b82f6">${workCenterName}</span>
+                </div>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <div style="display: flex; align-items: center;">
+                    <span style="display: inline-block; width: 10px; height: 10px; background: ${availableColor}; margin-right: 8px; border-radius: 50%;"></span>
+                    <span style="color: #6b7280;">Available Hours:</span>
+                  </div>
+                  <span style="font-weight: 600; color: #374151;">${availableHours.toFixed(0)}</span>
+                </div>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <div style="display: flex; align-items: center;">
+                    <span style="display: inline-block; width: 10px; height: 10px; background: ${utilizedColor}; margin-right: 8px; border-radius: 50%;"></span>
+                    <span style="color: #6b7280;">Planned Hours:</span>
+                  </div>
+                  <span style="font-weight: 600; color: #374151;">${utilizedHours.toFixed(0)}</span>
+                </div>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <div style="display: flex; align-items: center;">
+                    <span style="display: inline-block; width: 10px; height: 10px; background: ${remainingColor}; margin-right: 8px; border-radius: 50%;"></span>
+                    <span style="color: #6b7280;">Remaining Hours:</span>
+                  </div>
+                  <span style="font-weight: 600; color: #374151;">${remainingHours.toFixed(0)}</span>
+                </div>
+                
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #6b7280;">Utilization:</span>
+                  <span style="font-weight: 600; color: ${
+                    utilizedHours/availableHours > 0.8 ? '#ef4444' : 
+                    utilizedHours/availableHours > 0.5 ? '#f59e0b' : 
+                    '#10b981'
+                  };">
+                    ${utilizationPercentage}%
+                  </span>
+                </div>
+              </div>
+            `;
+          }
+        },
+        // Other chart options remain the same
         chart: {
           ...prev.options.chart,
           stacked: true,
@@ -371,7 +477,6 @@ const CapacityPlanning = () => {
             columnWidth: hasManyMachines ? '80%' : '55%'
           }
         },
-        // Responsive legend settings
         legend: {
           ...prev.options.legend,
           position: window.innerWidth < 768 ? 'bottom' : 'top',
@@ -383,38 +488,6 @@ const CapacityPlanning = () => {
         }
       }
     }));
-  };
-
-  // Fetch machine utilization data for the selected date range
-  const fetchMachineData = async (startDate = dateRange[0], endDate = dateRange[1]) => {
-    try {
-      setLoading(true);
-      const data = await fetchMachineUtilizationByDateRange(startDate, endDate);
-      if (Array.isArray(data) && data.length > 0) {
-        // Filter machines to only include those with work_center_bool = true
-        const filteredData = data.filter(machine => machine.work_center_bool === true);
-        
-        if (filteredData.length > 0) {
-          setMachineUtilizationData(filteredData);
-          updateChartWithUtilizationData(filteredData);
-        } else {
-          setMachineUtilizationData([]);
-          updateChartWithUtilizationData([]);
-          message.info('No work center machines available for the selected date range');
-        }
-      } else {
-        setMachineUtilizationData([]);
-        updateChartWithUtilizationData([]);
-        message.info('No machine utilization data available for the selected date range');
-      }
-    } catch (error) {
-      console.error('Error fetching machine utilization data:', error);
-      message.error('Failed to fetch machine utilization data');
-      setMachineUtilizationData([]);
-      updateChartWithUtilizationData([]);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Effect to fetch data when component mounts

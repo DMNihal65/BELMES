@@ -18,6 +18,13 @@ import usePlanningStore from '../../store/planning-store';
 
 const { Option } = Select;
 
+// Add styles for editable rows
+const styles = {
+  editableRow: {
+    backgroundColor: '#f5f5f5',
+  }
+};
+
 // Mock data for machines
 const mockMachines = [
   { id: 'M1', name: 'Machine 1', status: 'available' },
@@ -242,10 +249,10 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
   const edit = (record) => {
     form.setFieldsValue({
-      ...record,
-      primary_machine: {
-        name: record.primary_machine?.name
-      }
+      operation_description: record.operation_description,
+      setup_time: record.setup_time,
+      ideal_cycle_time: record.ideal_cycle_time,
+      work_center: record.work_center,
     });
     setEditingKey(record.key);
   };
@@ -259,17 +266,48 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       const row = await form.validateFields();
       const record = operations.find(item => item.key === key);
       
-      // Prepare update data
+      // Prepare update data with more comprehensive formatting
       const updateData = {
         operation_description: row.operation_description,
         setup_time: parseFloat(row.setup_time),
         ideal_cycle_time: parseFloat(row.ideal_cycle_time),
         work_center_code: record.work_center,
-        machine_id: record.primary_machine?.id || null
+        machine_id: record.primary_machine?.id || null,
+        // Add production order which is required by the API
+        production_order: productionOrder || orderNumber
       };
 
-      // Call API to update
-      const updatedOperation = await updateOperationDetails(partNumber, record.operation_number, updateData);
+      console.log('Updating operation with data:', {
+        partNumber,
+        operationNumber: record.operation_number,
+        updateData
+      });
+
+      // Make direct fetch call to the endpoint with the correct URL pattern
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
+      const response = await fetch(
+        `http://172.18.7.88:5674/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData)
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update operation');
+      }
+
+      const updatedOperation = await response.json();
       
       // Update the local state immediately
       setOperations(prevOperations => {
@@ -308,7 +346,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       message.success('Operation updated successfully');
     } catch (errInfo) {
       console.error('Validate Failed:', errInfo);
-      message.error('Failed to update operation');
+      message.error('Failed to update operation: ' + (errInfo.message || 'Unknown error'));
     }
   };
 
@@ -358,7 +396,8 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         setup_time: parseFloat(values.setup_time),
         ideal_cycle_time: parseFloat(values.ideal_cycle_time),
         work_center_code: values.work_center_code,
-        order_id: order.id
+        order_id: order.id,
+        production_order: productionOrder || orderNumber // Add production order
       };
 
       // Try to create the operation - with retry logic for handling conflicts
@@ -570,7 +609,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Example API call to get document details - replace with actual implementation
       const response = await fetch(
-        `http://172.18.7.88:3425/api/v1/document-management/ipid/details?production_order=${currentProductionOrder}&operation_number=${operationNumber}`,
+        `http://172.18.7.88:5674/api/v1/document-management/ipid/details?production_order=${currentProductionOrder}&operation_number=${operationNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -638,7 +677,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       
       // Call API to upload new version - replace with actual implementation
       const response = await fetch(
-        `http://172.18.7.88:3425/api/v1/document-management/ipid/${existingIpidDocument.id}/versions`,
+        `http://172.18.7.88:5674/api/v1/document-management/ipid/${existingIpidDocument.id}/versions`,
         {
           method: 'POST',
           headers: {
@@ -904,11 +943,29 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         production_order: currentProductionOrder // Add production order here
       };
 
-      await updateOperationMachine(
-        partNumber,
-        selectedOperationForMachine.operation_number,
-        currentData
+      // Make direct fetch call to the endpoint with the correct URL pattern
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
+      const response = await fetch(
+        `http://172.18.7.88:5674/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(currentData)
+        }
       );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update machine');
+      }
 
       // Update local state immediately with make
       setOperations(prevOperations => {
@@ -945,7 +1002,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       await refreshOperationsFromServer();
     } catch (error) {
       console.error('Error updating machine:', error);
-      message.error('Failed to update machine');
+      message.error('Failed to update machine: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -1009,6 +1066,21 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       dataIndex: 'operation_description',
       width: 200,
       editable: true,
+      render: (text, record) => {
+        const editable = isEditing(record);
+        return editable ? (
+          <Form.Item
+            name="operation_description"
+            style={{ margin: 0 }}
+            initialValue={text}
+            rules={[{ required: true, message: 'Operation description is required' }]}
+          >
+            <Input />
+          </Form.Item>
+        ) : (
+          text
+        );
+      }
     },
     {
       title: 'Setup Time [Hrs]',
@@ -1167,6 +1239,9 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     };
   });
 
+
+  
+
   // Updated header section with "Operation Sequences" and "Add Operation" button
   const headerSection = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -1200,6 +1275,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         }}
         size="middle"
         rowKey="id"
+        rowClassName={(record) => (isEditing(record) ? 'editable-row' : '')}
         sortDirections={['ascend']}
         defaultSortOrder="ascend"
         sortField="operation_number"

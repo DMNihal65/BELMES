@@ -726,7 +726,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:5674/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -901,7 +901,7 @@ const Workcenter = () => {
           </div>
 
           <div className="flex justify-center gap-4 mt-4">
-            <Button 
+            {/* <Button 
               type="primary" 
               size="large"
               onClick={() => setMachineModalStep('existing_form')}
@@ -909,7 +909,7 @@ const Workcenter = () => {
               icon={<PlusOutlined />}
             >
               Existing Machine
-            </Button>
+            </Button> */}
             <Button 
               type="primary" 
               size="large"

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
@@ -11,7 +11,44 @@ const CameraController = ({
 }) => {
   const controlsRef = useRef();
   const cameraRef = useRef();
-  const { camera, scene } = useThree();
+  const { camera, scene, gl } = useThree();
+  const [isLowPerformance, setIsLowPerformance] = useState(false);
+  
+  // Detect low performance on first render
+  useEffect(() => {
+    try {
+      // Check if using hardware acceleration
+      const canvas = gl.domElement;
+      const context = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      
+      if (context) {
+        const debugInfo = context.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+          const renderer = context.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+          // Check if using software renderer
+          if (renderer && (
+              renderer.includes('SwiftShader') || 
+              renderer.includes('ANGLE') || 
+              renderer.includes('llvmpipe') ||
+              renderer.includes('Software') ||
+              renderer.includes('Microsoft Basic Render')
+          )) {
+            setIsLowPerformance(true);
+          }
+        }
+      }
+
+      // Also check for mobile devices which typically have lower performance
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        setIsLowPerformance(true);
+      }
+    } catch (e) {
+      console.warn("Could not check performance capabilities:", e);
+      // Assume low performance on error to be safe
+      setIsLowPerformance(true);
+    }
+  }, [gl]);
   
   // Define better camera positions for the new shop floor layout
   const viewPositions = {
@@ -127,7 +164,9 @@ const CameraController = ({
       targetLookAt = viewPositions[view]?.target || viewPositions.overview.target;
     }
     
-    if (enableTransitions) {
+    const shouldTransition = enableTransitions && !isLowPerformance;
+    
+    if (shouldTransition) {
       // Start transition
       transition.inProgress = true;
       transition.progress = 0;
@@ -143,12 +182,26 @@ const CameraController = ({
       // Immediately set camera position and target
       camera.position.set(...targetPosition);
       controlsRef.current.target.set(...targetLookAt);
+      
+      // Make sure to update controls
+      controlsRef.current.update();
     }
-  }, [view, selectedMachine, camera, enableTransitions]);
+  }, [view, selectedMachine, camera, enableTransitions, isLowPerformance]);
   
   // Handle smooth camera transitions
   useFrame((state, delta) => {
+    if (!controlsRef.current) return;
+    
     const transition = transitionRef.current;
+    
+    // Skip transitions on low performance devices
+    if (isLowPerformance && transition.inProgress) {
+      transition.inProgress = false;
+      camera.position.copy(transition.endPosition);
+      controlsRef.current.target.copy(transition.endTarget);
+      controlsRef.current.update();
+      return;
+    }
     
     if (transition.inProgress) {
       // Update progress
@@ -177,6 +230,9 @@ const CameraController = ({
           transition.endTarget,
           easeProgress
         );
+        
+        // Ensure controls are updated
+        controlsRef.current.update();
       }
     }
   });
@@ -184,6 +240,38 @@ const CameraController = ({
   // Easing function for smoother transitions
   const easeOutCubic = (x) => {
     return 1 - Math.pow(1 - x, 3);
+  };
+  
+  // Optimize controls based on performance level
+  const getControlsConfig = () => {
+    if (isLowPerformance) {
+      return {
+        enablePan: true,
+        enableZoom: true,
+        enableRotate: true,
+        minDistance: 5,
+        maxDistance: 100,
+        maxPolarAngle: Math.PI / 2 - 0.1,
+        minPolarAngle: Math.PI / 12,
+        dampingFactor: 0, // No damping for better performance
+        enableDamping: false,
+        rotateSpeed: 0.5,
+        zoomSpeed: 0.8,
+      };
+    }
+    
+    return {
+      enablePan: true,
+      enableZoom: true,
+      enableRotate: true,
+      minDistance: 5,
+      maxDistance: 100,
+      maxPolarAngle: Math.PI / 2 - 0.1,
+      minPolarAngle: Math.PI / 12,
+      dampingFactor: 0.1,
+      enableDamping: true,
+      rotateSpeed: 0.5,
+    };
   };
   
   return (
@@ -199,15 +287,7 @@ const CameraController = ({
       
       <OrbitControls
         ref={controlsRef}
-        enablePan={true}
-        enableZoom={true}
-        enableRotate={true}
-        minDistance={5}
-        maxDistance={100}
-        maxPolarAngle={Math.PI / 2 - 0.1}
-        minPolarAngle={Math.PI / 12}
-        dampingFactor={0.1}
-        rotateSpeed={0.5}
+        {...getControlsConfig()}
       />
     </>
   );

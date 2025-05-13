@@ -1,22 +1,384 @@
-import React, { useState, Suspense, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Tabs, Progress, Badge, Collapse, Tag, Empty, Alert, Button, Tooltip, Radio } from 'antd';
+import React, { useState, Suspense, useEffect, lazy } from 'react';
+import { Card, Row, Col, Statistic, Tabs, Progress, Badge, Collapse, Tag, Empty, Alert, Button, Tooltip, Radio, Spin } from 'antd';
 import { 
   ArrowUpOutlined, ArrowDownOutlined, ClockCircleOutlined, 
   CheckCircleOutlined, ToolOutlined, DashboardOutlined, 
   CodeSandboxOutlined, BarcodeOutlined, BarChartOutlined, 
   MonitorOutlined, FileTextOutlined, ProjectOutlined, 
   FullscreenOutlined, CompassOutlined, DesktopOutlined,
-  AppstoreOutlined, BorderHorizontalOutlined
+  AppstoreOutlined, BorderHorizontalOutlined,
+  WarningOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import useDashboardStore from '../../store/dashboard';
+import BrowserCompatCheck from '../../components/3d/BrowserCompatCheck';
 
-// Import 3D components
-import FactoryScene from '../../components/3d/FactoryScene';
+// Import 3D components with error handling using lazy loading
+const FactoryScene = lazy(() => 
+  import('../../components/3d/FactoryScene')
+    .catch(err => {
+      console.error("Error loading 3D scene:", err);
+      // Return a module with a default component that shows an error
+      return { 
+        default: ({ machines, onMachineSelect }) => (
+          <div className="h-full flex flex-col items-center justify-center bg-gray-100 p-4">
+            <div className="bg-yellow-50 border border-yellow-400 text-yellow-700 p-4 rounded-md mb-4 max-w-lg text-center">
+              <h3 className="font-bold text-lg mb-2"><WarningOutlined /> 3D View Not Available</h3>
+              <p>Failed to load 3D factory visualization. Using simplified view instead.</p>
+              <Button 
+                type="primary" 
+                icon={<ReloadOutlined />} 
+                className="mt-3"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </div>
+            <SimpleMachineList machines={machines} onMachineSelect={onMachineSelect} />
+          </div>
+        )
+      };
+    })
+);
+
+// Simplified machine list component as fallback when 3D view fails
+const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
+  // Group machines by type for better organization
+  const machinesByType = {
+    turning: machines.filter(m => m.type === 'turning'),
+    milling: machines.filter(m => m.type === 'milling'),
+    edm: machines.filter(m => m.type === 'edm')
+  };
+
+  // Status count for statistics
+  const statusCounts = machines.reduce((counts, machine) => {
+    counts[machine.status] = (counts[machine.status] || 0) + 1;
+    return counts;
+  }, {});
+
+  // Calculate overall statistics
+  const totalMachines = machines.length;
+  const activeMachines = statusCounts['PRODUCTION'] || 0;
+  const idleMachines = statusCounts['IDLE'] || 0;
+  const errorMachines = statusCounts['ERROR'] || 0;
+
+  return (
+    <div className="bg-gray-100 h-full overflow-auto p-4">
+      {/* Dashboard header */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <h2 className="text-lg font-bold mb-3 text-gray-800">Factory Overview</h2>
+        
+        <div className="grid grid-cols-4 gap-4">
+          <div className="bg-blue-50 rounded-lg p-3 border border-blue-100 flex flex-col items-center">
+            <div className="text-blue-600 text-2xl font-bold">{totalMachines}</div>
+            <div className="text-blue-800 text-sm">Total Machines</div>
+          </div>
+          
+          <div className="bg-green-50 rounded-lg p-3 border border-green-100 flex flex-col items-center">
+            <div className="text-green-600 text-2xl font-bold">{activeMachines}</div>
+            <div className="text-green-800 text-sm">In Production</div>
+          </div>
+          
+          <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-100 flex flex-col items-center">
+            <div className="text-yellow-600 text-2xl font-bold">{idleMachines}</div>
+            <div className="text-yellow-800 text-sm">Idle/Setup</div>
+          </div>
+          
+          <div className="bg-red-50 rounded-lg p-3 border border-red-100 flex flex-col items-center">
+            <div className="text-red-600 text-2xl font-bold">{errorMachines}</div>
+            <div className="text-red-800 text-sm">Errors/Off</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Simplified Factory Layout Visualization */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <h3 className="font-bold text-gray-800 mb-3">Factory Layout</h3>
+        <div className="relative h-48 bg-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+          {/* Main shop floor */}
+          <div className="absolute inset-0 bg-blue-50"></div>
+          
+          {/* EDM Room */}
+          <div className="absolute top-0 left-0 right-0 h-16 bg-purple-50 border-b border-purple-200">
+            <div className="text-center text-xs font-medium text-purple-800 mt-1">EDM Area</div>
+            
+            {/* EDM Machines */}
+            <div className="flex justify-center mt-2 space-x-8">
+              {machinesByType.edm.slice(0, 2).map((machine, idx) => {
+                const color = getStatusColor(machine.status);
+                const borderClass = getBorderColorClass(color);
+                const dotClass = getStatusDotClass(color);
+                
+                return (
+                  <div 
+                    key={machine.id}
+                    onClick={() => onMachineSelect(machine)}
+                    className={`w-12 h-8 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-center ${borderClass}`}
+                  >
+                    <div className={dotClass}></div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Turning Machines (Left Side) */}
+          <div className="absolute top-20 left-3 bottom-6 w-1/3 flex flex-col justify-around">
+            <div className="text-xs font-medium text-blue-800 mb-1 text-center">Turning Machines</div>
+            <div className="flex flex-col space-y-2">
+              {machinesByType.turning.slice(0, 4).map((machine, idx) => {
+                const color = getStatusColor(machine.status);
+                const borderClass = getBorderColorClass(color);
+                const dotClass = getStatusDotClass(color);
+                
+                return (
+                  <div 
+                    key={machine.id}
+                    onClick={() => onMachineSelect(machine)}
+                    className={`w-full h-6 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-between px-2 ${borderClass}`}
+                  >
+                    <div className={dotClass}></div>
+                    <span className="text-xs truncate">{machine.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Milling Machines (Right Side) */}
+          <div className="absolute top-20 right-3 bottom-6 w-1/3 flex flex-col justify-around">
+            <div className="text-xs font-medium text-green-800 mb-1 text-center">Milling Machines</div>
+            <div className="flex flex-col space-y-2">
+              {machinesByType.milling.slice(0, 4).map((machine, idx) => {
+                const color = getStatusColor(machine.status);
+                const borderClass = getBorderColorClass(color);
+                const dotClass = getStatusDotClass(color);
+                
+                return (
+                  <div 
+                    key={machine.id}
+                    onClick={() => onMachineSelect(machine)}
+                    className={`w-full h-6 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-between px-2 ${borderClass}`}
+                  >
+                    <span className="text-xs truncate">{machine.name}</span>
+                    <div className={dotClass}></div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Central aisle */}
+          <div className="absolute left-1/2 transform -translate-x-1/2 top-16 bottom-0 w-8 bg-gray-200"></div>
+          
+          {/* Floor label */}
+          <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
+            Main Shop Floor
+          </div>
+        </div>
+      </div>
+      
+      {/* Machine sections by type */}
+      <div className="grid grid-cols-1 gap-4">
+        {/* Turning Machines */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-3 bg-blue-50 rounded-t-lg border-b border-blue-100">
+            <h3 className="font-bold text-blue-800">
+              <ToolOutlined className="mr-2" /> 
+              Turning Machines
+            </h3>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {machinesByType.turning.map((machine) => (
+                <MachineCard 
+                  key={machine.id} 
+                  machine={machine} 
+                  isSelected={selectedMachine?.id === machine.id}
+                  onSelect={() => onMachineSelect(machine)}
+                />
+              ))}
+              {machinesByType.turning.length === 0 && (
+                <div className="col-span-full text-center p-4 text-gray-500">No turning machines available</div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Milling Machines */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-3 bg-green-50 rounded-t-lg border-b border-green-100">
+            <h3 className="font-bold text-green-800">
+              <AppstoreOutlined className="mr-2" /> 
+              Milling Machines
+            </h3>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {machinesByType.milling.map((machine) => (
+                <MachineCard 
+                  key={machine.id} 
+                  machine={machine} 
+                  isSelected={selectedMachine?.id === machine.id}
+                  onSelect={() => onMachineSelect(machine)}
+                />
+              ))}
+              {machinesByType.milling.length === 0 && (
+                <div className="col-span-full text-center p-4 text-gray-500">No milling machines available</div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* EDM Machines */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-3 bg-purple-50 rounded-t-lg border-b border-purple-100">
+            <h3 className="font-bold text-purple-800">
+              <ProjectOutlined className="mr-2" /> 
+              EDM Machines
+            </h3>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {machinesByType.edm.map((machine) => (
+                <MachineCard 
+                  key={machine.id} 
+                  machine={machine} 
+                  isSelected={selectedMachine?.id === machine.id}
+                  onSelect={() => onMachineSelect(machine)}
+                />
+              ))}
+              {machinesByType.edm.length === 0 && (
+                <div className="col-span-full text-center p-4 text-gray-500">No EDM machines available</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Function to get status color for 2D layout
+const getStatusColor = (status) => {
+  switch(status) {
+    case 'PRODUCTION': return 'green';
+    case 'ON': return 'orange';
+    case 'IDLE': return 'blue';
+    case 'SETUP': return 'purple';
+    case 'ERROR': return 'red';
+    case 'MAINTENANCE': return 'indigo';
+    case 'OFF': default: return 'gray';
+  }
+};
+
+// Function to get border color class for machine cards
+const getBorderColorClass = (color) => {
+  switch(color) {
+    case 'green': return 'border border-green-300';
+    case 'orange': return 'border border-orange-300';
+    case 'blue': return 'border border-blue-300';
+    case 'purple': return 'border border-purple-300';
+    case 'red': return 'border border-red-300';
+    case 'indigo': return 'border border-indigo-300';
+    default: return 'border border-gray-300';
+  }
+};
+
+// Function to get status dot class for machine cards
+const getStatusDotClass = (color) => {
+  switch(color) {
+    case 'green': return 'w-2 h-2 rounded-full bg-green-500';
+    case 'orange': return 'w-2 h-2 rounded-full bg-orange-500';
+    case 'blue': return 'w-2 h-2 rounded-full bg-blue-500';
+    case 'purple': return 'w-2 h-2 rounded-full bg-purple-500';
+    case 'red': return 'w-2 h-2 rounded-full bg-red-500';
+    case 'indigo': return 'w-2 h-2 rounded-full bg-indigo-500';
+    default: return 'w-2 h-2 rounded-full bg-gray-500';
+  }
+};
+
+// Individual machine card component
+const MachineCard = ({ machine, isSelected, onSelect }) => {
+  // Calculate completion percentage
+  const completionPercentage = 
+    machine.targetCount > 0 
+      ? Math.round((machine.totalCount / machine.targetCount) * 100) 
+      : 0;
+      
+  // Status color mapping
+  const statusColor = getStatusColor(machine.status);
+  
+  // Get background class based on status
+  const getBgClass = () => {
+    switch(statusColor) {
+      case 'green': return 'bg-green-50 border-b border-green-100';
+      case 'orange': return 'bg-orange-50 border-b border-orange-100';
+      case 'blue': return 'bg-blue-50 border-b border-blue-100';
+      case 'purple': return 'bg-purple-50 border-b border-purple-100';
+      case 'red': return 'bg-red-50 border-b border-red-100';
+      case 'indigo': return 'bg-indigo-50 border-b border-indigo-100';
+      default: return 'bg-gray-50 border-b border-gray-100';
+    }
+  };
+  
+  return (
+    <div 
+      className={`border rounded-lg overflow-hidden shadow-sm transition-all cursor-pointer
+        ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}
+      onClick={onSelect}
+    >
+      <div className={`p-3 ${getBgClass()} flex justify-between items-center`}>
+        <div className="font-medium text-gray-800 truncate">{machine.name}</div>
+        <Tag color={statusColor}>{machine.status}</Tag>
+      </div>
+      
+      <div className="p-3">
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div>
+            <div className="text-xs text-gray-500">Program</div>
+            <div className="font-medium truncate">{machine.currentProgram || 'N/A'}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">Part</div>
+            <div className="font-medium truncate">{machine.partNumber || 'N/A'}</div>
+          </div>
+        </div>
+        
+        <div className="mb-2">
+          <div className="flex justify-between text-xs mb-1">
+            <span>Progress</span>
+            <span>{completionPercentage}%</span>
+          </div>
+          <Progress 
+            percent={completionPercentage}
+            size="small"
+            status={
+              machine.status === 'PRODUCTION' ? 'active' :
+              machine.status === 'ERROR' ? 'exception' :
+              completionPercentage >= 100 ? 'success' : 'normal'
+            }
+          />
+        </div>
+        
+        <div className="flex justify-between text-xs text-gray-500 mt-2">
+          <div>Parts: {machine.totalCount || 0}/{machine.targetCount || 0}</div>
+          <div>
+            <ClockCircleOutlined className="mr-1" />
+            {new Date(machine.lastUpdated || machine.last_updated).toLocaleTimeString()}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Main Dashboard Component
 const SupervisorDashboard = () => {
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [cameraView, setCameraView] = useState('overview');
+  const [renderError, setRenderError] = useState(false);
+  const [compatibility, setCompatibility] = useState(null);
+  const [use3DView, setUse3DView] = useState(true);
   const { initializeWebSocket, cleanup, getMappedMachineData, isConnected, error } = useDashboardStore();
 
   // Initialize WebSocket connection
@@ -24,6 +386,16 @@ const SupervisorDashboard = () => {
     initializeWebSocket();
     return () => cleanup();
   }, []);
+
+  // Handle compatibility check results
+  const handleCompatibilityChange = (compatResult) => {
+    setCompatibility(compatResult);
+    
+    // If WebGL is not supported, disable 3D view
+    if (compatResult.error && !compatResult.webGLSupported) {
+      setUse3DView(false);
+    }
+  };
 
   // Get the mapped machine data and categorize it
   const machines = getMappedMachineData().map((machine, index) => {
@@ -63,8 +435,18 @@ const SupervisorDashboard = () => {
     { label: <Tooltip title="EDM Room"><ProjectOutlined /></Tooltip>, value: 'edmRoom' },
   ];
 
+  // Handle 3D rendering errors
+  const handleRenderError = (err) => {
+    console.error("3D Rendering error:", err);
+    setRenderError(true);
+    setUse3DView(false);
+  };
+
   return (
     <div className="p-6 h-screen bg-gray-100">
+      {/* Browser Compatibility Check */}
+      <BrowserCompatCheck onCompatibilityChange={handleCompatibilityChange} />
+      
       {/* Connection Status */}
       {error && (
         <Alert
@@ -93,31 +475,69 @@ const SupervisorDashboard = () => {
             title={
               <div className="flex justify-between items-center">
                 <span>Factory Shop Floor</span>
-                <Radio.Group 
-                  options={cameraViewOptions} 
-                  onChange={(e) => setCameraView(e.target.value)}
-                  value={cameraView}
-                  optionType="button"
-                  buttonStyle="solid"
-                  size="small"
-                />
+                <div className="flex items-center space-x-2">
+                  {compatibility && compatibility.webGLSupported && (
+                    <Button.Group>
+                      <Button 
+                        type={use3DView ? "primary" : "default"} 
+                        onClick={() => setUse3DView(true)}
+                        icon={<DesktopOutlined />}
+                      >
+                        3D View
+                      </Button>
+                      <Button 
+                        type={!use3DView ? "primary" : "default"} 
+                        onClick={() => setUse3DView(false)}
+                        icon={<AppstoreOutlined />}
+                      >
+                        2D View
+                      </Button>
+                    </Button.Group>
+                  )}
+                  {use3DView && (
+                    <Radio.Group 
+                      options={cameraViewOptions} 
+                      onChange={(e) => setCameraView(e.target.value)}
+                      value={cameraView}
+                      optionType="button"
+                      buttonStyle="solid"
+                      size="small"
+                      disabled={renderError || !use3DView}
+                    />
+                  )}
+                </div>
               </div>
             }
             className="h-full"
             bodyStyle={{ 
               padding: 0, 
               height: 'calc(100% - 57px)',
-              position: 'relative'
+              position: 'relative',
+              overflow: 'hidden'
             }}
           >
-            <Suspense fallback={<div className="h-full flex items-center justify-center">Loading 3D Factory...</div>}>
-              <FactoryScene 
-                machines={machines}
-                onMachineSelect={handleMachineSelect}
-                selectedMachine={selectedMachine}
-                cameraView={cameraView}
-              />
-            </Suspense>
+            {!use3DView ? (
+              <div className="h-full p-4">
+                <SimpleMachineList 
+                  machines={machines} 
+                  onMachineSelect={handleMachineSelect} 
+                  selectedMachine={selectedMachine}
+                />
+              </div>
+            ) : (
+              <Suspense fallback={
+                <div className="h-full flex items-center justify-center bg-gray-100">
+                  <Spin tip="Loading 3D Factory..." />
+                </div>
+              }>
+                <FactoryScene 
+                  machines={machines}
+                  onMachineSelect={handleMachineSelect}
+                  selectedMachine={selectedMachine}
+                  cameraView={cameraView}
+                />
+              </Suspense>
+            )}
           </Card>
         </Col>
 
@@ -126,10 +546,11 @@ const SupervisorDashboard = () => {
           <MachineDetails 
             selectedMachine={selectedMachine || (machines.length > 0 ? machines[0] : null)} 
             onZoomToMachine={() => {
-              if (selectedMachine) {
+              if (selectedMachine && !renderError && use3DView) {
                 setCameraView('focusMachine');
               }
             }}
+            show3DControls={use3DView && !renderError}
           />
         </Col>
       </Row>
@@ -138,7 +559,7 @@ const SupervisorDashboard = () => {
 };
 
 // Update the Machine Details section with improved UI
-const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
+const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = true }) => {
   const { fetchOEEData, oeeData } = useDashboardStore();
 
   useEffect(() => {
@@ -194,14 +615,16 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
       title={
         <div className="flex justify-between items-center">
           <span>{selectedMachine.name}</span>
-          <Tooltip title="Focus on this machine">
-            <Button 
-              type="primary" 
-              size="small" 
-              icon={<FullscreenOutlined />} 
-              onClick={onZoomToMachine}
-            />
-          </Tooltip>
+          {show3DControls && (
+            <Tooltip title="Focus on this machine">
+              <Button 
+                type="primary" 
+                size="small" 
+                icon={<FullscreenOutlined />} 
+                onClick={onZoomToMachine}
+              />
+            </Tooltip>
+          )}
         </div>
       }
       className="h-full"
@@ -217,52 +640,6 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine }) => {
       }
     >
       <div className="space-y-4">
-        {/* Status Summary */}
-        {/* <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-3 rounded-xl shadow-sm border border-blue-100"> */}
-          {/* <div className="grid grid-cols-3 gap-3">
-            <Statistic
-              title="OEE"
-              value={oeeData?.average_oee || selectedMachine.oee || 0}
-              suffix="%"
-              valueStyle={{ color: '#1890ff' }}
-              prefix={<DashboardOutlined />}
-            />
-            <Statistic
-              title="Parts Complete"
-              value={selectedMachine.totalCount || 0}
-              valueStyle={{ color: selectedMachine.status === 'PRODUCTION' ? '#52c41a' : '#666' }}
-              prefix={<CodeSandboxOutlined />}
-            />
-            <Statistic
-              title="Target"
-              value={selectedMachine.targetCount || 0}
-              valueStyle={{ color: '#722ed1' }}
-              prefix={<BarChartOutlined />}
-            />
-          </div> */}
-
-          {/* Progress bar */}
-          {/* <div className="mt-3">
-            <div className="flex justify-between items-center text-xs mb-1">
-              <span>Production Progress</span>
-              <span className="font-medium">{completionPercentage}%</span>
-            </div>
-            <Progress 
-              percent={completionPercentage} 
-              status={
-                selectedMachine.status === 'OFF' ? 'normal' :
-                completionPercentage >= 100 ? 'success' :
-                selectedMachine.status === 'PRODUCTION' ? 'active' : 'normal'
-              }
-              strokeColor={
-                selectedMachine.status === 'PRODUCTION' ? 
-                  {from: '#10b981', to: '#059669'} : 
-                  undefined
-              }
-            />
-          </div> */}
-        {/* </div> */}
-
         {/* OEE Components */}
         {oeeData && (
           <Card 

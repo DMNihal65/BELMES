@@ -193,7 +193,7 @@ const JobDetails = () => {
   // Function to load all available jobs
   const loadAvailableJobs = useCallback(async () => {
     try {
-      const response = await fetch('http://172.18.7.88:3425/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.88:5674/api/v1/planning/all_orders');
       
       if (!response.ok) {
         throw new Error('Failed to fetch available jobs');
@@ -211,7 +211,7 @@ const JobDetails = () => {
   const loadJobDetails = useCallback(async (partNumber) => {
     try {
       setIsLoadingJobData(true);
-      const response = await fetch(`http://172.18.7.88:3425/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.88:5674/api/v1/planning/search_order?part_number=${partNumber}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch job details');
@@ -264,7 +264,7 @@ const JobDetails = () => {
         throw new Error('No active operation found to deactivate');
       }
       
-      const response = await fetch('http://172.18.7.88:3425/api/v1/logs/machine-raw-live-deactive/', {
+      const response = await fetch('http://172.18.7.88:5674/api/v1/logs/machine-raw-live-deactive/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -281,6 +281,9 @@ const JobDetails = () => {
       }
       
       message.success('Job deactivated successfully');
+      
+      // Reset the job source to allow new data from API
+      localStorage.removeItem('jobSource');
       
       // Clear the current job selection
       setPreviousActiveJob(null);
@@ -346,8 +349,8 @@ const JobDetails = () => {
       // Update the job data in the dashboard
       const jobDetails = await loadJobDetails(selectedJob.part_number);
       if (jobDetails) {
-        setJobData({
-          ...jobData,
+        // Construct a consolidated job data object
+        const consolidatedJobData = {
           jobId: `JOB-${jobDetails.production_order}`,
           part_number: jobDetails.part_number,
           production_order: jobDetails.production_order,
@@ -360,13 +363,39 @@ const JobDetails = () => {
           plant_id: jobDetails.plant_id,
           project: jobDetails.project,
           machine: {
-            ...jobData.machine,
+            ...(jobData.machine || {}),
+            id: machineId,
+            name: machineData.name || 'Unknown Machine',
+            status: machineStatus?.status || 'IDLE',
             completedParts: 0
-          }
-        });
-        console.log('Job data updated:', jobData);
+          },
+          // Include operation details
+          currentOperation: selectedOperation,
+          operations: jobDetails.operations || []
+        };
         
+        // Update state
+        setJobData(consolidatedJobData);
+        setJobOrderData(jobDetails);
+        
+        // IMPORTANT: Mark this as a user-selected job in localStorage
+        // This is the key fix for persisting user selection after refresh
+        localStorage.setItem('jobSource', 'user-selected');
+        
+        // Store in localStorage consistently - the key source of truth
         localStorage.setItem('currentJobData', JSON.stringify(jobDetails));
+        localStorage.setItem('jobData', JSON.stringify(consolidatedJobData));
+        localStorage.setItem('activeOperation', JSON.stringify(selectedOperation));
+        
+        // Also update job order in a separate event to ensure components refresh
+        window.dispatchEvent(new CustomEvent('jobActivated', { 
+          detail: { 
+            job: jobDetails,
+            operation: selectedOperation
+          } 
+        }));
+        
+        console.log('Job data updated:', consolidatedJobData);
         
         // Close the job selector
         setIsJobSelectorVisible(false);
@@ -379,7 +408,7 @@ const JobDetails = () => {
       setIsActivatingJob(false);
       setShowActivationWarning(false);
     }
-  }, [selectedJob, selectedOperation, loadJobDetails, jobData, activateJob, setIsJobSelectorVisible, setIsActivatingJob, setShowActivationWarning, machineOperations, deactivateCurrentJob]);
+  }, [selectedJob, selectedOperation, loadJobDetails, jobData, activateJob, setIsJobSelectorVisible, setIsActivatingJob, setShowActivationWarning, machineOperations, deactivateCurrentJob, machineStatus]);
 
   // Toggle job selector visibility
   const toggleJobSelector = () => {
@@ -435,10 +464,37 @@ const JobDetails = () => {
             console.log('Machine operations result:', result);
             
             if (result?.success) {
+              // Check if there's an active job
+              const hasActiveJob = result.data?.operations?.inprogress?.length > 0;
+              
               // Update job data
               if (result.data?.jobData) {
                 setJobData(result.data.jobData);
                 setJobOrderData(result.data.orders?.[0] || null);
+                
+                // Store updated data in localStorage
+                localStorage.setItem('jobData', JSON.stringify(result.data.jobData));
+                localStorage.setItem('currentJobData', JSON.stringify(result.data.orders?.[0] || null));
+                
+                if (hasActiveJob) {
+                  // Set active operation
+                  const activeOp = result.data.operations.inprogress[0];
+                  setSelectedOperation(activeOp);
+                  localStorage.setItem('activeOperation', JSON.stringify(activeOp));
+                }
+              } else if (!hasActiveJob) {
+                // If no active job, check if we have a previously selected job
+                const storedJobData = localStorage.getItem('currentJobData');
+                const storedJobDetails = localStorage.getItem('jobData');
+                
+                if (storedJobData && storedJobDetails) {
+                  try {
+                    setJobOrderData(JSON.parse(storedJobData));
+                    setJobData(JSON.parse(storedJobDetails));
+                  } catch (parseError) {
+                    console.error('Error parsing stored job data:', parseError);
+                  }
+                }
               }
             }
           }
@@ -453,7 +509,7 @@ const JobDetails = () => {
     return () => {
       closeWebSocket();
     };
-  }, []);
+  }, [initializeWebSocket, fetchMachineOperations, closeWebSocket]);
 
   // Monitor changes to job selector visibility
   useEffect(() => {
@@ -858,7 +914,7 @@ const JobDetails = () => {
       
       console.log('Submitting operator log payload:', payload);
       
-      const response = await fetch('http://172.18.7.88:3425/api/v1/logs/operator-log', {
+      const response = await fetch('http://172.18.7.88:5674/api/v1/logs/operator-log', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -892,6 +948,75 @@ const JobDetails = () => {
     }
   };
 
+  // Replace the switchToScheduledJobs function with this improved version
+  const switchToScheduledJobs = async () => {
+    // Clear any active job selection
+    setPreviousActiveJob(null);
+    setPreviousActiveOperation(null);
+    setSelectedJob(null);
+    setSelectedOperation(null);
+    
+    // Set job selection mode to scheduled
+    setJobSelectionMode('scheduled');
+    
+    // Show loading state
+    setIsLoadingJobData(true);
+    
+    try {
+      const storedMachine = localStorage.getItem('currentMachine');
+      if (!storedMachine) {
+        throw new Error('No machine selected');
+      }
+      
+      const machineData = JSON.parse(storedMachine);
+      if (!machineData.id) {
+        throw new Error('Invalid machine data');
+      }
+      
+      // Fetch machine operations directly
+      const result = await fetchMachineOperations(machineData.id);
+      
+      if (result.success) {
+        // Check if we have scheduled operations
+        if (result.data.operations.scheduled && result.data.operations.scheduled.length > 0) {
+          message.success(`Found ${result.data.operations.scheduled.length} scheduled operations`);
+          
+          // Store the operations data
+          localStorage.setItem('scheduledOperations', JSON.stringify(result.data.operations.scheduled));
+          
+          // Get the related orders
+          const scheduledOrders = [];
+          
+          // Check if there are any orders in the result
+          if (result.data.orders && result.data.orders.length > 0) {
+            scheduledOrders.push(...result.data.orders);
+            
+            // Update the availableJobs with these orders
+            setAvailableJobs(result.data.orders);
+          } else {
+            // If no orders are returned, we need to fetch available jobs
+            await loadAvailableJobs();
+          }
+        } else {
+          message.info('No scheduled operations found for this machine');
+          // Load available jobs as fallback
+          await loadAvailableJobs();
+        }
+      } else {
+        throw new Error('Failed to fetch machine operations');
+      }
+    } catch (error) {
+      console.error('Error loading scheduled jobs:', error);
+      message.error(`Failed to load scheduled jobs: ${error.message}`);
+      // Load available jobs as fallback
+      await loadAvailableJobs();
+    } finally {
+      setIsLoadingJobData(false);
+      // Open the job selector
+      setIsJobSelectorVisible(true);
+    }
+  };
+
   return (
     <Layout className="h-screen flex flex-col bg-gray-50">
       {/* Top Header Bar */}
@@ -915,14 +1040,23 @@ const JobDetails = () => {
           </div>
         </div>
         
-        {/* Job Selection Button */}
-        <Button
-          type="primary"
-          onClick={toggleJobSelector}
-          className="bg-blue-500"
-        >
-          Select Job
-        </Button>
+        {/* Job Selection Buttons */}
+        <div className="flex gap-2">
+          <Button
+            type="default"
+            onClick={switchToScheduledJobs}
+            icon={<FileTextOutlined />}
+          >
+            Scheduled Jobs
+          </Button>
+          <Button
+            type="primary"
+            onClick={toggleJobSelector}
+            className="bg-blue-500"
+          >
+            Select Job
+          </Button>
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -1717,59 +1851,86 @@ const JobDetails = () => {
             <Radio.Button value="custom">Select Other Job</Radio.Button>
           </Radio.Group>
           
-          {jobSelectionMode === 'custom' && (
+          {isLoadingJobData ? (
+            <div className="flex justify-center items-center py-8">
+              <Spin size="large" tip="Loading jobs..." />
+            </div>
+          ) : jobSelectionMode === 'scheduled' ? (
             <div className="space-y-6">
-              {/* <div>
-                <div className="mb-2 font-medium">Search by Part Number</div>
-                <Space.Compact style={{ width: '100%' }}>
-                  <Input 
-                    placeholder="Enter part number"
-                    value={inputValue}
-                    onChange={e => setInputValue(e.target.value)}
-                  />
-                  <Button 
-                    type="primary"
-                    onClick={async () => {
-                      if (inputValue) {
-                        try {
-                          // Mark that we have unsaved changes
-                          setHasUnsavedChanges(true);
-                          
-                          const response = await fetch(`http://172.18.7.88:3425/api/v1/planning/search_order?part_number=${inputValue}`);
-                          if (!response.ok) {
-                            throw new Error('Failed to fetch job details');
-                          }
-                          
-                          const data = await response.json();
-                          
-                          if (data.orders && data.orders.length > 0) {
-                            const jobDetails = data.orders[0];
-                            // Update selected job
-                            setSelectedJob(jobDetails);
-                            
-                            // Update available operations
-                            if (jobDetails.operations) {
-                              setAvailableOperations(jobDetails.operations.sort((a, b) => 
-                                a.operation_number - b.operation_number
-                              ));
-                            }
+              <div className="mb-2 font-medium">Scheduled Operations</div>
+              {machineOperations?.scheduled?.length > 0 ? (
+                <div className="space-y-4">
+                  {machineOperations.scheduled.map(operation => {
+                    // Find the associated job for this operation
+                    const relatedJob = availableJobs.find(job => 
+                      job.production_order === operation.production_order ||
+                      job.part_number === operation.part_number
+                    );
+                    
+                    return (
+                      <Card 
+                        key={operation.id} 
+                        className="cursor-pointer hover:shadow-md transition-all"
+                        onClick={() => {
+                          // If we have related job info, select it
+                          if (relatedJob) {
+                            handleJobSelection(relatedJob.id);
+                            handleOperationSelection(operation.id);
                           } else {
-                            message.warning('No jobs found for the entered part number');
+                            // Otherwise, create a basic job object
+                            setSelectedJob({
+                              id: operation.id,
+                              production_order: operation.production_order,
+                              part_number: operation.part_number,
+                              part_description: operation.part_description || operation.description
+                            });
+                            setSelectedOperation(operation);
                           }
-                        } catch (error) {
-                          console.error('Error:', error);
-                          message.error('Failed to search for job');
-                        }
-                      } else {
-                        message.warning('Please enter a part number');
-                      }
-                    }}
-                  >
-                    Search
-                  </Button>
-                </Space.Compact>
-              </div>
-               */}
+                          setHasUnsavedChanges(true);
+                        }}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <Tag color="blue">OP{operation.operation_number}</Tag>
+                            <div className="text-sm text-gray-500">{operation.work_center}</div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">{operation.operation_description}</div>
+                            <div className="text-xs text-gray-500">{operation.part_number} - {operation.part_description}</div>
+                          </div>
+                          {operation.planned_start_time && (
+                            <div className="text-xs bg-gray-50 p-2 rounded">
+                              <div className="flex justify-between">
+                                <span>Planned Start:</span>
+                                <span>{moment(operation.planned_start_time).format('MMM D, YYYY')}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Planned End:</span>
+                                <span>{moment(operation.planned_end_time).format('MMM D, YYYY')}</span>
+                              </div>
+                            </div>
+                          )}
+                          {selectedOperation?.id === operation.id && (
+                            <div className="mt-2 bg-blue-50 p-2 rounded text-blue-700 text-sm">
+                              Selected for activation
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Alert 
+                  message="No Scheduled Operations"
+                  description="There are no scheduled operations for this machine. You can select a job from the 'Select Other Job' tab."
+                  type="info"
+                  showIcon
+                />
+              )}
+            </div>
+          ) : (
+            <div className="space-y-6">
               <div>
                 <div className="mb-2 font-medium">Or Select from Available Jobs</div>
                 <Select

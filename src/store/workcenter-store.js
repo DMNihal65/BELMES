@@ -4,7 +4,7 @@ import { message } from 'antd';
 
 export const fetchAllMachines = async () => {
   try {
-    const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/machines/');
+    const response = await fetch('http://172.18.7.88:5674/api/v1/master-order/machines/');
     if (!response.ok) {
       throw new Error('Failed to fetch machines');
     }
@@ -17,7 +17,7 @@ export const fetchAllMachines = async () => {
 
 export const fetchMachineDetails = async (machineId) => {
   try {
-    const response = await fetch(`http://172.18.7.88:3425/api/v1/master-order/machines/${machineId}`);
+    const response = await fetch(`http://172.18.7.88:5674/api/v1/master-order/machines/${machineId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch machine details');
     }
@@ -34,7 +34,7 @@ export const fetchMachineDetails = async (machineId) => {
 
 export const createMachine = async (machineData) => {
   try {
-    const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/machines/', {
+    const response = await fetch('http://172.18.7.88:5674/api/v1/master-order/machines/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -63,7 +63,7 @@ const useWorkcenterStore = create((set, get) => ({
   fetchWorkcenters: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/all-machines/');
+      const response = await fetch('http://172.18.7.88:5674/api/v1/master-order/all-machines/');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -94,7 +94,7 @@ const useWorkcenterStore = create((set, get) => ({
   fetchWorkcentersList: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:5674/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters list');
       }
@@ -130,7 +130,7 @@ const useWorkcenterStore = create((set, get) => ({
 
       console.log('Sending update request with data:', requestBody);
 
-      const response = await fetch(`http://172.18.7.88:3425/api/v1/master-order/machines/${updatedItem.id}`, {
+      const response = await fetch(`http://172.18.7.88:5674/api/v1/master-order/machines/${updatedItem.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -190,7 +190,7 @@ const useWorkcenterStore = create((set, get) => ({
 
       console.log('Sending payload to API:', newMachinePayload);
 
-      const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/machines/', {
+      const response = await fetch('http://172.18.7.88:5674/api/v1/master-order/machines/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,7 +253,7 @@ const useWorkcenterStore = create((set, get) => ({
       console.log('Creating workcenter with payload:', requestBody);
 
       // Create new workcenter
-      const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/workcenters/', {
+      const response = await fetch('http://172.18.7.88:5674/api/v1/master-order/workcenters/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -272,8 +272,8 @@ const useWorkcenterStore = create((set, get) => ({
 
       // Fetch all updated data
       const [workcentersResponse, allMachinesResponse] = await Promise.all([
-        fetch('http://172.18.7.88:3425/api/v1/master-order/workcenters/?skip=0&limit=100'),
-        fetch('http://172.18.7.88:3425/api/v1/master-order/all-machines/')
+        fetch('http://172.18.7.88:5674/api/v1/master-order/workcenters/?skip=0&limit=100'),
+        fetch('http://172.18.7.88:5674/api/v1/master-order/all-machines/')
       ]);
 
       if (!workcentersResponse.ok || !allMachinesResponse.ok) {
@@ -307,7 +307,7 @@ const useWorkcenterStore = create((set, get) => ({
   fetchWorkcenterConfig: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:3425/api/v1/master-order/workcenters');
+      const response = await fetch('http://172.18.7.88:5674/api/v1/master-order/workcenters');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenter configuration');
       }
@@ -327,7 +327,7 @@ const useWorkcenterStore = create((set, get) => ({
   updateWorkcenterSchedulable: async (workcenterId, isSchedulable) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:3425/api/v1/master-order/workcenters/${workcenterId}`, {
+      const response = await fetch(`http://172.18.7.88:5674/api/v1/master-order/workcenters/${workcenterId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

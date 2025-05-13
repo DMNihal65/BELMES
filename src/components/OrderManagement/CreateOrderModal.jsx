@@ -1297,7 +1297,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                 <Button 
                   type="primary"
                   onClick={() => {
-                    message.info('Upload Version functionality will be implemented soon');
+                    // Remove the popup message
                   }}
                   icon={<CloudUploadOutlined />}
                   className="w-full mt-2"
@@ -1499,7 +1499,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                 <Button 
                   type="primary"
                   onClick={() => {
-                    message.info('Upload Version functionality will be implemented soon');
+                    // Remove the popup message
                   }}
                   icon={<CloudUploadOutlined />}
                   className="w-full mt-2"

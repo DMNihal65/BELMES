@@ -12,6 +12,7 @@ import {
 } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import WebGLErrorBoundary from './WebGLErrorBoundary';
 
 // Import custom components
 import FactoryFloor from './FactoryFloor';
@@ -430,8 +431,52 @@ const FactoryScene = ({
   cameraView = 'overview'
 }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [viewDetails, setViewDetails] = useState(true); // Start with detailed view
-  const [quality, setQuality] = useState('medium'); // 'low', 'medium', 'high'
+  const [viewDetails, setViewDetails] = useState(true);
+  const [quality, setQuality] = useState('medium');
+  const [webGLSupported, setWebGLSupported] = useState(true);
+  const [fallbackMode, setFallbackMode] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Check WebGL support on component mount
+  useEffect(() => {
+    const checkWebGLSupport = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        
+        // Try to get WebGL2 context first (modern browsers)
+        let gl = canvas.getContext('webgl2');
+        
+        // If WebGL2 is not available, try WebGL
+        if (!gl) {
+          gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        }
+        
+        // Set support state based on context creation success
+        if (!gl) {
+          setWebGLSupported(false);
+          setErrorMessage('WebGL not supported by your browser or graphics card. Displaying fallback view.');
+          setFallbackMode(true);
+        } else {
+          // Check for any potential WebGL context limitation flags in the browser
+          const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+          if (debugInfo) {
+            const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+            // Check if using software renderer like SwiftShader (Chrome) or ANGLE (Firefox)
+            if (renderer.includes('SwiftShader') || renderer.includes('ANGLE') || renderer.includes('llvmpipe')) {
+              setQuality('low');
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error checking WebGL support:', e);
+        setWebGLSupported(false);
+        setErrorMessage('Error initializing WebGL: ' + e.message);
+        setFallbackMode(true);
+      }
+    };
+
+    checkWebGLSupport();
+  }, []);
 
   // Divide machines into types
   const categorizeMachines = () => {
@@ -506,12 +551,66 @@ const FactoryScene = ({
     switch(quality) {
       case 'high': return [1, 2];
       case 'medium': return [1, 1.5];
-      case 'low': default: return [0.8, 1];
+      case 'low': default: return [0.5, 1]; // Reduced for better performance
     }
+  };
+
+  // Handle WebGL errors
+  const handleCreationError = (e) => {
+    console.error("Error creating WebGL context:", e);
+    setFallbackMode(true);
+    setErrorMessage(`Error creating WebGL context: ${e.message || 'Unknown error'}`);
   };
 
   // Get categorized machines
   const machinesByType = categorizeMachines();
+
+  // Fallback view when WebGL is not supported
+  if (fallbackMode) {
+    return (
+      <div className={`relative h-full w-full ${className} bg-gray-800 flex flex-col items-center justify-center p-4`}>
+        <div className="bg-yellow-50 border border-yellow-400 text-yellow-700 p-4 rounded-md mb-4 max-w-lg text-center">
+          <h3 className="font-bold text-lg mb-2">3D View Not Available</h3>
+          <p>{errorMessage || "Your browser or device doesn't support WebGL which is required for the 3D factory view."}</p>
+          <p className="mt-2 text-sm">
+            Try using the latest version of Chrome, Firefox, or Edge, and ensure your graphics drivers are updated.
+          </p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-lg p-4 max-w-lg w-full">
+          <h3 className="font-bold mb-4 text-center text-lg">Factory Shop Floor Status</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {machines.map((machine) => (
+              <div 
+                key={machine.id}
+                className={`border rounded-md p-3 cursor-pointer transition-all ${
+                  selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                }`}
+                onClick={() => onMachineSelect(machine)}
+              >
+                <div className="flex items-center">
+                  <div 
+                    className={`w-3 h-3 rounded-full mr-2 ${
+                      machine.status === 'PRODUCTION' ? 'bg-green-500' :
+                      machine.status === 'ON' ? 'bg-yellow-500' :
+                      machine.status === 'ERROR' ? 'bg-red-500' :
+                      'bg-gray-500'
+                    }`}
+                  />
+                  <span className="font-medium">{machine.name}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-2 mt-2 text-sm">
+                  <div>Status: <span className="font-medium">{machine.status}</span></div>
+                  <div>Parts: <span className="font-medium">{machine.totalCount || 0}</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`relative h-full w-full ${className}`}>
@@ -529,154 +628,151 @@ const FactoryScene = ({
         ))}
       </div>
 
-      <Canvas
-        shadows={quality !== 'low'}
-        dpr={getPixelRatio()}
-        gl={{ 
-          antialias: quality !== 'low',
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.2
-        }}
-        camera={{ position: [0, 30, 30], fov: 45 }}
-        performance={{ min: 0.5 }}
-      >
-        <Suspense fallback={null}>
-          {/* Scene lighting */}
-          <ambientLight intensity={0.3} color="#d4d4d8" />
-          
-          {/* Main factory lighting */}
-          <Factory3DLighting quality={quality} />
-          
-          {/* Environment */}
-          {quality !== 'low' && (
-            <Environment
-              files="/warehouse.hdr"
-              background={false}
-              blur={0.7}
+      {isLoading ? (
+        <div className="h-full w-full flex items-center justify-center bg-gray-800">
+          <div className="text-white">Loading factory scene...</div>
+        </div>
+      ) : (
+        <WebGLErrorBoundary onError={handleCreationError}>
+          <Canvas
+            shadows={quality !== 'low'}
+            dpr={getPixelRatio()}
+            gl={{ 
+              antialias: quality !== 'low',
+              toneMapping: THREE.ACESFilmicToneMapping,
+              toneMappingExposure: 1.0,
+              alpha: true,
+              stencil: false,
+              depth: true,
+              precision: quality === 'low' ? 'lowp' : 'mediump',
+              powerPreference: 'low-power',
+              failIfMajorPerformanceCaveat: false
+            }}
+            camera={{ position: [0, 30, 30], fov: 45 }}
+            performance={{ min: 0.5 }}
+            onCreated={({ gl }) => {
+              // Optional: Apply additional WebGL context optimizations
+              gl.getContext().getExtension('WEBGL_lose_context');
+            }}
+          >
+            <CameraController 
+              selectedMachine={selectedMachine} 
+              view={cameraView}
+              enableTransitions={quality !== 'low'} 
             />
-          )}
-          
-          {/* Factory environment */}
-          <FactoryFloor size={80} />
-          
-          {/* EDM Room - Glass enclosure */}
-          <EDMRoom position={[0, 0, -30]} />
-          
-          {/* Section Labels */}
-          <SectionLabels />
-          
-          {/* Machine display - Turning Machines */}
-          {machinesByType.turning.map((machine, index) => {
-            const position = getMachinePosition('turning', index);
-            const rotation = getMachineRotation('turning', index);
             
-            return (
-              <TurningMachineModel
-                key={machine.id || `turning-${index}`}
-                position={position}
-                rotation={rotation}
-                scale={12.0}
-                onClick={() => onMachineSelect(machine)}
-                isSelected={selectedMachine?.id === machine.id}
-                machineData={machine}
-              />
-            );
-          })}
-          
-          {/* Machine display - Milling Machines */}
-          {machinesByType.milling.map((machine, index) => {
-            const position = getMachinePosition('milling', index);
-            const rotation = getMachineRotation('milling', index);
-            
-            return (
-              <MillingMachineModel
-                key={machine.id || `milling-${index}`}
-                position={position}
-                rotation={rotation}
-                scale={8.0}
-                onClick={() => onMachineSelect(machine)}
-                isSelected={selectedMachine?.id === machine.id}
-                machineData={machine}
-              />
-            );
-          })}
-          
-          {/* Machine display - EDM Machines */}
-          {machinesByType.edm.map((machine, index) => {
-            const position = getMachinePosition('edm', index);
-            const rotation = getMachineRotation('edm', index);
-            
-            return (
-              <EDMMachineModel
-                key={machine.id || `edm-${index}`}
-                position={position}
-                rotation={rotation}
-                scale={12.0}
-                onClick={() => onMachineSelect(machine)}
-                isSelected={selectedMachine?.id === machine.id}
-                machineData={machine}
-              />
-            );
-          })}
-          
-          {/* Add workbenches and chairs */}
-          <ShopFloorFurniture />
-          
-          {/* Add factory workers at various positions - only in high quality mode */}
-          {viewDetails && quality === 'high' && <FactoryWorkers />}
-          
-          {/* Add factory equipment - toolboxes, carts, etc. */}
-          {viewDetails && <FactoryEquipment quality={quality} />}
-          
-          {/* Simple environment and atmosphere */}
-          <fog attach="fog" args={['#c8c8d0', 30, 100]} />
-          <Sky 
-            distance={450000} 
-            sunPosition={[10, 5, 10]} 
-            inclination={0.5} 
-            azimuth={0.25} 
-            turbidity={8}
-            rayleigh={1.5}
-            mieCoefficient={0.007}
-            mieDirectionalG={0.8}
-          />
-          {quality === 'high' && <Stars radius={100} depth={50} count={1000} factor={4} fade speed={1} />}
-          
-          {/* Camera controller */}
-          <CameraController 
-            view={cameraView}
-            selectedMachine={selectedMachine}
-          />
-        </Suspense>
-      </Canvas>
-      
-      {/* Detail toggle */}
-      <div className="absolute bottom-4 right-4 flex space-x-2">
-        <button 
-          className={`p-2 rounded-full ${viewDetails ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}
-          onClick={() => setViewDetails(!viewDetails)}
-          title={viewDetails ? "Hide details" : "Show details"}
-        >
-          {viewDetails ? "👁️" : "👁️‍🗨️"}
-        </button>
-      </div>
-      
-      {/* Loading indicator */}
-      <Loader 
-        active={isLoading}
-        dataInterpolation={(p) => `Loading factory ${p.toFixed(0)}%`}
-        containerStyles={{
-          background: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(5px)'
-        }}
-        innerStyles={{
-          backgroundColor: '#1e293b',
-          color: '#fff'
-        }}
-        barStyles={{
-          backgroundColor: '#38bdf8'
-        }}
-      />
+            <Suspense fallback={null}>
+              {/* Scene lighting */}
+              <ambientLight intensity={0.4} color="#d4d4d8" />
+              
+              {/* Main factory lighting */}
+              <Factory3DLighting quality={quality} />
+              
+              {/* Environment */}
+              {quality !== 'low' && (
+                <Environment
+                  files="/warehouse.hdr"
+                  background={false}
+                  blur={0.7}
+                />
+              )}
+              
+              {/* Simple environment and atmosphere */}
+              {quality !== 'low' && (
+                <>
+                  <fog attach="fog" args={['#c8c8d0', 30, 100]} />
+                  {quality === 'high' && (
+                    <>
+                      <Sky 
+                        distance={450000} 
+                        sunPosition={[10, 5, 10]} 
+                        inclination={0.5} 
+                        azimuth={0.25} 
+                        turbidity={8}
+                        rayleigh={1.5}
+                        mieCoefficient={0.007}
+                        mieDirectionalG={0.8}
+                      />
+                      <Stars radius={100} depth={50} count={1000} factor={4} fade speed={1} />
+                    </>
+                  )}
+                </>
+              )}
+              
+              {/* Factory environment */}
+              <FactoryFloor size={80} />
+              
+              {/* EDM Room - Glass enclosure */}
+              <EDMRoom position={[0, 0, -30]} />
+              
+              {/* Section Labels */}
+              {quality !== 'low' && <SectionLabels />}
+              
+              {/* Machine display - Turning Machines */}
+              {machinesByType.turning.map((machine, index) => {
+                const position = getMachinePosition('turning', index);
+                const rotation = getMachineRotation('turning', index);
+                
+                return (
+                  <TurningMachineModel
+                    key={machine.id || `turning-${index}`}
+                    position={position}
+                    rotation={rotation}
+                    scale={12.0}
+                    onClick={() => onMachineSelect(machine)}
+                    isSelected={selectedMachine?.id === machine.id}
+                    machineData={machine}
+                  />
+                );
+              })}
+              
+              {/* Machine display - Milling Machines */}
+              {machinesByType.milling.map((machine, index) => {
+                const position = getMachinePosition('milling', index);
+                const rotation = getMachineRotation('milling', index);
+                
+                return (
+                  <MillingMachineModel
+                    key={machine.id || `milling-${index}`}
+                    position={position}
+                    rotation={rotation}
+                    scale={8.0}
+                    onClick={() => onMachineSelect(machine)}
+                    isSelected={selectedMachine?.id === machine.id}
+                    machineData={machine}
+                  />
+                );
+              })}
+              
+              {/* Machine display - EDM Machines */}
+              {machinesByType.edm.map((machine, index) => {
+                const position = getMachinePosition('edm', index);
+                const rotation = getMachineRotation('edm', index);
+                
+                return (
+                  <EDMMachineModel
+                    key={machine.id || `edm-${index}`}
+                    position={position}
+                    rotation={rotation}
+                    scale={12.0}
+                    onClick={() => onMachineSelect(machine)}
+                    isSelected={selectedMachine?.id === machine.id}
+                    machineData={machine}
+                  />
+                );
+              })}
+              
+              {/* Add workbenches and chairs */}
+              {quality !== 'low' && <ShopFloorFurniture />}
+              
+              {/* Add equipment (only for medium/high quality) */}
+              {quality !== 'low' && (
+                <FactoryEquipment quality={quality} />
+              )}
+            </Suspense>
+          </Canvas>
+        </WebGLErrorBoundary>
+      )}
     </div>
   );
 };
@@ -684,11 +780,10 @@ const FactoryScene = ({
 // Factory lighting setup
 const Factory3DLighting = ({ quality = 'medium' }) => {
   // References for the lights to apply helpers if needed
-  const spotLightRef1 = React.useRef();
   const mainLightRef = React.useRef();
   
   // Determine number of lights based on quality
-  const lightCount = quality === 'high' ? 6 : quality === 'medium' ? 4 : 2;
+  const lightCount = quality === 'high' ? 4 : quality === 'medium' ? 3 : 1;
   
   return (
     <>
@@ -696,7 +791,7 @@ const Factory3DLighting = ({ quality = 'medium' }) => {
       <directionalLight
         ref={mainLightRef}
         position={[20, 30, 20]}
-        intensity={0.5}
+        intensity={0.6}
         castShadow={quality !== 'low'}
         shadow-mapSize-width={quality === 'high' ? 2048 : 1024}
         shadow-mapSize-height={quality === 'high' ? 2048 : 1024}
@@ -710,208 +805,56 @@ const Factory3DLighting = ({ quality = 'medium' }) => {
       />
       
       {/* Ambient light - warmer and less white */}
-      <ambientLight intensity={0.25} color="#d3d3c6" />
+      <ambientLight intensity={0.3} color="#d3d3c6" />
       
-      {/* Factory ceiling lights */}
+      {/* Factory ceiling lights - reduced number for performance */}
       <group>
         {[
-          [-25,19.5, -20],
           [-25, 19.5, 0],
-          [-25, 19.5, 20],
-          [0, 19.5, -20],
           [0, 19.5, 0],
-          [0, 19.5, 20],
-          [25, 19.5, -20],
           [25, 19.5, 0],
-          [25, 19.5, 20]
+          [0, 19.5, -20]
         ].slice(0, lightCount).map((position, index) => (
-          <React.Fragment key={`ceiling-light-${index}`}>
-            <SpotLight
-              position={position}
-              angle={Math.PI / 4}
-              penumbra={0.5}
-              intensity={0.45}
-              distance={40}
-              castShadow={quality !== 'low'}
-              shadow-bias={-0.0001}
-              attenuation={5}
-              anglePower={5}
-              color="#fff2e0"
-            />
-            {/* Ceiling light fixture */}
-            <mesh position={[position[0], position[1] + 0.5, position[2]]}>
-              <boxGeometry args={[2, 0.2, 2]} />
-              <meshStandardMaterial color="#f8fafc" emissive="#fff2e0" emissiveIntensity={0.2} />
-            </mesh>
-          </React.Fragment>
+          <SpotLight
+            key={`ceiling-light-${index}`}
+            position={position}
+            angle={Math.PI / 4}
+            penumbra={0.5}
+            intensity={0.45}
+            distance={40}
+            castShadow={quality !== 'low'}
+            shadow-bias={-0.0001}
+            attenuation={5}
+            anglePower={5}
+            color="#fff2e0"
+          />
         ))}
       </group>
-      
-      {/* EDM Room lights - more dramatic lighting */}
-      {quality !== 'low' && (
-        <>
-          <SpotLight
-            position={[-10, 12, -30]}
-            angle={Math.PI / 3}
-            penumbra={0.5}
-            intensity={0.6}
-            distance={35}
-            castShadow={quality === 'high'}
-            shadow-bias={-0.0001}
-            attenuation={3}
-            anglePower={3}
-            color="#e8e8ff"
-          />
-          <SpotLight
-            position={[10, 12, -30]}
-            angle={Math.PI / 3}
-            penumbra={0.5}
-            intensity={0.6}
-            distance={35}
-            castShadow={quality === 'high'}
-            shadow-bias={-0.0001}
-            attenuation={3}
-            anglePower={3}
-            color="#e8e8ff"
-          />
-          
-          {/* Additional fill light for better visibility in EDM area */}
-          <pointLight
-            position={[0, 5, -30]}
-            intensity={0.4}
-            distance={25}
-            color="#b3cfff"
-          />
-        </>
-      )}
-      
-      {/* Add some colored accent lights for visual interest */}
-      {quality === 'high' && (
-        <>
-          {/* Blue accent light for EDM area */}
-          <pointLight
-            position={[0, 5, -30]}
-            intensity={0.4}
-            distance={20}
-            color="#3b82f6"
-          />
-          
-          {/* Warm accent light for turning area */}
-          <pointLight
-            position={[-20, 5, 0]}
-            intensity={0.25}
-            distance={15}
-            color="#fb923c"
-          />
-          
-          {/* Green accent for milling area */}
-          <pointLight
-            position={[20, 5, 0]}
-            intensity={0.25}
-            distance={15}
-            color="#10b981"
-          />
-        </>
-      )}
     </>
-  );
-};
-
-// Factory workers component
-const FactoryWorkers = () => {
-  // Define fixed worker positions around the machines
-  const workerPositions = [
-    // Near turning machines
-    [-18, 0, -10],
-    [-20, 0, 5],
-    // Near milling machines
-    [18, 0, -5],
-    [22, 0, 10],
-    // Central area
-    [0, 0, 15],
-    [-5, 0, -15]
-  ];
-
-  return (
-    <>
-      {workerPositions.map((position, index) => {
-        // Add randomness to position
-        const workerPosition = [
-          position[0] + (Math.random() - 0.5) * 2,
-          position[1],
-          position[2] + (Math.random() - 0.5) * 2
-        ];
-        
-        return (
-          <SimpleWorker 
-            key={`worker-${index}`}
-            position={workerPosition}
-            color={index % 3 === 0 ? "#3b82f6" : index % 3 === 1 ? "#10b981" : "#f59e0b"}
-          />
-        );
-      })}
-    </>
-  );
-};
-
-// Simple worker model
-const SimpleWorker = ({ position, color = "#3b82f6" }) => {
-  // Create a simple worker model with primitives
-  return (
-    <group position={position}>
-      {/* Body */}
-      <mesh position={[0, 0.8, 0]} castShadow>
-        <capsuleGeometry args={[0.25, 0.8, 8, 16]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-      
-      {/* Head */}
-      <mesh position={[0, 1.8, 0]} castShadow>
-        <sphereGeometry args={[0.3, 16, 16]} />
-        <meshStandardMaterial color="#f8fafc" />
-      </mesh>
-      
-      {/* Safety helmet */}
-      <mesh position={[0, 2, 0]} castShadow>
-        <cylinderGeometry args={[0.33, 0.4, 0.3, 16]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-    </group>
   );
 };
 
 // Factory equipment (toolboxes, carts, etc.) - repositioned for new layout
 const FactoryEquipment = ({ quality = 'medium' }) => {
   // Determine the number of items to show based on quality
-  const detailLevel = quality === 'high' ? 1 : quality === 'medium' ? 0.7 : 0.4;
+  const detailLevel = quality === 'high' ? 1 : quality === 'medium' ? 0.5 : 0.3;
   
   return (
     <group>
-      {/* Toolboxes */}
+      {/* Only the most important equipment for visual context */}
       <Toolbox position={[-15, 0, -20]} />
-      <Toolbox position={[15, 0, 15]} />
-      {detailLevel > 0.6 && <Toolbox position={[25, 0, -18]} />}
+      {detailLevel > 0.4 && <Toolbox position={[15, 0, 15]} />}
       
-      {/* Workbenches with tools - in specific locations */}
+      {/* Workbenches with tools - only the most visible ones */}
       <Workbench position={[-25, 0, 15]} rotation={[0, Math.PI/4, 0]} />
-      <Workbench position={[25, 0, -5]} rotation={[0, -Math.PI/3, 0]} />
-      {detailLevel > 0.6 && <Workbench position={[-25, 0, -15]} rotation={[0, Math.PI/6, 0]} />}
+      {detailLevel > 0.5 && <Workbench position={[25, 0, -5]} rotation={[0, -Math.PI/3, 0]} />}
       
-      {/* Material racks - near the machines */}
-      <MaterialRack position={[-30, 0, 0]} rotation={[0, Math.PI/2, 0]} />
-      {detailLevel > 0.6 && <MaterialRack position={[30, 0, 0]} rotation={[0, -Math.PI/2, 0]} />}
+      {/* Material racks - reduced number */}
+      {detailLevel > 0.5 && <MaterialRack position={[-30, 0, 0]} rotation={[0, Math.PI/2, 0]} />}
       
-      {/* Forklifts */}
-      {detailLevel > 0.8 && <Forklift position={[15, 0, 25]} rotation={[0, -Math.PI/4, 0]} />}
-      
-      {/* Pallets with materials */}
+      {/* Pallets with materials - reduced */}
       <Pallet position={[-25, 0, 0]} />
-      <Pallet position={[25, 0, 10]} />
-      {detailLevel > 0.6 && <Pallet position={[0, 0, 25]} />}
-      
-      {/* Trash bins */}
-      <TrashBin position={[-10, 0, 20]} />
-      <TrashBin position={[10, 0, -20]} />
+      {detailLevel > 0.7 && <Pallet position={[25, 0, 10]} />}
     </group>
   );
 };
@@ -998,31 +941,6 @@ const MaterialRack = ({ position, rotation = [0, 0, 0] }) => {
   );
 };
 
-// Forklift component
-const Forklift = ({ position, rotation = [0, 0, 0] }) => {
-  return (
-    <group position={position} rotation={rotation}>
-      {/* Base and cabin combined for performance */}
-      <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
-        <boxGeometry args={[2.5, 2.5, 4]} />
-        <meshStandardMaterial color="#eab308" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Lift mechanism */}
-      <mesh position={[0, 2, 2]} castShadow>
-        <boxGeometry args={[1.5, 3, 0.3]} />
-        <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Forks combined for performance */}
-      <mesh position={[0, 1, 2.5]} castShadow>
-        <boxGeometry args={[1.2, 0.1, 1.5]} />
-        <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.2} />
-      </mesh>
-    </group>
-  );
-};
-
 // Pallet component with material
 const Pallet = ({ position, rotation = [0, 0, 0] }) => {
   return (
@@ -1046,95 +964,6 @@ const Pallet = ({ position, rotation = [0, 0, 0] }) => {
         <boxGeometry args={[1.5, 1, 1]} />
         <meshStandardMaterial color="#cbd5e1" metalness={0.3} roughness={0.7} />
       </mesh>
-    </group>
-  );
-};
-
-// Trash bin component
-const TrashBin = ({ position }) => {
-  return (
-    <group position={position}>
-      <mesh position={[0, 1, 0]} castShadow>
-        <cylinderGeometry args={[0.4, 0.3, 2, 16]} />
-        <meshStandardMaterial color="#475569" metalness={0.3} roughness={0.7} />
-      </mesh>
-    </group>
-  );
-};
-
-// Section labels for different areas
-const SectionLabels = () => {
-  return (
-    <group position={[0, 15, 0]}>
-      {/* TV instead of labels - left wall */}
-      {/* <LargeScreenTV 
-        position={[-20, 0, 0]}
-        rotation={[0, Math.PI/2, 0]}
-        size={[10, 6]}
-        content="Production Dashboard"
-      /> */}
-      
-      {/* Central TV - main board */}
-      <LargeScreenTV 
-        position={[0, 0, -25.5]}
-        rotation={[0, 0, 0]}
-        size={[12, 8]}
-        content="BEL MES FAB-C"
-      />
-      
-      {/* Right wall TV
-      <LargeScreenTV 
-        position={[20, 0, 0]}
-        rotation={[0, -Math.PI/2, 0]}
-        size={[10, 6]}
-        content="Performance Metrics"
-      /> */}
-    </group>
-  );
-};
-
-// TV component
-const LargeScreenTV = ({ position, rotation = [0, 0, 0], size = [10, 6], content = "MES" }) => {
-  const screenRef = useRef();
-  
-  useFrame((state) => {
-    if (screenRef.current) {
-      // Add subtle animation to the screen
-      const time = state.clock.getElapsedTime();
-      screenRef.current.material.emissiveIntensity = 0.6 + Math.sin(time * 0.5) * 0.1;
-    }
-  });
-  
-  return (
-    <group position={position} rotation={rotation}>
-      {/* TV Frame */}
-      <mesh castShadow>
-        <boxGeometry args={[size[0] + 0.5, size[1] + 0.5, 0.3]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Screen */}
-      <mesh ref={screenRef} position={[0, 0, 0.2]}>
-        <planeGeometry args={size} />
-        <meshStandardMaterial 
-          color="#0f172a" 
-          emissive="#60a5fa" 
-          emissiveIntensity={0.6}
-          metalness={0.3}
-          roughness={0.2}
-        />
-      </mesh>
-      
-      {/* TV Content */}
-      <Text
-        position={[0, 0, 0.3]}
-        color="white"
-        fontSize={0.8}
-        maxWidth={size[0] * 0.8}
-        textAlign="center"
-      >
-        {content}
-      </Text>
     </group>
   );
 };
@@ -1539,6 +1368,83 @@ const Banner = ({ position, rotation = [0, 0, 0], text = "BANNER", color = "#3b8
         anchorY="middle"
       >
         {text}
+      </Text>
+    </group>
+  );
+};
+
+// Section labels for different areas
+const SectionLabels = () => {
+  return (
+    <group position={[0, 15, 0]}>
+      {/* TV instead of labels - left wall */}
+      {/* <LargeScreenTV 
+        position={[-20, 0, 0]}
+        rotation={[0, Math.PI/2, 0]}
+        size={[10, 6]}
+        content="Production Dashboard"
+      /> */}
+      
+      {/* Central TV - main board */}
+      <LargeScreenTV 
+        position={[0, 0, -25.5]}
+        rotation={[0, 0, 0]}
+        size={[12, 8]}
+        content="BEL MES FAB-C"
+      />
+      
+      {/* Right wall TV
+      <LargeScreenTV 
+        position={[20, 0, 0]}
+        rotation={[0, -Math.PI/2, 0]}
+        size={[10, 6]}
+        content="Performance Metrics"
+      /> */}
+    </group>
+  );
+};
+
+// TV component
+const LargeScreenTV = ({ position, rotation = [0, 0, 0], size = [10, 6], content = "MES" }) => {
+  const screenRef = useRef();
+  
+  useFrame((state) => {
+    if (screenRef.current) {
+      // Add subtle animation to the screen
+      const time = state.clock.getElapsedTime();
+      screenRef.current.material.emissiveIntensity = 0.6 + Math.sin(time * 0.5) * 0.1;
+    }
+  });
+  
+  return (
+    <group position={position} rotation={rotation}>
+      {/* TV Frame */}
+      <mesh castShadow>
+        <boxGeometry args={[size[0] + 0.5, size[1] + 0.5, 0.3]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.3} />
+      </mesh>
+      
+      {/* Screen */}
+      <mesh ref={screenRef} position={[0, 0, 0.2]}>
+        <planeGeometry args={size} />
+        <meshStandardMaterial 
+          color="#0f172a" 
+          emissive="#60a5fa" 
+          emissiveIntensity={0.6}
+          metalness={0.3}
+          roughness={0.2}
+        />
+      </mesh>
+      
+      {/* TV Content */}
+      <Text
+        position={[0, 0, 0.3]}
+        color="white"
+        fontSize={0.8}
+        maxWidth={size[0] * 0.8}
+        textAlign="center"
+      >
+        {content}
       </Text>
     </group>
   );

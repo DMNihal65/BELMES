@@ -102,7 +102,7 @@ const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => {
             // If no documents exist, we should check the MPP endpoint directly
             try {
               const mppResponse = await fetch(
-                `http://172.18.7.88:3425/api/v1/mpp/by-part/${selectedOperation.part_number}/${selectedOperation.operation_number}`,
+                `http://172.18.7.88:5674/api/v1/mpp/by-part/${selectedOperation.part_number}/${selectedOperation.operation_number}`,
                 {
                   method: 'GET',
                   headers: {
@@ -372,6 +372,7 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
   const { currentActiveOrder, set } = useOperatorMppStore();
   const [selectedOperation, setSelectedOperation] = useState(null);
   const [showDrawer, setShowDrawer] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
 
   const handleDrawerClose = useCallback(() => {
     setShowDrawer(false);
@@ -416,12 +417,29 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
     }
   }, [fetchOperationDocuments, downloadDocumentById]);
 
+  // Add function to refresh data
+  const refreshOperationsData = useCallback(async () => {
+    if (!currentMachine?.id) return;
+    
+    setIsRefreshingData(true);
+    try {
+      await fetchMachineOperations(currentMachine.id);
+      message.success('Operations data refreshed');
+    } catch (error) {
+      console.error('Error refreshing operations data:', error);
+      message.error('Failed to refresh operations data');
+    } finally {
+      setIsRefreshingData(false);
+    }
+  }, [currentMachine?.id, fetchMachineOperations]);
+
   useEffect(() => {
     if (currentMachine?.id) {
       fetchMachineOperations(currentMachine.id);
     }
   }, [currentMachine?.id, fetchMachineOperations, currentActiveOrder]);
 
+  // Listen for operation updates
   useEffect(() => {
     const handleOperationsUpdate = (event) => {
       if (event.detail) {
@@ -438,6 +456,61 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
       window.removeEventListener('operationsUpdated', handleOperationsUpdate);
     };
   }, [currentMachine?.id, fetchMachineOperations]);
+
+  // Add listener for job activation events
+  useEffect(() => {
+    const handleJobActivation = (event) => {
+      if (event.detail && event.detail.job) {
+        // Load fresh operations data after job activation
+        if (currentMachine?.id) {
+          fetchMachineOperations(currentMachine.id);
+        }
+      }
+    };
+
+    window.addEventListener('jobActivated', handleJobActivation);
+    window.addEventListener('jobDataUpdated', handleJobActivation);
+
+    return () => {
+      window.removeEventListener('jobActivated', handleJobActivation);
+      window.removeEventListener('jobDataUpdated', handleJobActivation);
+    };
+  }, [currentMachine?.id, fetchMachineOperations]);
+
+  // Add an effect to handle localStorage changes
+  useEffect(() => {
+    // Function to handle storage changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'operationsData' || e.key === 'currentJobData' || e.key === 'jobData') {
+        refreshOperationsData();
+      }
+    };
+
+    // Add event listener for storage changes
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [refreshOperationsData]);
+
+  // Add listener for operations data update event
+  useEffect(() => {
+    const handleOperationsDataUpdate = (event) => {
+      if (event.detail && event.detail.operations) {
+        console.log('Operations data updated event received:', event.detail);
+        // We don't need to call fetchMachineOperations here as the data is already in the event
+        // Just update the store via the set function if needed
+      }
+    };
+
+    window.addEventListener('operationsDataUpdated', handleOperationsDataUpdate);
+
+    return () => {
+      window.removeEventListener('operationsDataUpdated', handleOperationsDataUpdate);
+    };
+  }, []);
 
   const columns = useMemo(() => [
     {
@@ -506,8 +579,15 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
 
   // Get operations from different sources with priority
   const allOperations = useMemo(() => {
-    // First check if we have operations in jobOrderData (from selected job)
-    if (jobOrderData?.operations) {
+    // First check if we have operations in the current component props
+    if (jobData?.operations && jobData.operations.length > 0) {
+      return [...jobData.operations].sort((a, b) => 
+        a.operation_number - b.operation_number
+      );
+    }
+    
+    // Then check if we have operations in jobOrderData (from selected job)
+    if (jobOrderData?.operations && jobOrderData.operations.length > 0) {
       return [...jobOrderData.operations].sort((a, b) => 
         a.operation_number - b.operation_number
       );
@@ -515,49 +595,266 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
     
     // Then check if we have operations from WebSocket store
     if (machineOperations) {
-      const operations = [
-        ...(machineOperations.completed || []),
-        ...(machineOperations.inprogress || []),
-        ...(machineOperations.scheduled || [])
-      ];
+      // Create a set of all operations
+      const allOps = new Set();
       
+      // Add operations from each category
+      if (machineOperations.completed) {
+        machineOperations.completed.forEach(op => allOps.add(JSON.stringify(op)));
+      }
+      
+      if (machineOperations.inprogress) {
+        machineOperations.inprogress.forEach(op => allOps.add(JSON.stringify(op)));
+      }
+      
+      if (machineOperations.scheduled) {
+        machineOperations.scheduled.forEach(op => allOps.add(JSON.stringify(op)));
+      }
+      
+      // Convert back to objects and sort
+      const operations = Array.from(allOps).map(op => JSON.parse(op));
       return operations.sort((a, b) => a.operation_number - b.operation_number);
     }
     
     // Lastly, check if we have operations from currentActiveOrder
-    if (currentActiveOrder?.operations) {
+    if (currentActiveOrder?.operations && currentActiveOrder.operations.length > 0) {
       return [...currentActiveOrder.operations].sort((a, b) => 
         a.operation_number - b.operation_number
       );
     }
     
+    // Try to load from localStorage as last resort
+    try {
+      // Check if we have a user-selected job
+      const jobSource = localStorage.getItem('jobSource');
+      
+      // If we have a user-selected job, prioritize that data
+      if (jobSource === 'user-selected') {
+        const storedJobData = localStorage.getItem('jobData');
+        if (storedJobData) {
+          const parsedJobData = JSON.parse(storedJobData);
+          if (parsedJobData.operations && parsedJobData.operations.length > 0) {
+            console.log('Using operations from user-selected job in localStorage');
+            return parsedJobData.operations.sort((a, b) => 
+              a.operation_number - b.operation_number
+            );
+          }
+        }
+        
+        // Also check for activeOperation
+        const storedActiveOp = localStorage.getItem('activeOperation');
+        if (storedActiveOp) {
+          try {
+            const activeOp = JSON.parse(storedActiveOp);
+            // If we have an active operation but no operations list,
+            // return it as a single-item array
+            return [activeOp];
+          } catch (error) {
+            console.error('Error parsing active operation:', error);
+          }
+        }
+      }
+      
+      // First check for scheduled operations specifically
+      const storedScheduledOps = localStorage.getItem('scheduledOperations');
+      if (storedScheduledOps) {
+        const scheduledOps = JSON.parse(storedScheduledOps);
+        if (Array.isArray(scheduledOps) && scheduledOps.length > 0) {
+          return scheduledOps.sort((a, b) => a.operation_number - b.operation_number);
+        }
+      }
+      
+      // Then check all operations
+      const storedOperations = localStorage.getItem('operationsData');
+      if (storedOperations) {
+        const parsedOperations = JSON.parse(storedOperations);
+        if (parsedOperations) {
+          const allOps = new Set();
+          
+          if (parsedOperations.completed) {
+            parsedOperations.completed.forEach(op => allOps.add(JSON.stringify(op)));
+          }
+          
+          if (parsedOperations.inprogress) {
+            parsedOperations.inprogress.forEach(op => allOps.add(JSON.stringify(op)));
+          }
+          
+          if (parsedOperations.scheduled) {
+            parsedOperations.scheduled.forEach(op => allOps.add(JSON.stringify(op)));
+          }
+          
+          const operations = Array.from(allOps).map(op => JSON.parse(op));
+          if (operations.length > 0) {
+            return operations.sort((a, b) => a.operation_number - b.operation_number);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading operations from localStorage:', error);
+    }
+    
     // If no operations found, return empty array
     return [];
-  }, [jobOrderData, machineOperations, currentActiveOrder]);
+  }, [jobData, jobOrderData, machineOperations, currentActiveOrder]);
 
-  if (loading) {
-    return <Spin />;
+  // Get the current active operation, if any
+  const activeOperation = useMemo(() => {
+    if (machineOperations?.inprogress?.length > 0) {
+      return machineOperations.inprogress[0];
+    }
+    
+    if (jobData?.currentOperation) {
+      return jobData.currentOperation;
+    }
+    
+    // Try to load from localStorage
+    try {
+      const storedActiveOp = localStorage.getItem('activeOperation');
+      if (storedActiveOp) {
+        return JSON.parse(storedActiveOp);
+      }
+    } catch (error) {
+      console.error('Error loading active operation from localStorage:', error);
+    }
+    
+    return null;
+  }, [machineOperations, jobData]);
+
+  if (loading || isRefreshingData) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Spin size="large" tip="Loading operations..." />
+      </div>
+    );
   }
 
   return (
     <div className="p-6 space-y-6">
       {/* Active Order Alert */}
-      {(jobOrderData || currentActiveOrder) && (
+      {(jobOrderData || currentActiveOrder || jobData) ? (
         <Alert
           message={
             <div className="flex items-center justify-between">
-              <span>Active Order: {jobOrderData?.production_order || currentActiveOrder?.production_order}</span>
-              <Tag color="green">ACTIVE</Tag>
+              <span>
+                Active Order: {jobOrderData?.production_order || 
+                              currentActiveOrder?.production_order || 
+                              jobData?.production_order || 
+                              'No active order'}
+              </span>
+              {(machineOperations?.inprogress?.length > 0 || activeOperation) ? (
+                <Tag color="green">ACTIVE</Tag>
+              ) : (
+                <Tag color="orange">SCHEDULED</Tag>
+              )}
             </div>
           }
           description={
             <div>
-              <p>Part Number: {jobOrderData?.part_number || currentActiveOrder?.part_number}</p>
-              <p>Description: {jobOrderData?.part_description || currentActiveOrder?.part_description}</p>
-              <p>Total Operations: {jobOrderData?.total_operations || currentActiveOrder?.total_operations}</p>
+              <p>Part Number: {jobOrderData?.part_number || 
+                             currentActiveOrder?.part_number || 
+                             jobData?.part_number || 'N/A'}</p>
+              <p>Description: {jobOrderData?.part_description || 
+                              jobOrderData?.material_description || 
+                              currentActiveOrder?.part_description || 
+                              jobData?.part_description || 'N/A'}</p>
+              <p>Total Operations: {jobOrderData?.total_operations || 
+                                   currentActiveOrder?.total_operations || 
+                                   jobData?.total_operations || 
+                                   allOperations.length || 0}</p>
+              
+              {/* Show refresh button */}
+              <div className="mt-2">
+                <Button 
+                  size="small" 
+                  onClick={refreshOperationsData} 
+                  loading={isRefreshingData}
+                  icon={<InfoCircleOutlined />}
+                >
+                  Refresh Operations Data
+                </Button>
+              </div>
             </div>
           }
           type="info"
+          showIcon
+          className="mb-4"
+        />
+      ) : machineOperations?.scheduled?.length > 0 ? (
+        <Alert
+          message={
+            <div className="flex items-center justify-between">
+              <span>
+                Scheduled Operations
+              </span>
+              <Tag color="orange">SCHEDULED</Tag>
+            </div>
+          }
+          description={
+            <div>
+              <p>There are {machineOperations.scheduled.length} operations scheduled for this machine.</p>
+              <p>You can view the details below or select a job to activate it.</p>
+              
+              {/* Show refresh button */}
+              <div className="mt-2">
+                <Button 
+                  size="small" 
+                  onClick={refreshOperationsData} 
+                  loading={isRefreshingData}
+                  icon={<InfoCircleOutlined />}
+                >
+                  Refresh Operations Data
+                </Button>
+              </div>
+            </div>
+          }
+          type="info"
+          showIcon
+          className="mb-4"
+        />
+      ) : (
+        <Alert
+          message="No Active or Scheduled Jobs"
+          description={
+            <div>
+              <p>There are no active or scheduled operations for this machine.</p>
+              <p>Click the "Select Job" button to choose a job to activate.</p>
+              
+              {/* Show refresh button */}
+              <div className="mt-2">
+                <Button 
+                  size="small" 
+                  onClick={refreshOperationsData} 
+                  loading={isRefreshingData}
+                  icon={<InfoCircleOutlined />}
+                >
+                  Refresh Operations Data
+                </Button>
+              </div>
+            </div>
+          }
+          type="warning"
+          showIcon
+          className="mb-4"
+        />
+      )}
+
+      {/* Active Operation Alert - only show if there's an active operation */}
+      {activeOperation && (
+        <Alert
+          message={
+            <div className="flex items-center justify-between">
+              <span>Active Operation: {activeOperation.operation_number} - {activeOperation.operation_description}</span>
+              <Tag color="processing">IN PROGRESS</Tag>
+            </div>
+          }
+          description={
+            <div>
+              <p>Work Center: {activeOperation.work_center}</p>
+              <p>Setup Time: {activeOperation.setup_time?.toFixed(2) || '0.00'} hrs</p>
+              <p>Cycle Time: {activeOperation.ideal_cycle_time?.toFixed(2) || '0.00'} hrs</p>
+            </div>
+          }
+          type="success"
           showIcon
           className="mb-4"
         />
@@ -572,6 +869,9 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
               <ToolOutlined className="text-blue-500" />
               <Title level={5} className="mb-0">Operation Sequence</Title>
             </Space>
+            <span className="text-gray-500 text-sm">
+              {allOperations.length} operations
+            </span>
           </div>
         }
       >
@@ -581,10 +881,15 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
             dataSource={allOperations}
             className="operation-table"
             pagination={false}
-            rowClassName={(record) => 
-              `operation-row ${record.status === 'in progress' ? 'bg-blue-50' : ''}`
-            }
-            rowKey={(record) => record.operation_number}
+            rowClassName={(record) => {
+              // Mark the active operation row
+              if (activeOperation && record.operation_number === activeOperation.operation_number) {
+                return 'operation-row bg-blue-50 border-l-4 border-blue-500';
+              }
+              
+              return 'operation-row';
+            }}
+            rowKey={(record) => record.operation_number + record.work_center}
           />
         ) : (
           <div className="p-6 text-center">
@@ -592,6 +897,13 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
             <div className="text-sm text-gray-500">
               Select a job to view operations or check if a job is active.
             </div>
+            <Button 
+              className="mt-4" 
+              onClick={refreshOperationsData}
+              loading={isRefreshingData}
+            >
+              Refresh Data
+            </Button>
           </div>
         )}
       </Card>
@@ -643,6 +955,24 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
         .operation-details-drawer .ant-tag {
           border-radius: 4px;
           padding: 2px 8px;
+        }
+
+        /* Add styles for active operation row */
+        .operation-row.bg-blue-50 {
+          background-color: #eff6ff;
+          transition: background-color 0.3s ease;
+        }
+        
+        .operation-row.border-l-4 {
+          padding-left: 12px;
+        }
+        
+        .operation-row:hover {
+          background-color: #f8fafc;
+        }
+        
+        .operation-row.bg-blue-50:hover {
+          background-color: #e0f2fe;
         }
       `}</style>
     </div>

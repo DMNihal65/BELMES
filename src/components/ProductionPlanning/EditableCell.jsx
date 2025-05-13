@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Input } from 'antd';
+import { Form, Input, InputNumber } from 'antd';
 
 const EditableCell = ({
   editing,
@@ -11,7 +11,14 @@ const EditableCell = ({
   children,
   ...restProps
 }) => {
-  const inputNode = <Input />;
+  let inputNode;
+  
+  // Select the right input type based on the field
+  if (dataIndex === 'setup_time' || dataIndex === 'ideal_cycle_time') {
+    inputNode = <InputNumber min={0} step={0.01} style={{ width: '100%' }} />;
+  } else {
+    inputNode = <Input />;
+  }
 
   return (
     <td {...restProps}>

@@ -26,11 +26,11 @@ const { RangePicker } = DatePicker;
 
 // Status colors matching the store definition
 const statusColors = {
-  'RUNNING': '#52c41a',
-  'IDLE': '#faad14',
-  'STOPPED': '#ff4d4f',
-  'MAINTENANCE': '#1890ff',
-  'OFFLINE': '#d9d9d9',
+  // 'RUNNING': '#52c41a',
+  // 'IDLE': '#faad14',
+  // 'STOPPED': '#ff4d4f',
+  'No Data': '#8884d8',
+  // 'OFFLINE': '#d9d9d9',
   // Updated color mappings as requested
   'PRODUCTION': '#355E3B', // Green
   'ON': '#faad14',         // Yellow
@@ -66,22 +66,21 @@ function ProductionAnalytics() {
   const [timelineGrouping, setTimelineGrouping] = useState('machine'); // 'machine' or 'date'
   const [workCenters, setWorkCenters] = useState([]);
   const [loadingWorkCenters, setLoadingWorkCenters] = useState(false);
-  const [schedulableMachines, setSchedulableMachines] = useState([]);
+  const [availableMachines, setAvailableMachines] = useState([]);
 
-  // Fetch work centers and filter to only include schedulable ones
+  // Fetch work centers - removed filtering by is_schedulable
   const fetchWorkCenters = async () => {
     setLoadingWorkCenters(true);
     try {
       const response = await axios.get('http://172.18.7.88:3425/api/v1/master-order/workcenters/?skip=0&limit=100');
       const workCentersData = response.data;
       
-      // Filter work centers that are schedulable
-      const schedulableWorkCenters = workCentersData.filter(wc => wc.is_schedulable === true);
-      setWorkCenters(schedulableWorkCenters);
+      // No longer filtering by is_schedulable
+      setWorkCenters(workCentersData);
       
-      // Extract machine codes from schedulable work centers
-      const machineNames = schedulableWorkCenters.map(wc => wc.code);
-      setSchedulableMachines(machineNames);
+      // Extract all machine codes from work centers
+      const machineNames = workCentersData.map(wc => wc.code);
+      setAvailableMachines(machineNames);
     } catch (error) {
       console.error('Error fetching work centers:', error);
     } finally {
@@ -97,31 +96,15 @@ function ProductionAnalytics() {
     fetchWorkCenters();
   }, []);
 
-  // Filter machines based on schedulable work centers
-  const filterSchedulableMachines = (machines) => {
-    if (!schedulableMachines.length || !machines) return machines;
-    
-    // Extract work center code from machine name (assuming format like "CNCT-Machine1")
-    return machines.filter(machine => {
-      const nameParts = machine.name ? machine.name.split('-') : [];
-      if (nameParts.length > 0) {
-        const workCenterCode = nameParts[0];
-        return schedulableMachines.includes(workCenterCode);
-      }
-      return true; // Include machines without clear work center in name
-    });
-  };
-
-  // Update available machines list for filtering
+  // Update available machines list for filtering - no longer filtering by schedulable
   useEffect(() => {
     if (analyticsData.timelineData?.machines?.length > 0 && selectedMachines.length === 0) {
-      // Filter machines based on is_schedulable flag
-      const schedulableMachineList = filterSchedulableMachines(analyticsData.timelineData.machines);
-      setSelectedMachines(schedulableMachineList.map(m => m.name));
+      // No longer filtering machines based on is_schedulable flag
+      setSelectedMachines(analyticsData.timelineData.machines.map(m => m.name));
     } else if (analyticsData.machineTimelines?.length > 0 && selectedMachines.length === 0) {
       setSelectedMachines(analyticsData.machineTimelines.map(m => m.machine_name));
     }
-  }, [analyticsData.timelineData, analyticsData.machineTimelines, schedulableMachines]);
+  }, [analyticsData.timelineData, analyticsData.machineTimelines]);
 
   const handleDateRangeChange = (range) => {
     if (range) {
@@ -765,6 +748,7 @@ function ProductionAnalytics() {
               onChange={handleDateRangeChange}
               className="w-full sm:w-auto"
               allowClear={false}
+              disabledDate={current => current && current > dayjs().endOf('day')}
             />
             
             <Button 
@@ -849,9 +833,8 @@ function ProductionAnalytics() {
                           let machineOptions = [];
                           
                           if (analyticsData.timelineData?.machines) {
-                            // Filter for schedulable machines only
-                            const filteredMachines = filterSchedulableMachines(analyticsData.timelineData.machines);
-                            machineOptions = filteredMachines.map(machine => ({
+                            // No longer filtering for schedulable machines only
+                            machineOptions = analyticsData.timelineData.machines.map(machine => ({
                               label: machine.name,
                               value: machine.name
                             }));

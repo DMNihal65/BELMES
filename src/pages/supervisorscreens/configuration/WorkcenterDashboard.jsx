@@ -14,14 +14,15 @@ import {
   Card,
   Tabs,
   Tag,
-  Switch
+  Switch,
+  Popconfirm
 } from 'antd';
-import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import dayjs from 'dayjs';
 import useWorkcenterStore from '../../../store/workcenter-store';
-import { fetchAllMachines, createMachine, fetchMachineDetails } from '../../../store/workcenter-store';
+import { fetchAllMachines, createMachine, fetchMachineDetails, deleteMachine } from '../../../store/workcenter-store';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -56,6 +57,7 @@ const Workcenter = () => {
     createWorkcenter,
     fetchWorkcenterConfig,
     updateWorkcenterSchedulable,
+    deleteMachine,
     workcenters, 
     workcenterConfig,
     isLoading,
@@ -172,6 +174,20 @@ const Workcenter = () => {
     } catch (error) {
       console.error('Edit failed:', error);
       toast.error('Failed to update workcenter: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (record) => {
+    try {
+      const response = await deleteMachine(record.id);
+      console.log('Delete response:', response);
+      // Display the message from the API response
+      const responseMessage = response?.message || 'Machine deleted successfully';
+      toast.success(responseMessage);
+      await fetchWorkcenters(); // Refresh the table data
+    } catch (error) {
+      console.error('Delete failed:', error);
+      toast.error(error.message || 'Failed to delete machine');
     }
   };
 
@@ -433,7 +449,7 @@ const Workcenter = () => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 150,
+      width: 200,
       render: (_, record) => {
         const editable = isEditing(record);
         return editable ? (
@@ -475,6 +491,20 @@ const Workcenter = () => {
             >
               View
             </Button>
+            <Popconfirm
+              title="Are you sure you want to delete this machine?"
+              onConfirm={() => handleDelete(record)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Button
+                type="link"
+                icon={<DeleteOutlined />}
+                className="text-red-600 hover:text-red-700"
+              >
+                Delete
+              </Button>
+            </Popconfirm>
           </Space>
         );
       },
@@ -580,22 +610,34 @@ const Workcenter = () => {
         const selectedMachines = values.machine_names;
         const workcenterId = values.work_center_id;
 
-        const machinePromises = selectedMachines.map(machineName => {
-          const machineData = {
-            work_center_id: workcenterId,
-            type: machineName,
-            make: "Default",
-            model: "Default",
-            year_of_installation: new Date().getFullYear(),
-            cnc_controller: "",
-            cnc_controller_series: "",
-            remarks: ""
-          };
-          return createMachine(machineData);
-        });
+        try {
+          const machinePromises = selectedMachines.map(machineName => {
+            const machineData = {
+              work_center_id: workcenterId,
+              type: machineName,
+              make: "Default",
+              model: "Default",
+              year_of_installation: new Date().getFullYear(),
+              cnc_controller: "",
+              cnc_controller_series: "",
+              remarks: ""
+            };
+            return createMachine(machineData);
+          });
 
-        await Promise.all(machinePromises);
-        toast.success('Existing machines added successfully');
+          const responses = await Promise.all(machinePromises);
+          // Display the message from the API response
+          const responseMessage = responses[0]?.message || 'Existing machines added successfully';
+          toast.success(responseMessage);
+          
+          setIsAddMachineModalVisible(false);
+          setMachineModalStep('select');
+          addMachineForm.resetFields();
+          fetchWorkcenters();
+        } catch (error) {
+          console.error('Error adding existing machine:', error);
+          toast.error(error.message || 'Failed to add machine. Please try again.');
+        }
       } else if (machineModalStep === 'new') {
         // Handle new machine creation
         const machineData = {
@@ -613,19 +655,30 @@ const Workcenter = () => {
         };
 
         console.log('Creating new machine with data:', machineData);
-        await createMachine(machineData);
-        toast.success('New machine added successfully');
+        try {
+          const response = await createMachine(machineData);
+          // Display the message from the API response
+          console.log('API response:', response);
+          const responseMessage = response?.message || 'New machine added successfully';
+          toast.success(responseMessage);
+          
+          setIsAddMachineModalVisible(false);
+          setMachineModalStep('select');
+          addMachineForm.resetFields();
+          fetchWorkcenters();
+        } catch (error) {
+          console.error('Error creating new machine:', error);
+          toast.error(error.message || 'Failed to add machine. Please try again.');
+        }
       }
-
-      setIsAddMachineModalVisible(false);
-      setMachineModalStep('select');
-      addMachineForm.resetFields();
-      fetchWorkcenters();
     } catch (error) {
-      console.error('Error adding machine:', error);
-      toast.error('Failed to add machine. Please try again.');
+      console.error('General error adding machine:', error);
+      toast.error(error.message || 'An unexpected error occurred. Please try again.');
     }
   };
+
+
+  
 
   const addWorkcenterForm = (
     <Form
@@ -732,7 +785,9 @@ const Workcenter = () => {
       }
       const data = await response.json();
       console.log('Fetched workcenter options:', data);
-      setWorkcenterOptions(data);
+      // Filter to only include schedulable workcenters
+      const schedulableWorkcenters = data.filter(wc => wc.is_schedulable === true);
+      setWorkcenterOptions(schedulableWorkcenters);
     } catch (error) {
       console.error('Error fetching workcenter options:', error);
       toast.error('Failed to load workcenter options');
@@ -815,7 +870,6 @@ const Workcenter = () => {
                   width: '100%'
                 }}
                 options={workcenterOptions
-                  .filter(wc => wc.is_schedulable)
                   .map(wc => ({
                     value: wc.code,
                     label: wc.code,

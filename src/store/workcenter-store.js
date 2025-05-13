@@ -28,6 +28,20 @@ export const fetchMachineDetails = async (machineId) => {
   }
 };
 
+export const deleteMachine = async (machineId) => {
+  try {
+    const response = await fetch(`http://172.18.7.88:5674/api/v1/master-order/machines/${machineId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete machine');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting machine:', error);
+    throw error;
+  }
+};
 
 
 
@@ -42,7 +56,7 @@ export const createMachine = async (machineData) => {
       body: JSON.stringify(machineData),
     });
     if (!response.ok) {
-      throw new Error('Failed to create machine');
+      throw new Error('This machine already exists in the specified work center.');
     }
     return await response.json();
   } catch (error) {
@@ -101,8 +115,11 @@ const useWorkcenterStore = create((set, get) => ({
       const data = await response.json();
       console.log('Fetched workcenters list:', data);
 
+      // Filter to only include schedulable workcenters
+      const schedulableWorkcenters = data.filter(wc => wc.is_schedulable === true);
+
       set({ 
-        workcentersList: data,
+        workcentersList: schedulableWorkcenters,
         isLoading: false 
       });
     } catch (err) {
@@ -202,35 +219,42 @@ const useWorkcenterStore = create((set, get) => ({
         throw new Error('Network error: Please check your connection and try again');
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error Response:', errorData);
-        let errorMessage = 'Failed to create machine';
-        if (errorData.detail) {
-          if (Array.isArray(errorData.detail)) {
-            errorMessage = errorData.detail[0]?.msg || errorData.detail[0] || errorMessage;
-          } else if (typeof errorData.detail === 'object') {
-            errorMessage = JSON.stringify(errorData.detail);
-          } else {
-            errorMessage = errorData.detail;
-          }
-        }
-        throw new Error(errorMessage);
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('API Response:', responseData);
+      } catch (e) {
+        console.error('Error parsing response JSON:', e);
+        responseData = {};
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        let errorMessage = 'Failed to create machine';
+
+        // Handle various error formats
+        if (responseData.detail) {
+          errorMessage = typeof responseData.detail === 'string' 
+            ? responseData.detail 
+            : Array.isArray(responseData.detail) 
+              ? (responseData.detail[0]?.msg || responseData.detail[0] || errorMessage) 
+              : typeof responseData.detail === 'object' 
+                ? JSON.stringify(responseData.detail)
+                : errorMessage;
+        }
+
+        console.error('API Error Response:', responseData, 'Extracted Message:', errorMessage);
+        throw new Error(errorMessage);
+      }
       
       // Fetch updated data after successful creation
       await get().fetchWorkcenters();
       
       set({ isLoading: false });
-      message.success('Machine added successfully');
       
-      return data;
+      return responseData;
     } catch (error) {
       console.error('Error creating machine:', error);
       set({ error: error.message, isLoading: false });
-      message.error(error.message || 'Failed to create machine');
       throw error;
     }
   },
@@ -285,11 +309,14 @@ const useWorkcenterStore = create((set, get) => ({
         allMachinesResponse.json()
       ]);
 
+      // Filter to only include schedulable workcenters
+      const schedulableWorkcenters = workcentersData.filter(wc => wc.is_schedulable === true);
+
       // Update all relevant data in the store
       set({
-        workcentersList: workcentersData,
+        workcentersList: schedulableWorkcenters,
         workcenters: allMachinesData,
-        workcenterCodes: [...new Set(workcentersData.map(wc => wc.code))].filter(Boolean),
+        workcenterCodes: [...new Set(schedulableWorkcenters.map(wc => wc.code))].filter(Boolean),
         isLoading: false
       });
 
@@ -314,6 +341,7 @@ const useWorkcenterStore = create((set, get) => ({
       const data = await response.json();
       console.log('Fetched workcenter configuration:', data);
 
+      // In configuration tab, we need to see all workcenters regardless of schedulable status
       set({ 
         workcenterConfig: data,
         isLoading: false 
@@ -342,20 +370,61 @@ const useWorkcenterStore = create((set, get) => ({
       const updatedData = await response.json();
       console.log('Updated workcenter:', updatedData);
 
-      // Update the local state with the new data
-      set(state => ({
-        workcenterConfig: state.workcenterConfig.map(wc => 
-          wc.id === workcenterId ? { ...wc, is_schedulable: isSchedulable } : wc
-        ),
-        isLoading: false
-      }));
-
+      // Fetch all updated workcenter data to ensure we have the latest state
+      await get().fetchWorkcenterConfig();
+      
       message.success('Workcenter status updated successfully');
       return updatedData;
     } catch (error) {
       console.error('Error updating workcenter status:', error);
       set({ error: error.message, isLoading: false });
       message.error('Failed to update workcenter status');
+      throw error;
+    }
+  },
+
+  deleteMachine: async (machineId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`http://172.18.7.88:5674/api/v1/master-order/machines/${machineId}`, {
+        method: 'DELETE',
+      });
+
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('Delete API Response:', responseData);
+      } catch (e) {
+        console.error('Error parsing delete response JSON:', e);
+        responseData = {};
+      }
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to delete machine';
+        
+        if (responseData.detail) {
+          errorMessage = typeof responseData.detail === 'string' 
+            ? responseData.detail 
+            : Array.isArray(responseData.detail) 
+              ? (responseData.detail[0]?.msg || responseData.detail[0] || errorMessage) 
+              : typeof responseData.detail === 'object' 
+                ? JSON.stringify(responseData.detail)
+                : errorMessage;
+        }
+        
+        console.error('API Error Response:', responseData, 'Extracted Message:', errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      // Fetch updated data after successful deletion
+      await get().fetchWorkcenters();
+      
+      set({ isLoading: false });
+      
+      return responseData;
+    } catch (error) {
+      console.error('Error deleting machine:', error);
+      set({ error: error.message, isLoading: false });
       throw error;
     }
   },

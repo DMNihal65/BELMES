@@ -1719,16 +1719,29 @@ const handleAddTool = async (values) => {
         throw new Error('Please assign operations to all files');
       }
 
+      // Validate that all assigned operations exist in the available operations
+      const availableOperationIds = documentOperations.map(op => op.id.toString());
+      const invalidMappings = Object.entries(fileOperationMappings).filter(
+        ([fileUid, operationId]) => !availableOperationIds.includes(operationId.toString())
+      );
+      
+      if (invalidMappings.length > 0) {
+        const invalidFiles = invalidMappings.map(([fileUid]) => 
+          files.find(f => f.uid === fileUid)?.name || 'Unknown file'
+        );
+        throw new Error(`Invalid operation assigned to: ${invalidFiles.join(', ')}. Please select valid operations.`);
+      }
+
       // Upload each file with its assigned operation
       const uploadPromises = files.map(fileInfo => {
         const file = fileInfo.originFileObj;
         const operationId = fileOperationMappings[fileInfo.uid];
         
         console.log('File:', file.name, 'Operation ID:', operationId);
-        console.log('Available operations:', selectedJob.operations.map(op => ({id: op.id, number: op.operation_number})));
+        console.log('Available operations:', documentOperations.map(op => ({id: op.id, number: op.operation_number})));
         
         // Use string comparison to ensure type compatibility
-        const selectedOperation = selectedJob.operations.find(op => String(op.id) === String(operationId));
+        const selectedOperation = documentOperations.find(op => String(op.id) === String(operationId));
         
         if (!selectedOperation) {
           console.error(`No matching operation found for ID ${operationId}`);
@@ -1746,6 +1759,7 @@ const handleAddTool = async (values) => {
         formData.append('version_number', '1'); // Default version
         formData.append('part_number', selectedJob.part_number);
         formData.append('operation_number', selectedOperation.operation_number);
+        formData.append('operation_id', selectedOperation.id); // Add operation_id explicitly
 
         // Return upload promise
         return uploadCncProgram(formData);
@@ -1799,10 +1813,19 @@ const handleAddTool = async (values) => {
   // Add new function to handle operation selection for a file
   const handleOperationSelect = (fileUid, operationId) => {
     console.log(`Assigning operation ID ${operationId} to file ${fileUid}`);
+    
+    // Find the operation details for better feedback
+    const operation = documentOperations.find(op => String(op.id) === String(operationId));
+    
     setFileOperationMappings(prev => ({
       ...prev,
       [fileUid]: operationId
     }));
+    
+    // Show feedback message
+    if (operation) {
+      message.success(`Assigned Operation ${operation.operation_number} to file`);
+    }
   };
 
   // Add this useEffect to set the form values when the modal opens
@@ -2359,17 +2382,28 @@ const handleAddTool = async (values) => {
   // Add useEffect to fetch operations when the modal opens
   useEffect(() => {
     const fetchOperationsForModal = async () => {
-      if (isAddDocumentModalVisible && selectedJob?.production_order) {
+      if (isAddDocumentModalVisible && selectedJob) {
         try {
           setLoading(true);
-          // Use the searchOrders function to fetch operations from the endpoint
+          
+          // Always fetch fresh operations from the API to ensure we have the latest data
+          console.log('Fetching operations from API for production order:', selectedJob.production_order);
           const orderData = await searchOrders(selectedJob.production_order);
           
           if (orderData && orderData.orders && orderData.orders.length > 0) {
             const operations = orderData.orders[0].operations || [];
-            console.log('Operations for CNC document upload:', operations);
+            console.log('Operations fetched from API:', operations);
             setDocumentOperations(operations);
+            
+            // Update the selected job's operations if needed
+            if (operations.length > 0 && (!selectedJob.operations || selectedJob.operations.length === 0)) {
+              setSelectedJob(prevJob => ({
+                ...prevJob,
+                operations: operations
+              }));
+            }
           } else {
+            console.warn('No operations found for production order:', selectedJob.production_order);
             setDocumentOperations([]);
           }
         } catch (error) {
@@ -2383,7 +2417,7 @@ const handleAddTool = async (values) => {
     };
     
     fetchOperationsForModal();
-  }, [isAddDocumentModalVisible, selectedJob?.production_order]);
+  }, [isAddDocumentModalVisible, selectedJob, searchOrders]);
 
   // Update the modal to reset operations when closing
   const handleCloseAddDocumentModal = () => {
@@ -3665,8 +3699,15 @@ const handleAddTool = async (values) => {
           {/* File Operation Mappings */}
           {addDocumentForm.getFieldValue('file')?.fileList?.length > 0 && (
             <div className="mt-4">
+              <Alert
+                message="Operation Assignment Required"
+                description="Please assign an operation to each file before uploading."
+                type="info"
+                showIcon
+                className="mb-4"
+              />
               <Text strong>Assign Operations to Files</Text>
-              <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
+              <div className="mt-2 space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded p-2">
                 {addDocumentForm.getFieldValue('file').fileList.map(file => (
                   <div key={file.uid} className="flex items-center space-x-4 p-2 bg-gray-50 rounded">
                     <div className="flex-1">
@@ -3674,7 +3715,7 @@ const handleAddTool = async (values) => {
                     </div>
                     <Form.Item
                       className="mb-0 flex-1"
-                      validateStatus={!fileOperationMappings[file.uid] ? 'error' : ''}
+                      validateStatus={!fileOperationMappings[file.uid] ? 'error' : 'success'}
                       help={!fileOperationMappings[file.uid] ? 'Please select an operation' : ''}
                     >
                       <Select
@@ -3682,6 +3723,13 @@ const handleAddTool = async (values) => {
                         value={fileOperationMappings[file.uid]}
                         onChange={(value) => handleOperationSelect(file.uid, value)}
                         style={{ width: '100%' }}
+                        status={!fileOperationMappings[file.uid] ? 'error' : ''}
+                        showSearch
+                        optionFilterProp="children"
+                        filterOption={(input, option) =>
+                          option.children.toLowerCase().includes(input.toLowerCase())
+                        }
+                        loading={loading}
                       >
                         {documentOperations.map((operation) => (
                           <Option key={operation.id} value={operation.id}>

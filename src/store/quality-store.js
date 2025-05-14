@@ -21,7 +21,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.88:5674/api/v1/planning/all_orders',
+        'http://172.18.7.88:5698/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -43,7 +43,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.88:5674/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.88:5698/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -78,7 +78,7 @@ class QualityStore {
       
       const config = {
         method: 'get',
-        url: `http://172.18.7.88:5674/api/v1/quality/master-boc/ipids/${orderId}`,
+        url: `http://172.18.7.88:5698/api/v1/quality/master-boc/ipids/${orderId}`,
         ...this.getAuthHeaders()
       };
 
@@ -127,7 +127,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://172.18.7.88:5674/api/v1/quality/run',
+        'http://172.18.7.88:5698/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;
@@ -144,7 +144,7 @@ class QualityStore {
   async fetchBalloonedDrawing(drawingId, operationId) {
     try {
       const response = await axios.get(
-        `http://172.18.7.88:5674/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
+        `http://172.18.7.88:5698/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
         {
           ...this.getAuthHeaders(),
           responseType: 'blob' // Important: set responseType to blob for PDF data
@@ -179,7 +179,7 @@ class QualityStore {
           
           const response = await axios({
             method: method,
-            url: `http://172.18.7.88:5674/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
+            url: `http://172.18.7.88:5698/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
             ...this.getAuthHeaders(),
             timeout: 5000
           });
@@ -222,7 +222,7 @@ class QualityStore {
       // Try to ping the server with a HEAD request
       await axios({
         method: 'head',
-        url: 'http://172.18.7.88:5674/api/v1/health', // Use a health endpoint if available
+        url: 'http://172.18.7.88:5698/api/v1/health', // Use a health endpoint if available
         timeout: 5000 // 5 second timeout
       });
       
@@ -233,7 +233,7 @@ class QualityStore {
       try {
         await axios({
           method: 'head',
-          url: 'http://172.18.7.88:5674/',
+          url: 'http://172.18.7.88:5698/',
           timeout: 5000
         });
         
@@ -251,7 +251,7 @@ class QualityStore {
       console.log('Fetching report structure data...');
       
       const response = await axios.get(
-        `http://172.18.7.88:5674/api/v1/document-management/report/structure/?force_refresh=${forceRefresh}`,
+        `http://172.18.7.88:5698/api/v1/document-management/report/structure/?force_refresh=${forceRefresh}`,
         this.getAuthHeaders()
       );
       
@@ -271,22 +271,48 @@ class QualityStore {
     try {
       console.log(`Downloading report from path: ${filePath}`);
       
+      // Log the request URL
+      const requestUrl = `http://172.18.7.88:5698/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`;
+      
+      // Ensure we explicitly request PDF format in headers
+      const headers = { 
+        ...this.getAuthHeaders().headers,
+        'Accept': 'application/pdf',  // Force PDF content type
+        'Content-Type': 'application/json'
+      };
+      
+      console.log('Request URL:', requestUrl);
+      console.log('Request headers:', headers);
+      
       const response = await axios.get(
-        `http://172.18.7.88:5674/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`,
+        requestUrl,
         {
-          ...this.getAuthHeaders(),
+          headers: headers,
           responseType: 'blob' // Important: set responseType to blob for file data
         }
       );
       
-      // Create a blob URL from the response data
-      const contentType = response.headers['content-type'] || 'application/octet-stream';
+      // Log response details
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
+      // Create a blob URL from the response data - force PDF mime type
+      const contentType = 'application/pdf';
       const blob = new Blob([response.data], { type: contentType });
       const url = URL.createObjectURL(blob);
       
       // Get the filename from the path
       const pathParts = filePath.split('/');
-      const fileName = pathParts[pathParts.length - 1] || 'download';
+      let fileName = pathParts[pathParts.length - 1] || 'download';
+      
+      // Ensure file has .pdf extension
+      if (!fileName.toLowerCase().endsWith('.pdf')) {
+        fileName = `${fileName}.pdf`;
+      }
+      
+      console.log('Blob created with type:', contentType);
+      console.log('Blob URL created:', url);
+      console.log('Filename:', fileName);
       
       return {
         url,
@@ -304,18 +330,39 @@ class QualityStore {
     try {
       console.log(`Downloading report with document ID: ${documentId}, version: ${versionNumber}`);
       
+      // Log the request URL and headers
+      const requestUrl = `http://172.18.7.88:5698/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`;
+      
+      // Ensure we explicitly request PDF format in headers
+      const headers = { 
+        ...this.getAuthHeaders().headers,
+        'Accept': 'application/pdf',  // Force PDF content type
+        'Content-Type': 'application/json'
+      };
+      
+      console.log('Request URL:', requestUrl);
+      console.log('Request headers:', headers);
+      
       const response = await axios.get(
-        `http://172.18.7.88:5674/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`,
+        requestUrl,
         {
-          ...this.getAuthHeaders(),
+          headers: headers,
           responseType: 'blob' // Important: set responseType to blob for file data
         }
       );
       
-      // Create a blob URL from the response data
-      const contentType = response.headers['content-type'] || 'application/octet-stream';
+      // Log response details
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      console.log('Response content type:', response.headers['content-type']);
+      
+      // Create a blob URL from the response data - force PDF mime type
+      const contentType = 'application/pdf';
       const blob = new Blob([response.data], { type: contentType });
       const url = URL.createObjectURL(blob);
+      
+      console.log('Blob created with type:', contentType);
+      console.log('Blob URL created:', url);
       
       return {
         url,
@@ -324,6 +371,9 @@ class QualityStore {
       };
     } catch (error) {
       console.error('Error downloading report by ID:', error);
+      console.error('Error response:', error.response);
+      console.error('Error request:', error.request);
+      console.error('Error config:', error.config);
       this.handleAuthError(error);
       throw error;
     }
@@ -334,7 +384,7 @@ class QualityStore {
       console.log(`Fetching detailed inspection data for ID: ${inspectionId}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:5674/api/v1/quality/inspection/${inspectionId}/detailed`,
+        `http://172.18.7.88:5698/api/v1/quality/inspection/${inspectionId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -343,6 +393,59 @@ class QualityStore {
       
     } catch (error) {
       console.error('Error fetching detailed inspection:', error);
+      this.handleAuthError(error);
+      throw error;
+    }
+  }
+
+  async downloadDocument(documentId, versionId = '1.0') {
+    try {
+      console.log(`Downloading document ID: ${documentId}, version: ${versionId}`);
+      
+      // Log the request URL and headers
+      const requestUrl = `http://172.18.7.88:5698/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
+      
+      // Ensure we explicitly request PDF format in headers
+      const headers = { 
+        ...this.getAuthHeaders().headers,
+        'Accept': 'application/pdf',  // Force PDF content type
+        'Content-Type': 'application/json'
+      };
+      
+      console.log('Request URL:', requestUrl);
+      console.log('Request headers:', headers);
+      
+      const response = await axios.get(
+        requestUrl,
+        {
+          headers: headers,
+          responseType: 'blob' // Important: set responseType to blob for file data
+        }
+      );
+      
+      // Log response details
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      console.log('Response content type:', response.headers['content-type']);
+      
+      // Create a blob URL from the response data - force PDF mime type
+      const contentType = 'application/pdf';
+      const blob = new Blob([response.data], { type: contentType });
+      const url = URL.createObjectURL(blob);
+      
+      console.log('Blob created with type:', contentType);
+      console.log('Blob URL created:', url);
+      
+      return {
+        url,
+        fileName: `document_${documentId}_v${versionId}.pdf`,
+        contentType
+      };
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      console.error('Error response:', error.response);
+      console.error('Error request:', error.request);
+      console.error('Error config:', error.config);
       this.handleAuthError(error);
       throw error;
     }

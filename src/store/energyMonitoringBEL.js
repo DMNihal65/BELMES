@@ -13,15 +13,20 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
   isLoading: false,
   error: null,
   filteredHistoryData: null, // Add state for filtered history data
+  websocket: null, // Add state for websocket connection
+  
+  // Add these to the store state
+  allMachinesWebsocket: null,
+  allMachinesEnergyData: {},
   
   // Fetch machine names from the API
   fetchMachineNames: async () => {
     set({ isLoading: true, error: null });
     
     try {
-      console.log('Attempting to fetch machines from http://172.18.100.214:8006/ems/machines');
+      console.log('Attempting to fetch machines from http://172.18.7.88:5698/api/v1/energymonitoring/machines');
       
-      const response = await fetchWithRetry('http://172.18.100.214:8006/ems/machines', {
+      const response = await fetchWithRetry('http://172.18.7.88:5698/api/v1/energymonitoring/machines', {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -53,52 +58,90 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     }
   },
   
-  // Fetch live data for a specific machine
-  fetchMachineLiveData: async (machineId) => {
+  // Connect to WebSocket for live machine data
+  connectWebSocket: (machineId) => {
     set({ isLoading: true, error: null });
     
     try {
-      // Create URL with proxy if needed
-      const isDevEnvironment = process.env.NODE_ENV === 'development';
-      const baseUrl = isDevEnvironment 
-        ? `/proxy/ems/live/${machineId}` // Use a proxy for development
-        : `http://172.18.100.214:8006/ems/live/${machineId}`; // Direct access in production
-      
-      console.log(`Attempting to fetch data from ${baseUrl}`);
-      
-      const response = await fetchWithRetry(baseUrl, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        timeout: API_TIMEOUT
-      });
-      
-      console.log('API Response for live data:', response.data);
-      
-      if (response.data) {
-        // Store the raw API response
-        set({ 
-          machineData: response.data,
-          isLoading: false 
-        });
-        return response.data;
-      } else {
-        throw new Error('Empty data received');
+      // Close existing connection if any
+      const existingSocket = get().websocket;
+      if (existingSocket && existingSocket.readyState !== WebSocket.CLOSED) {
+        console.log('Closing existing WebSocket connection');
+        existingSocket.close();
       }
-    } catch (error) {
-      console.error('Error fetching machine live data:', error);
       
-      // Generate mock data for this specific machine
-      console.log(`Using fallback live data for machine ${machineId}`);
+      // Create WebSocket connection
+      const wsUrl = `ws://172.18.7.88:5698/api/v1/energymonitoring/ws/live_data`;
+      console.log(`Connecting to WebSocket at ${wsUrl}`);
+      
+      const socket = new WebSocket(wsUrl);
+      
+      socket.onopen = () => {
+        console.log('WebSocket connection established');
+        // Send initial message with machine_id to subscribe to updates
+        socket.send(JSON.stringify({ machine_id: parseInt(machineId) }));
+        socket._machineId = machineId;
+        set({ isLoading: false, websocket: socket });
+      };
+      
+      socket.onmessage = (event) => {
+        try {
+          const response = JSON.parse(event.data);
+          console.log('Received WebSocket data:', response);
+          
+          // Check if response has the expected structure
+          if (response && response.type === 'live_data' && response.data) {
+            // Extract the actual machine data from the nested structure
+            const data = response.data;
+            console.log('Extracted machine data:', data);
+            
+            // Update store with the extracted data
+            set({ machineData: data });
+          } else {
+            console.warn('Unexpected WebSocket data format:', response);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket data:', error);
+        }
+      };
+      
+      socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        set({ error: 'WebSocket connection error', isLoading: false });
+        
+        // Fall back to mock data if WebSocket fails
+        const mockData = generateMockLiveData(machineId);
+        set({ machineData: mockData });
+      };
+      
+      socket.onclose = (event) => {
+        console.log('WebSocket connection closed:', event.code, event.reason);
+        // Only set socket to null if it's the current socket
+        if (get().websocket === socket) {
+          set({ websocket: null });
+        }
+      };
+      
+      return socket;
+    } catch (error) {
+      console.error('Error establishing WebSocket connection:', error);
+      set({ error: error.message, isLoading: false });
+      
+      // Fall back to mock data
       const mockData = generateMockLiveData(machineId);
-      set({ 
-        machineData: mockData,
-        isLoading: false, 
-        error: error.message 
-      });
-      return mockData;
+      set({ machineData: mockData });
+      return null;
     }
+  },
+  
+  // Disconnect WebSocket
+  disconnectWebSocket: () => {
+    const socket = get().websocket;
+    if (socket && socket.readyState !== WebSocket.CLOSED) {
+      console.log('Manually closing WebSocket connection');
+      socket.close();
+    }
+    set({ websocket: null });
   },
   
   // Fetch all machines data - this would need to be updated if there's a new endpoint for all machines
@@ -135,31 +178,41 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       return null;
     }
     
+    // Access the data either directly or from the nested structure
+    const data = machineData.data || machineData;
+    
     return {
-      phaseAVoltage: machineData.phase_a_voltage || 0,
-      phaseBVoltage: machineData.phase_b_voltage || 0,
-      phaseCVoltage: machineData.phase_c_voltage || 0,
-      avgPhaseVoltage: machineData.avg_phase_voltage || 0,
-      lineABVoltage: machineData.line_ab_voltage || 0,
-      lineBCVoltage: machineData.line_bc_voltage || 0,
-      lineCAVoltage: machineData.line_ca_voltage || 0,
-      avgLineVoltage: machineData.avg_line_voltage || 0,
-      phaseACurrent: machineData.phase_a_current || 0,
-      phaseBCurrent: machineData.phase_b_current || 0,
-      phaseCCurrent: machineData.phase_c_current || 0,
-      avgThreePhaseCurrent: machineData.avg_three_phase_current || 0,
-      powerFactor: machineData.power_factor || 0,
-      frequency: machineData.frequency || 0,
-      totalInstantaneousPower: machineData.total_instantaneous_power || 0,
-      activeEnergyDelivered: machineData.active_energy_delivered || 0,
-      status: machineData.status || 0,
-      timestamp: machineData.timestamp || new Date().toISOString()
+      phaseAVoltage: data.phase_a_voltage || 0,
+      phaseBVoltage: data.phase_b_voltage || 0,
+      phaseCVoltage: data.phase_c_voltage || 0,
+      avgPhaseVoltage: data.avg_phase_voltage || 0,
+      lineABVoltage: data.line_ab_voltage || 0,
+      lineBCVoltage: data.line_bc_voltage || 0,
+      lineCAVoltage: data.line_ca_voltage || 0,
+      avgLineVoltage: data.avg_line_voltage || 0,
+      phaseACurrent: data.phase_a_current || 0,
+      phaseBCurrent: data.phase_b_current || 0,
+      phaseCCurrent: data.phase_c_current || 0,
+      avgThreePhaseCurrent: data.avg_three_phase_current || 0,
+      powerFactor: data.power_factor || 0,
+      frequency: data.frequency || 0,
+      totalInstantaneousPower: data.total_instantaneous_power || 0,
+      activeEnergyDelivered: data.active_energy_delivered || 0,
+      status: data.status || 0,
+      timestamp: data.timestamp || new Date().toISOString()
     };
   },
   
   // Clear machine data
   clearMachineData: () => {
-    set({ machineData: {}, error: null });
+    // Disconnect WebSocket when clearing data
+    const socket = get().websocket;
+    if (socket && socket.readyState !== WebSocket.CLOSED) {
+      console.log('Closing WebSocket on clearMachineData');
+      socket.close();
+    }
+    
+    set({ machineData: {}, error: null, websocket: null });
   },
   
   // Add this to the store object
@@ -199,8 +252,10 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     
     try {
       // Format dates for API
-      const formattedStartDate = startDate.format('YYYY-MM-DD');
-      const formattedEndDate = endDate.format('YYYY-MM-DD');
+      const formattedStartDate = typeof startDate.format === 'function' ? 
+        startDate.format('YYYY-MM-DD') : startDate;
+      const formattedEndDate = typeof endDate.format === 'function' ? 
+        endDate.format('YYYY-MM-DD') : endDate;
       
       // Map frontend parameter name to API parameter name
       const apiParamMap = {
@@ -224,11 +279,8 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       
       const apiParamName = apiParamMap[parameterName] || parameterName;
       
-      // Create URL with proxy if needed
-      const isDevEnvironment = process.env.NODE_ENV === 'development';
-      const baseUrl = isDevEnvironment 
-        ? `/proxy/ems/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}` 
-        : `http://172.18.100.214:8006/ems/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      // Use the direct endpoint URL as specified
+      const baseUrl = `http://172.18.7.88:5698/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
       
       console.log(`Attempting to fetch filtered history data from ${baseUrl}`);
       
@@ -243,7 +295,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
         
         console.log('API Response for filtered history data:', response.data);
         
-        if (response.data && (response.data.data || response.data.length > 0)) {
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
           // Store the raw API response
           set({ 
             filteredHistoryData: response.data,
@@ -271,6 +323,163 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       });
       return mockData;
     }
+  },
+  
+  // Add this function back but have it use WebSocket data instead
+  fetchMachineLiveData: async (machineId) => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      // Check if we already have a WebSocket connection
+      const existingSocket = get().websocket;
+      
+      // If not connected, establish a WebSocket connection
+      if (!existingSocket || existingSocket.readyState !== WebSocket.OPEN) {
+        console.log('No active WebSocket connection, creating one');
+        const socket = get().connectWebSocket(machineId);
+        
+        // Wait briefly for data to come in
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } else {
+        // If already connected to a different machine, reconnect
+        if (existingSocket._machineId !== machineId) {
+          console.log('Switching machine ID in WebSocket');
+          existingSocket.send(JSON.stringify({ machine_id: parseInt(machineId) }));
+          existingSocket._machineId = machineId;
+        }
+      }
+      
+      // Return current data from store (might be from WS or might be fallback)
+      set({ isLoading: false });
+      return get().machineData;
+    } catch (error) {
+      console.error('Error in fetchMachineLiveData:', error);
+      
+      // Generate mock data for this specific machine
+      console.log(`Using fallback live data for machine ${machineId}`);
+      const mockData = generateMockLiveData(machineId);
+      set({ 
+        machineData: mockData,
+        isLoading: false, 
+        error: error.message 
+      });
+      return mockData;
+    }
+  },
+  
+  // Add this function to connect to the shiftwise energy WebSocket
+  connectShiftwiseEnergyWebSocket: () => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      // Close existing connection if any
+      const existingSocket = get().allMachinesWebsocket;
+      if (existingSocket && existingSocket.readyState !== WebSocket.CLOSED) {
+        console.log('Closing existing shiftwise energy WebSocket connection');
+        existingSocket.close();
+      }
+      
+      // Create WebSocket connection
+      const wsUrl = `ws://172.18.7.88:5698/api/v1/energymonitoring/ws/shiftwise_energy`;
+      console.log(`Connecting to shiftwise energy WebSocket at ${wsUrl}`);
+      
+      const socket = new WebSocket(wsUrl);
+      
+      socket.onopen = () => {
+        console.log('Shiftwise energy WebSocket connection established');
+        set({ isLoading: false, allMachinesWebsocket: socket });
+      };
+      
+      socket.onmessage = (event) => {
+        try {
+          const response = JSON.parse(event.data);
+          console.log('Received shiftwise energy WebSocket data:', response);
+          
+          // Check if response has the expected structure
+          if (response && response.type === 'shiftwise_energy' && response.data) {
+            // Extract the actual machine data from the nested structure
+            const data = response.data;
+            console.log('Extracted shiftwise energy data:', data);
+            
+            // Update store with the extracted data
+            set({ allMachinesEnergyData: data });
+          } else {
+            console.warn('Unexpected WebSocket data format:', response);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket data:', error);
+        }
+      };
+      
+      socket.onerror = (error) => {
+        console.error('Shiftwise energy WebSocket error:', error);
+        set({ error: 'WebSocket connection error', isLoading: false });
+        
+        // Fall back to mock data if WebSocket fails
+        const mockData = generateMockShiftwiseEnergyData();
+        set({ allMachinesEnergyData: mockData });
+      };
+      
+      socket.onclose = (event) => {
+        console.log('Shiftwise energy WebSocket connection closed:', event.code, event.reason);
+        // Only set socket to null if it's the current socket
+        if (get().allMachinesWebsocket === socket) {
+          set({ allMachinesWebsocket: null });
+        }
+      };
+      
+      return socket;
+    } catch (error) {
+      console.error('Error establishing shiftwise energy WebSocket connection:', error);
+      set({ error: error.message, isLoading: false });
+      
+      // Fall back to mock data
+      const mockData = generateMockShiftwiseEnergyData();
+      set({ allMachinesEnergyData: mockData });
+      return null;
+    }
+  },
+  
+  // Add this function to disconnect the shiftwise energy WebSocket
+  disconnectShiftwiseEnergyWebSocket: () => {
+    const socket = get().allMachinesWebsocket;
+    if (socket && socket.readyState !== WebSocket.CLOSED) {
+      console.log('Manually closing shiftwise energy WebSocket connection');
+      socket.close();
+    }
+    set({ allMachinesWebsocket: null });
+  },
+  
+  // Add this function to get energy data for a specific machine
+  getMachineEnergyData: (machineId) => {
+    const { allMachinesEnergyData } = get();
+    
+    if (!allMachinesEnergyData || !allMachinesEnergyData.machines) {
+      return {
+        energy: Math.random() * 100,
+        cost: Math.random() * 1000,
+        max_energy: 100
+      };
+    }
+    
+    // Find the machine data in the WebSocket response
+    const machineData = allMachinesEnergyData.machines.find(
+      machine => machine.machine_id === parseInt(machineId)
+    );
+    
+    if (!machineData) {
+      return {
+        energy: Math.random() * 100,
+        cost: Math.random() * 1000,
+        max_energy: 100
+      };
+    }
+    
+    return {
+      energy: machineData.energy || 0,
+      cost: machineData.cost || 0,
+      max_energy: machineData.max_energy || 100
+    };
   }
 }));
 
@@ -797,4 +1006,21 @@ function generateMockFilteredHistoryData(machineId, parameterName) {
   console.log('Last data point:', dataPoints[dataPoints.length - 1]);
   
   return result;
+}
+
+// Add this helper function at the bottom of the file
+function generateMockShiftwiseEnergyData() {
+  const machines = Array.from({ length: 14 }, (_, index) => ({
+    machine_id: index + 1,
+    machine_name: `Machine ${index + 1}`,
+    energy: Math.random() * 100,
+    cost: Math.random() * 1000,
+    max_energy: 100
+  }));
+  
+  return {
+    timestamp: new Date().toISOString(),
+    shift: 'Morning',
+    machines
+  };
 } 

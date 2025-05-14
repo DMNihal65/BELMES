@@ -550,16 +550,52 @@ function InspectionResult() {
       try {
         setLoadingDetailedMeasurements(true);
         
-        // Use the inspection ID - using 14 as specified
-        const inspectionId = '14';
+        // Use the actual order ID from the selected data
+        // Instead of hardcoded ID, use the selected order ID and operation
+        const inspectionId = selectedOrderId || '21'; // Default to 21 if no order selected
         
+        console.log(`Fetching detailed measurements for inspection ID: ${inspectionId}, operation: ${selectedOperation}`);
+        
+        // Call the fetchDetailedInspection method from quality-store.js
+        // This uses the endpoint: http://172.18.7.88:5698/api/v1/quality/inspection/${inspectionId}/detailed
         const response = await qualityStore.fetchDetailedInspection(inspectionId);
-        console.log('Detailed measurements data:', response);
-        setDetailedMeasurements(response);
-        setIsDetailedMeasurementsVisible(true);
+        console.log('Detailed measurements data received:', response);
+        
+        if (response) {
+          // If we have a selected operation, filter the data to show only that operation
+          if (selectedOperation && response.inspection_data) {
+            const filteredOperationData = response.inspection_data.filter(data => 
+              data.operation_number === parseInt(selectedOperation, 10) || 
+              data.operation_number === selectedOperation
+            );
+            
+            if (filteredOperationData.length > 0) {
+              // Create a new object with filtered data for the selected operation only
+              const filteredResponse = {
+                ...response,
+                inspection_data: filteredOperationData
+              };
+              
+              console.log('Filtered data for operation', selectedOperation, ':', filteredResponse);
+              setDetailedMeasurements(filteredResponse);
+            } else {
+              // Keep all data if no matching operation is found
+              setDetailedMeasurements(response);
+              console.log('No data found for operation', selectedOperation, 'showing all data');
+            }
+          } else {
+            // No specific operation selected, show all data
+            setDetailedMeasurements(response);
+          }
+          
+          // Show the modal with the measurements
+          setIsDetailedMeasurementsVisible(true);
+        } else {
+          message.error('No measurement data found');
+        }
       } catch (error) {
         console.error('Error fetching detailed measurements:', error);
-        message.error('Failed to load detailed measurements');
+        message.error(`Failed to load detailed measurements: ${error.message}`);
       } finally {
         setLoadingDetailedMeasurements(false);
       }
@@ -837,7 +873,8 @@ function InspectionResult() {
         
         // Find the operation data matching the selected operation
         const operationData = detailedMeasurements.inspection_data.find(
-          data => data.operation_number === parseInt(selectedOperation, 10)
+          data => data.operation_number === parseInt(selectedOperation, 10) || 
+                 data.operation_number === selectedOperation
         );
         
         // Return the inspections if found, otherwise empty array
@@ -856,7 +893,7 @@ function InspectionResult() {
               <div>
                 <div className="text-lg font-semibold">Operation {selectedOperation} Measurements</div>
                 <Text type="secondary" className="text-sm">
-                  {detailedMeasurements?.production_order} | {detailedMeasurements?.part_number}
+                  {detailedMeasurements?.production_order || 'N/A'} | {detailedMeasurements?.part_number || 'N/A'}
                 </Text>
               </div>
             </div>
@@ -878,7 +915,7 @@ function InspectionResult() {
           <div className="p-4">
             {loadingDetailedMeasurements ? (
               <div className="flex justify-center items-center p-12">
-                <Spin size="large" />
+                <Spin size="large" tip="Loading measurement data..." />
               </div>
             ) : detailedMeasurements ? (
               <div>
@@ -887,16 +924,16 @@ function InspectionResult() {
                   description={
                     <Row gutter={[16, 16]} className="pt-2">
                       <Col span={6}>
-                        <Text strong>Order ID:</Text> {detailedMeasurements.order_id}
+                        <Text strong>Order ID:</Text> {detailedMeasurements.order_id || 'N/A'}
                       </Col>
                       <Col span={6}>
-                        <Text strong>Part Number:</Text> {detailedMeasurements.part_number}
+                        <Text strong>Part Number:</Text> {detailedMeasurements.part_number || 'N/A'}
                       </Col>
                       <Col span={6}>
-                        <Text strong>Production Order:</Text> {detailedMeasurements.production_order}
+                        <Text strong>Production Order:</Text> {detailedMeasurements.production_order || 'N/A'}
                       </Col>
                       <Col span={6}>
-                        <Text strong>Operation:</Text> {selectedOperation}
+                        <Text strong>Operation:</Text> {selectedOperation || 'N/A'}
                       </Col>
                     </Row>
                   }
@@ -905,12 +942,12 @@ function InspectionResult() {
                   className="mb-4"
                 />
                 
-                {measurements.length > 0 ? (
+                {measurements && measurements.length > 0 ? (
                   <Table
                     columns={detailedMeasurementColumns}
                     dataSource={measurements.map(item => ({
                       ...item,
-                      key: item.id
+                      key: item.id || `${item.zone}-${item.dimension_type}`
                     }))}
                     bordered
                     size="middle"
@@ -932,7 +969,9 @@ function InspectionResult() {
                             </Table.Summary.Cell>
                             <Table.Summary.Cell index={2} colSpan={3}>
                               <Text type="secondary">
-                                {data.length > 0 ? `Last Updated: ${new Date(Math.max(...data.map(item => new Date(item.created_at)))).toLocaleString()}` : ''}
+                                {data.length > 0 && data[0].created_at ? 
+                                  `Last Updated: ${new Date(Math.max(...data.filter(item => item.created_at).map(item => new Date(item.created_at)))).toLocaleString()}` 
+                                  : ''}
                               </Text>
                             </Table.Summary.Cell>
                           </Table.Summary.Row>
@@ -941,7 +980,18 @@ function InspectionResult() {
                     }}
                   />
                 ) : (
-                  <Empty description="No measurements found for this operation" />
+                  <Empty description={
+                    <span>
+                      No measurements found for Operation {selectedOperation}. 
+                      <Button 
+                        type="link" 
+                        onClick={handleLaunchQMS}
+                        className="ml-2"
+                      >
+                        Launch QMS Software
+                      </Button>
+                    </span>
+                  } />
                 )}
               </div>
             ) : (

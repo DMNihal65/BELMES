@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Typography, Button, Space, Card, Row, Col, DatePicker } from 'antd';
 import { ArrowLeftOutlined, ReloadOutlined, FileTextOutlined } from '@ant-design/icons';
 import Highcharts from 'highcharts';
@@ -7,6 +7,7 @@ import highchartsMore from 'highcharts/highcharts-more';
 import solidGauge from 'highcharts/modules/solid-gauge';
 import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
+import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBel';
 
 // Initialize Highcharts modules
 highchartsMore(Highcharts);
@@ -18,24 +19,118 @@ const Productivity = ({ onBack }) => {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(null);
   const [isLive, setIsLive] = useState(true);
+  const [machineData, setMachineData] = useState([]);
+  
+  // Get functions and state from the store
+  const { 
+    connectShiftwiseEnergyWebSocket, 
+    disconnectShiftwiseEnergyWebSocket,
+    getMachineEnergyData,
+    fetchMachineNames,
+    machineNames,
+    isLoading
+  } = useEnergyMonitoringBelStore();
 
-  // Mock data for 14 machines
-  const machineData = Array.from({ length: 14 }, (_, index) => ({
-    id: index + 1,
-    machine_name: `Machine ${index + 1}`,
-    energy: Math.random() * 100, // Random energy value between 0 and 100
-    cost: Math.random() * 1000, // Random cost value between 0 and 1000
-    max_energy: 100 // Maximum energy threshold
-  }));
+  // Connect to WebSocket when component mounts and isLive is true
+  useEffect(() => {
+    const loadData = async () => {
+      // Fetch machine names if they haven't been loaded yet
+      if (!machineNames || machineNames.length === 0) {
+        await fetchMachineNames();
+      }
+      
+      // Connect to WebSocket if in live mode
+      if (isLive) {
+        connectShiftwiseEnergyWebSocket();
+      }
+    };
+    
+    loadData();
+    
+    // Cleanup - disconnect WebSocket when component unmounts
+    return () => {
+      disconnectShiftwiseEnergyWebSocket();
+    };
+  }, [connectShiftwiseEnergyWebSocket, disconnectShiftwiseEnergyWebSocket, fetchMachineNames, isLive, machineNames]);
+
+  // Update machine data when WebSocket sends new data or on interval
+  useEffect(() => {
+    // Function to update machine data
+    const updateMachineData = () => {
+      // Get machine names from store or use a default list
+      const machines = machineNames && machineNames.length > 0 ? 
+        machineNames : 
+        Array.from({ length: 14 }, (_, index) => ({
+          machine_id: index + 1,
+          machine_data: { id: index + 1 }
+        }));
+      
+      // Map machine names to machine data with energy values
+      const updatedMachineData = machines.map(machine => {
+        const id = machine.machine_id;
+        const name = machine.machine_data?.work_center ? 
+          `Machine ${machine.machine_data.work_center}` : 
+          `Machine ${id}`;
+        
+        // Get energy data from WebSocket data in the store
+        const energyData = getMachineEnergyData(id);
+        
+        return {
+          id,
+          machine_name: name,
+          energy: energyData.energy,
+          cost: energyData.cost,
+          max_energy: energyData.max_energy
+        };
+      });
+      
+      setMachineData(updatedMachineData);
+    };
+    
+    // Update data immediately
+    updateMachineData();
+    
+    // Set interval to update data every 5 seconds if in live mode
+    let interval;
+    if (isLive) {
+      interval = setInterval(updateMachineData, 5000);
+    }
+    
+    // Clean up interval
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [getMachineEnergyData, isLive, machineNames]);
 
   const handleDateChange = (date) => {
     setSelectedDate(date);
     setIsLive(!date);
+    
+    if (!date) {
+      // If returning to live mode, reconnect WebSocket
+      connectShiftwiseEnergyWebSocket();
+    } else {
+      // If switching to history mode, disconnect WebSocket
+      disconnectShiftwiseEnergyWebSocket();
+      
+      // In a real implementation, you would fetch historical data for the selected date
+      // For now, we'll just use mock data
+      const mockHistoryData = Array.from({ length: 14 }, (_, index) => ({
+        id: index + 1,
+        machine_name: `Machine ${index + 1}`,
+        energy: Math.random() * 80 + 10, // Random energy between 10 and 90
+        cost: Math.random() * 800 + 100, // Random cost between 100 and 900
+        max_energy: 100
+      }));
+      
+      setMachineData(mockHistoryData);
+    }
   };
 
   const handleGoLive = () => {
     setSelectedDate(null);
     setIsLive(true);
+    connectShiftwiseEnergyWebSocket();
   };
 
   const handleViewReport = () => {
@@ -154,7 +249,7 @@ const Productivity = ({ onBack }) => {
             fontWeight: 600
           }}
         >
-          Machine Energy Monitoring
+          {isLive ? 'Live Energy Monitoring' : 'Historical Energy Data'}
         </Title>
         <Space size="middle">
           <DatePicker 
@@ -188,6 +283,14 @@ const Productivity = ({ onBack }) => {
           </Button>
         </Space>
       </div>
+
+      {/* Loading state */}
+      {isLoading && machineData.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <div className="spinner" style={{ margin: '0 auto 20px' }}></div>
+          <Text>Loading machine energy data...</Text>
+        </div>
+      )}
 
       {/* Machine Gauge Charts Grid */}
       <Row gutter={[16, 16]}>
@@ -236,6 +339,54 @@ const Productivity = ({ onBack }) => {
           </Col>
         ))}
       </Row>
+      
+      {/* Live indicator */}
+      {isLive && (
+        <div style={{ 
+          position: 'fixed', 
+          bottom: '20px', 
+          right: '20px',
+          background: '#22c55e',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          color: 'white',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <div style={{ 
+            width: '8px', 
+            height: '8px', 
+            background: 'white',
+            borderRadius: '50%',
+            animation: 'pulse 1.5s infinite'
+          }}></div>
+          <span>Live Data</span>
+        </div>
+      )}
+      
+      <style jsx>{`
+        @keyframes pulse {
+          0% { opacity: 0.4; }
+          50% { opacity: 1; }
+          100% { opacity: 0.4; }
+        }
+        
+        .spinner {
+          border: 4px solid rgba(0, 0, 0, 0.1);
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          border-left-color: #22c55e;
+          animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

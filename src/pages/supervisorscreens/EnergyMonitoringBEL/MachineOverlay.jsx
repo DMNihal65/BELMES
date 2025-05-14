@@ -9,15 +9,21 @@ import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBel';
 const { Title } = Typography;
 
 const MachineOverlay = ({ machineId, machineName, onBack }) => {
-  const { clearMachineData } = useEnergyMonitoringBelStore();
+  const { clearMachineData, connectWebSocket, disconnectWebSocket } = useEnergyMonitoringBelStore();
   const [activeTab, setActiveTab] = useState('1'); // Use consistent key format
 
-  // Clear machine data when unmounting
+  // Connect to WebSocket when component mounts and disconnect when unmounting
   useEffect(() => {
+    console.log(`Initializing WebSocket for machine ${machineId}`);
+    const socket = connectWebSocket(machineId);
+    
+    // Clean up function to disconnect when unmounting
     return () => {
+      console.log(`Cleaning up WebSocket for machine ${machineId}`);
+      disconnectWebSocket();
       clearMachineData();
     };
-  }, [clearMachineData]);
+  }, [machineId, connectWebSocket, disconnectWebSocket, clearMachineData]);
 
   const handleBack = () => {
     clearMachineData();

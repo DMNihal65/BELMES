@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, Typography, Space, Badge, List, Spin, Alert, Button } from 'antd';
 import { 
   BookOutlined, 
@@ -21,15 +21,72 @@ function HelpAndSupport() {
     loading, 
     error, 
     fetchMachineDocuments,
-    downloadDocument 
+    downloadDocument,
+    downloadLatestDocument
   } = useHelpSupportStore();
 
   const token = useAuthStore(state => state.token);
+  const currentMachine = useAuthStore(state => state.currentMachine);
+  const [localError, setLocalError] = useState(null);
 
   useEffect(() => {
-    // Assuming machine ID 3, you might want to make this dynamic
-    fetchMachineDocuments(3);
-  }, [fetchMachineDocuments]);
+    console.log("Component mounted, checking for machine ID...");
+    
+    let machineId = null;
+    
+    // First try to get machine from auth store
+    if (currentMachine && currentMachine.id) {
+      machineId = currentMachine.id;
+      console.log("Using machine ID from auth store:", machineId);
+    } else {
+      // Try to get from localStorage as JSON object
+      try {
+        const storedMachine = localStorage.getItem('currentMachine');
+        if (storedMachine) {
+          const parsedMachine = JSON.parse(storedMachine);
+          if (parsedMachine && parsedMachine.id) {
+            machineId = parsedMachine.id;
+            console.log("Using machine ID from localStorage (JSON):", machineId);
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing machine from localStorage:", e);
+      }
+      
+      // If still not found, try direct ID values
+      if (!machineId) {
+        const directId = localStorage.getItem('machineId');
+        if (directId) {
+          machineId = parseInt(directId, 10);
+          console.log("Using direct machine ID from localStorage:", machineId);
+        }
+      }
+    }
+    
+    console.log("Final machine ID:", machineId);
+    console.log("Auth token available:", !!token);
+    
+    if (machineId) {
+      console.log("Fetching documents for machine ID:", machineId);
+      fetchMachineDocuments(machineId);
+    } else {
+      const errorMsg = 'No machine ID found. Using default machine ID: 3';
+      console.warn(errorMsg);
+      setLocalError(errorMsg);
+      // Fallback to a default machine ID
+      fetchMachineDocuments(3);
+    }
+  }, [fetchMachineDocuments, token, currentMachine]);
+
+  // Log when documents are received or errors occur
+  useEffect(() => {
+    if (machineDocuments.length > 0) {
+      console.log("Documents received:", machineDocuments.length);
+    }
+    if (error) {
+      console.error("Error from store:", error);
+    }
+  }, [machineDocuments, error]);
 
   const getDocumentIcon = (docType) => {
     switch (docType?.toLowerCase()) {
@@ -42,8 +99,19 @@ function HelpAndSupport() {
     }
   };
 
-  const handleDownload = (minioPath) => {
-    downloadDocument(minioPath, token);
+  const handleDownload = (item) => {
+    // If we have a document ID, use the new endpoint
+    if (item.id) {
+      console.log(`Downloading latest version of document ID: ${item.id}`);
+      downloadLatestDocument(item.id, token);
+    } 
+    // Fallback to the old method if we only have a minio path
+    else if (item.latest_version?.minio_path) {
+      console.log(`Downloading document by minio path: ${item.latest_version.minio_path}`);
+      downloadDocument(item.latest_version.minio_path, token);
+    } else {
+      console.error("Cannot download document - no ID or minio_path available", item);
+    }
   };
 
   return (
@@ -89,6 +157,16 @@ function HelpAndSupport() {
             }}
             bodyStyle={{ padding: '24px' }}
           >
+            {localError && (
+              <Alert
+                message="Warning"
+                description={localError}
+                type="warning"
+                showIcon
+                className="mb-6 rounded-lg"
+              />
+            )}
+            
             {error && (
               <Alert
                 message="Error loading documents"
@@ -128,7 +206,7 @@ function HelpAndSupport() {
                         <div className="flex-1">
                           <Title level={5} className="mb-2">
                             <a 
-                              onClick={() => handleDownload(item.latest_version.minio_path)}
+                              onClick={() => handleDownload(item)}
                               className="hover:text-blue-500 transition-colors cursor-pointer"
                             >
                               {item.name}
@@ -150,7 +228,7 @@ function HelpAndSupport() {
                             <Button 
                               type="primary"
                               icon={<DownloadOutlined />}
-                              onClick={() => handleDownload(item.latest_version.minio_path)}
+                              onClick={() => handleDownload(item)}
                               className="mt-4 hover:scale-105 transition-transform"
                               style={{ backgroundColor: '#0284C7' }}
                             >
@@ -166,7 +244,7 @@ function HelpAndSupport() {
             )}
           </Card>
 
-          {/* Enhanced General Documentation Section */}
+          Enhanced General Documentation Section
           <Card 
             title={
               <Space size="large">

@@ -35,6 +35,8 @@ import {
   CalendarOutlined
 } from '@ant-design/icons';
 import { qualityStore } from '../../../store/quality-store';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const { Title, Text } = Typography;
 
@@ -98,6 +100,13 @@ const InspectionReport = () => {
       items.forEach(item => {
         // If it's a document, add it to our reports list
         if (item.type === 'document') {
+          console.log('Processing document:', item.name);
+          console.log('Document latest_version:', item.latest_version);
+          
+          // Extract version ID
+          const versionId = item.latest_version?.id || '1.0';
+          console.log('Extracted version_id:', versionId);
+          
           extractedReports.push({
             key: item.id, // This is the document ID we need for download
             name: item.name,
@@ -110,6 +119,7 @@ const InspectionReport = () => {
             file_path: item.latest_version?.minio_path || '',
             file_size: item.latest_version?.file_size || 0,
             version: item.latest_version?.version_number || '1.0',
+            version_id: versionId,
             category: item.path?.split('/')[2] || 'Unknown' // Extract category from path
           });
         }
@@ -155,6 +165,12 @@ const InspectionReport = () => {
 
   // Handle tree selection
   const handleTreeSelect = (selectedKeys, info) => {
+    // Prevent default behavior that might cause navigation
+    if (info && info.event) {
+      info.event.preventDefault();
+      info.event.stopPropagation();
+    }
+    
     if (selectedKeys.length > 0) {
       const selectedKey = selectedKeys[0];
       setSelectedCategory(selectedKey);
@@ -168,16 +184,32 @@ const InspectionReport = () => {
         setSelectedReportType('all'); // Reset type filter
         
         // The table will be filtered in the filteredReports computed value
-        message.info(`Selected document: ${info.node.title}`);
+        toast.info(`Selected document: ${info.node.title}`, {
+          position: 'top-right',
+          autoClose: 2000,
+        });
       } else if (itemType === 'folder') {
         // For folders, we'll simply use the path to filter reports
         setSearchText(''); // Clear any existing search
         setSelectedReportType('all'); // Reset type filter
         
+        // Prevent navigation by stopping the default behavior and preventing propagation
+        // This ensures we stay on the current page when clicking folders
+        if (info && info.event) {
+          info.event.preventDefault();
+          info.event.stopPropagation();
+        }
+        
         // The filtering will happen in the filteredReports computed value
-        message.info(`Selected folder: ${info.node.title}`);
+        toast.info(`Showing reports in folder: ${info.node.title}`, {
+          position: 'top-right',
+          autoClose: 2000,
+        });
       }
     }
+    
+    // Return false to prevent any default navigation
+    return false;
   };
 
   // Handle refreshing the report structure
@@ -190,39 +222,182 @@ const InspectionReport = () => {
   const handleDownloadReport = async (report) => {
     // Check if we have a valid document ID and version info
     if (!report.key) {
-      message.error('Missing document information for download');
+      toast.error('Missing document information for download', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
     
-    message.loading({ content: 'Preparing download...', key: 'download' });
+    const toastId = toast.loading('Preparing download...', {
+      position: 'top-right',
+    });
     
     try {
       const documentId = report.key;
       // Extract version number from the report data, default to "1.0" if not available
-      const versionNumber = report.version || "1.0";
+      const versionId = report.version_id || "1.0";
       
-      console.log(`Downloading document ID: ${documentId}, version: ${versionNumber}`);
+      console.log(`Download request details:`, {
+        documentId,
+        versionId,
+        reportName: report.name,
+        reportDetails: report
+      });
       
-      // Call the new download method from the quality store
-      const downloadData = await qualityStore.downloadReportById(documentId, versionNumber);
-      
-      // Create a link and click it to download
-      const a = document.createElement('a');
-      a.href = downloadData.url;
-      a.download = report.name || downloadData.fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-      // Clean up the blob URL
-      setTimeout(() => URL.revokeObjectURL(downloadData.url), 5000);
-      
-      message.success({ content: 'Report downloaded successfully', key: 'download' });
+      try {
+        // Try downloading using the new document endpoint first
+        console.log(`Attempting primary download method with documentId=${documentId}, versionId=${versionId}`);
+        const downloadData = await qualityStore.downloadDocument(documentId, versionId);
+        console.log('Download data received:', downloadData);
+        
+        // Create a link and click it to download
+        const a = document.createElement('a');
+        a.href = downloadData.url;
+        // Ensure filename has .pdf extension
+        let filename = report.name || downloadData.fileName;
+        if (!filename.toLowerCase().endsWith('.pdf')) {
+          filename += '.pdf';
+        }
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Clean up the blob URL
+        setTimeout(() => URL.revokeObjectURL(downloadData.url), 5000);
+        
+        // Dismiss the loading toast and show success toast
+        toast.dismiss(toastId);
+        toast.success('Report downloaded successfully', {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } catch (downloadError) {
+        console.log('Error in primary download method:', downloadError);
+        console.log('Error details:', downloadError.response || downloadError.message || downloadError);
+        console.log('Trying alternative methods...');
+        
+        try {
+          // Fallback 1: Try the downloadReportById method
+          console.log(`Attempting download using downloadReportById method with documentId=${documentId}, versionId=${versionId}`);
+          const byIdData = await qualityStore.downloadReportById(documentId, versionId);
+          console.log('Download data from alternative method:', byIdData);
+          
+          const a = document.createElement('a');
+          a.href = byIdData.url;
+          // Ensure filename has .pdf extension
+          let filename = report.name || byIdData.fileName;
+          if (!filename.toLowerCase().endsWith('.pdf')) {
+            filename += '.pdf';
+          }
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          
+          // Clean up the blob URL
+          setTimeout(() => URL.revokeObjectURL(byIdData.url), 5000);
+          
+          // Dismiss loading toast and show success toast
+          toast.dismiss(toastId);
+          toast.success('Report downloaded using alternative method', {
+            position: 'top-right',
+            autoClose: 3000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+          return;
+        } catch (byIdError) {
+          console.log('Error in first alternative method:', byIdError);
+          console.log('Error details:', byIdError.response || byIdError.message || byIdError);
+          
+          // Fallback 2: If report has a file_path, try downloading by path
+          if (report.file_path) {
+            console.log('Attempting download using file path:', report.file_path);
+            const pathDownloadData = await qualityStore.downloadReport(report.file_path);
+            console.log('Download data from file path method:', pathDownloadData);
+            
+            const a = document.createElement('a');
+            a.href = pathDownloadData.url;
+            // Ensure filename has .pdf extension
+            let filename = report.name || pathDownloadData.fileName;
+            if (!filename.toLowerCase().endsWith('.pdf')) {
+              filename += '.pdf';
+            }
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            // Clean up the blob URL
+            setTimeout(() => URL.revokeObjectURL(pathDownloadData.url), 5000);
+            
+            // Dismiss loading toast and show success toast
+            toast.dismiss(toastId);
+            toast.success('Report downloaded using file path method', {
+              position: 'top-right',
+              autoClose: 3000,
+              hideProgressBar: false,
+              closeOnClick: true,
+              pauseOnHover: true,
+              draggable: true,
+            });
+            return;
+          }
+          
+          // If no alternatives work, show detailed error
+          throw byIdError;
+        }
+      }
     } catch (error) {
       console.error('Error downloading report:', error);
-      message.error({ 
-        content: `Failed to download report: ${error.message || 'Unknown error'}`, 
-        key: 'download' 
+      console.error('Full error object:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        stack: error.stack
+      });
+      
+      // Provide more specific error messages based on status code
+      let errorMsg = 'Failed to download report';
+      
+      if (error.response) {
+        switch (error.response.status) {
+          case 404:
+            errorMsg = 'Report file not found on server';
+            break;
+          case 403:
+            errorMsg = 'You do not have permission to access this report';
+            break;
+          case 500:
+            errorMsg = 'Server error occurred while downloading the report';
+            break;
+          default:
+            errorMsg = `Server returned error (${error.response.status})`;
+        }
+      } else if (error.request) {
+        errorMsg = 'No response from server. Please check your network connection';
+      } else {
+        errorMsg = error.message || 'Unknown error occurred';
+      }
+      
+      // Dismiss loading toast and show error toast
+      toast.dismiss(toastId);
+      toast.error(errorMsg, {
+        position: 'top-right',
+        autoClose: 4000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
       });
     }
   };
@@ -331,13 +506,7 @@ const InspectionReport = () => {
       width: 200,
       render: (_, record) => (
         <Space>
-          <Tooltip title="Add to favorites">
-            <Button 
-              icon={<StarOutlined />} 
-              type="text" 
-              className="text-amber-400 hover:text-amber-500 hover:bg-amber-50" 
-            />
-          </Tooltip>
+          
           <Tooltip title="Delete report">
             <Button 
               icon={<DeleteOutlined />} 
@@ -383,18 +552,37 @@ const InspectionReport = () => {
         // If a document is selected, only show that specific document
         matchesCategory = report.key === parseInt(itemId);
       } else if (itemType === 'folder') {
-        // If a folder is selected, show reports where path contains this folder
-        // For simplicity, we'll use the name in the check, but in reality
-        // you might need more complex logic depending on your data structure
-        const folder = treeData.find(item => 
-          item.key === selectedCategory || 
-          findNodeInTree(item, selectedCategory)
-        );
+        // If a folder is selected, show reports that belong to this folder or its subfolders
         
-        if (folder) {
-          // Check if the report belongs to this folder based on category or path
-          matchesCategory = report.category.includes(folder.title) || 
-                           (report.path && report.path.includes(folder.title));
+        // First get the selected folder and its full path
+        const findFolderPath = (nodes, folderId, parentPath = '') => {
+          for (const node of nodes || []) {
+            if (node.key === `folder-${folderId}`) {
+              return parentPath ? `${parentPath}/${node.title}` : node.title;
+            }
+            
+            if (node.children && node.children.length > 0) {
+              const path = findFolderPath(node.children, folderId, parentPath ? `${parentPath}/${node.title}` : node.title);
+              if (path) return path;
+            }
+          }
+          return null;
+        };
+        
+        const folderPath = findFolderPath(treeData, itemId);
+        console.log('Selected folder path:', folderPath);
+        
+        if (folderPath) {
+          // Check if the report belongs to this folder or its subfolders
+          matchesCategory = report.category.includes(folderPath) || 
+                          (report.path && report.path.includes(folderPath));
+        } else {
+          // Fallback to the basic filtering if path is not found
+          const folder = treeData.find(item => item.key === selectedCategory);
+          if (folder) {
+            matchesCategory = report.category.includes(folder.title) || 
+                            (report.path && report.path.includes(folder.title));
+          }
         }
       }
     }
@@ -517,6 +705,17 @@ const InspectionReport = () => {
                   onSelect={handleTreeSelect}
                   blockNode
                   className="custom-tree"
+                  selectable={true}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                  }}
+                  expandAction="click"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                 />
               </div>
             ) : (
@@ -594,6 +793,9 @@ const InspectionReport = () => {
         </Col>
       </Row>
 
+      {/* ToastContainer for notifications */}
+      <ToastContainer />
+      
       {/* Custom CSS */}
       <style jsx="true">{`
         .reports-table .ant-table-thead > tr > th {

@@ -391,18 +391,66 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
   };
 
   const handleMppFileChange = (info) => {
-    if (info.fileList.length > 0) {
-      setMppFile(info.fileList[0].originFileObj);
-    } else {
-      setMppFile(null);
+    console.log('MPP file change event:', info);
+    
+    try {
+      if (info.fileList && info.fileList.length > 0) {
+        // Get the file from the fileList
+        const file = info.fileList[0].originFileObj || info.fileList[0];
+        console.log('Setting MPP file:', file);
+        
+        // Explicitly set the file name property if it doesn't exist
+        if (!file.name && info.fileList[0].name) {
+          file.name = info.fileList[0].name;
+        }
+        
+        setMppFile(file);
+        
+        // Force a re-render by updating component state
+        setTimeout(() => {
+          // Any small state change to force re-render
+          setMppDescription(prev => prev + ' ');
+          setTimeout(() => setMppDescription(prev => prev.trim()), 10);
+        }, 10);
+      } else {
+        console.log('Clearing MPP file (no files in fileList)');
+        setMppFile(null);
+      }
+    } catch (error) {
+      console.error('Error handling MPP file change:', error);
+      message.error('Failed to process the selected file');
     }
   };
 
   const handleDrawingFileChange = (info) => {
-    if (info.fileList.length > 0) {
-      setDrawingFile(info.fileList[0].originFileObj);
-    } else {
-      setDrawingFile(null);
+    console.log('Drawing file change event:', info);
+    
+    try {
+      if (info.fileList && info.fileList.length > 0) {
+        // Get the file from the fileList
+        const file = info.fileList[0].originFileObj || info.fileList[0];
+        console.log('Setting drawing file:', file);
+        
+        // Explicitly set the file name property if it doesn't exist
+        if (!file.name && info.fileList[0].name) {
+          file.name = info.fileList[0].name;
+        }
+        
+        setDrawingFile(file);
+        
+        // Force a re-render by updating component state
+        setTimeout(() => {
+          // Any small state change to force re-render
+          setDrawingDescription(prev => prev + ' ');
+          setTimeout(() => setDrawingDescription(prev => prev.trim()), 10);
+        }, 10);
+      } else {
+        console.log('Clearing drawing file (no files in fileList)');
+        setDrawingFile(null);
+      }
+    } catch (error) {
+      console.error('Error handling drawing file change:', error);
+      message.error('Failed to process the selected file');
     }
   };
 
@@ -1289,22 +1337,16 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                   beforeUpload={() => false}
                   accept=".pdf,.doc,.docx"
                   ref={mppUploadRef}
+                  fileList={mppFile ? [{ uid: '-1', name: mppFile.name, originFileObj: mppFile }] : []}
                 >
                   <Button icon={<UploadOutlined />} className="w-full">
                     Select MPP File
                   </Button>
                 </Upload>
-                <Button 
-                  type="primary"
-                  onClick={() => {
-                    // Remove the popup message
-                  }}
-                  icon={<CloudUploadOutlined />}
-                  className="w-full mt-2"
-                  disabled={!mppFile}
-                >
-                  Upload Version
-                </Button>
+                {/* Debug information */}
+                <div className="mt-2 text-xs text-gray-500">
+                  File selected: {mppFile ? `Yes (${mppFile.name})` : 'No'}
+                </div>
               </>
             )}
           </Card>
@@ -1491,22 +1533,16 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                   beforeUpload={() => false}
                   accept=".pdf,.dwg,.dxf"
                   ref={drawingUploadRef}
+                  fileList={drawingFile ? [{ uid: '-1', name: drawingFile.name, originFileObj: drawingFile }] : []}
                 >
                   <Button icon={<UploadOutlined />} className="w-full">
                     Select Drawing File
                   </Button>
                 </Upload>
-                <Button 
-                  type="primary"
-                  onClick={() => {
-                    // Remove the popup message
-                  }}
-                  icon={<CloudUploadOutlined />}
-                  className="w-full mt-2"
-                  disabled={!drawingFile}
-                >
-                  Upload Version
-                </Button>
+                {/* Debug information */}
+                <div className="mt-2 text-xs text-gray-500">
+                  File selected: {drawingFile ? `Yes (${drawingFile.name})` : 'No'}
+                </div>
               </>
             )}
           </Card>

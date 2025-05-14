@@ -100,7 +100,9 @@ const { Search } = Input;
 const VersionManagementModal = ({ visible, document, onClose }) => {
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const { fetchDocumentVersions, uploadNewVersion, deleteVersion, updateVersion, fetchFolderDocuments } = useDocumentStore();
+  const [customVersionNumber, setCustomVersionNumber] = useState("");
+  const [useCustomVersion, setUseCustomVersion] = useState(false);
+  const { fetchDocumentVersions, uploadNewVersion, deleteDocumentVersion, updateVersion, fetchFolderDocuments } = useDocumentStore();
 
   const loadVersions = async () => {
     if (!document) return;
@@ -110,8 +112,8 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
       const data = await fetchDocumentVersions(document.id);
       // Sort versions by version number
       const sortedVersions = data.sort((a, b) => {
-        const aNum = parseInt(a.version_number.replace('v', ''));
-        const bNum = parseInt(b.version_number.replace('v', ''));
+        const aNum = parseFloat(a.version_number.replace('v', ''));
+        const bNum = parseFloat(b.version_number.replace('v', ''));
         return bNum - aNum; // Sort in descending order
       });
       setVersions(sortedVersions);
@@ -120,6 +122,17 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Calculate next version number for auto increment
+  const getNextVersionNumber = () => {
+    if (!versions || versions.length === 0) return "1.0";
+    
+    const highestVersion = Math.max(
+      ...versions.map(v => parseFloat(v.version_number.replace('v', '')))
+    );
+    
+    return (highestVersion + 1).toString();
   };
 
   // Refresh data when modal becomes visible
@@ -142,8 +155,11 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
 
   const handleNewVersion = async (file) => {
     try {
-      await uploadNewVersion(document.id, file);
+      const versionNumber = useCustomVersion ? customVersionNumber : null;
+      await uploadNewVersion(document.id, file, versionNumber);
       message.success('New version uploaded successfully');
+      setCustomVersionNumber("");
+      setUseCustomVersion(false);
       await loadVersions(); // Refresh versions list
       await fetchFolderDocuments(); // Refresh main document list
     } catch (error) {
@@ -153,12 +169,12 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
 
   const handleVersionDelete = async (versionId) => {
     try {
-      await deleteVersion(document.id, versionId);
+      await deleteDocumentVersion(versionId);
       message.success('Version deleted successfully');
       await loadVersions(); // Refresh versions list
       await fetchFolderDocuments(); // Refresh main document list
     } catch (error) {
-      message.error('Failed to delete version');
+      message.error('Failed to delete version: ' + error.message);
     }
   };
 
@@ -171,21 +187,53 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
       width={800}
     >
       <div className="mb-4">
-        <Upload
-          showUploadList={false}
-          beforeUpload={(file) => {
-            Modal.confirm({
-              title: 'Upload New Version',
-              content: `Are you sure you want to upload version ${versions.length + 1}?`,
-              onOk: () => handleNewVersion(file),
-            });
-            return false;
-          }}
-        >
-          <Button type="primary" icon={<UploadOutlined />}>
-            Upload New Version
-          </Button>
-        </Upload>
+        <Form layout="inline" className="mb-4">
+          <Form.Item label="Version Number">
+            <Checkbox
+              checked={useCustomVersion}
+              onChange={(e) => setUseCustomVersion(e.target.checked)}
+            >
+              Custom Version Number
+            </Checkbox>
+          </Form.Item>
+          
+          {useCustomVersion ? (
+            <Form.Item>
+              <Input
+                value={customVersionNumber}
+                onChange={(e) => setCustomVersionNumber(e.target.value)}
+                placeholder="Enter version number"
+                style={{ width: 150 }}
+              />
+            </Form.Item>
+          ) : (
+            <Form.Item>
+              <Badge 
+                status="processing" 
+                text={`Next: v${getNextVersionNumber()}`} 
+                className="text-blue-600"
+              />
+            </Form.Item>
+          )}
+          
+          <Form.Item>
+            <Upload
+              showUploadList={false}
+              beforeUpload={(file) => {
+                Modal.confirm({
+                  title: 'Upload New Version',
+                  content: `Are you sure you want to upload version ${useCustomVersion ? customVersionNumber : getNextVersionNumber()}?`,
+                  onOk: () => handleNewVersion(file),
+                });
+                return false;
+              }}
+            >
+              <Button type="primary" icon={<UploadOutlined />}>
+                Upload New Version
+              </Button>
+            </Upload>
+          </Form.Item>
+        </Form>
       </div>
 
       <Table
@@ -197,7 +245,11 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
             title: 'Version',
             dataIndex: 'version_number',
             key: 'version',
-            render: (text) => text.startsWith('v') ? text : `${text}`,
+            render: (text) => (
+              <Tag color="blue">
+                {text.startsWith('v') ? text : `v${text}`}
+              </Tag>
+            ),
           },
           {
             title: 'Created',
@@ -216,48 +268,58 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
             key: 'actions',
             render: (_, record) => (
               <Space>
-                <Upload
-                  showUploadList={false}
-                  beforeUpload={(file) => {
-                    Modal.confirm({
-                      title: 'Update Version',
-                      content: `Are you sure you want to update version ${record.version_number} with a new file?`,
-                      onOk: () => handleFileUpdate(file, record.id),
-                    });
-                    return false;
-                  }}
-                >
+                <Tooltip title="Update Version">
+                  <Upload
+                    showUploadList={false}
+                    beforeUpload={(file) => {
+                      Modal.confirm({
+                        title: 'Update Version',
+                        content: `Are you sure you want to update version ${record.version_number} with a new file?`,
+                        onOk: () => handleFileUpdate(file, record.id),
+                      });
+                      return false;
+                    }}
+                  >
+                    <Button
+                      icon={<EditOutlined />}
+                      type="text"
+                    />
+                  </Upload>
+                </Tooltip>
+                <Tooltip title="Delete Version">
                   <Button
-                    icon={<EditOutlined />}
+                    icon={<DeleteOutlined />}
                     type="text"
-                    title="Edit Version"
+                    danger
+                    onClick={() => {
+                      // Don't allow deleting if it's the only version
+                      if (versions.length <= 1) {
+                        message.error('Cannot delete the only version of a document');
+                        return;
+                      }
+                      
+                      Modal.confirm({
+                        title: 'Delete Version',
+                        content: 'Are you sure you want to delete this version? This action cannot be undone.',
+                        okText: 'Delete',
+                        okType: 'danger',
+                        onOk: async () => {
+                          try {
+                            await handleVersionDelete(record.id);
+                          } catch (error) {
+                            message.error('Failed to delete version');
+                          }
+                        },
+                      });
+                    }}
                   />
-                </Upload>
-                <Button
-                  icon={<DeleteOutlined />}
-                  type="text"
-                  danger
-                  title="Delete Version"
-                  onClick={() => {
-                    Modal.confirm({
-                      title: 'Delete Version',
-                      content: 'Are you sure you want to delete this version?',
-                      okType: 'danger',
-                      onOk: async () => {
-                        try {
-                          await handleVersionDelete(record.id);
-                        } catch (error) {
-                          message.error('Failed to delete version');
-                        }
-                      },
-                    });
-                  }}
-                />
+                </Tooltip>
               </Space>
             ),
           },
         ]}
         pagination={false}
+        className="version-table"
       />
     </Modal>
   );
@@ -629,7 +691,8 @@ const DocumentManagement = () => {
   const { 
     documentTypes, 
     fetchDocTypes, 
-    createDocType, 
+    createDocType,
+    deleteDocumentType, // Add this
     isLoading, 
     partNumbers, 
     fetchPartNumbers, 
@@ -640,6 +703,7 @@ const DocumentManagement = () => {
     searchByPartNumber,
     downloadDocument,
     fetchDocumentVersions,
+    deleteDocumentVersion, // Add this
     folders,
     columns,
     filteredDocuments,
@@ -780,6 +844,60 @@ const DocumentManagement = () => {
       console.error('Create document type error:', error);
       message.error('Failed to create document type');
     }
+  };
+
+  // Add handler for document type deletion
+  const handleDeleteDocType = (docType) => {
+    Modal.confirm({
+      title: 'Delete Document Type',
+      content: (
+        <div>
+          <p>Are you sure you want to delete document type "{docType.name}"?</p>
+          <p className="text-red-500 text-sm mt-2">
+            Note: Document types used by active documents cannot be deleted without force.
+          </p>
+        </div>
+      ),
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await deleteDocumentType(docType.id, false);
+          message.success(`Document type "${docType.name}" deleted successfully`);
+          await fetchDocTypes(); // Refresh the document types list
+        } catch (error) {
+          if (error.message.includes('used by') && error.message.includes('active documents')) {
+            Modal.confirm({
+              title: 'Force Delete',
+              content: (
+                <div>
+                  <p>{error.message}</p>
+                  <p className="text-red-500 font-medium">
+                    Do you want to force delete this document type?
+                  </p>
+                  <p>This may lead to issues with documents using this type.</p>
+                </div>
+              ),
+              okText: 'Force Delete',
+              okType: 'danger',
+              cancelText: 'Cancel',
+              onOk: async () => {
+                try {
+                  await deleteDocumentType(docType.id, true);
+                  message.success(`Document type "${docType.name}" force deleted successfully`);
+                  await fetchDocTypes(); // Refresh the document types list
+                } catch (innerError) {
+                  message.error(`Failed to force delete: ${innerError.message}`);
+                }
+              }
+            });
+          } else {
+            message.error(`Failed to delete document type: ${error.message}`);
+          }
+        }
+      }
+    });
   };
 
   // Add back the context menu handler
@@ -1194,7 +1312,7 @@ const DocumentManagement = () => {
         }}
       >
         <Menu>
-          <Menu.Item 
+          {/* <Menu.Item 
             key="rename" 
             icon={<EditOutlined />}
             onClick={() => {
@@ -1207,8 +1325,8 @@ const DocumentManagement = () => {
             }}
           >
             Rename
-          </Menu.Item>
-          <Menu.Item 
+          </Menu.Item> */}
+          {/* <Menu.Item 
             key="cut" 
             icon={<ScissorOutlined />}
             onClick={() => {
@@ -1220,8 +1338,8 @@ const DocumentManagement = () => {
             }}
           >
             Cut
-          </Menu.Item>
-          {clipboardItem && (
+          </Menu.Item> */}
+          {/* {clipboardItem && (
             <Menu.Item 
               key="paste" 
               icon={<SnippetsOutlined />}
@@ -1232,7 +1350,7 @@ const DocumentManagement = () => {
             >
               Paste
           </Menu.Item>
-          )}
+          )} */}
           <Menu.Item 
             key="delete" 
             icon={<DeleteOutlined />}
@@ -2003,6 +2121,22 @@ const DocumentManagement = () => {
                 { text: 'Inactive', value: false }
               ],
               onFilter: (value, record) => record.is_active === value,
+            },
+            {
+              title: 'Actions',
+              key: 'actions',
+              render: (_, record) => (
+                <Space>
+                  <Tooltip title="Delete Document Type">
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleDeleteDocType(record)}
+                    />
+                  </Tooltip>
+                </Space>
+              ),
             }
           ]}
           pagination={{

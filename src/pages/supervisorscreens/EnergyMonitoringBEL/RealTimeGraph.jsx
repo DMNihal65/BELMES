@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Card, Row, Col, Typography, Spin, Badge, Space, Alert, Select, DatePicker, Button } from 'antd';
 import { ThunderboltOutlined, SearchOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBel';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area } from 'recharts';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -13,27 +13,202 @@ const { RangePicker } = DatePicker;
 const RealTimeGraph = ({ machineId, machineName }) => {
   const { 
     fetchMachineLiveData, 
-    getMachineParameters, 
+    getMachineParameters,
     fetchFilteredHistoryData,
     isLoading 
   } = useEnergyMonitoringBelStore();
   const [parameters, setParameters] = useState(null);
   const [initialLoad, setInitialLoad] = useState(true);
   const [apiError, setApiError] = useState(null);
-  const [selectedParameter, setSelectedParameter] = useState(null);
-  const [dateRange, setDateRange] = useState(null);
-  const [isLive, setIsLive] = useState(false);
+  const [selectedParameter, setSelectedParameter] = useState('avgPhaseVoltage');
   const [chartData, setChartData] = useState([]);
-  const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState(null);
+  
+  // Add states for historical data mode
+  const [isLive, setIsLive] = useState(true);
+  const [dateRange, setDateRange] = useState([
+    dayjs().subtract(7, 'day'),
+    dayjs()
+  ]);
+  const [chartLoading, setChartLoading] = useState(false);
 
+  // Toggle between live and historical data
   const handleLiveToggle = () => {
     setIsLive(!isLive);
     if (!isLive) {
-      setDateRange(null); // Clear date range when going live
-      setChartData([]); // Clear chart data
-      setChartError(null); // Clear any chart errors
+      // When switching to live, clear chart and reset
+      setChartData([]);
     }
+  };
+
+  // Handle filtered history data submission
+  const handleSubmitFilteredData = async () => {
+    if (!selectedParameter || !dateRange || !dateRange[0] || !dateRange[1]) {
+      setChartError("Please select a parameter and date range");
+      return;
+    }
+
+    setChartLoading(true);
+    setChartError(null);
+    setChartData([]);
+    setIsLive(false); // Turn off live mode when historical data is requested
+
+    try {
+      // Map parameter names to backend format
+      const apiParamMap = {
+        'phaseAVoltage': 'phase_a_voltage',
+        'phaseBVoltage': 'phase_b_voltage',
+        'phaseCVoltage': 'phase_c_voltage',
+        'avgPhaseVoltage': 'avg_phase_voltage',
+        'lineABVoltage': 'line_ab_voltage',
+        'lineBCVoltage': 'line_bc_voltage',
+        'lineCAVoltage': 'line_ca_voltage',
+        'avgLineVoltage': 'avg_line_voltage',
+        'phaseACurrent': 'phase_a_current',
+        'phaseBCurrent': 'phase_b_current',
+        'phaseCCurrent': 'phase_c_current',
+        'avgThreePhaseCurrent': 'avg_three_phase_current',
+        'powerFactor': 'power_factor',
+        'frequency': 'frequency',
+        'totalInstantaneousPower': 'total_instantaneous_power',
+        'activeEnergyDelivered': 'active_energy_delivered'
+      };
+      
+      const apiParamName = apiParamMap[selectedParameter] || selectedParameter;
+
+      console.log(`Fetching historical data for machine ${machineId}, parameter ${selectedParameter} (${apiParamName}), date range ${dateRange[0].format('YYYY-MM-DD')} to ${dateRange[1].format('YYYY-MM-DD')}`);
+      
+      const data = await fetchFilteredHistoryData(
+        machineId, 
+        dateRange[0], 
+        dateRange[1], 
+        selectedParameter
+      );
+
+      // Check the response structure
+      if (!data) {
+        throw new Error("Empty response received from the server");
+      }
+
+      // Handle array format - the API returns an array directly
+      let dataPoints = Array.isArray(data) ? data : data.data;
+      
+      if (!dataPoints || dataPoints.length === 0) {
+        throw new Error("No data points available for the selected criteria");
+      }
+
+      console.log("Raw data points:", dataPoints);
+
+      // Sort data points by timestamp to ensure proper stepline rendering
+      dataPoints.sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        return timeA - timeB;
+      });
+
+      // Format data for chart - map the actual parameter property name
+      const formattedData = dataPoints.map((point, index) => {
+        // Format timestamp for display
+        let formattedTimestamp;
+        try {
+          const date = new Date(point.timestamp);
+          formattedTimestamp = date.toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit'
+          });
+        } catch (error) {
+          formattedTimestamp = `Point ${index + 1}`;
+        }
+        
+        // Get the value using the API parameter name
+        const paramValue = point[apiParamName];
+        let numericValue;
+        
+        if (typeof paramValue === 'string') {
+          numericValue = parseFloat(paramValue);
+        } else if (typeof paramValue === 'number') {
+          numericValue = paramValue;
+        } else {
+          numericValue = getDefaultValue(selectedParameter);
+        }
+        
+        return {
+          key: index,
+          timestamp: formattedTimestamp,
+          rawTimestamp: point.timestamp,
+          value: isNaN(numericValue) ? getDefaultValue(selectedParameter) : numericValue
+        };
+      });
+      
+      if (formattedData.length === 0) {
+        setChartError("No valid data points available for the selected date range");
+        setChartData([]);
+      } else {
+        console.log(`Processed ${formattedData.length} data points for chart`);
+        setChartData(formattedData);
+      }
+    } catch (error) {
+      console.error("Error in handleSubmitFilteredData:", error);
+      setChartError(error.message || "Failed to fetch filtered history data");
+      setChartData([]);
+    } finally {
+      setChartLoading(false);
+    }
+  };
+
+  // Get default value for a parameter type
+  const getDefaultValue = useCallback((paramKey) => {
+    switch(paramKey) {
+      case 'phaseAVoltage':
+      case 'phaseBVoltage':
+      case 'phaseCVoltage':
+      case 'avgPhaseVoltage':
+        return 220;
+      case 'lineABVoltage':
+      case 'lineBCVoltage':
+      case 'lineCAVoltage':
+      case 'avgLineVoltage':
+        return 380;
+      case 'phaseACurrent':
+      case 'phaseBCurrent':
+      case 'phaseCCurrent':
+      case 'avgThreePhaseCurrent':
+        return 10;
+      case 'powerFactor':
+        return 0.9;
+      case 'frequency':
+        return 50;
+      case 'totalInstantaneousPower':
+        return 8;
+      case 'activeEnergyDelivered':
+        return 350;
+      default:
+        return 100;
+    }
+  }, []);
+
+  // Get parameter display name
+  const getParameterDisplayName = (paramKey) => {
+    const parameterMap = {
+      'phaseAVoltage': 'Phase A Voltage (V)',
+      'phaseBVoltage': 'Phase B Voltage (V)',
+      'phaseCVoltage': 'Phase C Voltage (V)',
+      'avgPhaseVoltage': 'Avg Phase Voltage (V)',
+      'lineABVoltage': 'Line AB Voltage (V)',
+      'lineBCVoltage': 'Line BC Voltage (V)',
+      'lineCAVoltage': 'Line CA Voltage (V)',
+      'avgLineVoltage': 'Avg Line Voltage (V)',
+      'phaseACurrent': 'Phase A Current (A)',
+      'phaseBCurrent': 'Phase B Current (A)',
+      'phaseCCurrent': 'Phase C Current (A)',
+      'avgThreePhaseCurrent': 'Avg Current (A)',
+      'powerFactor': 'Power Factor',
+      'frequency': 'Frequency (Hz)',
+      'totalInstantaneousPower': 'Total Power (kW)',
+      'activeEnergyDelivered': 'Energy Delivered (kWh)'
+    };
+    
+    return parameterMap[paramKey] || paramKey;
   };
 
   // Effect to fetch machine data and update parameter history
@@ -67,181 +242,94 @@ const RealTimeGraph = ({ machineId, machineName }) => {
     // Fetch initial data
     fetchData();
     
-    // Set up interval for periodic updates
-    const intervalId = setInterval(fetchData, 5000);
-    
-    return () => clearInterval(intervalId);
+    return () => {}; // No cleanup needed for intervals
   }, [fetchMachineLiveData, getMachineParameters, machineId]);
 
-  // Add a separate effect to handle initialLoad state
+  // Handle live data effect - only run when isLive is true
   useEffect(() => {
-    if (initialLoad && parameters) {
-      setInitialLoad(false);
-    }
-  }, [initialLoad, parameters]);
-
-  // Handle filtered history data submission
-  const handleSubmitFilteredData = async () => {
-    if (!selectedParameter || !dateRange || !dateRange[0] || !dateRange[1]) {
-      setChartError("Please select a parameter and date range");
-      return;
-    }
-
-    setChartLoading(true);
-    setChartError(null);
-    setChartData([]);
-
-    try {
-      const data = await fetchFilteredHistoryData(
-        machineId, 
-        dateRange[0], 
-        dateRange[1], 
-        selectedParameter
-      );
-
-      // Check the response structure
-      if (!data) {
-        throw new Error("Empty response received from the server");
-      }
-
-      // Check for data property
-      let dataPoints = [];
-      if (data.data && Array.isArray(data.data)) {
-        dataPoints = data.data;
-      } else if (Array.isArray(data)) {
-        dataPoints = data;
-      } else {
-        console.error("Unexpected data structure:", data);
-        throw new Error("Data structure is not in the expected format");
-      }
-
-      if (dataPoints.length === 0) {
-        throw new Error("No data points available for the selected criteria");
-      }
-
-      // Sort data points by timestamp to ensure proper stepline rendering
-      dataPoints.sort((a, b) => {
-        const timeA = new Date(a.timestamp).getTime();
-        const timeB = new Date(b.timestamp).getTime();
-        return timeA - timeB;
-      });
-
-      // Format data for chart
-      const formattedData = dataPoints.map((point, index) => {
-        // Format timestamp for display
-        let formattedTimestamp;
-        try {
-          const date = new Date(point.timestamp);
-          formattedTimestamp = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } catch (error) {
-          formattedTimestamp = `Point ${index + 1}`;
-        }
-        
-        // Ensure value is a proper number
-        let numericValue;
-        if (typeof point.value === 'string') {
-          numericValue = parseFloat(point.value);
-        } else if (typeof point.value === 'number') {
-          numericValue = point.value;
-        } else {
-          // Get default value based on parameter type
-          switch(selectedParameter) {
-            case 'phaseAVoltage':
-            case 'phaseBVoltage':
-            case 'phaseCVoltage':
-            case 'avgPhaseVoltage':
-              numericValue = 220;
-              break;
-            case 'frequency':
-              numericValue = 50;
-              break;
-            case 'powerFactor':
-              numericValue = 0.9;
-              break;
-            case 'totalInstantaneousPower':
-              numericValue = 8;
-              break;
-            default:
-              numericValue = 100;
-          }
-        }
-        
-        return {
-          key: index,
-          timestamp: formattedTimestamp,
-          rawTimestamp: point.timestamp,
-          value: isNaN(numericValue) ? getDefaultValue(selectedParameter) : numericValue
-        };
-      });
+    if (isLive && selectedParameter && parameters) {
+      // When in live mode, update chart with current value
+      const paramValue = parameters[selectedParameter];
+      let numericValue;
       
-      if (formattedData.length === 0) {
-        setChartError("No valid data points available for the selected date range");
-        setChartData([]);
+      if (typeof paramValue === 'string') {
+        numericValue = parseFloat(paramValue);
+      } else if (typeof paramValue === 'number') {
+        numericValue = paramValue;
       } else {
-        setChartData(formattedData);
+        numericValue = getDefaultValue(selectedParameter);
       }
-    } catch (error) {
-      setChartError(error.message || "Failed to fetch filtered history data");
-      setChartData([]);
-    } finally {
-      setChartLoading(false);
+      
+      if (numericValue !== undefined && !isNaN(numericValue)) {
+        const now = new Date();
+        const formattedTimestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const newDataPoint = {
+          key: Date.now(),
+          timestamp: formattedTimestamp,
+          rawTimestamp: now.toISOString(),
+          value: numericValue
+        };
+        
+        setChartData(prevData => {
+          const newData = [...prevData, newDataPoint];
+          // Keep only the last 20 points for better visualization
+          return newData.length > 20 ? newData.slice(-20) : newData;
+        });
+      }
     }
-  };
+  }, [parameters, selectedParameter, getDefaultValue, isLive]);
 
-  // Get parameter display name
-  const getParameterDisplayName = (paramKey) => {
-    const parameterMap = {
-      'phaseAVoltage': 'Phase A Voltage (V)',
-      'phaseBVoltage': 'Phase B Voltage (V)',
-      'phaseCVoltage': 'Phase C Voltage (V)',
-      'avgPhaseVoltage': 'Avg Phase Voltage (V)',
-      'lineABVoltage': 'Line AB Voltage (V)',
-      'lineBCVoltage': 'Line BC Voltage (V)',
-      'lineCAVoltage': 'Line CA Voltage (V)',
-      'avgLineVoltage': 'Avg Line Voltage (V)',
-      'phaseACurrent': 'Phase A Current (A)',
-      'phaseBCurrent': 'Phase B Current (A)',
-      'phaseCCurrent': 'Phase C Current (A)',
-      'avgThreePhaseCurrent': 'Avg Current (A)',
-      'powerFactor': 'Power Factor',
-      'frequency': 'Frequency (Hz)',
-      'totalInstantaneousPower': 'Total Power (kW)',
-      'activeEnergyDelivered': 'Energy Delivered (kWh)'
-    };
+  // Handle parameter changes in live mode
+  useEffect(() => {
+    if (isLive && parameters) {
+      // When parameter selection changes, immediately add a data point for the new parameter
+      const paramValue = parameters[selectedParameter];
+      let numericValue;
+      
+      if (typeof paramValue === 'string') {
+        numericValue = parseFloat(paramValue);
+      } else if (typeof paramValue === 'number') {
+        numericValue = paramValue;
+      } else {
+        numericValue = getDefaultValue(selectedParameter);
+      }
+      
+      if (numericValue !== undefined && !isNaN(numericValue)) {
+        const now = new Date();
+        const formattedTimestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        // Reset chart data with just the current value for the new parameter
+        setChartData([{
+          key: Date.now(),
+          timestamp: formattedTimestamp,
+          rawTimestamp: now.toISOString(),
+          value: numericValue
+        }]);
+      } else {
+        // If there's no valid value, clear the chart
+        setChartData([]);
+      }
+    }
+  }, [selectedParameter, parameters, getDefaultValue, isLive]);
+
+  // Validate date range
+  const isDateRangeValid = () => {
+    if (!dateRange || !dateRange[0] || !dateRange[1]) {
+      return false;
+    }
     
-    return parameterMap[paramKey] || paramKey;
+    // Check if start date is before or equal to end date
+    return dateRange[0].isBefore(dateRange[1]) || dateRange[0].isSame(dateRange[1], 'day');
   };
 
-  // Get default value for a parameter type
-  const getDefaultValue = useCallback((paramKey) => {
-    switch(paramKey) {
-      case 'phaseAVoltage':
-      case 'phaseBVoltage':
-      case 'phaseCVoltage':
-      case 'avgPhaseVoltage':
-        return 220;
-      case 'lineABVoltage':
-      case 'lineBCVoltage':
-      case 'lineCAVoltage':
-      case 'avgLineVoltage':
-        return 380;
-      case 'phaseACurrent':
-      case 'phaseBCurrent':
-      case 'phaseCCurrent':
-      case 'avgThreePhaseCurrent':
-        return 10;
-      case 'powerFactor':
-        return 0.9;
-      case 'frequency':
-        return 50;
-      case 'totalInstantaneousPower':
-        return 8;
-      case 'activeEnergyDelivered':
-        return 350;
-      default:
-        return 100;
-    }
-  }, []);
+  // Disable submit button if parameters are invalid
+  const isSubmitDisabled = () => {
+    if (isLive) return true;
+    if (!selectedParameter) return true;
+    if (!isDateRangeValid()) return true;
+    return false;
+  };
 
   // Helper function for status info
   const getStatusInfo = (status) => {
@@ -296,66 +384,6 @@ const RealTimeGraph = ({ machineId, machineName }) => {
     }
   };
 
-  // Handle live data effect
-  useEffect(() => {
-    if (isLive && selectedParameter && parameters) {
-      // When in live mode, update chart with current value
-      const paramValue = parameters[selectedParameter];
-      let numericValue;
-      
-      if (typeof paramValue === 'string') {
-        numericValue = parseFloat(paramValue);
-      } else if (typeof paramValue === 'number') {
-        numericValue = paramValue;
-      } else {
-        numericValue = getDefaultValue(selectedParameter);
-      }
-      
-      if (numericValue !== undefined && !isNaN(numericValue)) {
-        const now = new Date();
-        const formattedTimestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        const newDataPoint = {
-          key: Date.now(),
-          timestamp: formattedTimestamp,
-          rawTimestamp: now.toISOString(),
-          value: numericValue
-        };
-        
-        setChartData(prevData => {
-          const newData = [...prevData, newDataPoint];
-          // Keep only the last 20 points for better visualization
-          return newData.length > 20 ? newData.slice(-20) : newData;
-        });
-      }
-    }
-  }, [isLive, parameters, selectedParameter, getDefaultValue]);
-
-  // Clear chart when changing parameter in live mode
-  useEffect(() => {
-    if (isLive) {
-      setChartData([]);
-    }
-  }, [selectedParameter, isLive]);
-
-  // Validate date range
-  const isDateRangeValid = () => {
-    if (!dateRange || !dateRange[0] || !dateRange[1]) {
-      return false;
-    }
-    
-    // Check if start date is before end date
-    return dateRange[0].isBefore(dateRange[1]) || dateRange[0].isSame(dateRange[1], 'day');
-  };
-
-  // Disable submit button if parameters are invalid
-  const isSubmitDisabled = () => {
-    if (isLive) return true;
-    if (!selectedParameter) return true;
-    if (!isDateRangeValid()) return true;
-    return false;
-  };
-  
   // If we're in the initial loading state
   if (initialLoad || !parameters) {
     return (
@@ -637,7 +665,7 @@ const RealTimeGraph = ({ machineId, machineName }) => {
         </Row>
       </Card>
 
-      {/* New Production Timeline Card */}
+      {/* Production Timeline Card */}
       <Card
         style={{
           borderRadius: '8px',
@@ -645,9 +673,11 @@ const RealTimeGraph = ({ machineId, machineName }) => {
           marginBottom: '16px'
         }}
       >
-        <Row justify="space-between" align="middle" style={{ marginBottom: '24px' }}>
+        <Row justify="space-between" align="middle" style={{ marginBottom: '16px' }}>
           <Col>
-            <Title level={4} style={{ margin: 0 }}>Production Timeline</Title>
+            <Title level={4} style={{ margin: 0 }}>
+              {isLive ? 'Live Production Timeline' : 'Historical Production Timeline'}
+            </Title>
             <Text type="secondary">{machineName}</Text>
           </Col>
           <Col>
@@ -677,25 +707,23 @@ const RealTimeGraph = ({ machineId, machineName }) => {
                 <Option value="activeEnergyDelivered">Energy Delivered</Option>
               </Select>
               
-              {!isLive && (
-                <>
-                  <RangePicker 
-                    style={{ width: 280 }}
-                    onChange={setDateRange}
-                    value={dateRange}
-                    allowClear
-                  />
-                  <Button 
-                    type="primary" 
-                    icon={<SearchOutlined />}
-                    onClick={handleSubmitFilteredData}
-                    disabled={isSubmitDisabled()}
-                    loading={chartLoading}
-                  >
-                    Submit
-                  </Button>
-                </>
-              )}
+              <RangePicker 
+                style={{ width: 280 }}
+                onChange={setDateRange}
+                value={dateRange}
+                allowClear={false}
+                disabled={isLive}
+              />
+              
+              <Button 
+                type="primary" 
+                icon={<SearchOutlined />}
+                onClick={handleSubmitFilteredData}
+                disabled={isSubmitDisabled()}
+                loading={chartLoading}
+              >
+                Submit
+              </Button>
               
               <Button 
                 type={isLive ? "primary" : "default"}
@@ -707,7 +735,6 @@ const RealTimeGraph = ({ machineId, machineName }) => {
                   })
                 }}
                 onClick={handleLiveToggle}
-                disabled={!selectedParameter}
               >
                 {isLive ? 'Live' : 'Go Live'}
               </Button>
@@ -715,14 +742,14 @@ const RealTimeGraph = ({ machineId, machineName }) => {
           </Col>
         </Row>
         <div style={{ 
-          padding: '16px',
+          padding: '12px',
           background: '#f8fafc',
           borderRadius: '6px',
-          minHeight: '300px',
+          minHeight: '200px',
           border: '1px solid #e2e8f0'
         }}>
           {chartLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
               <Spin size="large" />
             </div>
           ) : chartError ? (
@@ -734,65 +761,112 @@ const RealTimeGraph = ({ machineId, machineName }) => {
             />
           ) : chartData.length > 0 ? (
             <>
-              <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text strong>
                   {selectedParameter && getParameterDisplayName(selectedParameter)}
                   {!isLive && dateRange && dateRange[0] && dateRange[1] && ` - ${dateRange[0].format('YYYY-MM-DD')} to ${dateRange[1].format('YYYY-MM-DD')}`}
                 </Text>
-                {isLive && (
+                {isLive ? (
                   <Badge status="processing" text="Live Data" style={{ color: '#22c55e' }} />
+                ) : (
+                  <Text type="secondary">Historical Data</Text>
                 )}
               </div>
-              <ResponsiveContainer width="100%" height={300}>
-                {chartData.length > 0 ? (
-                  <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="timestamp" 
-                      tick={{ fontSize: 12 }}
-                      label={{ 
-                        value: 'Time', 
-                        position: 'insideBottomRight', 
-                        offset: 0,
-                        fontSize: 12
-                      }}
-                    />
-                    <YAxis 
-                      label={{ 
-                        value: getParameterDisplayName(selectedParameter).split(' ')[0], 
-                        angle: -90, 
-                        position: 'insideLeft',
-                        fontSize: 12
-                      }}
-                      domain={[
-                        dataMin => Math.floor(dataMin * 0.9), // Start at 90% of minimum value
-                        dataMax => Math.ceil(dataMax * 1.1)  // End at 110% of maximum value
-                      ]}
-                      tickFormatter={(value) => value.toFixed(1)}
-                    />
-                    <Tooltip
-                      formatter={(value) => [typeof value === 'number' ? value.toFixed(2) : value, getParameterDisplayName(selectedParameter).split(' ')[0]]}
-                      labelFormatter={(label) => label}
-                      isAnimationActive={false}
-                    />
-                    <Legend />
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="value" 
-                      stroke="#8884d8" 
-                      activeDot={{ r: 6 }} 
-                      name={selectedParameter && getParameterDisplayName(selectedParameter)}
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      isAnimationActive={false}
-                      connectNulls
-                    />
-                  </LineChart>
-                ) : (
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                    <Text type="secondary">No data to display</Text>
-                  </div>
-                )}
+              <ResponsiveContainer width="100%" height={200} minHeight={200}>
+                <LineChart 
+                  data={chartData} 
+                  margin={{ top: 15, right: 15, left: 15, bottom: 15 }}
+                  style={{ overflow: 'visible' }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0.2}/>
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* X-axis displaying timestamps */}
+                  <XAxis 
+                    dataKey="timestamp" 
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={{ stroke: '#64748b' }}
+                    tickLine={{ stroke: '#64748b' }}
+                    allowDataOverflow={false}
+                    padding={{ left: 10, right: 10 }}
+                    tickMargin={5}
+                  />
+                  
+                  {/* Y-axis displaying parameter values */}
+                  <YAxis 
+                    label={{ 
+                      value: getParameterDisplayName(selectedParameter).split(' ')[0], 
+                      angle: -90, 
+                      position: 'insideLeft',
+                      offset: 0,
+                      fontSize: 11,
+                      fill: '#64748b'
+                    }}
+                    domain={['auto', 'auto']}
+                    tickFormatter={(value) => value.toFixed(1)}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={{ stroke: '#64748b' }}
+                    tickLine={{ stroke: '#64748b' }}
+                    allowDataOverflow={false}
+                    padding={{ top: 10, bottom: 10 }}
+                    tickMargin={5}
+                  />
+                  
+                  <Tooltip
+                    formatter={(value) => [
+                      `${value.toFixed(2)} ${getParameterDisplayName(selectedParameter).split('(')[1]?.replace(')', '') || ''}`,
+                      getParameterDisplayName(selectedParameter).split(' ')[0]
+                    ]}
+                    labelFormatter={(label) => `Time: ${label}`}
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      padding: '8px'
+                    }}
+                    isAnimationActive={false}
+                    cursor={{ stroke: '#64748b', strokeWidth: 1, strokeDasharray: '5 5' }}
+                  />
+                  
+                  <Legend 
+                    wrapperStyle={{ 
+                      paddingTop: '5px',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value) => <span style={{ color: '#64748b' }}>{value}</span>}
+                    iconSize={8}
+                    verticalAlign="bottom"
+                    height={20}
+                  />
+                  
+                  <Line 
+                    type="stepAfter" 
+                    dataKey="value" 
+                    stroke="#8884d8" 
+                    strokeWidth={2}
+                    activeDot={{ r: 5, fill: '#8884d8', stroke: '#fff', strokeWidth: 2 }}
+                    dot={{ r: 2.5, fill: '#8884d8', strokeWidth: 0 }}
+                    name={getParameterDisplayName(selectedParameter)}
+                    isAnimationActive={false}
+                    connectNulls
+                  />
+                  
+                  <Area 
+                    type="stepAfter"
+                    dataKey="value"
+                    stroke="none"
+                    fillOpacity={0.5}
+                    fill="url(#colorValue)"
+                    isAnimationActive={false}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </>
           ) : (
@@ -801,19 +875,11 @@ const RealTimeGraph = ({ machineId, machineName }) => {
               flexDirection: 'column', 
               justifyContent: 'center', 
               alignItems: 'center', 
-              height: '300px' 
+              height: '200px'
             }}>
-              {selectedParameter ? (
-                <Text type="secondary">
-                  {isLive ? 
-                    'Waiting for live data...' : 
-                    'Select a date range, then click Submit to view historical data'}
-                </Text>
-              ) : (
-                <Text type="secondary">
-                  Please select a parameter first
-                </Text>
-              )}
+              <Text type="secondary">
+                {isLive ? 'Waiting for live data...' : 'Select dates and click Submit to view historical data'}
+              </Text>
             </div>
           )}
         </div>

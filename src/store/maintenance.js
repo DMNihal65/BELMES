@@ -1,10 +1,11 @@
+
 import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.88:5674/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.88:5674/api/v1/operator';
-const MASTER_ORDER_URL = 'http://172.18.7.88:5674/api/v1/master-order';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.88:5698/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.88:5698/api/v1/operator';
+const MASTER_ORDER_URL = 'http://172.18.7.88:5698/api/v1/master-order';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -162,17 +163,18 @@ const useMachineMaintenanceStore = create((set, get) => ({
         const machineStatus = statusResponse.data.statuses.find(
           status => status.machine_id === machine.id
         ) || {
-          status_name: 'OFF',
+          status_name: 'OFF', // Default status
           available_from: new Date().toISOString(),
+          available_to: new Date().toISOString(), // Default available_to
           description: ''
         };
   
         return {
-          ...machineStatus,
+          ...machineStatus, // Includes available_from, available_to, status_name, description
           machine_id: machine.id,
-          machine_make: machine.make,
-          id: machine.id,
-          description: machineStatus.description || ''
+          machine_make: machine.make, // Use 'make' from master data for machine_make
+          id: machine.id, // Ensure id is present
+          description: machineStatus.description || '' // Ensure description is never undefined or null
         };
       });
   
@@ -217,6 +219,17 @@ const useMachineMaintenanceStore = create((set, get) => ({
         available_from: data.available_from,
         description: description
       };
+
+      // Add available_to only if status is OFF (status_id 2)
+      if (data.status_id === 2 && data.available_to) {
+        requestData.available_to = data.available_to;
+      } else if (data.status_id === 1) {
+        // If status is ON, we can explicitly set available_to to null or rely on backend to handle it.
+        // For now, let's send it as null, or the same as available_from if the API requires it.
+        // Based on the provided API PUT an ON status does not seem to send available_to, 
+        // but GET for ON status returns it, so let's match available_from for now if status is ON
+        requestData.available_to = data.available_from; 
+      }
   
       console.log('Sendingggg request data:', requestData);
   
@@ -239,17 +252,18 @@ const useMachineMaintenanceStore = create((set, get) => ({
         const machineStatus = statusResponse.data.statuses.find(
           status => status.machine_id === machine.id
         ) || {
-          status_name: 'OFF',
+          status_name: 'OFF', // Default status
           available_from: new Date().toISOString(),
+          available_to: new Date().toISOString(), // Default available_to
           description: ''
         };
   
         return {
-          ...machineStatus,
+          ...machineStatus, // Includes available_from, available_to, status_name, description
           machine_id: machine.id,
-          machine_make: machine.make,
-          id: machine.id,
-          description: machineStatus.description || ''
+          machine_make: machine.make, // Use 'make' from master data for machine_make
+          id: machine.id, // Ensure id is present
+          description: machineStatus.description || '' // Ensure description is never undefined or null
         };
       });
   
@@ -269,9 +283,6 @@ const useMachineMaintenanceStore = create((set, get) => ({
       throw error;
     }
   },
-
-
-  
 
   // Fetch machine notifications
   fetchMachineNotifications: async () => {
@@ -407,14 +418,3 @@ fetchMachinePerformanceMetrics: async () => {
 }));
 
 export default useMachineMaintenanceStore;
-
-
-
-
-
-
-
-
-
-
-

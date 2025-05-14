@@ -51,11 +51,13 @@ export default function MachineMaintenance() {
 
   const edit = (record) => {
     const availableFrom = record.available_from ? dayjs(record.available_from) : dayjs();
+    const availableTo = record.available_to ? dayjs(record.available_to) : dayjs();
     const statusId = record.status_name === 'ON' ? '1' : '2';
     setCurrentStatus(statusId);
     form.setFieldsValue({
       status_id: statusId,
       available_from: availableFrom,
+      available_to: availableTo,
       machine_make: record.machine_make,
       description: record.description
     });
@@ -82,13 +84,18 @@ export default function MachineMaintenance() {
       const formattedData = {
         machine_id: record.machine_id,
         status_id: values.status_id === '1' ? 1 : 2,
-        available_from: dayjs(values.available_from).utc().format(),
+        available_from: dayjs(values.available_from).format('YYYY-MM-DDTHH:mm:ss'),
         description: description || '' // Ensure description is never undefined or null
       };
+
+      if (formattedData.status_id === 2 && values.available_to) {
+        formattedData.available_to = dayjs(values.available_to).format('YYYY-MM-DDTHH:mm:ss');
+      } else if (formattedData.status_id === 1) {
+        formattedData.available_to = formattedData.available_from;
+      }
       
       console.log('Sending request data:', formattedData); // Log the request data
       
-      // Use the machine_id from the record to update the status
       await updateMachineStatus(record.machine_id, formattedData); // Ensure record.machine_id is used
       setEditingKey('');
       setCurrentStatus('');
@@ -97,8 +104,6 @@ export default function MachineMaintenance() {
       // Show success toast
       toast.success('Machine status updated successfully!');
 
-
-      
     } catch (errInfo) {
       console.log('Validate Failed:', errInfo);
       // Show error toast
@@ -152,7 +157,44 @@ export default function MachineMaintenance() {
           format(new Date(record.available_from), 'dd/MM/yyyy HH:mm')
         );
       },
-      width: '35%',
+      width: '20%',
+    },
+    {
+      title: 'Available To',
+      dataIndex: 'available_to',
+      key: 'available_to',
+      sorter: (a, b) => {
+        if (!a.available_to && !b.available_to) return 0;
+        if (!a.available_to) return 1;
+        if (!b.available_to) return -1;
+        return new Date(a.available_to) - new Date(b.available_to);
+      },
+      render: (_, record) => {
+        const editable = isEditing(record);
+        if (editable) {
+          if (currentStatus === '2') { 
+            return (
+              <Form.Item
+                name="available_to"
+                style={{ margin: 0 }}
+                rules={[{ required: true, message: 'Please select date and time!' }]}
+              >
+                <DatePicker
+                  showTime={{ format: 'HH:mm:ss' }}
+                  format="YYYY-MM-DD HH:mm:ss"
+                  style={{ width: '100%' }}
+                  allowClear={false}
+                />
+              </Form.Item>
+            );
+          }
+          return null;
+        }
+        return record.status_name === 'OFF' && record.available_to 
+          ? format(new Date(record.available_to), 'dd/MM/yyyy HH:mm') 
+          : '-';
+      },
+      width: '20%',
     },
     {
       title: 'Status',

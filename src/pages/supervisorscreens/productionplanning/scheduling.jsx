@@ -472,21 +472,21 @@ const Scheduling = () => {
                       <span class="value">${op.quantity}</span>
                     </div>
                     ${
-                      isFirstOperation
-                        ? `<div class="info-row">
-                            <span class="label">Start:</span>
-                            <span class="value">${new Date(op.start_time).toLocaleString()}</span>
-                          </div>
-                          <div class="info-row">
-                            <span class="label">PDC of Operation:</span>
-                            <span class="value">${new Date(groupOperations[groupOperations.length - 1].end_time).toLocaleString()}</span>
-                          </div>`
-                        : isLastOperation
+                      isLastOperation
                         ? `<div class="info-row">
                             <span class="label">End:</span>
                             <span class="value">${new Date(op.end_time).toLocaleString()}</span>
                           </div>`
-                        : ''
+                        : `
+                            <div class="info-row">
+                              <span class="label">Start:</span>
+                              <span class="value">${new Date(firstOp.start_time).toLocaleString()}</span>
+                            </div>
+                            <div class="info-row">
+                              <span class="label">PDC of Operation:</span>
+                              <span class="value">${new Date(groupOperations[groupOperations.length - 1].end_time).toLocaleString()}</span>
+                            </div>
+                          `
                     }
                   </div>
                 </div>

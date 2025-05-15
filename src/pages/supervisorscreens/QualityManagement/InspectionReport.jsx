@@ -402,6 +402,173 @@ const InspectionReport = () => {
     }
   };
 
+  // Update the handleDeleteReport function to handle server connection issues better
+  const handleDeleteReport = async (record) => {
+    try {
+      // Extract the document ID from the record
+      const documentId = record.key;
+      
+      // Show a confirmation dialog before deleting
+      if (!window.confirm(`Are you sure you want to delete "${record.name}"?`)) {
+        return; // User canceled the deletion
+      }
+      
+      // Show a loading message
+      const toastId = toast.loading('Deleting report...', {
+        position: 'top-right',
+      });
+      
+      console.log(`Attempting to delete document with ID: ${documentId}`);
+      
+      // Optimistically update the UI by removing the report from the local state
+      const originalReports = [...reports]; // Keep a copy of the original reports
+      const updatedReports = reports.filter(r => r.key !== documentId);
+      setReports(updatedReports);
+      
+      // Call the deleteDocument function from the quality store
+      try {
+        const result = await qualityStore.deleteDocument(documentId);
+        
+        // Dismiss the loading toast
+        toast.dismiss(toastId);
+        
+        // Show success message
+        toast.success('Report deleted successfully', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+        
+        // Refresh the report structure in the background
+        fetchReportStructure(true);
+      } catch (error) {
+        console.error('Error deleting report:', error);
+        
+        // Revert the optimistic update if the deletion fails
+        setReports(originalReports);
+        
+        // Dismiss loading toast
+        toast.dismiss(toastId);
+        
+        // Show error message with more helpful information
+        let errorMsg = 'Failed to delete report';
+        
+        if (error.message && error.message.includes('Server did not respond')) {
+          // Show a more detailed error with possible solutions
+          toast.error(
+            <div>
+              <div><strong>Connection Error</strong></div>
+              <div>The server did not respond to the delete request.</div>
+              <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
+                <div>API Endpoint:</div>
+                <div style={{ 
+                  fontFamily: 'monospace', 
+                  background: '#f0f0f0', 
+                  padding: '4px 8px',
+                  margin: '4px 0',
+                  borderRadius: '4px',
+                  fontSize: '0.9em',
+                  wordBreak: 'break-all'
+                }}>
+                  DELETE http://172.18.7.88:7878/api/v1/document-management/report/structure/document/{documentId}
+                </div>
+                <div style={{ marginTop: '8px' }}>
+                  Possible solutions:
+                  <ul style={{ paddingLeft: '20px', marginTop: '4px' }}>
+                    <li>Verify the API endpoint is correct</li>
+                    <li>Check if the server is running</li>
+                    <li>Ensure your network can reach the server</li>
+                    <li>Check server logs for errors</li>
+                  </ul>
+                </div>
+              </div>
+            </div>,
+            {
+              position: 'top-right',
+              autoClose: 10000,
+              closeOnClick: false,
+              pauseOnHover: true,
+              draggable: true,
+            }
+          );
+          return;
+        }
+        
+        if (error.response) {
+          switch (error.response.status) {
+            case 404:
+              errorMsg = 'Report not found on server';
+              break;
+            case 403:
+              errorMsg = 'You do not have permission to delete this report';
+              break;
+            case 500:
+              errorMsg = 'Server error occurred while deleting the report';
+              break;
+            default:
+              errorMsg = `Server returned error (${error.response.status})`;
+          }
+        } else if (error.request) {
+          errorMsg = 'No response from server. Please check your network connection';
+        } else {
+          errorMsg = error.message || 'Unknown error occurred';
+        }
+        
+        toast.error(errorMsg, {
+          position: 'top-right',
+          autoClose: 4000,
+        });
+      }
+    } catch (error) {
+      console.error('Unexpected error in handleDeleteReport:', error);
+      
+      // Show error message
+      toast.error('An unexpected error occurred while trying to delete the report', {
+        position: 'top-right',
+        autoClose: 4000,
+      });
+    }
+  };
+
+  // Add a function to handle folder deletion
+  const handleDeleteFolder = async (folderId) => {
+    try {
+      // Show a loading message
+      const toastId = toast.loading('Deleting folder...', {
+        position: 'top-right',
+      });
+      
+      console.log(`Attempting to delete folder with ID: ${folderId}`);
+      
+      // Call the deleteFolder function from the quality store
+      const result = await qualityStore.deleteFolder(folderId);
+      
+      // If deletion was successful
+      if (result.success) {
+        // Dismiss the loading toast
+        toast.dismiss(toastId);
+        
+        // Show success message
+        toast.success('Folder deleted successfully', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+        
+        // Refresh the report structure to update the UI
+        fetchReportStructure(true);
+      } else {
+        throw new Error(result.message || 'Failed to delete folder');
+      }
+    } catch (error) {
+      console.error('Error deleting folder:', error);
+      
+      // Show error message
+      toast.error(error.message || 'Failed to delete folder', {
+        position: 'top-right',
+        autoClose: 4000,
+      });
+    }
+  };
+
   // Table columns
   const columns = [
     {
@@ -506,13 +673,13 @@ const InspectionReport = () => {
       width: 200,
       render: (_, record) => (
         <Space>
-          
           <Tooltip title="Delete report">
             <Button 
               icon={<DeleteOutlined />} 
               type="text" 
               danger 
-              className="hover:bg-red-50" 
+              className="hover:bg-red-50"
+              onClick={() => handleDeleteReport(record)}
             />
           </Tooltip>
           <Tooltip title={record.key ? "Download PDF" : "No document available"}>
@@ -622,18 +789,7 @@ const InspectionReport = () => {
       
       {/* Filters Section */}
       <Row gutter={[24, 24]} className="mb-6">
-        <Col span={8}>
-          <div className="font-medium mb-2 flex items-center">
-            <CalendarOutlined className="mr-2 text-blue-500" />
-            <span>Date Range</span>
-          </div>
-          <DatePicker.RangePicker 
-            className="w-full"
-            placeholder={['Start date', 'End date']}
-            size="middle"
-          />
-        </Col>
-        <Col span={8}>
+        <Col span={16}>
           <div className="font-medium mb-2 flex items-center">
             <FilterOutlined className="mr-2 text-blue-500" />
             <span>Report Type</span>

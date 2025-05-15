@@ -662,18 +662,6 @@ const DynamicSchedulingGraph2 = () => {
             <Option value="month">Monthly</Option>
             <Option value="year">Yearly</Option>
           </Select>
-          
-          {/* <Select
-            placeholder="Select Production Order"
-            value={selectedProductionOrder}
-            onChange={handleProductionOrderChange}
-            style={{ width: 200 }}
-            allowClear
-          >
-            {productionOrders.map(po => (
-              <Option key={po} value={po}>{po}</Option>
-            ))}
-          </Select> */}
 
           <Select
             placeholder="Select Machine"
@@ -691,6 +679,18 @@ const DynamicSchedulingGraph2 = () => {
                   </Option>
                 ))
               )}
+          </Select>
+
+          <Select
+            placeholder="Select Production Order"
+            value={selectedProductionOrder}
+            onChange={handleProductionOrderChange}
+            style={{ width: 200 }}
+            allowClear
+          >
+            {productionOrders.map(po => (
+              <Option key={po} value={po}>{po}</Option>
+            ))}
           </Select>
 
           <Select

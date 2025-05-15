@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { 
   Card, Row, Col, Statistic, Progress, Badge, Space, Button, 
   Input, Select, Tooltip, Tag, Modal, Drawer, Switch, Empty,
-  Divider, Table, Tabs, Avatar, Alert, Spin, Typography
+  Divider, Table, Tabs, Avatar, Alert, Spin, Typography, DatePicker
 } from 'antd';
 import { 
   RefreshCw, Search, Grid, List, Filter, Bell, 
@@ -10,7 +10,7 @@ import {
   Zap, Percent, Award, Target, Box, Monitor,
   FileText, HashIcon, Code, Server, BarChart2, Settings,
   Cpu, RotateCw, Disc,
-  Eye
+  Eye, Calendar
 } from 'lucide-react';
 import { 
   EyeOutlined, InfoCircleOutlined, CloseCircleFilled, 
@@ -27,6 +27,7 @@ dayjs.extend(relativeTime);
 const { TabPane } = Tabs;
 const { Search: SearchInput } = Input;
 const { Text, Title } = Typography;
+const { RangePicker } = DatePicker;
 
 const MachineDashboard = () => {
   const { 
@@ -49,6 +50,9 @@ const MachineDashboard = () => {
   const [alertsCount, setAlertsCount] = useState(3); // Mock alerts count
   const [sortOrder, setSortOrder] = useState('status');
   const [machineTimers, setMachineTimers] = useState({});
+  const [dateRange, setDateRange] = useState([dayjs().subtract(7, 'days'), dayjs()]); // Default to last 7 days
+  const [selectedDatePreset, setSelectedDatePreset] = useState('week');
+  const [showDatePicker, setShowDatePicker] = useState(false);
   
   // OEE refresh interval ref
   const oeeRefreshIntervalRef = useRef(null);
@@ -147,24 +151,61 @@ const MachineDashboard = () => {
     return matchesStatus && matchesSearch;
   });
 
+  // Date range presets
+  const datePresets = [
+    { label: 'Last Week', value: 'week', range: [dayjs().subtract(7, 'days'), dayjs()] },
+    { label: 'Last Month', value: 'month', range: [dayjs().subtract(30, 'days'), dayjs()] },
+  ];
+
+  // Handle date range change
+  const handleDateRangeChange = (dates) => {
+    if (dates) {
+      setDateRange(dates);
+      fetchOverallOEEMetrics(dates[0], dates[1]);
+    }
+  };
+
+  // Handle preset selection
+  const handlePresetChange = (preset) => {
+    setSelectedDatePreset(preset);
+    if (preset === 'custom') {
+      setShowDatePicker(true);
+    } else {
+      setShowDatePicker(false);
+      const selectedPreset = datePresets.find(p => p.value === preset);
+      if (selectedPreset) {
+        setDateRange(selectedPreset.range);
+        fetchOverallOEEMetrics(selectedPreset.range[0], selectedPreset.range[1]);
+      }
+    }
+  };
+
   // Get machine data in a stable order that won't change positions
   const stableSortedMachines = useMemo(() => {
     if (!filteredMachines.length) return [];
     
-    // First sort by machine ID to ensure stable ordering
-    return [...filteredMachines].sort((a, b) => {
-      // First sort by the criteria selected by user
+    // Create a stable sort key for each machine
+    const machinesWithSortKey = filteredMachines.map(machine => ({
+      ...machine,
+      stableSortKey: `${machine.machine_id}-${machine.machine_name}`
+    }));
+    
+    return machinesWithSortKey.sort((a, b) => {
+      // First sort by the stable sort key
+      const stableCompare = a.stableSortKey.localeCompare(b.stableSortKey);
+      if (stableCompare !== 0) return stableCompare;
+      
+      // Then apply user-selected sort if machines have the same stable key
       if (sortOrder === 'name') {
         return (a.machine_name || '').localeCompare(b.machine_name || '');
       } else if (sortOrder === 'status') {
-        // Priority order: ON > PRODUCTION > OFF
         const statusPriority = {
           'ON': 0,
-          'IDLE': 0, // Same priority as ON
+          'IDLE': 0,
           'PRODUCTION': 1,
-          'RUNNING': 1, // Same priority as PRODUCTION
+          'RUNNING': 1,
           'OFF': 2,
-          'OFFLINE': 2, // Same priority as OFF
+          'OFFLINE': 2,
           'STOPPED': 3,
           'MAINTENANCE': 4
         };
@@ -172,9 +213,7 @@ const MachineDashboard = () => {
       } else if (sortOrder === 'parts') {
         return (b.part_count || 0) - (a.part_count || 0);
       }
-      
-      // Then always sort by ID as a secondary criteria for stability
-      return a.machine_id - b.machine_id;
+      return 0;
     });
   }, [filteredMachines, sortOrder]);
 
@@ -200,7 +239,7 @@ const MachineDashboard = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     initializeWebSocket();
-    fetchOverallOEEMetrics();
+    fetchOverallOEEMetrics(dateRange[0], dateRange[1]);
     
     setTimeout(() => {
       setRefreshing(false);
@@ -209,12 +248,12 @@ const MachineDashboard = () => {
 
   // Initialize WebSocket and OEE metrics on component mount
   useEffect(() => {
-        initializeWebSocket();
-    fetchOverallOEEMetrics();
+    initializeWebSocket();
+    fetchOverallOEEMetrics(dateRange[0], dateRange[1]);
     
     // Set up 5-minute interval for OEE metrics refresh
     oeeRefreshIntervalRef.current = setInterval(() => {
-      fetchOverallOEEMetrics();
+      fetchOverallOEEMetrics(dateRange[0], dateRange[1]);
     }, 5 * 60 * 1000); // 5 minutes
     
     return () => {
@@ -222,7 +261,7 @@ const MachineDashboard = () => {
         clearInterval(oeeRefreshIntervalRef.current);
       }
     };
-  }, []);
+  }, [dateRange]);
 
   // Update machine idle timers
   useEffect(() => {
@@ -927,12 +966,35 @@ const MachineDashboard = () => {
                   <Activity size={20} className="text-blue-500" />
                   <span className="font-bold text-gray-800">Overall Efficiency</span>
                 </div>
-                <Tooltip title="Last updated">
-                  <div className="text-xs text-gray-500 flex items-center">
-                    <Clock size={14} className="mr-1 text-blue-400" />
-                    {overallOEEMetrics?.lastUpdated ? dayjs(overallOEEMetrics.lastUpdated).format('HH:mm') : '--:--'}
-                  </div>
-                </Tooltip>
+                <div className="flex items-center gap-4">
+                  {/* Date Range Selection */}
+                  <Space size="middle">
+                    <Select
+                      value={selectedDatePreset}
+                      onChange={handlePresetChange}
+                      style={{ width: 130 }}
+                      options={[
+                        { value: 'week', label: 'One Week' },
+                        { value: 'month', label: 'Last Month' },
+                        { value: 'custom', label: 'Custom Range' }
+                      ]}
+                    />
+                    
+                    <RangePicker
+                      value={dateRange}
+                      onChange={handleDateRangeChange}
+                      allowClear={false}
+                      style={{ display: selectedDatePreset === 'custom' ? 'inline-flex' : 'none' }}
+                    />
+                  </Space>
+                  
+                  <Tooltip title="Last updated">
+                    <div className="text-xs text-gray-500 flex items-center">
+                      <Clock size={14} className="mr-1 text-blue-400" />
+                      {overallOEEMetrics?.lastUpdated ? dayjs(overallOEEMetrics.lastUpdated).format('HH:mm') : '--:--'}
+                    </div>
+                  </Tooltip>
+                </div>
               </div>
               
               <div className="grid grid-cols-4 gap-3">

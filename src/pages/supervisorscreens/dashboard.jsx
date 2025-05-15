@@ -62,185 +62,157 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
   const errorMachines = statusCounts['ERROR'] || 0;
 
   return (
-    <div className="bg-gray-100 h-full overflow-auto p-4">
-      {/* Dashboard header */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <h2 className="text-lg font-bold mb-3 text-gray-800">Factory Overview</h2>
-        
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-blue-50 rounded-lg p-3 border border-blue-100 flex flex-col items-center">
-            <div className="text-blue-600 text-2xl font-bold">{totalMachines}</div>
-            <div className="text-blue-800 text-sm">Total Machines</div>
+    <div className="h-full flex flex-col">
+      {/* Stats Panel - Top */}
+      <div className="bg-white rounded-lg shadow p-3 mb-3">
+        <div className="grid grid-cols-4 gap-3">
+          <div className="bg-blue-50 rounded-lg p-2 border border-blue-100 flex items-center justify-between">
+            <div className="text-blue-800 text-sm font-medium">Total Machines</div>
+            <div className="text-blue-600 text-xl font-bold">{totalMachines}</div>
           </div>
           
-          <div className="bg-green-50 rounded-lg p-3 border border-green-100 flex flex-col items-center">
-            <div className="text-green-600 text-2xl font-bold">{activeMachines}</div>
-            <div className="text-green-800 text-sm">In Production</div>
+          <div className="bg-green-50 rounded-lg p-2 border border-green-100 flex items-center justify-between">
+            <div className="text-green-800 text-sm font-medium">In Production</div>
+            <div className="text-green-600 text-xl font-bold">{activeMachines}</div>
           </div>
           
-          <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-100 flex flex-col items-center">
-            <div className="text-yellow-600 text-2xl font-bold">{idleMachines}</div>
-            <div className="text-yellow-800 text-sm">Idle/Setup</div>
+          <div className="bg-yellow-50 rounded-lg p-2 border border-yellow-100 flex items-center justify-between">
+            <div className="text-yellow-800 text-sm font-medium">Idle/Setup</div>
+            <div className="text-yellow-600 text-xl font-bold">{idleMachines}</div>
           </div>
           
-          <div className="bg-red-50 rounded-lg p-3 border border-red-100 flex flex-col items-center">
-            <div className="text-red-600 text-2xl font-bold">{errorMachines}</div>
-            <div className="text-red-800 text-sm">Errors/Off</div>
+          <div className="bg-red-50 rounded-lg p-2 border border-red-100 flex items-center justify-between">
+            <div className="text-red-800 text-sm font-medium">Errors/Off</div>
+            <div className="text-red-600 text-xl font-bold">{errorMachines}</div>
           </div>
         </div>
       </div>
       
-      {/* Simplified Factory Layout Visualization */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <h3 className="font-bold text-gray-800 mb-3">Factory Layout</h3>
-        <div className="relative h-48 bg-gray-100 border border-gray-200 rounded-lg overflow-hidden">
-          {/* Main shop floor */}
-          <div className="absolute inset-0 bg-blue-50"></div>
-          
-          {/* EDM Room */}
-          <div className="absolute top-0 left-0 right-0 h-16 bg-purple-50 border-b border-purple-200">
-            <div className="text-center text-xs font-medium text-purple-800 mt-1">EDM Area</div>
+      {/* Main Content Area - fills remaining height */}
+      <div className="flex-1 grid grid-cols-4 gap-3 overflow-hidden">
+        {/* Left Column - Shop Floor Visualization */}
+        <div className="col-span-2 bg-white rounded-lg shadow p-3 flex flex-col">
+          <h3 className="font-bold text-gray-800 mb-2 text-sm">Factory Layout</h3>
+          <div className="flex-1 relative bg-blue-50 rounded-lg border border-blue-100 overflow-hidden">
+            {/* EDM Room */}
+            <div className="absolute top-0 left-0 right-0 h-1/4 bg-purple-50 border-b border-purple-200 flex flex-col">
+              <div className="text-xs font-medium text-purple-800 p-1">EDM Area</div>
+              <div className="flex-1 flex items-center justify-center gap-x-4">
+                {machinesByType.edm.slice(0, 2).map((machine) => {
+                  const color = getStatusColor(machine.status);
+                  return (
+                    <Tooltip key={machine.id} title={`${machine.name} - ${machine.status}`}>
+                      <div 
+                        onClick={() => onMachineSelect(machine)}
+                        className={`w-12 h-8 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-center border-${color}-300 border`}
+                      >
+                        <div className={`w-2 h-2 rounded-full bg-${color}-500`}></div>
+                      </div>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </div>
             
-            {/* EDM Machines */}
-            <div className="flex justify-center mt-2 space-x-8">
-              {machinesByType.edm.slice(0, 2).map((machine, idx) => {
-                const color = getStatusColor(machine.status);
-                const borderClass = getBorderColorClass(color);
-                const dotClass = getStatusDotClass(color);
-                
-                return (
-                  <div 
-                    key={machine.id}
-                    onClick={() => onMachineSelect(machine)}
-                    className={`w-12 h-8 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-center ${borderClass}`}
-                  >
-                    <div className={dotClass}></div>
-                  </div>
-                );
-              })}
+            {/* Center Aisle */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 top-1/4 bottom-0 w-3 bg-gray-200"></div>
+            
+            {/* Turning Machines - Left Side */}
+            <div className="absolute top-1/4 left-2 bottom-2 w-[45%] flex flex-col">
+              <div className="text-xs font-medium text-blue-800 mb-1 text-center">Turning</div>
+              <div className="flex-1 flex flex-col justify-around">
+                {machinesByType.turning.slice(0, 5).map((machine) => {
+                  const color = getStatusColor(machine.status);
+                  return (
+                    <Tooltip key={machine.id} title={`${machine.name} - ${machine.partNumber || 'No Part'}`}>
+                      <div 
+                        onClick={() => onMachineSelect(machine)}
+                        className={`h-8 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-between px-2 border-${color}-300 border`}
+                      >
+                        <div className={`w-2 h-2 rounded-full bg-${color}-500`}></div>
+                        <span className="text-xs truncate max-w-[70%]">{machine.name}</span>
+                      </div>
+                    </Tooltip>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-          
-          {/* Turning Machines (Left Side) */}
-          <div className="absolute top-20 left-3 bottom-6 w-1/3 flex flex-col justify-around">
-            <div className="text-xs font-medium text-blue-800 mb-1 text-center">Turning Machines</div>
-            <div className="flex flex-col space-y-2">
-              {machinesByType.turning.slice(0, 4).map((machine, idx) => {
-                const color = getStatusColor(machine.status);
-                const borderClass = getBorderColorClass(color);
-                const dotClass = getStatusDotClass(color);
-                
-                return (
-                  <div 
-                    key={machine.id}
-                    onClick={() => onMachineSelect(machine)}
-                    className={`w-full h-6 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-between px-2 ${borderClass}`}
-                  >
-                    <div className={dotClass}></div>
-                    <span className="text-xs truncate">{machine.name}</span>
-                  </div>
-                );
-              })}
+            
+            {/* Milling Machines - Right Side */}
+            <div className="absolute top-1/4 right-2 bottom-2 w-[45%] flex flex-col">
+              <div className="text-xs font-medium text-green-800 mb-1 text-center">Milling</div>
+              <div className="flex-1 flex flex-col justify-around">
+                {machinesByType.milling.slice(0, 5).map((machine) => {
+                  const color = getStatusColor(machine.status);
+                  return (
+                    <Tooltip key={machine.id} title={`${machine.name} - ${machine.partNumber || 'No Part'}`}>
+                      <div 
+                        onClick={() => onMachineSelect(machine)}
+                        className={`h-8 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-between px-2 border-${color}-300 border`}
+                      >
+                        <span className="text-xs truncate max-w-[70%]">{machine.name}</span>
+                        <div className={`w-2 h-2 rounded-full bg-${color}-500`}></div>
+                      </div>
+                    </Tooltip>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-          
-          {/* Milling Machines (Right Side) */}
-          <div className="absolute top-20 right-3 bottom-6 w-1/3 flex flex-col justify-around">
-            <div className="text-xs font-medium text-green-800 mb-1 text-center">Milling Machines</div>
-            <div className="flex flex-col space-y-2">
-              {machinesByType.milling.slice(0, 4).map((machine, idx) => {
-                const color = getStatusColor(machine.status);
-                const borderClass = getBorderColorClass(color);
-                const dotClass = getStatusDotClass(color);
-                
-                return (
-                  <div 
-                    key={machine.id}
-                    onClick={() => onMachineSelect(machine)}
-                    className={`w-full h-6 ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''} cursor-pointer bg-white rounded shadow-sm flex items-center justify-between px-2 ${borderClass}`}
-                  >
-                    <span className="text-xs truncate">{machine.name}</span>
-                    <div className={dotClass}></div>
-                  </div>
-                );
-              })}
+            
+            {/* Floor Label */}
+            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
+              Main Shop Floor
             </div>
-          </div>
-          
-          {/* Central aisle */}
-          <div className="absolute left-1/2 transform -translate-x-1/2 top-16 bottom-0 w-8 bg-gray-200"></div>
-          
-          {/* Floor label */}
-          <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
-            Main Shop Floor
           </div>
         </div>
-      </div>
-      
-      {/* Machine sections by type */}
-      <div className="grid grid-cols-1 gap-4">
-        {/* Turning Machines */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-3 bg-blue-50 rounded-t-lg border-b border-blue-100">
-            <h3 className="font-bold text-blue-800">
-              <ToolOutlined className="mr-2" /> 
-              Turning Machines
-            </h3>
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {machinesByType.turning.map((machine) => (
-                <MachineCard 
+        
+        {/* Right Columns - Machine Summary by Type */}
+        <div className="col-span-2 grid grid-rows-3 gap-3">
+          {/* Turning Machines */}
+          <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+            <div className="p-2 bg-blue-50 border-b border-blue-100 flex items-center">
+              <ToolOutlined className="text-blue-700 mr-2" />
+              <h3 className="font-medium text-blue-800 text-sm">Turning Machines</h3>
+            </div>
+            <div className="flex-1 p-2 grid grid-cols-2 gap-2 auto-rows-max overflow-hidden">
+              {machinesByType.turning.slice(0, 4).map((machine) => (
+                <CompactMachineCard 
                   key={machine.id} 
                   machine={machine} 
                   isSelected={selectedMachine?.id === machine.id}
                   onSelect={() => onMachineSelect(machine)}
                 />
               ))}
-              {machinesByType.turning.length === 0 && (
-                <div className="col-span-full text-center p-4 text-gray-500">No turning machines available</div>
-              )}
             </div>
           </div>
-        </div>
-        
-        {/* Milling Machines */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-3 bg-green-50 rounded-t-lg border-b border-green-100">
-            <h3 className="font-bold text-green-800">
-              <AppstoreOutlined className="mr-2" /> 
-              Milling Machines
-            </h3>
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {machinesByType.milling.map((machine) => (
-                <MachineCard 
+          
+          {/* Milling Machines */}
+          <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+            <div className="p-2 bg-green-50 border-b border-green-100 flex items-center">
+              <AppstoreOutlined className="text-green-700 mr-2" />
+              <h3 className="font-medium text-green-800 text-sm">Milling Machines</h3>
+            </div>
+            <div className="flex-1 p-2 grid grid-cols-2 gap-2 auto-rows-max overflow-hidden">
+              {machinesByType.milling.slice(0, 4).map((machine) => (
+                <CompactMachineCard 
                   key={machine.id} 
                   machine={machine} 
                   isSelected={selectedMachine?.id === machine.id}
                   onSelect={() => onMachineSelect(machine)}
                 />
               ))}
-              {machinesByType.milling.length === 0 && (
-                <div className="col-span-full text-center p-4 text-gray-500">No milling machines available</div>
-              )}
             </div>
           </div>
-        </div>
-        
-        {/* EDM Machines */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-3 bg-purple-50 rounded-t-lg border-b border-purple-100">
-            <h3 className="font-bold text-purple-800">
-              <ProjectOutlined className="mr-2" /> 
-              EDM Machines
-            </h3>
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {machinesByType.edm.map((machine) => (
-                <MachineCard 
+          
+          {/* EDM Machines */}
+          <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+            <div className="p-2 bg-purple-50 border-b border-purple-100 flex items-center">
+              <ProjectOutlined className="text-purple-700 mr-2" />
+              <h3 className="font-medium text-purple-800 text-sm">EDM Machines</h3>
+            </div>
+            <div className="flex-1 p-2 grid grid-cols-2 gap-2 auto-rows-max overflow-hidden">
+              {machinesByType.edm.slice(0, 4).map((machine) => (
+                <CompactMachineCard 
                   key={machine.id} 
                   machine={machine} 
                   isSelected={selectedMachine?.id === machine.id}
@@ -248,11 +220,61 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
                 />
               ))}
               {machinesByType.edm.length === 0 && (
-                <div className="col-span-full text-center p-4 text-gray-500">No EDM machines available</div>
+                <div className="col-span-2 flex items-center justify-center p-2 text-gray-500 text-sm">
+                  No EDM machines available
+                </div>
               )}
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Compact version of MachineCard for the 2D view
+const CompactMachineCard = ({ machine, isSelected, onSelect }) => {
+  // Calculate completion percentage
+  const completionPercentage = 
+    machine.targetCount > 0 
+      ? Math.round((machine.totalCount / machine.targetCount) * 100) 
+      : 0;
+      
+  // Status color mapping
+  const statusColor = getStatusColor(machine.status);
+  
+  return (
+    <div 
+      className={`border rounded overflow-hidden shadow-sm transition-all cursor-pointer text-xs
+        ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-gray-50'}`}
+      onClick={onSelect}
+    >
+      <div className={`flex justify-between items-center p-1 bg-${statusColor}-50 border-b border-${statusColor}-100`}>
+        <div className="font-medium truncate max-w-[70%]">{machine.name}</div>
+        <Tag color={statusColor} className="text-[10px] py-0 h-5 leading-5">
+          {machine.status}
+        </Tag>
+      </div>
+      
+      <div className="p-1">
+        <div className="flex justify-between items-center">
+          <div className="truncate max-w-[70%]" title={machine.partNumber || 'No part'}>
+            {machine.partNumber || 'No part'}
+          </div>
+          <div className="text-right">{machine.totalCount || 0}/{machine.targetCount || 0}</div>
+        </div>
+        
+        <Progress 
+          percent={completionPercentage}
+          size="small"
+          status={
+            machine.status === 'PRODUCTION' ? 'active' :
+            machine.status === 'ERROR' ? 'exception' :
+            completionPercentage >= 100 ? 'success' : 'normal'
+          }
+          showInfo={false}
+          className="mt-1"
+        />
       </div>
     </div>
   );

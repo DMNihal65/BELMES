@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Card, 
   Tabs, 
@@ -72,7 +72,7 @@ function ProductionAnalytics() {
   const fetchWorkCenters = async () => {
     setLoadingWorkCenters(true);
     try {
-      const response = await axios.get('http://172.18.7.88:3425/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await axios.get('http://172.18.7.88:9999/api/v1/master-order/workcenters/?skip=0&limit=100');
       const workCentersData = response.data;
       
       // No longer filtering by is_schedulable
@@ -736,6 +736,21 @@ function ProductionAnalytics() {
     );
   };
 
+  const machineTimelineOptions = useMemo(() => {
+    return getMachineTimelineOptions();
+  }, [analyticsData.timelineData, selectedMachines, statusColors]); // Assuming statusColors is stable or include if dynamic
+
+  const statusDistributionPercentageOptions = useMemo(() => {
+    // getFilteredMachineTimelines is called inside getStatusDistributionOptions
+    // Dependencies are analyticsData.machineTimelines and selectedMachines (from getFilteredMachineTimelines)
+    return getStatusDistributionOptions('percentage');
+  }, [analyticsData.machineTimelines, selectedMachines, statusColors]);
+
+  const statusDistributionHoursOptions = useMemo(() => {
+    // Dependencies are analyticsData.machineTimelines and selectedMachines (from getFilteredMachineTimelines)
+    return getStatusDistributionOptions('hours');
+  }, [analyticsData.machineTimelines, selectedMachines, statusColors]);
+
   return (
     <div className="p-4 lg:p-6" id="analytics-container">
       <Card className="shadow-md">
@@ -864,16 +879,15 @@ function ProductionAnalytics() {
                 <ReactECharts
                   option={
                     getTimelineDisplayMode() === 'timeline' ? 
-                      getMachineTimelineOptions() : 
+                      machineTimelineOptions : 
                       getTimelineDisplayMode() === 'percentage' ? 
-                        getStatusDistributionOptions('percentage') : 
+                        statusDistributionPercentageOptions : 
                         getTimelineDisplayMode() === 'hours' ? 
-                          getStatusDistributionOptions('hours') : 
+                          statusDistributionHoursOptions : 
                           { title: { text: 'No data available', left: 'center', top: 'center' } }
                   }
                   style={{ height: '500px', width: '100%' }}
                   onChartReady={instance => setChartInstance(instance)}
-                  notMerge={true}
                   lazyUpdate={true}
                   opts={{ renderer: 'canvas' }}
                   className="analytics-chart shadow-sm border border-gray-200 rounded-lg"

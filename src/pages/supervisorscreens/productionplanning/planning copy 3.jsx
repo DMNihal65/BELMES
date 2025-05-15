@@ -2470,223 +2470,77 @@ const handleAddTool = async (values) => {
         } catch (e) { console.error("Error adding BEL logo to PDF", e); }
       }
 
-    // Add company header with better styling
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    // doc.text('FABRICATION COMPONENTS', 105, 15, { align: 'center' });
-    // doc.setFontSize(16);
-    // doc.text('Job Number Tag', 105, 22, { align: 'center' });
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Job Number Tag', doc.internal.pageSize.getWidth() / 2, 25, { align: 'center' });
 
       // Prepare table data
       const material = selectedJob.raw_materials?.[0] || {};
-
-            // Generate QR codes as Data URLs (already done in your code)
-            const qrString = [
-             selectedJob.part_number || '',
-             selectedJob.part_description || '',
-             selectedJob.production_order || '',
-             material.child_part_number || '',
-           ].join(' ; ');
-
-	      // const qrString = [
-        //       'Part Number: ' + (selectedJob.part_number || ''),
-        //       'Part Description: ' + (selectedJob.part_description || ''),
-        //       'Production Order: ' + (selectedJob.production_order || ''),
-        //       'Child Part Number: ' + (material.child_part_number || ''),
-        //     ].join(' ; ');
-      
-      const qrDataUrl = await QRCodeNode.toDataURL(qrString, { errorCorrectionLevel: 'M', margin: 1, width: 60 });
-      
-            
       const tableBody = [
-        [
-          {
-            content: 'FAB/C - Job Number Tag',
-            colSpan: 2, // Span across two columns
-            styles: {
-              fontStyle: 'bold',
-              halign: 'center', // Center-align the content
-              fillColor: [240, 240, 240], // Optional background color
-              textColor: [0, 0, 0],
-              fontSize: 12,
-              minCellHeight: 15
-            }
-          },
-        ],
-        [
-          {
-            content: 'Part Number',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: selectedJob.part_number || 'N/A',
-            styles: { cellWidth: 80 }
-          }
-        ],
-        [
-          {
-            content: 'Part Description',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: selectedJob.part_description || 'N/A',
-            styles: { cellWidth: 80 }
-          }
-        ],
-        [
-          {
-            content: 'Production Order',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: selectedJob.production_order || 'N/A',
-              styles: { cellWidth: 80 }
-          }
-        ],
-        [
-          {
-            content: 'Child Part Number',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: material.child_part_number || 'N/A',
-            styles: { cellWidth: 80 }
-          }
-        ],      
-        [
-          {
-            content: 'Qty',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: selectedJob.launched_quantity || 'N/A',
-            styles: { cellWidth: 80 }
-          }
-        ],
-        [
-          { content: 'QR Code', styles: { fontStyle: 'bold', cellWidth: 40, minCellHeight: 60 } },
-          { content: '', styles: { cellWidth: 80, minCellHeight: 60 } } // Increase minCellHeight for QR row
-        ]
-        
+        ['Part Number', selectedJob.part_number || ''],
+        ['Part Description', selectedJob.part_description || ''],
+        ['Production Order', selectedJob.production_order || ''],
+        ['Launched Quantity', selectedJob.launched_quantity || ''],
+        ['Child Part Number', material.child_part_number || ''],
+        // The QR code row will be handled after the table
       ];
 
-
-
-      
-
-      
-      let qrCellPos = null;
-      
-      // Draw the table (with light borders and centered text)
+      // Draw the table (without QR row)
       autoTable(doc, {
         startY: 35,
         head: [],
         body: tableBody,
         theme: 'grid',
-        styles: {
-          fontSize: 10,
-          cellPadding: 4,
-          lineColor: [200, 200, 200], // light gray
-          lineWidth: 0.5,
-          font: 'helvetica',
-          textColor: [0, 0, 0],
-          halign: 'center', // center align all cells
-          valign: 'middle'
-        },
+        styles: { fontSize: 12, cellPadding: 6, halign: 'left', valign: 'middle' },
         columnStyles: {
-          0: { cellWidth: 60, fontStyle: 'bold', halign: 'center' },
-          1: { cellWidth: 110, halign: 'center' }
+          0: { cellWidth: 60, fontStyle: 'bold' },
+          1: { cellWidth: 110 }
         },
-        tableWidth: 'wrap',
-        margin: { horizontal: (doc.internal.pageSize.getWidth() - 170) / 2 }, // Center the table manually
         didDrawCell: function (data) {
-          // Save the position of the QR Code cell
-          if (
-            data.row.index === tableBody.length - 1 && // last row
-            data.column.index === 1
-          ) {
-            qrCellPos = {
-              x: data.cell.x,
-              y: data.cell.y,
-              width: data.cell.width,
-              height: data.cell.height
-            };
-          }
+          doc.setDrawColor(34, 34, 34);
+          doc.setLineWidth(0.5);
+          doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
         }
       });
+
       // Get the Y position after the table
       const finalY = doc.lastAutoTable.finalY || 35 + tableBody.length * 10;
 
-      // After autoTable:
-      let tableStartX = 15;
-      let tableWidth = 170;
-      let tableStartY = 35;
-      let tableHeight = tableBody.length * 10; // fallback
-      if (doc.lastAutoTable && doc.lastAutoTable.table) {
-        tableStartX = doc.lastAutoTable.table.x;
-        tableWidth = doc.lastAutoTable.table.width;
-        tableStartY = doc.lastAutoTable.table.y;
-        tableHeight = doc.lastAutoTable.table.height;
-      }
+      // Draw the QR code row (2x2 grid)
+      const qrRowHeight = 90;
+      const leftX = 15;
+      const rightX = 75;
+      const tableWidth = 170;
 
-      // Set up QR code grid dimensions
-      const qrGridWidth = 60; // or 80 for bigger QR codes
-      const qrGridHeight = 60; // or 80
-      // const qrSize = 30; // or 40
-      const qrMargin = 20; // margin between table and QR grid
+      // Draw left cell (label)
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.rect(leftX, finalY, 60, qrRowHeight);
+      doc.text('QR Code', leftX + 5, finalY + 10);
 
-      const pageWidth = doc.internal.pageSize.getWidth();
-      let qrStartX, qrStartY;
-      if (tableStartX + tableWidth + qrMargin + qrGridWidth < pageWidth - 10) {
-        // Enough space to the right
-        qrStartX = tableStartX + tableWidth + qrMargin;
-        qrStartY = tableStartY;
-      } else {
-        // Not enough space, place below the table
-        qrStartX = tableStartX;
-        qrStartY = tableStartY + tableHeight + qrMargin;
-      }
+      // Draw right cell (QR codes)
+      doc.rect(rightX, finalY, tableWidth - 60, qrRowHeight);
 
-      // const qrDataUrls = [qrDataUrl, qrDataUrl, qrDataUrl, qrDataUrl];
+      // Generate QR codes as Data URLs
+      const qrCodes = await Promise.all([
+        QRCodeNode.toDataURL(selectedJob.part_number || '', { errorCorrectionLevel: 'M', margin: 1, width: 100 }),
+        QRCodeNode.toDataURL(selectedJob.production_order || '', { errorCorrectionLevel: 'M', margin: 1, width: 100 }),
+        QRCodeNode.toDataURL(selectedJob.part_description || '', { errorCorrectionLevel: 'M', margin: 1, width: 100 }),
+        QRCodeNode.toDataURL(material.child_part_number || '', { errorCorrectionLevel: 'M', margin: 1, width: 100 }),
+      ]);
 
-      // // Top row
-      // doc.addImage(qrDataUrls[0], 'PNG', qrStartX, qrStartY, qrSize, qrSize);
-      // doc.addImage(qrDataUrls[1], 'PNG', qrStartX + qrSize, qrStartY, qrSize, qrSize);
-      // // Bottom row
-      // doc.addImage(qrDataUrls[2], 'PNG', qrStartX, qrStartY + qrSize, qrSize, qrSize);
-      // doc.addImage(qrDataUrls[3], 'PNG', qrStartX + qrSize, qrStartY + qrSize, qrSize, qrSize);
-
-      // After autoTable, draw the 2x2 QR codes inside the QR Code cell
-      // if (qrCellPos) {
-      //   // Decrease QR code size for 2x2 grid
-      //   const qrSize = qrCellPos.width / 3 - 2; // Smaller QR codes
-      //   const margin = 2;
-      //   const qrDataUrls = [qrDataUrl, qrDataUrl, qrDataUrl, qrDataUrl]; // Use your actual QR data URLs here
-
-      //   // Calculate total grid size (2 QR codes + margin between them)
-      //   const gridSize = 2 * qrSize + 2 * margin;
-      //   // Calculate starting x and y to center the grid in the cell
-      //   const startX = qrCellPos.x + (qrCellPos.width - gridSize) / 2;
-      //   const startY = qrCellPos.y + (qrCellPos.height - gridSize) / 2;
-
-      //   // Top-left
-      //   doc.addImage(qrDataUrls[0], 'PNG', startX, startY, qrSize, qrSize);
-      //   // Top-right
-      //   doc.addImage(qrDataUrls[1], 'PNG', startX + qrSize + margin, startY, qrSize, qrSize);
-      //   // Bottom-left
-      //   doc.addImage(qrDataUrls[2], 'PNG', startX, startY + qrSize + margin, qrSize, qrSize);
-      //   // Bottom-right
-      //   doc.addImage(qrDataUrls[3], 'PNG', startX + qrSize + margin, startY + qrSize + margin, qrSize, qrSize);
-      // }
-      if (qrCellPos) {
-        // Set QR code size to fit nicely in the cell with a bit more margin
-        const qrSize = Math.min(qrCellPos.width, qrCellPos.height) - 18; // Increased margin for smaller QR
-        const startX = qrCellPos.x + (qrCellPos.width - qrSize) / 2;
-        const startY = qrCellPos.y + (qrCellPos.height - qrSize) / 2;
-      
-        doc.addImage(qrDataUrl, 'PNG', startX, startY, qrSize, qrSize);
-      }
+      // Place the QR codes in a 2x2 grid
+      const qrSize = 30;
+      const qrGapX = 10;
+      const qrGapY = 10;
+      const startX = rightX + 10;
+      const startY = finalY + 10;
+      // Top row
+      doc.addImage(qrCodes[0], 'PNG', startX, startY, qrSize, qrSize);
+      doc.addImage(qrCodes[1], 'PNG', startX + qrSize + qrGapX, startY, qrSize, qrSize);
+      // Bottom row
+      doc.addImage(qrCodes[2], 'PNG', startX, startY + qrSize + qrGapY, qrSize, qrSize);
+      doc.addImage(qrCodes[3], 'PNG', startX + qrSize + qrGapX, startY + qrSize + qrGapY, qrSize, qrSize);
 
       // Save the PDF
       const fileName = `RawMaterial_JobCard_${selectedJob.production_order || 'unknown'}.pdf`;
@@ -2704,62 +2558,83 @@ const handleAddTool = async (values) => {
 
 
 
-
   
   return (
     <div className="space-y-6 p-6">
       {/* Job Selection Section with improved layout */}
       <Card className="shadow-sm">
-      <Row justify="space-between" align="middle" wrap>
-        <Col flex="1">
-          <Form.Item label="Select Job/Production Order" className="mb-0" style={{ width: '100%' }}>
-            <Select
-              className="job-select"
-              showSearch
-              style={{ width: '100%', maxWidth: 300 }}
-              placeholder="Select Production Order"
-              optionFilterProp="label"
-              value={selectedOrderNumber}
-              onChange={handleJobSelect}
-              filterOption={(input, option) =>
-                option.label.toLowerCase().includes(input.toLowerCase())
-              }
-            >
-              {partNumbers.map(order => (
-                <Option 
-                  key={order.id} 
-                  value={order.value}
-                  label={order.label}
-                >
-                  {order.label}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
-
-        {selectedJob && (
-          <Col>
-            <Space>
-              <Button
-                type="primary"
-                icon={<FileTextOutlined />}
-                onClick={handleShowRawMaterialModal}
-              >
-                Job Number Tag
-              </Button>
-              <Button
-                type="default"
-                icon={<DownloadOutlined />}
-                onClick={handleShowPreview}
-              >
-                Download Job Card
-              </Button>
+        <Row gutter={24} align="middle">
+          <Col 
+            xs={24} 
+            sm={selectedJob ? 18 : 24} 
+            md={selectedJob ? 18 : 24} 
+            lg={selectedJob ? 19 : 24} 
+            xl={selectedJob ? 20 : 24} 
+            xxl={selectedJob ? 20 : 24}
+          >
+            <Space size="large" className="w-full">
+              <Form.Item label="Select Job/Production Order" className="mb-0" style={{ flex: 1 }}>
+                <Space className="w-full">
+                  <Select
+                    className="job-select"
+                    showSearch
+                    style={{ width: 300 }}
+                    placeholder="Select Production Order"
+                    optionFilterProp="label"
+                    value={selectedOrderNumber}
+                    onChange={handleJobSelect}
+                    filterOption={(input, option) =>
+                      option.label.toLowerCase().includes(input.toLowerCase())
+                    }
+                  >
+                    {partNumbers.map(order => (
+                      <Option 
+                        key={order.id} 
+                        value={order.value}
+                        label={order.label}
+                      >
+                        {order.label}
+                      </Option>
+                    ))}
+                  </Select>
+                </Space>
+              </Form.Item>
             </Space>
           </Col>
-        )}
-      </Row>
-    </Card>
+          
+          {selectedJob && (
+            <Col 
+              xs={24} 
+              sm={6} 
+              md={6} 
+              lg={5} 
+              xl={4} 
+              xxl={4} 
+              className="text-right "
+            >
+              <Space>
+                <Button
+                   type="primary"
+                    icon={<FileTextOutlined />}
+                    onClick={handleShowRawMaterialModal}
+                    disabled={!selectedJob}
+                  >
+                    Job Number Tag
+                 </Button>
+                 <Button
+                   type="default" 
+                   icon={<DownloadOutlined />}
+                   onClick={handleShowPreview}
+                 >
+                   Download Job Card
+                 </Button>
+
+                 
+              </Space>
+            </Col>
+          )}
+        </Row>
+      </Card>
 
       {/* All other content conditionally rendered only when a job is selected */}
       {selectedJob && (

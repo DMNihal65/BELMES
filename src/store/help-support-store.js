@@ -22,7 +22,7 @@ const useHelpSupportStore = create((set) => ({
       const token = useAuthStore.getState().token;
       
       const response = await fetch(
-        'http://172.18.7.88:5698/api/v1/master-order/machines/',
+        'http://172.18.7.88:9999/api/v1/master-order/machines/',
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -51,7 +51,7 @@ const useHelpSupportStore = create((set) => ({
       const token = useAuthStore.getState().token;
       
       const response = await fetch(
-        `http://172.18.7.88:5698/api/v1/document-management/machine-documents/${machineId}`,
+        `http://172.18.7.88:9999/api/v1/document-management/machine-documents/${machineId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -75,7 +75,7 @@ const useHelpSupportStore = create((set) => ({
   downloadDocument: async (minioPath, token) => {
     try {
       const response = await fetch(
-        `http://172.18.7.88:5698/api/v1/document-management/documents/download/?path=${encodeURIComponent(minioPath)}`,
+        `http://172.18.7.88:9999/api/v1/document-management/documents/download/?path=${encodeURIComponent(minioPath)}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -100,7 +100,7 @@ const useHelpSupportStore = create((set) => ({
     try {
       console.log(`Downloading latest version of document ID: ${documentId}`);
       const response = await fetch(
-        `http://172.18.7.88:5698/api/v1/document-management/documents/${documentId}/download-latest`,
+        `http://172.18.7.88:9999/api/v1/document-management/documents/${documentId}/download-latest`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

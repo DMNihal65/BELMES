@@ -381,9 +381,16 @@ const usePlanningStore = create((set) => ({
   // Function to update operation details
   updateOperationDetails: async (partNumber, operationNumber, updateData) => {
     try {
-      const response = await fetch(`http://172.18.7.88:9999/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      console.log('Sending operation update data:', {
+        partNumber,
+        operationNumber,
+        updateData
+      });
+      
+      const response = await fetch(`http://172.18.7.88:9999/api/v1/planning/operations/${updateData.production_order}/${operationNumber}`, {
         method: 'PUT',
         headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -391,12 +398,27 @@ const usePlanningStore = create((set) => ({
           setup_time: updateData.setup_time,
           ideal_cycle_time: updateData.ideal_cycle_time,
           work_center_code: updateData.work_center_code,
-          machine_id: updateData.machine_id
+          machine_id: updateData.machine_id,
+          production_order: updateData.production_order
         })
       });
 
+      // Try to get detailed error information if the request fails
       if (!response.ok) {
-        throw new Error('Failed to update operation details');
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('API error response:', errorData);
+        } catch (parseError) {
+          errorData = await response.text();
+          console.error('API error text:', errorData);
+        }
+        
+        throw new Error(
+          errorData && typeof errorData === 'object' && errorData.detail 
+            ? errorData.detail 
+            : 'Failed to update operation details'
+        );
       }
 
       const data = await response.json();
@@ -422,7 +444,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending machine update data:', formattedData);
 
-      const response = await fetch(`http://172.18.7.88:9999/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.88:9999/api/v1/planning/operations/${updateData.production_order}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -472,6 +494,10 @@ const usePlanningStore = create((set) => ({
       throw error;
     }
   },
+
+
+
+
 
   // Function to fetch MPP by identifier (production order and operation)
   fetchMppByIdentifier: async (productionOrder, operationNumber) => {
@@ -947,17 +973,14 @@ const usePlanningStore = create((set) => ({
         
         try {
           // Update the operation with the default machine
-          await fetch(`http://172.18.7.88:9999/api/v1/planning/operations/${partNumber}/${operationData.operation_number}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+          await updateOperationMachine(
+            partNumber,
+            operationData.operation_number,
+            {
               ...operationData,
               machine_id: defaultMachine.id
-            })
-          });
+            }
+          );
         } catch (updateError) {
           console.error('Error assigning default machine:', updateError);
           // Continue even if machine assignment fails
@@ -1673,6 +1696,12 @@ const usePlanningStore = create((set) => ({
     try {
       set({ isLoading: true, error: null });
       
+      // Log the form data for debugging
+      console.log('Uploading CNC program with form data:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}: ${value}`);
+      }
+      
       const response = await fetch('http://172.18.7.88:9999/api/v1/document-management/cnc-program/upload/', {
         method: 'POST',
         headers: {
@@ -1681,12 +1710,23 @@ const usePlanningStore = create((set) => ({
         body: formData
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to upload CNC program');
+      // Try to parse the response as JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // If parsing fails, get the response as text
+        const textResponse = await response.text();
+        console.error('Failed to parse response as JSON:', textResponse);
+        throw new Error('Invalid response from server');
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errorMessage = data.detail || data.message || 'Failed to upload CNC program';
+        console.error('API Error Response:', data);
+        throw new Error(errorMessage);
+      }
+
       set({ isLoading: false });
       return data;
     } catch (error) {

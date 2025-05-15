@@ -220,9 +220,9 @@ const StatusLegend = () => (
   </div>
 );
 
-// Status colors configuration
+// Status colors configuration with updated comments
 const STATUS_COLORS = {
-  0: "#94A3B8",      // Grey for OFF status (0)
+  0: "#94A3B8",      // Grey
   1: "#eab308",      // Yellow for IDLE/ON status (1)
   2: "#22c55e",      // Green for PRODUCTION status (2)
   default: "#94A3B8" // Grey for unknown status

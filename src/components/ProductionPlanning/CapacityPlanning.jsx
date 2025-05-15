@@ -290,13 +290,16 @@ const CapacityPlanning = () => {
     },
   });
 
-  const { fetchMachineUtilizationByDateRange, isLoading: storeLoading } = usePlanningStore();
+  const { fetchMachinePlanningByDateRange, isLoading: storeLoading } = usePlanningStore();
 
   // Fetch machine utilization data for the selected date range
   const fetchMachineData = async (startDate = dateRange[0], endDate = dateRange[1]) => {
     try {
       setLoading(true);
-      const data = await fetchMachineUtilizationByDateRange(startDate, endDate);
+      
+      // Call the store function with the date range
+      const data = await fetchMachinePlanningByDateRange(startDate, endDate);
+      
       if (Array.isArray(data) && data.length > 0) {
         // Filter machines to only include those with work_center_bool = true
         const filteredData = data.filter(machine => machine.work_center_bool === true);

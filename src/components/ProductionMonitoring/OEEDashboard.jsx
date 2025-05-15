@@ -44,7 +44,7 @@ const OEEDashboard = () => {
     setOEESelectedShift
   } = useProductionStore();
   
-  const [activeTab, setActiveTab] = useState('1');
+  const [activeTab, setActiveTab] = useState('3');
   const [trendModalVisible, setTrendModalVisible] = useState(false);
   const [trendModalLoading, setTrendModalLoading] = useState(false);
   const [selectedMachineForTrend, setSelectedMachineForTrend] = useState(null);
@@ -68,6 +68,8 @@ const OEEDashboard = () => {
     loadShiftSummaryData();
     fetchAllMachinesOEE();
     fetchOverallOEEAnalytics();
+    // Set default machine selection to 'all'
+    setOEESelectedMachine('all');
   }, [oeeData.dateRange, oeeData.selectedShift]);
   
   // Update filtered machines when selection changes
@@ -96,7 +98,7 @@ const OEEDashboard = () => {
       }
       
       const response = await axios.get(
-        `http://172.18.7.88:5698/production_monitoring/overall-oee-analytics/?${params.toString()}`
+        `http://172.18.7.88:9988/production_monitoring/overall-oee-analytics/?${params.toString()}`
       );
       
       setOverallOEEData(response.data);
@@ -128,7 +130,7 @@ const OEEDashboard = () => {
       }
       
       const response = await axios.get(
-        `http://172.18.7.88:5698/production_monitoring/detailed-shift-summary/?${params.toString()}`
+        `http://172.18.7.88:9988/production_monitoring/detailed-shift-summary/?${params.toString()}`
       );
       
       // Transform data for table
@@ -171,7 +173,7 @@ const OEEDashboard = () => {
       
       // Fetch data for each machine
       const promises = machineIds.map(id => 
-        axios.get(`http://172.18.7.88:5698/production_monitoring/machine-oee-analysis/${id}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`)
+        axios.get(`http://172.18.7.88:9988/production_monitoring/machine-oee-analysis/${id}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`)
       );
       
       const results = await Promise.allSettled(promises);
@@ -202,7 +204,7 @@ const OEEDashboard = () => {
       const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
       
       const response = await axios.get(
-        `http://172.18.7.88:5698/production_monitoring/machine-oee-analysis/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        `http://172.18.7.88:9988/production_monitoring/machine-oee-analysis/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
       );
       
       if (response.data && response.data.oee_trends) {
@@ -278,110 +280,143 @@ const OEEDashboard = () => {
       title: 'Date',
       dataIndex: 'date',
       key: 'date',
-      width: 120
+      width: 100,
+      fixed: 'left'
     },
     {
       title: 'Shift',
       dataIndex: 'shift',
       key: 'shift',
       width: 80,
+      fixed: 'left',
       render: (value) => value || 'All'
     },
     {
       title: 'Machine',
       dataIndex: 'machine',
       key: 'machine',
-      width: 150
-    },
-    {
-      title: 'OEE',
-      dataIndex: 'oee',
-      key: 'oee',
-      render: (value) => (
-        <Tooltip title={`${value.toFixed(1)}%`}>
-          <div className="flex items-center">
-            <Progress 
-              percent={value} 
-              size="small" 
-              strokeColor={
-                value >= 85 ? '#10b981' : 
-                value >= 60 ? '#f59e0b' : '#ef4444'
-              }
-              format={(percent) => `${percent.toFixed(1)}%`}
-            />
-          </div>
-        </Tooltip>
-      ),
       width: 150,
-      sorter: (a, b) => a.oee - b.oee,
-      defaultSortOrder: 'descend'
+      fixed: 'left'
     },
     {
-      title: 'Availability',
-      dataIndex: 'availability',
-      key: 'availability',
+      title: 'Production Time',
+      dataIndex: 'productionTime',
+      key: 'productionTime',
+      width: 120,
       render: (value) => (
-        <Tooltip title={`${value.toFixed(1)}%`}>
-          <div className="flex items-center">
-            <Progress 
-              percent={value} 
-              size="small" 
-              strokeColor="#1890ff"
-              format={(percent) => `${percent.toFixed(1)}%`}
-            />
+        <Tooltip title={`${value} minutes`}>
+          <div className="font-medium text-emerald-600">
+            {value} min
           </div>
         </Tooltip>
-      ),
-      width: 150
+      )
     },
     {
-      title: 'Performance',
-      dataIndex: 'performance',
-      key: 'performance',
+      title: 'Idle Time',
+      dataIndex: 'idleTime',
+      key: 'idleTime',
+      width: 120,
       render: (value) => (
-        <Tooltip title={`${value.toFixed(1)}%`}>
-          <div className="flex items-center">
-            <Progress 
-              percent={value} 
-              size="small" 
-              strokeColor="#faad14"
-              format={(percent) => `${percent.toFixed(1)}%`}
-            />
+        <Tooltip title={`${value} minutes`}>
+          <div className="font-medium text-amber-600">
+            {value} min
           </div>
         </Tooltip>
-      ),
-      width: 150
+      )
     },
     {
-      title: 'Quality',
-      dataIndex: 'quality',
-      key: 'quality',
+      title: 'Off Time',
+      dataIndex: 'offTime',
+      key: 'offTime',
+      width: 120,
       render: (value) => (
-        <Tooltip title={`${value.toFixed(1)}%`}>
-          <div className="flex items-center">
-            <Progress 
-              percent={value} 
-              size="small" 
-              strokeColor="#722ed1"
-              format={(percent) => `${percent.toFixed(1)}%`}
-            />
+        <Tooltip title={`${value} minutes`}>
+          <div className="font-medium text-red-600">
+            {value} min
           </div>
         </Tooltip>
-      ),
-      width: 150
+      )
     },
     {
       title: 'Parts',
       dataIndex: 'parts',
       key: 'parts',
+      width: 60,
       render: (_, record) => (
-        <div>
-          <div><span className="font-medium">Total:</span> {record.totalParts}</div>
-          <div><span className="text-green-600">Good:</span> {record.goodParts}</div>
-          <div><span className="text-red-600">Bad:</span> {record.badParts}</div>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Total:</span>
+            <span className="font-medium">{record.totalParts}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-green-600">Good:</span>
+            <span className="font-medium text-green-600">{record.goodParts}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-red-600">Bad:</span>
+            <span className="font-medium text-red-600">{record.badParts}</span>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: 'Availability',
+      dataIndex: 'availability',
+      key: 'availability',
+      width: 100,
+      render: (value) => (
+        <Tooltip title={`${value.toFixed(1)}%`}>
+          <div className="font-medium text-blue-600">
+            {value.toFixed(1)}%
+          </div>
+        </Tooltip>
+      )
+    },
+    {
+      title: 'Performance',
+      dataIndex: 'performance',
+      key: 'performance',
+      width: 100,
+      render: (value) => (
+        <Tooltip title={`${value.toFixed(1)}%`}>
+          <div className="font-medium text-amber-600">
+            {value.toFixed(1)}%
+          </div>
+        </Tooltip>
+      )
+    },
+    {
+      title: 'Quality',
+      dataIndex: 'quality',
+      key: 'quality',
+      width: 100,
+      render: (value) => (
+        <Tooltip title={`${value.toFixed(1)}%`}>
+          <div className="font-medium text-purple-600">
+            {value.toFixed(1)}%
+          </div>
+        </Tooltip>
+      )
+    },
+    {
+      title: 'OEE',
+      dataIndex: 'oee',
+      key: 'oee',
+      width: 120,
+      fixed: 'right',
+      render: (value) => (
+        <div className="flex items-center gap-2">
+          <div className="font-medium" style={{ 
+            color: value >= 85 ? '#10b981' : 
+                   value >= 60 ? '#f59e0b' : '#ef4444' 
+          }}>
+            {value.toFixed(1)}%
+          </div>
+          {/* {getStatusBadge(value)} */}
         </div>
       ),
-      width: 150
+      sorter: (a, b) => a.oee - b.oee,
+      defaultSortOrder: 'descend'
     }
   ];
 
@@ -434,455 +469,187 @@ const OEEDashboard = () => {
         </div>
       </Card>
 
-      {/* Overall OEE Analytics Cards */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-sm h-full" loading={isLoadingOverallOEE}>
-            <div className="flex items-center justify-between">
+      {/* Overall OEE Analytics Hero Section */}
+      <div className="bg-gradient-to-br from-blue-50 via-white to-blue-50 rounded-xl shadow-lg p-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main OEE Score */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-xl shadow-sm p-6 h-full flex flex-col justify-between border border-blue-100">
               <div>
-                <div className="text-gray-500 mb-1">Overall OEE</div>
-                <div className="text-2xl font-bold" style={{ 
-                  color: (overallOEEData?.overall_oee || 0) >= 85 ? '#10b981' : 
-                         (overallOEEData?.overall_oee || 0) >= 60 ? '#f59e0b' : '#ef4444' 
-                }}>
-                  {(overallOEEData?.overall_oee || 0).toFixed(1)}%
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-blue-50">
-                <Award size={24} className="text-blue-500" />
-              </div>
-            </div>
-            <div className="mt-3">
-            <Progress 
-                percent={overallOEEData?.overall_oee || 0} 
-                strokeColor={{
-                  '0%': '#ef4444',
-                  '60%': '#f59e0b',
-                  '85%': '#10b981',
-                }}
-                size="small"
-              />
-              <div className="flex justify-between text-xs mt-1">
-                <span>Poor</span>
-                <span>Average</span>
-                <span>Excellent</span>
-              </div>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-sm h-full" loading={isLoadingOverallOEE}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-500 mb-1">Availability</div>
-                <div className="text-2xl font-bold text-blue-500">
-                  {(overallOEEData?.overall_availability * 100 || 0).toFixed(1)}%
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-blue-50">
-                <Clock size={24} className="text-blue-500" />
-              </div>
-            </div>
-            <div className="mt-3">
-            <Progress 
-                percent={overallOEEData?.overall_availability * 100 || 0} 
-                strokeColor="#1890ff"
-                size="small"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                Planned vs. Actual Uptime
-              </div>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-sm h-full" loading={isLoadingOverallOEE}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-500 mb-1">Performance</div>
-                <div className="text-2xl font-bold text-amber-500">
-                  {(overallOEEData?.overall_performance * 100 || 0).toFixed(1)}%
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-amber-50">
-                <Target size={24} className="text-amber-500" />
-              </div>
-            </div>
-            <div className="mt-3">
-            <Progress 
-                percent={overallOEEData?.overall_performance * 100 || 0} 
-                strokeColor="#faad14"
-                size="small"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                Actual vs. Ideal Cycle Time
-              </div>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={6}>
-          <Card className="shadow-sm h-full" loading={isLoadingOverallOEE}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-500 mb-1">Quality</div>
-                <div className="text-2xl font-bold text-purple-500">
-                  {(overallOEEData?.overall_quality * 100 || 0).toFixed(1)}%
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-purple-50">
-                <CheckCircle size={24} className="text-purple-500" />
-              </div>
-            </div>
-            <div className="mt-3">
-            <Progress 
-                percent={overallOEEData?.overall_quality * 100 || 0} 
-                strokeColor="#722ed1"
-                size="small"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                Good Parts vs. Total Parts
-              </div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
-      <Tabs activeKey={activeTab} onChange={setActiveTab}>
-        <TabPane tab="OEE Overview" key="1">
-      <Row gutter={[16, 16]}>
-            <Col xs={24} lg={12}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <TrendingUp size={16} className="mr-2 text-blue-500" />
-                    <span>OEE Daily Trends</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-                {overallOEEData?.daily_trends && overallOEEData.daily_trends.length > 0 ? (
-                  <div style={{ height: 300 }}>
-                    <Line 
-                      data={overallOEEData.daily_trends.flatMap(trend => [
-                        { date: trend.date, type: 'OEE', value: trend.oee },
-                        { date: trend.date, type: 'Availability', value: trend.availability * 100 },
-                        { date: trend.date, type: 'Performance', value: trend.performance * 100 },
-                        { date: trend.date, type: 'Quality', value: trend.quality * 100 }
-                      ])}
-                      xField="date"
-                      yField="value"
-                      seriesField="type"
-                      yAxis={{
-                        min: 0,
-                        max: 100,
-                        title: {
-                          text: 'Percentage (%)'
-                        }
-                      }}
-                      color={['#1890ff', '#52c41a', '#faad14', '#722ed1']}
-                      legend={{
-                        position: 'top'
-                      }}
-                      animation={false}
-                    />
-                  </div>
-                ) : (
-                  <Empty description="No trend data available" />
-                )}
-              </Card>
-            </Col>
-            
-            <Col xs={24} lg={12}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <PieChart size={16} className="mr-2 text-blue-500" />
-                    <span>Loss Analysis</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-                {overallOEEData?.losses ? (
-                  <div style={{ height: 300 }}>
-                    <Pie
-                      data={[
-                        { type: 'Availability Loss', value: overallOEEData.losses.availability_loss * 100 },
-                        { type: 'Performance Loss', value: overallOEEData.losses.performance_loss * 100 },
-                        { type: 'Quality Loss', value: overallOEEData.losses.quality_loss * 100 }
-                      ]}
-                      angleField="value"
-                      colorField="type"
-                      radius={0.8}
-                      innerRadius={0.5}
-                      label={{
-                        type: 'outer',
-                        content: '{name}: {percentage}',
-                      }}
-                      color={['#ff4d4f', '#faad14', '#722ed1']}
-                      legend={{
-                        position: 'bottom'
-                      }}
-                      animation={false}
-                    />
-                  </div>
-                ) : (
-                  <Empty description="No loss analysis data available" />
-                )}
-          </Card>
-        </Col>
-            
-            <Col xs={24}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <BarChart size={16} className="mr-2 text-blue-500" />
-                    <span>Shift Breakdown</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-                {overallOEEData?.shift_breakdown && overallOEEData.shift_breakdown.length > 0 ? (
-                  <div style={{ height: 300 }}>
-                    <Column
-                      data={overallOEEData.shift_breakdown.flatMap(shift => [
-                        { shift: `Shift ${shift.shift}`, type: 'OEE', value: shift.oee },
-                        { shift: `Shift ${shift.shift}`, type: 'Availability', value: shift.availability * 100 },
-                        { shift: `Shift ${shift.shift}`, type: 'Performance', value: shift.performance * 100 },
-                        { shift: `Shift ${shift.shift}`, type: 'Quality', value: shift.quality * 100 }
-                      ])}
-                      xField="shift"
-                      yField="value"
-                      seriesField="type"
-                      isGroup={true}
-                      yAxis={{
-                        min: 0,
-                        max: 100,
-                        title: {
-                          text: 'Percentage (%)'
-                        }
-                      }}
-                      color={['#1890ff', '#52c41a', '#faad14', '#722ed1']}
-                      legend={{
-                        position: 'top'
-                      }}
-                      animation={false}
-                    />
-                  </div>
-                ) : (
-                  <Empty description="No shift breakdown data available" />
-                )}
-          </Card>
-        </Col>
-            
-            {/* <Col xs={24} md={12}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <Activity size={16} className="mr-2 text-blue-500" />
-                    <span>Production Summary</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-        <Row gutter={[16, 16]}>
-                  <Col span={8}>
-                    <Statistic 
-                      title="Total Production" 
-                      value={overallOEEData?.total_production || 0} 
-                      prefix={<Target size={16} className="mr-1" />}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Statistic 
-                      title="Good Parts" 
-                      value={overallOEEData?.total_good_parts || 0} 
-                      valueStyle={{ color: '#52c41a' }}
-                      prefix={<CheckCircle size={16} className="mr-1" />}
-                    />
-                  </Col>
-                  <Col span={8}>
-                <Statistic
-                      title="Bad Parts" 
-                      value={overallOEEData?.total_bad_parts || 0} 
-                      valueStyle={{ color: '#ff4d4f' }}
-                      prefix={<XCircle size={16} className="mr-1" />}
-                    />
-                  </Col>
-                </Row>
-                
-                <Divider />
-                
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="text-sm text-gray-500">Quality Rate</div>
-                    <div className="text-lg font-semibold">
-                      {overallOEEData?.total_production ? 
-                        ((overallOEEData.total_good_parts / overallOEEData.total_production) * 100).toFixed(1) : 
-                        0}%
+                <h3 className="text-lg font-medium text-gray-600 mb-2 flex items-center">
+                  <Award className="mr-2 text-blue-500" size={24} />
+                  Overall Equipment Effectiveness
+                </h3>
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="relative">
+                    <div className="text-6xl font-bold" style={{ 
+                      color: (overallOEEData?.overall_oee || 0) >= 85 ? '#10b981' : 
+                             (overallOEEData?.overall_oee || 0) >= 60 ? '#f59e0b' : '#ef4444' 
+                    }}>
+                      {(overallOEEData?.overall_oee || 0).toFixed(1)}%
+                    </div>
+                    <div className="absolute -right-16 top-2">
+                      {/* {getStatusBadge(overallOEEData?.overall_oee || 0)} */}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Machine Count</div>
-                    <div className="text-lg font-semibold">{overallOEEData?.machine_count || 0}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Period</div>
-                    <div className="text-lg font-semibold">
-                      {dayjs(overallOEEData?.period_start).format('MMM D')} - {dayjs(overallOEEData?.period_end).format('MMM D, YYYY')}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-            
-            <Col xs={24} md={12}>
-              <Card 
-                title={
-                  <div className="flex items-center">
-                    <Award size={16} className="mr-2 text-blue-500" />
-                    <span>OEE Performance</span>
-                  </div>
-                }
-                className="shadow-sm"
-                loading={isLoadingOverallOEE}
-              >
-                <div className="flex justify-center mb-4">
-                  <div className="relative" style={{ width: 200, height: 200 }}>
-                <Progress
-                      type="circle" 
-                      percent={overallOEEData?.overall_oee * 100 || 0} 
-                      width={200}
-                      strokeColor={
-                        (overallOEEData?.overall_oee * 100 || 0) >= 85 ? '#52c41a' : 
-                        (overallOEEData?.overall_oee * 100 || 0) >= 60 ? '#faad14' : '#ff4d4f'
-                      }
-                      format={percent => (
-                        <div className="text-center">
-                          <div className="text-3xl font-bold">{percent.toFixed(1)}%</div>
-                          <div className="text-sm text-gray-500">Overall OEE</div>
-                        </div>
-                      )}
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-sm text-gray-500">Availability</div>
-                    <div className="text-lg font-semibold text-blue-500">
-                      {(overallOEEData?.overall_availability * 100 || 0).toFixed(1)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Performance</div>
-                    <div className="text-lg font-semibold text-amber-500">
-                      {(overallOEEData?.overall_performance * 100 || 0).toFixed(1)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Quality</div>
-                    <div className="text-lg font-semibold text-purple-500">
-                      {(overallOEEData?.overall_quality * 100 || 0).toFixed(1)}%
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Col> */}
-          </Row>
-        </TabPane>
-        
-        <TabPane tab="Shift Summary" key="2">
-          <Card className="shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-              <div className="flex items-center gap-4">
-                <SearchInput
-                  placeholder="Search by machine name..."
-                  style={{ width: 250 }}
-                  value={shiftSummaryFilter.search}
-                  onChange={e => setShiftSummaryFilter({
-                    ...shiftSummaryFilter,
-                    search: e.target.value
-                  })}
-                  allowClear
-                />
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">Sort by:</span>
-                  <Select
-                    style={{ width: 150 }}
-                    value={shiftSummaryFilter.sortBy}
-                    onChange={value => setShiftSummaryFilter({
-                      ...shiftSummaryFilter,
-                      sortBy: value
-                    })}
-                  >
-                    <Option value="date">Date</Option>
-                    <Option value="machine">Machine</Option>
-                    <Option value="oee">OEE</Option>
-                    <Option value="availability">Availability</Option>
-                    <Option value="performance">Performance</Option>
-                    <Option value="quality">Quality</Option>
-                  </Select>
-                  
-                  <Select
-                    style={{ width: 120 }}
-                    value={shiftSummaryFilter.sortDirection}
-                    onChange={value => setShiftSummaryFilter({
-                      ...shiftSummaryFilter,
-                      sortDirection: value
-                    })}
-                  >
-                    <Option value="asc">
-                      <Space>
-                        <ArrowUp size={14} />
-                        Ascending
-                      </Space>
-                    </Option>
-                    <Option value="desc">
-                      <Space>
-                        <ArrowDown size={14} />
-                        Descending
-                      </Space>
-                    </Option>
-                  </Select>
                 </div>
               </div>
               
-              <Button
-                icon={<DownloadOutlined />}
-                onClick={() => {/* Export functionality */}}
-              >
-                Export
-              </Button>
-            </div>
-            
-            {isLoadingShiftSummary ? (
-              <div className="flex justify-center items-center py-10">
-                <Spin size="large" />
+              <div className="mt-6">
+                <Progress 
+                  percent={(overallOEEData?.overall_oee || 0).toFixed(1)} 
+                  strokeColor={{
+                    '0%': '#ef4444',
+                    '60%': '#f59e0b',
+                    '85%': '#10b981',
+                  }}
+                  size="large"
+                  strokeWidth={12}
+                />
+                {/* <div className="flex justify-between text-xs mt-2 text-gray-500">
+                  <span>Poor (&lt;60%)</span>
+                  <span>Average (60-85%)</span>
+                  <span>Excellent (&gt;85%)</span>
+                </div> */}
               </div>
-            ) : filteredShiftSummaryData.length > 0 ? (
-              <Table 
-                columns={columns} 
-                dataSource={filteredShiftSummaryData} 
-                scroll={{ x: 1200 }}
-                pagination={{ pageSize: 10 }}
-                size="middle"
-              />
-            ) : (
-              <Empty description="No shift summary data available" />
-            )}
-          </Card>
-        </TabPane>
-        
+            </div>
+          </div>
+
+          {/* OEE Components */}
+          <div className="lg:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Availability Card */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-blue-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 transform translate-x-16 -translate-y-16">
+                  <div className="absolute inset-0 bg-blue-500 opacity-10 rounded-full"></div>
+                </div>
+                <div className="relative">
+                  <h4 className="text-gray-600 mb-2 flex items-center">
+                    <Clock className="mr-2 text-blue-500" size={20} />
+                    Availability
+                  </h4>
+                  <div className="mt-4">
+                    <div className="text-4xl font-bold text-blue-600">
+                      {(overallOEEData?.overall_availability || 0).toFixed(1)}%
+                    </div>
+                    <div className="text-sm text-gray-500 mt-2">Planned vs. Actual Uptime</div>
+                  </div>
+                  <div className="mt-4">
+                    <Progress 
+                      percent={(overallOEEData?.overall_availability || 0).toFixed(3)} 
+                      strokeColor="#1890ff"
+                      size="small"
+                      strokeWidth={8}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Card */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-amber-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 transform translate-x-16 -translate-y-16">
+                  <div className="absolute inset-0 bg-amber-500 opacity-10 rounded-full"></div>
+                </div>
+                <div className="relative">
+                  <h4 className="text-gray-600 mb-2 flex items-center">
+                    <Target className="mr-2 text-amber-500" size={20} />
+                    Performance
+                  </h4>
+                  <div className="mt-4">
+                    <div className="text-4xl font-bold text-amber-600">
+                      {(overallOEEData?.overall_performance || 0).toFixed(1)}%
+                    </div>
+                    <div className="text-sm text-gray-500 mt-2">Actual vs. Ideal Cycle Time</div>
+                  </div>
+                  <div className="mt-4">
+                    <Progress 
+                      percent={(overallOEEData?.overall_performance || 0).toFixed(3)} 
+                      strokeColor="#faad14"
+                      size="small"
+                      strokeWidth={8}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quality Card */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-purple-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 transform translate-x-16 -translate-y-16">
+                  <div className="absolute inset-0 bg-purple-500 opacity-10 rounded-full"></div>
+                </div>
+                <div className="relative">
+                  <h4 className="text-gray-600 mb-2 flex items-center">
+                    <CheckCircle className="mr-2 text-purple-500" size={20} />
+                    Quality
+                  </h4>
+                  <div className="mt-4">
+                    <div className="text-4xl font-bold text-purple-600">
+                      {(overallOEEData?.overall_quality || 0).toFixed(1)}%
+                    </div>
+                    <div className="text-sm text-gray-500 mt-2">Good Parts vs. Total Parts</div>
+                  </div>
+                  <div className="mt-4">
+                    <Progress 
+                      percent={(overallOEEData?.overall_quality || 0).toFixed(3)} 
+                      strokeColor="#722ed1"
+                      size="small"
+                      strokeWidth={8}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Production Stats */}
+            {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-gray-500">Total Production</div>
+                    <div className="text-2xl font-semibold mt-1">{overallOEEData?.total_production || 0}</div>
+                  </div>
+                  <div className="p-3 rounded-full bg-gray-50">
+                    <Target size={24} className="text-gray-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-4 border border-green-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-gray-500">Good Parts</div>
+                    <div className="text-2xl font-semibold text-green-600 mt-1">{overallOEEData?.total_good_parts || 0}</div>
+                  </div>
+                  <div className="p-3 rounded-full bg-green-50">
+                    <CheckCircle size={24} className="text-green-500" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-4 border border-red-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-gray-500">Bad Parts</div>
+                    <div className="text-2xl font-semibold text-red-600 mt-1">{overallOEEData?.total_bad_parts || 0}</div>
+                  </div>
+                  <div className="p-3 rounded-full bg-red-50">
+                    <XCircle size={24} className="text-red-500" />
+                  </div>
+                </div>
+              </div>
+            </div> */}
+          </div>
+        </div>
+      </div>
+
+      <Tabs activeKey={activeTab} onChange={setActiveTab}>
         <TabPane 
-          tab="Machine Analysis" 
+          tab={
+            <span className="flex items-center gap-2">
+              <BarChart2 size={16} />
+              Machine-wise Analysis
+            </span>
+          }
           key="3"
           className="p-1"
         >
@@ -940,33 +707,33 @@ const OEEDashboard = () => {
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
-                      {getStatusBadge(machine.average_oee)}
-                      <div className="text-2xl font-bold mt-1" style={{ 
+                      {/* {getStatusBadge(machine.average_oee)} */}
+                      {/* <div className="text-2xl font-bold mt-1" style={{ 
                         color: machine.average_oee >= 85 ? '#10b981' : 
                               machine.average_oee >= 60 ? '#f59e0b' : '#ef4444' 
                       }}>
                         {machine.average_oee.toFixed(1)}%
-                      </div>
-                      <div className="text-xs text-gray-500">OEE Score</div>
+                      </div> */}
+                      {/* <div className="text-xs text-gray-500">OEE Score</div> */}
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2 mb-4">
                     <div className="bg-blue-50 rounded-lg p-2 text-center">
                       <div className="text-xs text-gray-500">Availability</div>
-                      <div className="text-base font-semibold text-blue-600">
+                      <div className="text-xl font-bold text-blue-600">
                         {machine.average_availability.toFixed(1)}%
                       </div>
                     </div>
                     <div className="bg-amber-50 rounded-lg p-2 text-center">
                       <div className="text-xs text-gray-500">Performance</div>
-                      <div className="text-base font-semibold text-amber-600">
+                      <div className="text-xl font-semibold text-amber-600">
                         {machine.average_performance.toFixed(1)}%
                       </div>
                     </div>
                     <div className="bg-purple-50 rounded-lg p-2 text-center">
                       <div className="text-xs text-gray-500">Quality</div>
-                      <div className="text-base font-semibold text-purple-600">
+                      <div className="text-xl font-semibold text-purple-600">
                         {machine.average_quality.toFixed(1)}%
                       </div>
                     </div>
@@ -1000,7 +767,7 @@ const OEEDashboard = () => {
                     </div>
                   </div>
                   
-                  <Button 
+                  {/* <Button 
                     type="primary"
                     block
                     icon={<BarChart2 size={16} />}
@@ -1008,11 +775,110 @@ const OEEDashboard = () => {
                     className="bg-blue-500 hover:bg-blue-600"
                   >
                     View OEE Trends
-                  </Button>
+                  </Button> */}
       </Card>
               ))}
             </div>
           )}
+        </TabPane>
+
+        <TabPane 
+          tab={
+            <span className="flex items-center gap-2">
+              <Activity size={16} />
+              Shift Summary
+            </span>
+          } 
+          key="2"
+        >
+          <Card className="shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+              <div className="flex items-center gap-4">
+                <SearchInput
+                  placeholder="Search by machine name or date..."
+                  style={{ width: 250 }}
+                  value={shiftSummaryFilter.search}
+                  onChange={e => setShiftSummaryFilter({
+                    ...shiftSummaryFilter,
+                    search: e.target.value
+                  })}
+                  allowClear
+                />
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Sort by:</span>
+                  <Select
+                    style={{ width: 150 }}
+                    value={shiftSummaryFilter.sortBy}
+                    onChange={value => setShiftSummaryFilter({
+                      ...shiftSummaryFilter,
+                      sortBy: value
+                    })}
+                  >
+                    <Option value="date">Date</Option>
+                    <Option value="machine">Machine</Option>
+                    <Option value="productionTime">Production Time</Option>
+                    <Option value="idleTime">Idle Time</Option>
+                    <Option value="offTime">Off Time</Option>
+                    <Option value="oee">OEE</Option>
+                  </Select>
+                  
+                  <Select
+                    style={{ width: 120 }}
+                    value={shiftSummaryFilter.sortDirection}
+                    onChange={value => setShiftSummaryFilter({
+                      ...shiftSummaryFilter,
+                      sortDirection: value
+                    })}
+                  >
+                    <Option value="asc">
+                      <Space>
+                        <ArrowUp size={14} />
+                        Ascending
+                      </Space>
+                    </Option>
+                    <Option value="desc">
+                      <Space>
+                        <ArrowDown size={14} />
+                        Descending
+                      </Space>
+                    </Option>
+                  </Select>
+                </div>
+              </div>
+              
+              <Button
+                icon={<DownloadOutlined />}
+                type="primary"
+                onClick={() => {/* Export functionality */}}
+                className="bg-blue-500 hover:bg-blue-600"
+              >
+                Export to Excel
+              </Button>
+            </div>
+            
+            {isLoadingShiftSummary ? (
+              <div className="flex justify-center items-center py-10">
+                <Spin size="large" />
+              </div>
+            ) : filteredShiftSummaryData.length > 0 ? (
+              <Table 
+                columns={columns} 
+                dataSource={filteredShiftSummaryData} 
+                scroll={{ x: 1500, y: 600 }}
+                pagination={{ 
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} entries`
+                }}
+                size="middle"
+                bordered
+                className="custom-table"
+              />
+            ) : (
+              <Empty description="No shift summary data available" />
+            )}
+          </Card>
         </TabPane>
       </Tabs>
       

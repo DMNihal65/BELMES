@@ -193,7 +193,7 @@ const JobDetails = () => {
   // Function to load all available jobs
   const loadAvailableJobs = useCallback(async () => {
     try {
-      const response = await fetch('http://172.18.7.88:5698/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.88:9999/api/v1/planning/all_orders');
       
       if (!response.ok) {
         throw new Error('Failed to fetch available jobs');
@@ -211,7 +211,7 @@ const JobDetails = () => {
   const loadJobDetails = useCallback(async (partNumber) => {
     try {
       setIsLoadingJobData(true);
-      const response = await fetch(`http://172.18.7.88:5698/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.88:9999/api/v1/planning/search_order?part_number=${partNumber}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch job details');
@@ -246,7 +246,7 @@ const JobDetails = () => {
     }
   }, []);
 
-  // Add the deactivation function here, before activateSelectedJob
+  // Update deactivateCurrentJob function to pass true for persistence
   const deactivateCurrentJob = async () => {
     try {
       setIsDeactivating(true);
@@ -258,13 +258,22 @@ const JobDetails = () => {
         throw new Error('Machine ID not found');
       }
       
-      const operationId = machineOperations?.inprogress?.[0]?.id;
+      // Find the active operation ID - simplified approach
+      let operationId = 0;
       
-      if (!operationId) {
-        throw new Error('No active operation found to deactivate');
+      // First check if there's an active operation in machineOperations
+      if (machineOperations?.inprogress?.length > 0) {
+        operationId = machineOperations.inprogress[0].id;
+        console.log('Deactivating operation ID from machine operations:', operationId);
+      } 
+      // If selectedOperation exists (from job selector)
+      else if (selectedOperation && selectedOperation.id) {
+        operationId = selectedOperation.id;
+        console.log('Deactivating operation ID from selected operation:', operationId);
       }
       
-      const response = await fetch('http://172.18.7.88:5698/api/v1/logs/machine-raw-live-deactive/', {
+      // Directly call the deactivation endpoint with simple payload
+      const response = await fetch('http://172.18.7.88:9999/api/v1/logs/machine-raw-live-deactive/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,14 +284,16 @@ const JobDetails = () => {
         })
       });
       
+      const responseData = await response.json();
+      console.log('Deactivation response:', responseData);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to deactivate job');
+        throw new Error(responseData.detail || 'Failed to deactivate job');
       }
       
       message.success('Job deactivated successfully');
       
-      // Reset the job source to allow new data from API
+      // Reset the job source to allow new data
       localStorage.removeItem('jobSource');
       
       // Clear the current job selection
@@ -291,8 +302,10 @@ const JobDetails = () => {
       setSelectedJob(null);
       setSelectedOperation(null);
       
-      // Refresh machine operations
-      await fetchMachineOperations(machineId);
+      // Refresh machine operations - pass true to allow fetching new scheduled jobs
+      if (machineId) {
+        await fetchMachineOperations(machineId, true);
+      }
       
       return true;
     } catch (error) {
@@ -304,7 +317,7 @@ const JobDetails = () => {
     }
   };
 
-  // Function to activate selected job and operation
+  // Function to activate selected job and operation - improved version
   const activateSelectedJob = useCallback(async () => {
     if (!selectedJob || !selectedOperation) {
       message.error('Please select both a job and an operation');
@@ -325,6 +338,7 @@ const JobDetails = () => {
       const hasActiveJob = machineOperations?.inprogress?.length > 0;
       
       if (hasActiveJob) {
+        console.log('Active job found. Deactivating before activating new job...');
         const deactivateResult = await deactivateCurrentJob();
         
         if (!deactivateResult) {
@@ -332,11 +346,23 @@ const JobDetails = () => {
         }
       }
       
-      // Now activate the new job
-      const activationResult = await activateJob(machineId, selectedOperation.id);
+      // Now activate the new job with simpler direct approach
+      const activateResponse = await fetch('http://172.18.7.88:9999/api/v1/logs/machine-raw-live/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          machine_id: machineId,
+          operation_id: selectedOperation.id
+        })
+      });
       
-      if (!activationResult.success) {
-        throw new Error(activationResult.error || 'Failed to activate job');
+      const activateData = await activateResponse.json();
+      console.log('Activation response:', activateData);
+      
+      if (!activateResponse.ok) {
+        throw new Error(activateData.detail || 'Failed to activate job');
       }
       
       message.success('Job activated successfully');
@@ -379,10 +405,9 @@ const JobDetails = () => {
         setJobOrderData(jobDetails);
         
         // IMPORTANT: Mark this as a user-selected job in localStorage
-        // This is the key fix for persisting user selection after refresh
         localStorage.setItem('jobSource', 'user-selected');
         
-        // Store in localStorage consistently - the key source of truth
+        // Store in localStorage for persistence
         localStorage.setItem('currentJobData', JSON.stringify(jobDetails));
         localStorage.setItem('jobData', JSON.stringify(consolidatedJobData));
         localStorage.setItem('activeOperation', JSON.stringify(selectedOperation));
@@ -408,7 +433,7 @@ const JobDetails = () => {
       setIsActivatingJob(false);
       setShowActivationWarning(false);
     }
-  }, [selectedJob, selectedOperation, loadJobDetails, jobData, activateJob, setIsJobSelectorVisible, setIsActivatingJob, setShowActivationWarning, machineOperations, deactivateCurrentJob, machineStatus]);
+  }, [selectedJob, selectedOperation, loadJobDetails, jobData, machineOperations, setIsJobSelectorVisible, setIsActivatingJob, setShowActivationWarning, deactivateCurrentJob, machineStatus]);
 
   // Toggle job selector visibility
   const toggleJobSelector = () => {
@@ -447,7 +472,7 @@ const JobDetails = () => {
     console.log('New visibility state set to:', !isJobSelectorVisible);
   };
 
-  // Initialize WebSocket when component mounts
+  // Initialize WebSocket when component mounts - updated for better persistence
   useEffect(() => {
     const initializeData = async () => {
       const storedMachine = localStorage.getItem('currentMachine');
@@ -458,9 +483,40 @@ const JobDetails = () => {
             // Initialize WebSocket
             initializeWebSocket(machineData.id);
             
-            // Fetch machine operations and job data
+            // Check job source to determine if we need to fetch new data
+            const jobSource = localStorage.getItem('jobSource');
+            
+            // If user previously selected a job, prioritize that over fetching scheduled jobs
+            if (jobSource === 'user-selected') {
+              console.log('User previously selected a job. Restoring from localStorage...');
+              
+              // Restore job data from localStorage
+              const storedJobData = localStorage.getItem('currentJobData');
+              const storedJobDetails = localStorage.getItem('jobData');
+              const storedOperation = localStorage.getItem('activeOperation');
+              
+              if (storedJobData && storedJobDetails && storedOperation) {
+                try {
+                  setJobOrderData(JSON.parse(storedJobData));
+                  setJobData(JSON.parse(storedJobDetails));
+                  setSelectedOperation(JSON.parse(storedOperation));
+                  
+                  console.log('Job restored from localStorage successfully');
+                  
+                  // Still fetch operations in background but don't reset the current job
+                  // Pass false to prevent overriding the user-selected job
+                  fetchMachineOperations(machineData.id, false);
+                  return;
+                } catch (parseError) {
+                  console.error('Error parsing stored job data:', parseError);
+                }
+              }
+            }
+            
+            // If no user-selected job or failed to restore, get scheduled jobs
+            // Pass true to allow overriding with scheduled jobs
             console.log('Fetching machine operations for machine:', machineData.id);
-            const result = await fetchMachineOperations(machineData.id);
+            const result = await fetchMachineOperations(machineData.id, true);
             console.log('Machine operations result:', result);
             
             if (result?.success) {
@@ -481,19 +537,6 @@ const JobDetails = () => {
                   const activeOp = result.data.operations.inprogress[0];
                   setSelectedOperation(activeOp);
                   localStorage.setItem('activeOperation', JSON.stringify(activeOp));
-                }
-              } else if (!hasActiveJob) {
-                // If no active job, check if we have a previously selected job
-                const storedJobData = localStorage.getItem('currentJobData');
-                const storedJobDetails = localStorage.getItem('jobData');
-                
-                if (storedJobData && storedJobDetails) {
-                  try {
-                    setJobOrderData(JSON.parse(storedJobData));
-                    setJobData(JSON.parse(storedJobDetails));
-                  } catch (parseError) {
-                    console.error('Error parsing stored job data:', parseError);
-                  }
                 }
               }
             }
@@ -590,20 +633,25 @@ const JobDetails = () => {
     };
   }, [machineStatus?.status, getIdleTime]);
 
-  // Add new useEffect to fetch job data
+  // Update the useEffect for fetchMachineOperations
   useEffect(() => {
     const fetchJobData = async () => {
       if (currentMachine?.id) {
         setIsLoadingJobData(true);
         try {
-          const result = await fetchMachineOperations(currentMachine.id);
+          // Pass false to prevent overriding user-selected jobs
+          const result = await fetchMachineOperations(currentMachine.id, false);
           if (result.success && result.data.orders && result.data.orders.length > 0) {
-            // Get the first order from the response
-            setJobOrderData(result.data.orders[0]);
-            
-            // Update operations data if needed
-            if (result.data.operations) {
-              // You could set operations data here if needed
+            // Only update if we don't have a user-selected job
+            const jobSource = localStorage.getItem('jobSource');
+            if (jobSource !== 'user-selected') {
+              // Get the first order from the response
+              setJobOrderData(result.data.orders[0]);
+              
+              // Update operations data if needed
+              if (result.data.operations) {
+                // You could set operations data here if needed
+              }
             }
           }
         } catch (error) {
@@ -618,14 +666,15 @@ const JobDetails = () => {
     fetchJobData();
   }, [currentMachine?.id, fetchMachineOperations]);
 
-  // Add an effect to handle machine operations updates
+  // Update the useEffect to handle machine operations updates
   useEffect(() => {
     const storedMachine = localStorage.getItem('currentMachine');
     if (storedMachine) {
       try {
         const machineData = JSON.parse(storedMachine);
         if (machineData?.id && (!jobData || !jobData.machine?.id)) {
-          fetchMachineOperations(machineData.id);
+          // Pass false to prevent overriding user-selected jobs
+          fetchMachineOperations(machineData.id, false);
         }
       } catch (error) {
         console.error('Error fetching machine operations:', error);
@@ -633,10 +682,11 @@ const JobDetails = () => {
     }
   }, [jobData]);
 
-  // Add this useEffect near your other useEffects
+  // Update this useEffect
   useEffect(() => {
     if (currentMachine?.id) {
-      fetchMachineOperations(currentMachine.id);
+      // Pass false to prevent overriding user-selected jobs during regular updates
+      fetchMachineOperations(currentMachine.id, false);
     }
   }, [currentMachine?.id, fetchMachineOperations]);
 
@@ -914,7 +964,7 @@ const JobDetails = () => {
       
       console.log('Submitting operator log payload:', payload);
       
-      const response = await fetch('http://172.18.7.88:5698/api/v1/logs/operator-log', {
+      const response = await fetch('http://172.18.7.88:9999/api/v1/logs/operator-log', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -950,6 +1000,31 @@ const JobDetails = () => {
 
   // Replace the switchToScheduledJobs function with this improved version
   const switchToScheduledJobs = async () => {
+    // Check if there's an active custom job that needs to be deactivated
+    const jobSource = localStorage.getItem('jobSource');
+    const hasActiveCustomJob = jobSource === 'user-selected' && machineOperations?.inprogress?.length > 0;
+    
+    if (hasActiveCustomJob) {
+      // Show confirmation dialog
+      Modal.confirm({
+        title: 'Deactivate Current Job?',
+        content: 'Switching to scheduled jobs will deactivate your current custom job. Do you want to continue?',
+        okText: 'Yes, Switch',
+        cancelText: 'Cancel',
+        onOk: async () => {
+          const success = await deactivateCurrentJob();
+          if (success) {
+            proceedToScheduledJobs();
+          }
+        }
+      });
+    } else {
+      proceedToScheduledJobs();
+    }
+  };
+  
+  // Helper function to load scheduled jobs
+  const proceedToScheduledJobs = async () => {
     // Clear any active job selection
     setPreviousActiveJob(null);
     setPreviousActiveOperation(null);
@@ -973,8 +1048,11 @@ const JobDetails = () => {
         throw new Error('Invalid machine data');
       }
       
+      // Remove jobSource to reset to scheduled jobs
+      localStorage.removeItem('jobSource');
+      
       // Fetch machine operations directly
-      const result = await fetchMachineOperations(machineData.id);
+      const result = await fetchMachineOperations(machineData.id, true);
       
       if (result.success) {
         // Check if we have scheduled operations
@@ -1399,7 +1477,7 @@ const JobDetails = () => {
                     <Button 
                       type="primary" 
                       className="mt-4"
-                      onClick={() => fetchMachineOperations(currentMachine?.id)}
+                      onClick={() => fetchMachineOperations(currentMachine?.id, false)}
                       loading={isLoadingJobData}
                     >
                       Refresh Data

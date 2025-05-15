@@ -20,8 +20,8 @@ const calculateUptime = (lastUpdated) => {
   return moment(lastUpdated).fromNow();
 };
 
-const BASE_URL = 'http://172.18.7.88:5698/production_monitoring';
-const WS_URL = 'ws://172.18.7.88:5698/production_monitoring/ws/live-status/';
+const BASE_URL = 'http://172.18.7.88:9988/production_monitoring';
+const WS_URL = 'ws://172.18.7.88:9988/production_monitoring/ws/live-status/';
 
 const useProductionStore = create(
   devtools((set, get) => ({
@@ -185,7 +185,7 @@ const useProductionStore = create(
     // Fetch work centers for filtering machines
     fetchWorkCenters: async () => {
       try {
-        const response = await axios.get('http://172.18.7.88:5698/api/v1/master-order/workcenters/?skip=0&limit=100');
+        const response = await axios.get('http://172.18.7.88:9988/api/v1/master-order/workcenters/?skip=0&limit=100');
         const workcenters = response.data;
         
         // No longer filtering by is_schedulable
@@ -410,7 +410,7 @@ const useProductionStore = create(
       }));
       
       // Fetch both datasets with new date range
-      get().fetchMachineTimelines(startDate, endDate);
+      get().fetchMachineStatusTimeline(startDate, endDate);
       get().fetchDailyProduction(startDate, endDate);
     },
 
@@ -565,22 +565,25 @@ const useProductionStore = create(
       }
     },
 
-    // Add this function to the store
-    fetchOverallOEEMetrics: async () => {
+    // Update this function in the store
+    fetchOverallOEEMetrics: async (startDate, endDate) => {
       try {
-        const today = dayjs().format('YYYY-MM-DD');
+        const start = startDate ? dayjs(startDate).format('YYYY-MM-DD') : dayjs().subtract(7, 'days').format('YYYY-MM-DD');
+        const end = endDate ? dayjs(endDate).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
         
         const response = await axios.get(
-          `${BASE_URL}/overall-oee-analytics/?start_date=${today}&end_date=${today}`
+          `${BASE_URL}/overall-oee-analytics/?start_date=${start}&end_date=${end}`
         );
         
         set(state => ({
           overallOEEMetrics: {
-            oee: response.data.overall_oee * 100 || 0,
-            availability: response.data.overall_availability * 100 || 0,
-            performance: response.data.overall_performance * 100 || 0,
-            quality: response.data.overall_quality * 100 || 0,
-            lastUpdated: new Date()
+            oee: response.data.overall_oee || 0,
+            availability: response.data.overall_availability || 0,
+            performance: response.data.overall_performance || 0,
+            quality: response.data.overall_quality || 0,
+            lastUpdated: new Date(),
+            startDate: start,
+            endDate: end
           }
         }));
       } catch (error) {
@@ -594,7 +597,9 @@ const useProductionStore = create(
       availability: 0,
       performance: 0,
       quality: 0,
-      lastUpdated: null
+      lastUpdated: null,
+      startDate: dayjs().subtract(7, 'days').format('YYYY-MM-DD'),
+      endDate: dayjs().format('YYYY-MM-DD')
     }
   }))
 );

@@ -13,6 +13,7 @@ import {
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import WebGLErrorBoundary from './WebGLErrorBoundary';
+import { ToolOutlined, AppstoreOutlined, ProjectOutlined } from '@ant-design/icons';
 
 // Import custom components
 import FactoryFloor from './FactoryFloor';
@@ -577,35 +578,173 @@ const FactoryScene = ({
           </p>
         </div>
         
-        <div className="bg-white rounded-lg shadow-lg p-4 max-w-lg w-full">
+        <div className="bg-white rounded-lg shadow-lg p-4 w-full h-[calc(100%-130px)] flex flex-col">
           <h3 className="font-bold mb-4 text-center text-lg">Factory Shop Floor Status</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {machines.map((machine) => (
-              <div 
-                key={machine.id}
-                className={`border rounded-md p-3 cursor-pointer transition-all ${
-                  selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
-                }`}
-                onClick={() => onMachineSelect(machine)}
-              >
-                <div className="flex items-center">
-                  <div 
-                    className={`w-3 h-3 rounded-full mr-2 ${
-                      machine.status === 'PRODUCTION' ? 'bg-green-500' :
-                      machine.status === 'ON' ? 'bg-yellow-500' :
-                      machine.status === 'ERROR' ? 'bg-red-500' :
-                      'bg-gray-500'
-                    }`}
-                  />
-                  <span className="font-medium">{machine.name}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-x-2 mt-2 text-sm">
-                  <div>Status: <span className="font-medium">{machine.status}</span></div>
-                  <div>Parts: <span className="font-medium">{machine.totalCount || 0}</span></div>
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            {/* Status counters */}
+            <div className="bg-blue-50 rounded-lg p-2 border border-blue-100 flex items-center justify-between">
+              <span className="text-blue-800 text-sm font-medium">Total</span>
+              <span className="text-blue-600 text-xl font-bold">{machines.length}</span>
+            </div>
+            <div className="bg-green-50 rounded-lg p-2 border border-green-100 flex items-center justify-between">
+              <span className="text-green-800 text-sm font-medium">Running</span>
+              <span className="text-green-600 text-xl font-bold">
+                {machines.filter(m => m.status === 'PRODUCTION').length}
+              </span>
+            </div>
+            <div className="bg-yellow-50 rounded-lg p-2 border border-yellow-100 flex items-center justify-between">
+              <span className="text-yellow-800 text-sm font-medium">Idle</span>
+              <span className="text-yellow-600 text-xl font-bold">
+                {machines.filter(m => m.status === 'IDLE' || m.status === 'SETUP').length}
+              </span>
+            </div>
+            <div className="bg-red-50 rounded-lg p-2 border border-red-100 flex items-center justify-between">
+              <span className="text-red-800 text-sm font-medium">Error/Off</span>
+              <span className="text-red-600 text-xl font-bold">
+                {machines.filter(m => m.status === 'ERROR' || m.status === 'OFF').length}
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex-1 grid grid-cols-2 gap-4 overflow-hidden">
+            {/* Left: Factory layout visualization */}
+            <div className="bg-blue-50 rounded-lg border border-blue-100 p-3 relative overflow-hidden">
+              <h4 className="text-blue-800 font-medium mb-2 text-sm">Factory Layout</h4>
+              
+              {/* EDM Area */}
+              <div className="absolute top-8 left-2 right-2 h-1/4 bg-purple-50 rounded-lg border border-purple-200 flex flex-col">
+                <div className="text-xs font-medium text-purple-800 p-1 text-center">EDM Area</div>
+                <div className="flex justify-center items-center h-full space-x-4">
+                  {machines.filter(m => m.type === 'edm').slice(0, 2).map(machine => (
+                    <div 
+                      key={machine.id}
+                      onClick={() => onMachineSelect(machine)}
+                      className={`w-12 h-8 bg-white rounded-md shadow-sm flex items-center justify-center cursor-pointer
+                        ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''}
+                        border border-${getStatusColor(machine.status)}-300`}
+                    >
+                      <div className={`w-2 h-2 rounded-full bg-${getStatusColor(machine.status)}-500`}></div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+              
+              {/* Center aisle */}
+              <div className="absolute left-1/2 transform -translate-x-1/2 top-[calc(25%+40px)] bottom-2 w-3 bg-gray-200 rounded"></div>
+              
+              {/* Main shop floor */}
+              <div className="absolute bottom-2 left-2 right-2 h-[60%] flex">
+                {/* Turning side */}
+                <div className="w-[45%] flex flex-col">
+                  <div className="text-xs font-medium text-blue-800 mb-1 text-center">Turning</div>
+                  <div className="flex-1 flex flex-col justify-around">
+                    {machines.filter(m => m.type === 'turning').slice(0, 5).map(machine => (
+                      <div 
+                        key={machine.id}
+                        onClick={() => onMachineSelect(machine)}
+                        className={`h-8 bg-white rounded-md shadow-sm flex items-center justify-between px-2 cursor-pointer
+                          ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''}
+                          border border-${getStatusColor(machine.status)}-300`}
+                      >
+                        <div className={`w-2 h-2 rounded-full bg-${getStatusColor(machine.status)}-500`}></div>
+                        <span className="text-xs truncate max-w-[70%]">{machine.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Center space */}
+                <div className="w-[10%]"></div>
+                
+                {/* Milling side */}
+                <div className="w-[45%] flex flex-col">
+                  <div className="text-xs font-medium text-green-800 mb-1 text-center">Milling</div>
+                  <div className="flex-1 flex flex-col justify-around">
+                    {machines.filter(m => m.type === 'milling').slice(0, 5).map(machine => (
+                      <div 
+                        key={machine.id}
+                        onClick={() => onMachineSelect(machine)}
+                        className={`h-8 bg-white rounded-md shadow-sm flex items-center justify-between px-2 cursor-pointer
+                          ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''}
+                          border border-${getStatusColor(machine.status)}-300`}
+                      >
+                        <span className="text-xs truncate max-w-[70%]">{machine.name}</span>
+                        <div className={`w-2 h-2 rounded-full bg-${getStatusColor(machine.status)}-500`}></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Label */}
+              <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
+                Main Shop Floor
+              </div>
+            </div>
+            
+            {/* Right: Machine cards */}
+            <div className="grid grid-rows-3 gap-4 overflow-hidden">
+              {/* Machine categories */}
+              <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+                <div className="bg-blue-50 p-2 border-b border-blue-100">
+                  <h4 className="text-blue-800 font-medium text-sm flex items-center">
+                    <ToolOutlined className="mr-1" /> Turning Machines
+                  </h4>
+                </div>
+                <div className="p-2 grid grid-cols-2 gap-2 overflow-hidden">
+                  {machines.filter(m => m.type === 'turning').slice(0, 4).map(machine => (
+                    <MachineSummaryCard 
+                      key={machine.id} 
+                      machine={machine} 
+                      isSelected={selectedMachine?.id === machine.id}
+                      onSelect={() => onMachineSelect(machine)}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+                <div className="bg-green-50 p-2 border-b border-green-100">
+                  <h4 className="text-green-800 font-medium text-sm flex items-center">
+                    <AppstoreOutlined className="mr-1" /> Milling Machines
+                  </h4>
+                </div>
+                <div className="p-2 grid grid-cols-2 gap-2 overflow-hidden">
+                  {machines.filter(m => m.type === 'milling').slice(0, 4).map(machine => (
+                    <MachineSummaryCard 
+                      key={machine.id} 
+                      machine={machine} 
+                      isSelected={selectedMachine?.id === machine.id}
+                      onSelect={() => onMachineSelect(machine)}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+                <div className="bg-purple-50 p-2 border-b border-purple-100">
+                  <h4 className="text-purple-800 font-medium text-sm flex items-center">
+                    <ProjectOutlined className="mr-1" /> EDM Machines
+                  </h4>
+                </div>
+                <div className="p-2 grid grid-cols-2 gap-2 overflow-hidden">
+                  {machines.filter(m => m.type === 'edm').slice(0, 4).map(machine => (
+                    <MachineSummaryCard 
+                      key={machine.id} 
+                      machine={machine} 
+                      isSelected={selectedMachine?.id === machine.id}
+                      onSelect={() => onMachineSelect(machine)}
+                    />
+                  ))}
+                  {machines.filter(m => m.type === 'edm').length === 0 && (
+                    <div className="col-span-2 flex items-center justify-center p-2 text-gray-500 text-sm">
+                      No EDM machines available
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1447,6 +1586,64 @@ const LargeScreenTV = ({ position, rotation = [0, 0, 0], size = [10, 6], content
         {content}
       </Text>
     </group>
+  );
+};
+
+// Machine summary card component for 2D fallback view
+const MachineSummaryCard = ({ machine, isSelected, onSelect }) => {
+  // Calculate completion percentage
+  const completionPercentage = 
+    machine.targetCount > 0 ? Math.round((machine.totalCount / machine.targetCount) * 100) : 0;
+  
+  // Status colors match the main app  
+  const getStatusBg = (status) => {
+    switch(status) {
+      case 'PRODUCTION': return 'bg-green-50 border-green-100';
+      case 'ON': return 'bg-yellow-50 border-yellow-100';
+      case 'IDLE': return 'bg-blue-50 border-blue-100';
+      case 'ERROR': return 'bg-red-50 border-red-100';
+      default: return 'bg-gray-50 border-gray-100';
+    }
+  };
+  
+  const getStatusText = (status) => {
+    switch(status) {
+      case 'PRODUCTION': return 'text-green-800';
+      case 'ON': return 'text-yellow-800';
+      case 'IDLE': return 'text-blue-800';
+      case 'ERROR': return 'text-red-800';
+      default: return 'text-gray-800';
+    }
+  };
+  
+  return (
+    <div 
+      className={`border rounded-md overflow-hidden shadow-sm cursor-pointer
+        ${isSelected ? 'ring-2 ring-blue-500' : 'hover:bg-gray-50'}`}
+      onClick={onSelect}
+    >
+      <div className={`flex justify-between items-center p-1 ${getStatusBg(machine.status)} border-b`}>
+        <div className="font-medium text-xs truncate max-w-[70%]">{machine.name}</div>
+        <div className={`text-xs font-semibold px-1 py-0.5 rounded ${getStatusText(machine.status)}`}>
+          {machine.status}
+        </div>
+      </div>
+      
+      <div className="p-1">
+        <div className="flex justify-between items-center text-xs">
+          <div className="truncate max-w-[70%]">{machine.partNumber || 'No part'}</div>
+          <div>{machine.totalCount || 0}/{machine.targetCount || 0}</div>
+        </div>
+        
+        <div className="w-full h-1 mt-1 bg-gray-200 rounded overflow-hidden">
+          <div 
+            className={`h-full ${machine.status === 'PRODUCTION' ? 'bg-green-500' : 
+              machine.status === 'ERROR' ? 'bg-red-500' : 'bg-blue-500'}`}
+            style={{ width: `${completionPercentage}%` }}
+          ></div>
+        </div>
+      </div>
+    </div>
   );
 };
 

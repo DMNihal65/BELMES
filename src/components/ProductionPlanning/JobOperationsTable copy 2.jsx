@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Table, Button, Space, Tooltip, Form, Input, 
   Popconfirm, Select, Tag, TimePicker, Modal, message,
-  Upload, InputNumber, Card, Tabs, Spin
+  Upload, InputNumber, Card, Tabs
 } from 'antd';
 import { 
   EditOutlined, DeleteOutlined, FileTextOutlined, 
@@ -15,7 +15,6 @@ import EditableCell from './EditableCell';
 import dayjs from 'dayjs';
 import useIpidStore from '../../store/ipid-store';
 import usePlanningStore from '../../store/planning-store';
-import { Document, Page, pdfjs } from 'react-pdf';
 
 const { Option } = Select;
 
@@ -72,13 +71,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   const [isUploadingVersion, setIsUploadingVersion] = useState(false);
   const [versionNumber, setVersionNumber] = useState('1');
   const [isLoading, setIsLoading] = useState(false);
-  const loadingStartTimeRef = useRef(0);
-  const [partDrawings, setPartDrawings] = useState([]);
-  const [pdfUrl, setPdfUrl] = useState(null);
-  const [isPdfModalVisible, setIsPdfModalVisible] = useState(false);
-  const [numPages, setNumPages] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [viewingDocument, setViewingDocument] = useState(null);
 
   useEffect(() => {
     if (initialOperations && initialOperations.length > 0) {
@@ -157,7 +149,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
   // Modify the useEffect that checks IPID status to ensure it runs on mount and sets loading state
   useEffect(() => {
-    const checkIpidStatusForOperations = async () => {
+    const fetchIpidStatus = async () => {
       if (!operations || operations.length === 0) {
         setIsIpidStatusLoading(false);
         return;
@@ -174,68 +166,42 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       console.log(`Checking IPID status for ${operations.length} operations in order ${currentProductionOrder}`);
       
       setIsIpidStatusLoading(true);
-      loadingStartTimeRef.current = Date.now();
       const statusMap = {};
       
       try {
-        // Fetch IPID structure using the new endpoint
-        const { fetchIpidStructure } = usePlanningStore.getState();
-        const ipidStructure = await fetchIpidStructure(currentProductionOrder);
-        
-        if (!ipidStructure || !ipidStructure.structure || !ipidStructure.structure.subfolders) {
-          console.log('No IPID structure found for production order:', currentProductionOrder);
-          setIpidStatusMap({});
-          setIsIpidStatusLoading(false);
-          return;
-        }
-        
-        console.log('IPID structure:', ipidStructure);
-        
-        // Process all operations
-        operations.forEach(operation => {
-          if (!operation || !operation.operation_number) {
-            console.warn('Found invalid operation:', operation);
-            return;
-          }
-          
-          const opNumber = parseInt(operation.operation_number, 10);
-          const opFolderKey = `OP${opNumber}`;
-          
-          // Check if there's an IPID folder and documents for this operation
-          const opFolder = ipidStructure.structure.subfolders[opFolderKey];
-          
-          if (opFolder && opFolder.documents && opFolder.documents.length > 0) {
-            statusMap[operation.operation_number] = true;
-            console.log(`Found ${opFolder.documents.length} IPID documents for operation ${opNumber}`);
-          } else {
-            statusMap[operation.operation_number] = false;
+        // Process all operations in parallel for faster loading
+        const statusPromises = operations.map(async (operation) => {
+          try {
+            // Always check against the server for the latest status
+            const hasIpid = await checkIpidStatus(currentProductionOrder, operation.operation_number);
+            console.log(`IPID status for operation ${operation.operation_number}: ${hasIpid}`);
+            return { opNumber: operation.operation_number, hasIpid };
+          } catch (error) {
+            console.error(`Error checking IPID status for operation ${operation.operation_number}:`, error);
+            return { opNumber: operation.operation_number, hasIpid: false };
           }
         });
         
-        console.log('Finished processing operations, status map:', statusMap);
+        // Wait for all status checks to complete
+        const results = await Promise.all(statusPromises);
+        
+        // Convert results to status map
+        results.forEach(result => {
+          statusMap[result.opNumber] = result.hasIpid;
+        });
       } catch (error) {
         console.error('Error checking IPID statuses:', error);
       } finally {
-        // Always set loading to false and update the status map
+        // Set the status map in state
         setIpidStatusMap(statusMap);
+        console.log('Updated IPID status map:', statusMap);
         setIsIpidStatusLoading(false);
       }
     };
 
-    // Add a timeout to ensure the loading state doesn't get stuck
-    const loadingTimeout = setTimeout(() => {
-      if (isIpidStatusLoading) {
-        console.warn('IPID status check timed out, resetting loading state');
-        setIsIpidStatusLoading(false);
-      }
-    }, 10000); // 10 second timeout
-
-    // Run the check
-    checkIpidStatusForOperations();
-    
-    // Cleanup timeout
-    return () => clearTimeout(loadingTimeout);
-  }, [operations, productionOrder, orderNumber]);
+    // Run this effect whenever operations change or when the component mounts
+    fetchIpidStatus();
+  }, [operations, productionOrder, orderNumber, checkIpidStatus]);
 
   // Sort the operations by operation_number
   useEffect(() => {
@@ -629,120 +595,119 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   };
 
   // Function to fetch IPID document details and versions
-  const fetchIpidDocuments = async (productionOrder) => {
-    try {
-      // Fetch IPID structure using the new endpoint
-      const { fetchIpidStructure } = usePlanningStore.getState();
-      const ipidStructure = await fetchIpidStructure(productionOrder);
-      
-      if (!ipidStructure || !ipidStructure.structure || !ipidStructure.structure.subfolders) {
-        console.log('No IPID structure found for production order:', productionOrder);
-        return [];
-      }
-      
-      // Extract all documents from all operation folders
-      const allDocuments = [];
-      Object.values(ipidStructure.structure.subfolders).forEach(folder => {
-        if (folder.documents && folder.documents.length > 0) {
-          allDocuments.push(...folder.documents);
-        }
-      });
-      
-      return allDocuments;
-    } catch (error) {
-      console.error('Error fetching IPID documents:', error);
-      return [];
-    }
-  };
-
-  // Add this function to fetch IPID document details for a specific operation
-  const fetchIpidDocumentForOperation = async (productionOrder, operationNumber) => {
-    try {
-      // Fetch IPID structure using the new endpoint
-      const { fetchIpidStructure } = usePlanningStore.getState();
-      const ipidStructure = await fetchIpidStructure(productionOrder);
-      
-      if (!ipidStructure || !ipidStructure.structure || !ipidStructure.structure.subfolders) {
-        console.log('No IPID structure found for production order:', productionOrder);
-        return null;
-      }
-      
-      const opFolderKey = `OP${operationNumber}`;
-      const opFolder = ipidStructure.structure.subfolders[opFolderKey];
-      
-      // Check if there are documents for this operation
-      if (opFolder && opFolder.documents && opFolder.documents.length > 0) {
-        // Sort documents by created_at to get the most recent
-        const sortedDocuments = [...opFolder.documents].sort((a, b) => 
-          new Date(b.created_at) - new Date(a.created_at)
-        );
-        
-        return sortedDocuments[0];
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error fetching IPID document for operation:', error);
-      return null;
-    }
-  };
-
-  // Update the handleOpenIpidModal function
-  const handleOpenIpidModal = async (record) => {
-    setSelectedOperation(record);
-    setIsIpidModalVisible(true);
-    setIsLoading(true);
-    
+  const fetchIpidDocumentDetails = async (operationNumber) => {
     try {
       const currentProductionOrder = productionOrder || orderNumber;
-      const operationNumber = parseInt(record.operation_number, 10);
+      console.log(`Fetching IPID details for order ${currentProductionOrder}, operation ${operationNumber}`);
       
-      // Fetch the IPID document for this operation
-      const ipidDocument = await fetchIpidDocumentForOperation(
-        currentProductionOrder, 
-        operationNumber
-      );
-      
-      if (ipidDocument) {
-        console.log('Found IPID document:', ipidDocument);
-        setExistingIpidDocument(ipidDocument);
-        
-        // Fetch all versions for this document
-        const { fetchDocumentVersions } = usePlanningStore.getState();
-        const versions = await fetchDocumentVersions(ipidDocument.id);
-        setIpidVersions(versions);
-        
-        // Set next version number
-        if (versions && versions.length > 0) {
-          const latestVersion = Math.max(...versions.map(v => parseFloat(v.version_number)));
-          setVersionNumber((latestVersion + 1).toString());
-        } else {
-          setVersionNumber('1');
+      // This is just a placeholder - in the real implementation, you would add an API endpoint
+      // to fetch IPID document details and versions
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      // Example API call to get document details - replace with actual implementation
+      const response = await fetch(
+        `http://172.18.7.88:9999/api/v1/document-management/ipid/details?production_order=${currentProductionOrder}&operation_number=${operationNumber}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'accept': 'application/json'
+          }
         }
-      } else {
-        console.log('No IPID document found for this operation');
+      );
+
+      if (response.status === 404) {
+        console.log('No IPID document found');
         setExistingIpidDocument(null);
         setIpidVersions([]);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch IPID document details');
+      }
+
+      const data = await response.json();
+      console.log('IPID document details:', data);
+      
+      // Set document details and versions
+      setExistingIpidDocument(data.document);
+      setIpidVersions(data.versions || []);
+      
+      // Set next version number
+      if (data.versions && data.versions.length > 0) {
+        const latestVersion = Math.max(...data.versions.map(v => parseFloat(v.version_number)));
+        setVersionNumber((latestVersion + 1).toString());
+      } else {
         setVersionNumber('1');
       }
-      
-      // Also fetch part drawings
-      if (partNumber) {
-        const drawings = await fetchPartDrawings(partNumber);
-        console.log('Found part drawings:', drawings);
-        setPartDrawings(drawings);
-      }
     } catch (error) {
-      console.error('Error opening IPID modal:', error);
+      console.error('Error fetching IPID document details:', error);
+      // If API fails, just assume no document exists
       setExistingIpidDocument(null);
       setIpidVersions([]);
-      setPartDrawings([]);
-    } finally {
+      setVersionNumber('1');
+    }
+  };
+
+  // Handle version upload
+  const handleVersionUpload = async (values) => {
+    try {
+      setIsLoading(true);
+      const file = values.file?.fileList[0]?.originFileObj;
+      
+      if (!file) {
+        throw new Error('Please select a file to upload');
+      }
+
+      if (!existingIpidDocument?.id) {
+        throw new Error('No existing IPID document found');
+      }
+
+      const currentProductionOrder = productionOrder || orderNumber;
+
+      // Create form data for version upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('version_number', values.versionNumber || versionNumber);
+      formData.append('document_id', existingIpidDocument.id);
+      formData.append('description', values.description || '');
+      
+      // Call API to upload new version - replace with actual implementation
+      const response = await fetch(
+        `http://172.18.7.88:9999/api/v1/document-management/ipid/${existingIpidDocument.id}/versions`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: formData
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload IPID version');
+      }
+
+      message.success('IPID version uploaded successfully');
+      
+      // Update versions
+      await fetchIpidDocumentDetails(selectedOperation.operation_number);
+      
+      setIsLoading(false);
+      setIsUploadingVersion(false);
+      ipidForm.resetFields();
+    } catch (error) {
+      console.error('Error uploading IPID version:', error);
+      message.error(error.message || 'Failed to upload IPID version');
       setIsLoading(false);
     }
   };
 
-  // Update the handleIpidUpload function
+  // Update handleIpidUpload
   const handleIpidUpload = async (values) => {
     try {
       const file = values.file?.fileList[0]?.originFileObj;
@@ -761,272 +726,104 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         throw new Error('Operation number is required');
       }
 
-      // Upload new IPID document
-      setIsLoading(true);
-      
-      // Create form data for new document
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('production_order', currentProductionOrder);
-      formData.append('operation_number', selectedOperation.operation_number);
-      formData.append('document_name', values.documentName);
-      formData.append('description', values.description || '');
-      formData.append('version_number', '1');
-      formData.append('metadata', JSON.stringify({
-        operation_id: selectedOperation.id,
-        operation_number: selectedOperation.operation_number
-      }));
-      
-      // Call the function to upload new document
-      const { uploadIpidDocument } = usePlanningStore.getState();
-      await uploadIpidDocument(formData);
-      
-      message.success('IPID document uploaded successfully');
-      
-      // Update the status map for this operation
-      setIpidStatusMap(prev => {
-        const updated = {
-          ...prev,
-          [selectedOperation.operation_number]: true
-        };
+      // If uploading a new version to existing document
+      if (isUploadingVersion && existingIpidDocument) {
+        return handleVersionUpload(values);
+      }
+
+      // Otherwise upload a new document
+      const response = await uploadIpidDocument(
+        file,
+        currentProductionOrder,
+        selectedOperation.operation_number,
+        values.documentName,
+        values.description || '',
+        '1',
+        JSON.stringify({
+          operation_id: selectedOperation.id,
+          operation_number: selectedOperation.operation_number
+        })
+      );
+
+      if (response.success) {
+        // Update the status map for this operation
+        setIpidStatusMap(prev => {
+          const updated = {
+            ...prev,
+            [selectedOperation.operation_number]: true
+          };
+          
+          // Also store in localStorage to persist through refreshes
+          try {
+            localStorage.setItem(
+              `ipid_status_${currentProductionOrder}`,
+              JSON.stringify(updated)
+            );
+          } catch (err) {
+            console.error('Error saving IPID status to localStorage:', err);
+          }
+          
+          return updated;
+        });
         
-        // Store in localStorage to persist through refreshes
-        try {
-          localStorage.setItem(
-            `ipid_status_${currentProductionOrder}`,
-            JSON.stringify(updated)
-          );
-        } catch (err) {
-          console.error('Error saving IPID status to localStorage:', err);
-        }
+        message.success('IPID document uploaded successfully');
+        setIsIpidModalVisible(false);
+        ipidForm.resetFields();
         
-        return updated;
-      });
-      
-      // Close the modal and reset form
-      setIsIpidModalVisible(false);
-      ipidForm.resetFields();
-      
-      // Refresh IPID status
-      await fetchIpidDocuments(currentProductionOrder);
+        // Refresh status to ensure it's up to date
+        const updatedStatus = await checkIpidStatus(
+          currentProductionOrder,
+          selectedOperation.operation_number
+        );
+        
+        console.log(`Updated IPID status after upload for operation ${selectedOperation.operation_number}: ${updatedStatus}`);
+        
+        // Fetch the document details to get the versions
+        await fetchIpidDocumentDetails(selectedOperation.operation_number);
+      }
     } catch (error) {
       console.error('Error uploading IPID:', error);
       message.error(error.message || 'Failed to upload IPID document');
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  // Update the handleDownloadIpidDocument function to use the correct version_id
-  const handleDownloadIpidDocument = async (versionId) => {
-    await handleDownloadDocument(existingIpidDocument.id, versionId, existingIpidDocument.name);
+  // Update modal open handling
+  const handleOpenIpidModal = (record) => {
+    setSelectedOperation(record);
+    // Fetch IPID document details when opening the modal
+    fetchIpidDocumentDetails(record.operation_number);
+    setIsIpidModalVisible(true);
+    setIsUploadingVersion(false); // Default to new document upload
   };
 
-  // Add function to fetch part drawings
-  const fetchPartDrawings = async (partNumber) => {
-    try {
-      const { fetchEngineeringDrawings } = usePlanningStore.getState();
-      const drawings = await fetchEngineeringDrawings(partNumber);
-      return drawings?.items || [];
-    } catch (error) {
-      console.error('Error fetching part drawings:', error);
-      return [];
-    }
-  };
+  // Update IPID modal
+  // Replace the existing modal with this updated version
+  // In the render part of the component, update the IPID modal:
 
-  // Add function to handle drawing download
-  const handleDownloadDrawing = async (drawing) => {
-    await handleDownloadDocument(drawing.id, null, drawing.name);
-  };
-
-  // Update the handleViewDocument function to handle different file types
-  const handleViewDocument = async (documentId, versionId, documentName) => {
-    try {
-      setIsLoading(true);
-      setViewingDocument({ id: documentId, versionId, name: documentName });
-      
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      // Construct the URL to fetch the document
-      let downloadUrl = `http://172.18.7.93:8800/api/v1/document-management/documents/${documentId}/download`;
-      if (versionId) {
-        downloadUrl += `?version_id=${versionId}`;
-      }
-
-      console.log(`Fetching document for viewing: ${downloadUrl}`);
-      
-      const response = await fetch(downloadUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': '*/*'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
-      }
-      
-      // Get the content type to handle different file types
-      const contentType = response.headers.get('content-type');
-      console.log(`Document content type: ${contentType}`);
-      
-      // Create a blob URL to use with PDF viewer
-      const blob = await response.blob();
-      
-      // If it's not a PDF, just download it instead of trying to view
-      if (!contentType || !contentType.includes('application/pdf')) {
-        console.log('Non-PDF document detected, downloading instead of viewing');
-        // Get filename from Content-Disposition header if available
-        let filename = documentName || 'document';
-        const contentDisposition = response.headers.get('content-disposition');
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (filenameMatch && filenameMatch[1]) {
-            filename = filenameMatch[1].replace(/['"]/g, '');
-          }
-        }
-        
-        const url = URL.createObjectURL(blob);
-        
-        // Create and trigger download link
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 100);
-        
-        message.info('Document downloaded as it is not a viewable format');
-        setIsLoading(false);
-        return;
-      }
-      
-      const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
-      setIsPdfModalVisible(true);
-      setCurrentPage(1);
-    } catch (error) {
-      console.error('Error viewing document:', error);
-      message.error('Failed to view document: ' + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Function to handle PDF document loading
-  const onDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
-  };
-
-  // Updated download function that preserves file type
-  const handleDownloadDocument = async (documentId, versionId, fileName) => {
-    try {
-      setIsLoading(true);
-      
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      // Construct the download URL
-      let downloadUrl = `http://172.18.7.93:8800/api/v1/document-management/documents/${documentId}/download`;
-      if (versionId) {
-        downloadUrl += `?version_id=${versionId}`;
-      }
-
-      console.log(`Downloading document: ${downloadUrl}`);
-      
-      const response = await fetch(downloadUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': '*/*'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to download document: ${response.status} ${response.statusText}`);
-      }
-      
-      // Get filename from Content-Disposition header if available
-      let filename = fileName || 'document';
-      const contentDisposition = response.headers.get('content-disposition');
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
-        }
-      }
-      
-      // Get the content type and set appropriate extension if needed
-      const contentType = response.headers.get('content-type');
-      
-      // Ensure filename has appropriate extension
-      if (contentType) {
-        // Don't modify file extension - use whatever the server provides
-        console.log(`Downloading file as: ${filename} (${contentType})`);
-      }
-      
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      
-      // Create and trigger download link
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Cleanup
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
-      
-      message.success('Document downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading document:', error);
-      message.error('Failed to download document: ' + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Update the renderIpidButton function to be more resilient
+  // Update the IPID Upload button in the Actions column
   const renderIpidButton = (record) => {
-    // Default to false if status is undefined
-    const hasIpid = ipidStatusMap[record.operation_number] || false;
-    
-    // If loading for more than 5 seconds, just show the default state
-    const showLoadingState = isIpidStatusLoading && Date.now() - loadingStartTimeRef.current < 5000;
+    const hasIpid = ipidStatusMap[record.operation_number];
     
     return (
-      <Tooltip title={showLoadingState ? 'Checking IPID status...' : 
-                       hasIpid ? 'View IPID Document' : 'Upload IPID File'}>
+      <Tooltip title={isIpidStatusLoading ? 'Checking IPID status...' : 
+                       hasIpid ? 'Manage IPID Documents' : 'Upload IPID File'}>
         <Button 
           type="link" 
-          icon={hasIpid ? <FileTextOutlined /> : <UploadOutlined />} 
+          icon={<UploadOutlined />} 
           onClick={() => {
-            if (showLoadingState) {
-              message.info('Still checking IPID status, please wait a moment');
+            if (isIpidStatusLoading) {
+              message.info('Please wait while we check IPID status');
               return;
             }
             handleOpenIpidModal(record);
           }}
           style={{ 
             color: hasIpid ? '#52c41a' : undefined,
-            cursor: showLoadingState ? 'not-allowed' : 'pointer',
-            opacity: showLoadingState ? 0.7 : 1,
+            cursor: isIpidStatusLoading ? 'not-allowed' : 'pointer',
+            opacity: isIpidStatusLoading ? 0.7 : 1,
           }}
-          disabled={showLoadingState}
-          loading={showLoadingState}
+          disabled={isIpidStatusLoading}
+          loading={isIpidStatusLoading}
         />
       </Tooltip>
     );
@@ -1552,130 +1349,114 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         </Form>
       </Modal>
 
-      {/* IPID Document Modal (Updated) */}
+      {/* Add this modal to your JSX */}
       <Modal
-        title={existingIpidDocument ? "IPID Document" : "Upload IPID Document"}
+        title={isUploadingVersion ? "Upload New IPID Version" : "Upload IPID Document"}
         open={isIpidModalVisible}
         onCancel={() => {
           setIsIpidModalVisible(false);
           ipidForm.resetFields();
         }}
         footer={null}
-        width={700}
+        width={600}
       >
-        {isLoading ? (
-          <div className="flex justify-center items-center py-8">
-            <Spin tip="Loading..." />
-          </div>
-        ) : (
-          <>
-            {/* Show IPID document and versions if exists */}
-            {selectedOperation && ipidStatusMap[selectedOperation.operation_number] && existingIpidDocument ? (
-              <div>
-                <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                  <h4 className="text-lg font-medium mb-2">Current IPID Document</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm text-gray-600">Document Name</label>
-                      <div className="font-medium">{existingIpidDocument.name}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-600">Latest Version</label>
-                      <div className="font-medium">
-                        {existingIpidDocument.latest_version?.version_number || '1'}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-600">Description</label>
-                      <div className="font-medium">{existingIpidDocument.description}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-600">Created At</label>
-                      <div className="font-medium">
-                        {new Date(existingIpidDocument.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {ipidVersions.length > 0 && (
-                    <div className="mt-4">
-                      <label className="text-sm text-gray-600 block mb-2">Document Versions</label>
-                      <div className="max-h-40 overflow-y-auto">
-                        <table className="min-w-full border-collapse">
-                          <thead className="bg-gray-100">
-                            <tr>
-                              <th className="p-2 text-left text-sm">Version</th>
-                              <th className="p-2 text-left text-sm">Date</th>
-                              <th className="p-2 text-left text-sm">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[...ipidVersions].sort((a, b) => 
-                              parseFloat(b.version_number) - parseFloat(a.version_number)
-                            ).map(version => (
-                              <tr key={version.id} className="border-t border-gray-200">
-                                <td className="p-2 text-sm">{version.version_number}</td>
-                                <td className="p-2 text-sm">
-                                  {new Date(version.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="p-2 text-sm">
-                                  <Space>
-                                    <Button 
-                                      type="link" 
-                                      size="small"
-                                      onClick={() => handleViewDocument(existingIpidDocument.id, version.id, existingIpidDocument.name)}
-                                    >
-                                      View
-                                    </Button>
-                                    <Button 
-                                      type="link" 
-                                      size="small"
-                                      onClick={() => handleDownloadIpidDocument(version.id)}
-                                    >
-                                      Download
-                                    </Button>
-                                  </Space>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Information about uploading new versions */}
-                  <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
-                    <p className="text-sm text-blue-700">
-                      <strong>Note:</strong> To upload new versions, please go to Document Management → 
-                      Document Types → IPID → {productionOrder || orderNumber} → OP{selectedOperation.operation_number} 
-                      and select the IPID document. Click the 3 dots menu and choose "Upload new version".
-                    </p>
+        {/* Show IPID document and versions if exists */}
+        {selectedOperation && ipidStatusMap[selectedOperation.operation_number] && existingIpidDocument ? (
+          <div>
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <h4 className="text-lg font-medium mb-2">Current IPID Document</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-600">Document Name</label>
+                  <div className="font-medium">{existingIpidDocument.name}</div>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600">Latest Version</label>
+                  <div className="font-medium">
+                    {ipidVersions.length > 0 
+                      ? Math.max(...ipidVersions.map(v => parseFloat(v.version_number)))
+                      : '1'}
                   </div>
                 </div>
               </div>
-            ) : (
+              
+              {ipidVersions.length > 0 && (
+                <div className="mt-4">
+                  <label className="text-sm text-gray-600 block mb-2">Document Versions</label>
+                  <div className="max-h-40 overflow-y-auto">
+                    <table className="min-w-full border-collapse">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="p-2 text-left text-sm">Version</th>
+                          <th className="p-2 text-left text-sm">Date</th>
+                          <th className="p-2 text-left text-sm">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...ipidVersions].sort((a, b) => 
+                          parseFloat(b.version_number) - parseFloat(a.version_number)
+                        ).map(version => (
+                          <tr key={version.id} className="border-t border-gray-200">
+                            <td className="p-2 text-sm">{version.version_number}</td>
+                            <td className="p-2 text-sm">
+                              {new Date(version.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="p-2 text-sm">
+                              <Button 
+                                type="link" 
+                                size="small"
+                                onClick={() => {
+                                  // Call the download function
+                                  const downloadDocument = usePlanningStore.getState().downloadDocument;
+                                  downloadDocument(version.id);
+                                }}
+                              >
+                                Download
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-4 flex justify-end">
+                <Button
+                  type="primary"
+                  onClick={() => setIsUploadingVersion(true)}
+                >
+                  Upload New Version
+                </Button>
+              </div>
+            </div>
+            
+            {isUploadingVersion && (
               <Form
                 form={ipidForm}
                 layout="vertical"
                 onFinish={handleIpidUpload}
               >
                 <Form.Item
-                  name="documentName"
-                  label="Document Name"
-                  rules={[{ required: true, message: 'Please enter document name' }]}
+                  name="versionNumber"
+                  label="Version Number"
+                  initialValue={versionNumber}
                 >
-                  <Input placeholder="Enter document name" />
+                  <Input placeholder="Enter version number" disabled />
                 </Form.Item>
-
+                
                 <Form.Item
                   name="description"
                   label="Description"
                   rules={[{ required: true, message: 'Please enter description' }]}
                 >
-                  <Input.TextArea rows={4} placeholder="Enter document description" />
+                  <Input.TextArea 
+                    rows={3} 
+                    placeholder="Enter changes in this version"
+                  />
                 </Form.Item>
-
+                
                 <Form.Item
                   name="file"
                   label="IPID Document"
@@ -1696,27 +1477,81 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
                     </p>
                   </Upload.Dragger>
                 </Form.Item>
-
+                
                 <Form.Item className="mb-0 text-right">
                   <Space>
-                    <Button onClick={() => {
-                      setIsIpidModalVisible(false);
-                      ipidForm.resetFields();
-                    }}>
+                    <Button onClick={() => setIsUploadingVersion(false)}>
                       Cancel
                     </Button>
                     <Button type="primary" htmlType="submit" loading={isLoading}>
-                      Upload
+                      Upload Version
                     </Button>
                   </Space>
                 </Form.Item>
               </Form>
             )}
-          </>
+          </div>
+        ) : (
+          <Form
+            form={ipidForm}
+            layout="vertical"
+            onFinish={handleIpidUpload}
+          >
+            <Form.Item
+              name="documentName"
+              label="Document Name"
+              rules={[{ required: true, message: 'Please enter document name' }]}
+            >
+              <Input placeholder="Enter document name" />
+            </Form.Item>
+
+            <Form.Item
+              name="description"
+              label="Description"
+              rules={[{ required: true, message: 'Please enter description' }]}
+            >
+              <Input.TextArea rows={4} placeholder="Enter document description" />
+            </Form.Item>
+
+            <Form.Item
+              name="file"
+              label="IPID Document"
+              rules={[{ required: true, message: 'Please select a file' }]}
+            >
+              <Upload.Dragger
+                name="file"
+                maxCount={1}
+                beforeUpload={() => false}
+                accept=".pdf,.doc,.docx"
+              >
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">Click or drag file to this area to upload</p>
+                <p className="ant-upload-hint">
+                  Support for PDF, DOC, DOCX files
+                </p>
+              </Upload.Dragger>
+            </Form.Item>
+
+            <Form.Item className="mb-0 text-right">
+              <Space>
+                <Button onClick={() => {
+                  setIsIpidModalVisible(false);
+                  ipidForm.resetFields();
+                }}>
+                  Cancel
+                </Button>
+                <Button type="primary" htmlType="submit" loading={isLoading}>
+                  Upload
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
         )}
       </Modal>
 
-      {/* Add Machine Linking Modal (no changes needed) */}
+      {/* Add Machine Linking Modal */}
       <Modal
         title={
           <div className="flex items-center gap-2">
@@ -1729,7 +1564,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         footer={null}
         width={500}
       >
-        {/* Machine linking form (no changes needed) */}
         {selectedOperationForMachine && (
           <Form
             onFinish={(values) => handleMachineSave(values.machineId)}
@@ -1783,103 +1617,10 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
                 Cancel
               </Button>
               <Button type="primary" htmlType="submit">
-                Save Changes
+                Save Changess
               </Button>
             </div>
           </Form>
-        )}
-      </Modal>
-
-      {/* PDF Viewer Modal (Updated) */}
-      <Modal
-        title={viewingDocument?.name || "Document Viewer"}
-        open={isPdfModalVisible}
-        onCancel={() => {
-          setIsPdfModalVisible(false);
-          setPdfUrl(null);
-        }}
-        footer={[
-          <Button key="close" onClick={() => {
-            setIsPdfModalVisible(false);
-            setPdfUrl(null);
-          }}>
-            Close
-          </Button>,
-          <Button 
-            key="download" 
-            type="primary" 
-            onClick={() => {
-              if (viewingDocument) {
-                handleDownloadDocument(viewingDocument.id, viewingDocument.versionId, viewingDocument.name);
-              }
-            }}
-          >
-            Download
-          </Button>
-        ]}
-        width={800}
-        bodyStyle={{ 
-          height: '70vh', 
-          overflow: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center'
-        }}
-      >
-        {pdfUrl && (
-          <>
-            <div className="pdf-controls mb-4">
-              <Space>
-                <Button 
-                  disabled={currentPage <= 1} 
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Previous
-                </Button>
-                <span>
-                  Page {currentPage} of {numPages || '--'}
-                </span>
-                <Button 
-                  disabled={!numPages || currentPage >= numPages} 
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </Button>
-              </Space>
-            </div>
-            <div className="pdf-container" style={{ width: '100%', textAlign: 'center' }}>
-              <Document
-                file={pdfUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                loading={<Spin tip="Loading document..." />}
-                error={
-                  <div className="p-4 text-center">
-                    <p className="text-red-500">Failed to load PDF document.</p>
-                    <p className="text-gray-600 mt-2">The document may not be in PDF format. Please download instead.</p>
-                    <Button 
-                      type="primary" 
-                      onClick={() => {
-                        if (viewingDocument) {
-                          handleDownloadDocument(viewingDocument.id, viewingDocument.versionId, viewingDocument.name);
-                          setIsPdfModalVisible(false);
-                        }
-                      }}
-                      className="mt-3"
-                    >
-                      Download File
-                    </Button>
-                  </div>
-                }
-              >
-                <Page 
-                  pageNumber={currentPage} 
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                  width={700}
-                />
-              </Document>
-            </div>
-          </>
         )}
       </Modal>
     </Form>

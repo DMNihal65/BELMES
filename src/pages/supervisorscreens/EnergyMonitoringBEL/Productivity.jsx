@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Typography, Button, Space, Card, Row, Col, DatePicker } from 'antd';
 import { ArrowLeftOutlined, ReloadOutlined, FileTextOutlined } from '@ant-design/icons';
 import Highcharts from 'highcharts';
@@ -8,6 +8,7 @@ import solidGauge from 'highcharts/modules/solid-gauge';
 import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
 import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBel';
+import { isEqual } from 'lodash';
 
 // Initialize Highcharts modules
 highchartsMore(Highcharts);
@@ -20,6 +21,7 @@ const Productivity = ({ onBack }) => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [isLive, setIsLive] = useState(true);
   const [machineData, setMachineData] = useState([]);
+  const prevDataRef = useRef([]);
   
   // Get functions and state from the store
   const { 
@@ -28,7 +30,8 @@ const Productivity = ({ onBack }) => {
     getMachineEnergyData,
     fetchMachineNames,
     machineNames,
-    isLoading
+    isLoading,
+    fetchShiftwiseEnergyHistoryByDate
   } = useEnergyMonitoringBelStore();
 
   // Connect to WebSocket when component mounts and isLive is true
@@ -56,74 +59,169 @@ const Productivity = ({ onBack }) => {
   // Update machine data when WebSocket sends new data or on interval
   useEffect(() => {
     // Function to update machine data
-    const updateMachineData = () => {
-      // Get machine names from store or use a default list
-      const machines = machineNames && machineNames.length > 0 ? 
-        machineNames : 
-        Array.from({ length: 14 }, (_, index) => ({
-          machine_id: index + 1,
-          machine_data: { id: index + 1 }
-        }));
+    const updateMachineData = async (checkForChanges = true) => {
+      // Get raw machine data directly from the WebSocket data
+      const { allMachinesEnergyData } = useEnergyMonitoringBelStore.getState();
+      const { machineNames } = useEnergyMonitoringBelStore.getState();
       
-      // Map machine names to machine data with energy values
-      const updatedMachineData = machines.map(machine => {
-        const id = machine.machine_id;
-        const name = machine.machine_data?.work_center ? 
-          `Machine ${machine.machine_data.work_center}` : 
-          `Machine ${id}`;
+      // If we have valid WebSocket data (array of machine data)
+      if (allMachinesEnergyData && Array.isArray(allMachinesEnergyData) && allMachinesEnergyData.length > 0) {
+        // Process only the machines that have data from the WebSocket
+        const newMachineData = allMachinesEnergyData.map(machine => {
+          const id = machine.machine_id;
+          
+          // Try to find the machine name from the machineNames array
+          const machineInfo = machineNames && machineNames.length > 0 
+            ? machineNames.find(m => m.machine_id === id) 
+            : null;
+          
+          // Get the actual machine name (use the make field from machine_data)
+          const machineName = machineInfo?.machine_data?.make || `Machine ${id}`;
+          
+          // Ensure all numeric values are actually numbers
+          return {
+            id,
+            machine_name: machineName,
+            energy: parseFloat(machine.total_energy || 0),
+            max_energy: 2, // Set a reasonable max based on actual data
+            first_shift: parseFloat(machine.first_shift || 0),
+            second_shift: parseFloat(machine.second_shift || 0),
+            third_shift: parseFloat(machine.third_shift || 0)
+          };
+        });
         
-        // Get energy data from WebSocket data in the store
-        const energyData = getMachineEnergyData(id);
+        // If checkForChanges is false or the data has changed, update state
+        if (!checkForChanges || !isDeepEqual(newMachineData, prevDataRef.current)) {
+          console.log("Energy data updated, refreshing charts");
+          setMachineData(newMachineData);
+          prevDataRef.current = newMachineData;
+        }
+      } else if (prevDataRef.current.length === 0) {
+        // Only set fallback data if we don't have any data yet
+        const fallbackData = Array.from({ length: 7 }, (_, index) => {
+          const id = index + 1;
+          
+          // Try to find machine name from machineNames
+          const machineInfo = machineNames && machineNames.length > 0 
+            ? machineNames.find(m => m.machine_id === id) 
+            : null;
+          
+          const machineName = machineInfo?.machine_data?.make || `Machine ${id}`;
+          
+          return {
+            id,
+            machine_name: machineName,
+            energy: Math.random() * 1, // Small random value for fallback
+            max_energy: 2,
+            first_shift: Math.random() * 0.8,
+            second_shift: 0,
+            third_shift: 0
+          };
+        });
         
-        return {
-          id,
-          machine_name: name,
-          energy: energyData.energy,
-          cost: energyData.cost,
-          max_energy: energyData.max_energy
-        };
-      });
-      
-      setMachineData(updatedMachineData);
+        setMachineData(fallbackData);
+        prevDataRef.current = fallbackData;
+      }
     };
     
     // Update data immediately
     updateMachineData();
     
-    // Set interval to update data every 5 seconds if in live mode
+    // Set interval to check for updates less frequently (10 seconds instead of 5)
     let interval;
     if (isLive) {
-      interval = setInterval(updateMachineData, 5000);
+      interval = setInterval(() => updateMachineData(), 10000); // Changed from 5000 to 10000 ms
     }
     
     // Clean up interval
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [getMachineEnergyData, isLive, machineNames]);
+  }, [isLive]);
 
-  const handleDateChange = (date) => {
-    setSelectedDate(date);
-    setIsLive(!date);
-    
-    if (!date) {
-      // If returning to live mode, reconnect WebSocket
-      connectShiftwiseEnergyWebSocket();
-    } else {
+  const handleDateChange = async (date) => {
+    try {
+      // Set loading state and update UI state
+      useEnergyMonitoringBelStore.setState({ isLoading: true });
+      setSelectedDate(date);
+      setIsLive(!date);
+      
+      if (!date) {
+        // If returning to live mode, reconnect WebSocket
+        connectShiftwiseEnergyWebSocket();
+        useEnergyMonitoringBelStore.setState({ isLoading: false });
+        return;
+      }
+      
       // If switching to history mode, disconnect WebSocket
       disconnectShiftwiseEnergyWebSocket();
       
-      // In a real implementation, you would fetch historical data for the selected date
-      // For now, we'll just use mock data
-      const mockHistoryData = Array.from({ length: 14 }, (_, index) => ({
-        id: index + 1,
-        machine_name: `Machine ${index + 1}`,
-        energy: Math.random() * 80 + 10, // Random energy between 10 and 90
-        cost: Math.random() * 800 + 100, // Random cost between 100 and 900
-        max_energy: 100
-      }));
+      // Format the date for the API call
+      const formattedDate = date.format('YYYY-MM-DD');
+      console.log(`Fetching historical data for date: ${formattedDate}`);
       
-      setMachineData(mockHistoryData);
+      try {
+        // Call the store function to fetch historical data using REST API endpoint
+        const historyData = await fetchShiftwiseEnergyHistoryByDate(date);
+        
+        // Process the data if available
+        if (historyData && Array.isArray(historyData) && historyData.length > 0) {
+          // Process the data for display
+          const processedData = historyData.map(machine => {
+            const id = machine.machine_id;
+            
+            // Find machine name in machineNames
+            const machineInfo = machineNames && machineNames.length > 0 
+              ? machineNames.find(m => m.machine_id === id) 
+              : null;
+            
+            const machineName = machineInfo?.machine_data?.make || `Machine ${id}`;
+            
+            // Log raw values to debug
+            console.log(`Machine ${id} raw values:`, {
+              total_energy: machine.total_energy,
+              type: typeof machine.total_energy,
+              first_shift: machine.first_shift,
+              second_shift: machine.second_shift,
+              third_shift: machine.third_shift
+            });
+            
+            // Make sure to convert all values to numbers
+            return {
+              id,
+              machine_name: machineName,
+              energy: parseFloat(machine.total_energy || 0),
+              max_energy: 2,
+              first_shift: parseFloat(machine.first_shift || 0),
+              second_shift: parseFloat(machine.second_shift || 0),
+              third_shift: parseFloat(machine.third_shift || 0)
+            };
+          });
+          
+          console.log('Processed historical data:', processedData);
+          setMachineData(processedData);
+          prevDataRef.current = processedData;
+        } else {
+          console.warn('No historical data available for the selected date');
+          // Show empty data with message instead of fallback data
+          setMachineData([]);
+          prevDataRef.current = [];
+        }
+      } catch (error) {
+        console.error('Error fetching historical data:', error);
+        // Show empty data with message
+        setMachineData([]);
+        prevDataRef.current = [];
+      }
+      
+    } catch (error) {
+      console.error('Error in handleDateChange:', error);
+      useEnergyMonitoringBelStore.setState({ isLoading: false });
+      setMachineData([]);
+      prevDataRef.current = [];
+    } finally {
+      // Always make sure to turn off loading state
+      useEnergyMonitoringBelStore.setState({ isLoading: false });
     }
   };
 
@@ -135,10 +233,19 @@ const Productivity = ({ onBack }) => {
 
   const handleViewReport = () => {
     if (selectedDate) {
+      // Calculate costs for each machine before sending to report
+      const reportData = machineData.map(machine => ({
+        ...machine,
+        // Calculate cost based on energy (using fixed rate of 12.5 rupees per kWh)
+        cost: parseFloat((machine.energy * 12.5).toFixed(2))
+      }));
+      
+      console.log('Sending data to report:', reportData);
+      
       navigate('/supervisor/energy-monitoring-bel/report', { 
         state: { 
           date: selectedDate.format('YYYY-MM-DD'),
-          machineData: machineData,
+          machineData: reportData,
           returnPath: '/supervisor/energy-monitoring-bel/machines'
         } 
       });
@@ -150,6 +257,10 @@ const Productivity = ({ onBack }) => {
       type: 'solidgauge',
       height: '200px',
       backgroundColor: 'transparent',
+      animation: {
+        duration: 300, // Reduced animation duration for more stability
+        easing: 'linear' // Changed to linear easing for less bouncing
+      }
     },
     title: {
       text: machine.machine_name,
@@ -172,8 +283,9 @@ const Productivity = ({ onBack }) => {
       enabled: true,
       formatter: function() {
         return `<b>${machine.machine_name}</b><br/>
-                Energy: ${this.y.toFixed(2)} kWh<br/>
-                Cost: ₹${machine.cost.toFixed(2)}`;
+                Total Energy: ${typeof this.y === 'number' ? this.y.toFixed(3) : '0.000'} kWh<br/>
+                Second Shift: ${typeof machine.second_shift === 'number' ? machine.second_shift.toFixed(3) : '0.000'} kWh<br/>
+                Third Shift: ${typeof machine.third_shift === 'number' ? machine.third_shift.toFixed(3) : '0.000'} kWh`;
       }
     },
     yAxis: {
@@ -201,6 +313,9 @@ const Productivity = ({ onBack }) => {
           y: -25,
           borderWidth: 0,
           useHTML: true
+        },
+        animation: {
+          duration: 300 // Match chart animation duration
         }
       }
     },
@@ -208,14 +323,37 @@ const Productivity = ({ onBack }) => {
       enabled: false
     },
     series: [{
-      name: 'Energy',
+      name: 'Total Energy',
       data: [machine.energy],
       dataLabels: {
-        format: '<div style="text-align:center"><span style="font-size:20px;color:black">{y:.1f}</span><br/>' +
+        format: '<div style="text-align:center"><span style="font-size:20px;color:black">{y:.3f}</span><br/>' +
                '<span style="font-size:12px;color:silver">kWh</span></div>'
       }
     }]
   });
+
+  function isDeepEqual(obj1, obj2) {
+    if (typeof isEqual === 'function') {
+      return isEqual(obj1, obj2);
+    }
+    
+    // Simple deep comparison for our specific data structure
+    if (obj1.length !== obj2.length) return false;
+    
+    for (let i = 0; i < obj1.length; i++) {
+      const a = obj1[i];
+      const b = obj2[i];
+      
+      if (a.id !== b.id) return false;
+      if (a.machine_name !== b.machine_name) return false;
+      if (a.energy !== b.energy) return false;
+      if (a.first_shift !== b.first_shift) return false;
+      if (a.second_shift !== b.second_shift) return false;
+      if (a.third_shift !== b.third_shift) return false;
+    }
+    
+    return true;
+  }
 
   return (
     <div style={{ padding: '20px' }}>
@@ -273,7 +411,7 @@ const Productivity = ({ onBack }) => {
             type="primary"
             icon={<FileTextOutlined />}
             onClick={handleViewReport}
-            disabled={!selectedDate}
+            disabled={!selectedDate || machineData.length === 0}
             style={{
               backgroundColor: '#3b82f6',
               borderColor: '#2563eb'
@@ -285,60 +423,93 @@ const Productivity = ({ onBack }) => {
       </div>
 
       {/* Loading state */}
-      {isLoading && machineData.length === 0 && (
+      {isLoading && (
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
           <div className="spinner" style={{ margin: '0 auto 20px' }}></div>
           <Text>Loading machine energy data...</Text>
         </div>
       )}
 
-      {/* Machine Gauge Charts Grid */}
-      <Row gutter={[16, 16]}>
-        {machineData.map((machine) => (
-          <Col xs={24} sm={12} lg={8} xl={6} key={machine.id}>
-            <Card 
-              className="shadow-lg hover:shadow-xl transition-all duration-300"
-              style={{ 
-                borderRadius: '8px',
-                height: '100%'
-              }}
-            >
-              <HighchartsReact
-                highcharts={Highcharts}
-                options={getGaugeOptions(machine)}
-              />
-              <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                <div style={{ 
-                  background: '#f9fafb',
-                  padding: '12px',
+      {/* No data message */}
+      {!isLoading && selectedDate && machineData.length === 0 && (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '80px 0',
+          background: '#f9fafb',
+          borderRadius: '12px',
+          margin: '20px 0'
+        }}>
+          <Text 
+            style={{ 
+              fontSize: '18px', 
+              display: 'block',
+              marginBottom: '16px',
+              color: '#64748b'
+            }}
+          >
+            No energy monitoring data available for {selectedDate.format('MMMM D, YYYY')}
+          </Text>
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            onClick={handleGoLive}
+          >
+            Return to Live Data
+          </Button>
+        </div>
+      )}
+
+      {/* Machine Gauge Charts Grid - only show if there's data */}
+      {machineData.length > 0 && (
+        <Row gutter={[16, 16]}>
+          {machineData.map((machine) => (
+            <Col xs={24} sm={12} lg={8} xl={6} key={machine.id}>
+              <Card 
+                className="shadow-lg hover:shadow-xl transition-all duration-300"
+                style={{ 
                   borderRadius: '8px',
-                  marginTop: '8px'
-                }}>
+                  height: '100%'
+                }}
+              >
+                <HighchartsReact
+                  highcharts={Highcharts}
+                  options={getGaugeOptions(machine)}
+                  immutable={true}
+                  updateArgs={[true, false, false]}
+                />
+                <div style={{ textAlign: 'center', marginTop: '16px' }}>
                   <div style={{ 
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '8px'
+                    background: '#f9fafb',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    marginTop: '8px'
                   }}>
-                    <Text type="secondary">Energy:</Text>
-                    <Text strong style={{ color: '#059669' }}>
-                      {machine.energy.toFixed(2)} kWh
-                    </Text>
-                  </div>
-                  <div style={{ 
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                  }}>
-                    <Text type="secondary">Cost:</Text>
-                    <Text strong style={{ color: '#059669' }}>
-                      ₹{machine.cost.toFixed(2)}
-                    </Text>
+                    <div style={{ 
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '8px'
+                    }}>
+                      <Text type="secondary">Total Energy:</Text>
+                      <Text strong style={{ color: '#059669' }}>
+                        {machine.energy.toFixed(3)} kWh
+                      </Text>
+                    </div>
+                    <div style={{ 
+                      display: 'flex',
+                      justifyContent: 'space-between'
+                    }}>
+                      {/* <Text type="secondary">Second Shift:</Text>
+                      <Text strong style={{ color: '#059669' }}>
+                        {machine.second_shift.toFixed(3)} kWh
+                      </Text> */}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
       
       {/* Live indicator */}
       {isLive && (

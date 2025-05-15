@@ -1,10 +1,20 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import moment from 'moment';
 
 // Use a relative URL that will be handled by the proxy
 const API_BASE_URL = '/api/bel';
 const API_TIMEOUT = 5000;
 const MAX_RETRIES = 1;
+
+// Use the correct WebSocket endpoint for machines data
+const WS_MACHINES_ENDPOINT = 'ws://172.18.7.88:9999/api/v1/energymonitoring/ws/machines_data';
+
+// Update the WebSocket endpoint for shiftwise energy data
+const WS_SHIFTWISE_ENERGY_ENDPOINT = 'ws://172.18.7.88:9999/api/v1/energymonitoring/ws/shiftwise_energy';
+
+// Add the HTTP endpoint for historical data
+const HISTORY_API_ENDPOINT = 'http://172.18.7.88:9999/api/v1/energymonitoring/shiftwise_energy_history_by_date';
 
 const useEnergyMonitoringBelStore = create((set, get) => ({
   // Machine data
@@ -19,39 +29,85 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
   allMachinesWebsocket: null,
   allMachinesEnergyData: {},
   
-  // Fetch machine names from the API
+  // Fetch machine names from the API using WebSocket instead of HTTP
   fetchMachineNames: async () => {
     set({ isLoading: true, error: null });
     
     try {
-      console.log('Attempting to fetch machines from http://172.18.7.88:5698/api/v1/energymonitoring/machines');
+      console.log(`Attempting to connect to WebSocket at ${WS_MACHINES_ENDPOINT}`);
       
-      const response = await fetchWithRetry('http://172.18.7.88:5698/api/v1/energymonitoring/machines', {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        timeout: API_TIMEOUT
+      // Close existing connection if any
+      const existingSocket = get().allMachinesWebsocket;
+      if (existingSocket && existingSocket.readyState !== WebSocket.CLOSED) {
+        console.log('Closing existing machines WebSocket connection');
+        existingSocket.close();
+      }
+      
+      const socket = new WebSocket(WS_MACHINES_ENDPOINT);
+      
+      // Create a promise to handle the initial data from WebSocket
+      const dataPromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('WebSocket connection timeout'));
+        }, API_TIMEOUT);
+        
+        socket.onopen = () => {
+          console.log('WebSocket connection established for machines data');
+          set({ allMachinesWebsocket: socket });
+        };
+        
+        socket.onmessage = (event) => {
+          try {
+            clearTimeout(timeout);
+            const data = JSON.parse(event.data);
+            console.log('Received machines data from WebSocket:', data);
+            resolve(data);
+          } catch (error) {
+            console.error('Error parsing WebSocket data:', error);
+            reject(error);
+          }
+        };
+        
+        socket.onerror = (error) => {
+          clearTimeout(timeout);
+          console.error('WebSocket error:', error);
+          reject(error);
+        };
+        
+        socket.onclose = (event) => {
+          console.log('WebSocket connection closed:', event.code, event.reason);
+          if (get().allMachinesWebsocket === socket) {
+            set({ allMachinesWebsocket: null });
+          }
+        };
       });
       
-      console.log('API Response for machines:', response.data);
+      const data = await dataPromise;
       
-      if (response.data && Array.isArray(response.data)) {
-        // Store the raw API response without transformation
-        set({ machineNames: response.data, isLoading: false });
-        return response.data;
+      if (data && Array.isArray(data)) {
+        // Process and format the data to match our expected structure
+        const formattedMachines = data.map(machine => ({
+          machine_id: machine.machine_id || machine.id,
+          machine_data: {
+            id: machine.machine_id || machine.id,
+            work_center: machine.work_center || 'N/A',
+            type: machine.type || 'Default',
+            make: machine.name || `Machine ${machine.machine_id || machine.id}`,
+            model: machine.model || 'Default'
+          },
+          status: machine.status !== undefined ? machine.status : 0
+        }));
+        
+        set({ machineNames: formattedMachines, isLoading: false });
+        return formattedMachines;
       } else {
-        // Fallback to mock data if API doesn't return expected format
-        console.warn('API did not return expected array format for machines, using fallback data');
-        const fallbackMachines = generateMockMachineList();
-        set({ machineNames: fallbackMachines, isLoading: false });
-        return fallbackMachines;
+        throw new Error('Invalid data format received from WebSocket');
       }
     } catch (error) {
-      console.error('Error fetching machines:', error);
+      console.error('Error fetching machines via WebSocket:', error);
       
       // Fallback to mock data
-      console.log('Using fallback machine data due to API error');
+      console.log('Using fallback machine data due to WebSocket error');
       const fallbackMachines = generateMockMachineList();
       set({ machineNames: fallbackMachines, isLoading: false, error: error.message });
       return fallbackMachines;
@@ -71,7 +127,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
       
       // Create WebSocket connection
-      const wsUrl = `ws://172.18.7.88:5698/api/v1/energymonitoring/ws/live_data`;
+      const wsUrl = `ws://172.18.7.88:9999/api/v1/energymonitoring/ws/live_data`;
       console.log(`Connecting to WebSocket at ${wsUrl}`);
       
       const socket = new WebSocket(wsUrl);
@@ -280,7 +336,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       const apiParamName = apiParamMap[parameterName] || parameterName;
       
       // Use the direct endpoint URL as specified
-      const baseUrl = `http://172.18.7.88:5698/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      const baseUrl = `http://172.18.7.88:9999/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
       
       console.log(`Attempting to fetch filtered history data from ${baseUrl}`);
       
@@ -379,8 +435,8 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
         existingSocket.close();
       }
       
-      // Create WebSocket connection
-      const wsUrl = `ws://172.18.7.88:5698/api/v1/energymonitoring/ws/shiftwise_energy`;
+      // Create WebSocket connection with the exact endpoint
+      const wsUrl = WS_SHIFTWISE_ENERGY_ENDPOINT;
       console.log(`Connecting to shiftwise energy WebSocket at ${wsUrl}`);
       
       const socket = new WebSocket(wsUrl);
@@ -395,14 +451,16 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
           const response = JSON.parse(event.data);
           console.log('Received shiftwise energy WebSocket data:', response);
           
-          // Check if response has the expected structure
-          if (response && response.type === 'shiftwise_energy' && response.data) {
-            // Extract the actual machine data from the nested structure
-            const data = response.data;
-            console.log('Extracted shiftwise energy data:', data);
+          // Check if response has the expected structure (data array)
+          if (response && response.data && Array.isArray(response.data)) {
+            console.log('Extracted machine energy data:', response.data);
             
-            // Update store with the extracted data
-            set({ allMachinesEnergyData: data });
+            // Update store with the array of machine data
+            set({ allMachinesEnergyData: response.data });
+          } else if (Array.isArray(response)) {
+            // In case the response is directly an array
+            console.log('Received array of machine energy data:', response);
+            set({ allMachinesEnergyData: response });
           } else {
             console.warn('Unexpected WebSocket data format:', response);
           }
@@ -454,32 +512,107 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
   getMachineEnergyData: (machineId) => {
     const { allMachinesEnergyData } = get();
     
-    if (!allMachinesEnergyData || !allMachinesEnergyData.machines) {
+    if (!allMachinesEnergyData || !Array.isArray(allMachinesEnergyData) || allMachinesEnergyData.length === 0) {
+      // Fallback data if no machine data is available
       return {
         energy: Math.random() * 100,
         cost: Math.random() * 1000,
-        max_energy: 100
+        max_energy: 100,
+        first_shift: 0,
+        second_shift: 0,
+        third_shift: 0
       };
     }
     
-    // Find the machine data in the WebSocket response
-    const machineData = allMachinesEnergyData.machines.find(
+    // Find the machine data in the WebSocket response array
+    const machineData = allMachinesEnergyData.find(
       machine => machine.machine_id === parseInt(machineId)
     );
     
     if (!machineData) {
+      // Fallback data if specific machine is not found
       return {
         energy: Math.random() * 100,
         cost: Math.random() * 1000,
-        max_energy: 100
+        max_energy: 100,
+        first_shift: 0,
+        second_shift: 0,
+        third_shift: 0
       };
     }
     
+    // Calculate cost based on energy (just an example calculation)
+    const energyRate = 12.5; // Cost per kWh in rupees
+    const cost = machineData.total_energy * energyRate;
+    
     return {
-      energy: machineData.energy || 0,
-      cost: machineData.cost || 0,
-      max_energy: machineData.max_energy || 100
+      energy: machineData.total_energy || 0,
+      cost: cost,
+      max_energy: 2, // Set a reasonable max based on your data
+      first_shift: machineData.first_shift || 0,
+      second_shift: machineData.second_shift || 0,
+      third_shift: machineData.third_shift || 0
     };
+  },
+  
+  // Add this function to the store to connect to historical WebSocket
+  fetchShiftwiseEnergyHistoryByDate: async (date) => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      // Format the date to YYYY-MM-DD
+      const formattedDate = typeof date.format === 'function' ? 
+        date.format('YYYY-MM-DD') : date;
+      
+      // Use the specific HTTP endpoint for historical data with the correct parameter
+      // Use date parameter instead of start_date and end_date
+      const apiUrl = `${HISTORY_API_ENDPOINT}?date=${formattedDate}`;
+      console.log(`Fetching historical energy data from: ${apiUrl}`);
+      
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000 // 10 seconds timeout
+      });
+      
+      console.log('Historical energy data API response:', response.data);
+      
+      // Check if we have valid data
+      let historyData = [];
+      
+      if (Array.isArray(response.data)) {
+        historyData = response.data;
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        // Extract the data array from the nested structure
+        console.log('Extracted data from nested response:', response.data.data);
+        historyData = response.data.data;
+      } else {
+        console.warn('Unexpected data format from API:', response.data);
+        throw new Error('Invalid data format from API');
+      }
+      
+      // Store the data in the store
+      set({ 
+        allMachinesEnergyData: historyData,
+        isLoading: false 
+      });
+      
+      return historyData;
+      
+    } catch (error) {
+      console.error('Error fetching historical energy data:', error);
+      
+      // Generate mock historical data as fallback
+      const mockData = generateMockHistoricalEnergyData(date);
+      set({ 
+        allMachinesEnergyData: mockData,
+        isLoading: false, 
+        error: error.message 
+      });
+      return mockData;
+    }
   }
 }));
 
@@ -688,7 +821,7 @@ function generateMockMachineList() {
         make: "m1", 
         model: "Default"
       },
-      status: 0
+      status: 0  // OFF (grey)
     },
     { 
       machine_id: 2, 
@@ -699,7 +832,7 @@ function generateMockMachineList() {
         make: "m2", 
         model: "Default" 
       },
-      status: 1
+      status: 1  // ON (yellow)
     },
     { 
       machine_id: 3, 
@@ -1010,17 +1143,29 @@ function generateMockFilteredHistoryData(machineId, parameterName) {
 
 // Add this helper function at the bottom of the file
 function generateMockShiftwiseEnergyData() {
-  const machines = Array.from({ length: 14 }, (_, index) => ({
+  return Array.from({ length: 7 }, (_, index) => ({
     machine_id: index + 1,
-    machine_name: `Machine ${index + 1}`,
-    energy: Math.random() * 100,
-    cost: Math.random() * 1000,
-    max_energy: 100
+    total_energy: (Math.random() * 1).toFixed(3),
+    first_shift: (Math.random() * 1).toFixed(3),
+    second_shift: 0,
+    third_shift: 0,
+    timestamp: new Date().toISOString()
   }));
+}
+
+// Update helper function for mock historical data if not already present
+function generateMockHistoricalEnergyData(date) {
+  const formattedDate = typeof date.format === 'function' ? 
+    date.format('YYYY-MM-DD') : date;
   
-  return {
-    timestamp: new Date().toISOString(),
-    shift: 'Morning',
-    machines
-  };
+  console.log(`Generating mock historical data for date: ${formattedDate}`);
+  
+  return Array.from({ length: 7 }, (_, index) => ({
+    machine_id: index + 1,
+    total_energy: parseFloat((Math.random() * 1.5).toFixed(3)),
+    first_shift: parseFloat((Math.random() * 0.9).toFixed(3)),
+    second_shift: parseFloat((Math.random() * 0.4).toFixed(3)),
+    third_shift: parseFloat((Math.random() * 0.2).toFixed(3)),
+    timestamp: formattedDate + 'T00:00:00.000Z'
+  }));
 } 

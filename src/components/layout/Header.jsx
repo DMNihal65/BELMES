@@ -1,5 +1,5 @@
 import { Avatar, Button, Dropdown, Input, Layout, Space, Badge, List, Typography, Empty, Tabs, Tag, Spin } from 'antd';
-import { LogOut, Menu as MenuIcon, Search, User, Bell, Wrench, Package } from 'lucide-react';
+import { LogOut, Menu as MenuIcon, Search, User, Bell, Wrench, Package, Ruler } from 'lucide-react';
 import useAuthStore from '../../store/auth-store';
 import useStore from '../../store/useStore';
 import useNotificationStore from '../../store/notification';
@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 // import belLogo from '../../assets/belKannada.png'
 import belLogo from '../../assets/bel.png';
 import { useEffect, useState } from 'react';
+import { ToolFilled } from '@ant-design/icons';
 
 const { Header: AntHeader } = Layout;
 const { Text } = Typography;
@@ -81,13 +82,19 @@ function Header() {
   // Filter notifications by type
   const machineNotifications = notifications.filter(n => n.notificationType === 'machine');
   const materialNotifications = notifications.filter(n => n.notificationType === 'material');
+  const instrumentCalibrationNotifications = notifications.filter(n => n.notificationType === 'instrumentCalibration');
+  const machineCalibrationNotifications = notifications.filter(n => n.notificationType === 'machineCalibration');
   
   // Get filtered notifications based on active tab
   let filteredNotifications = activeTabKey === 'all' 
     ? notifications 
     : activeTabKey === 'machine' 
       ? machineNotifications 
-      : materialNotifications;
+      : activeTabKey === 'material'
+        ? materialNotifications
+        : activeTabKey === 'instrumentCalibration'
+          ? instrumentCalibrationNotifications
+          : machineCalibrationNotifications;
   
   // For dropdown display, limit to top 5 most recent
   const limitedNotifications = filteredNotifications.slice(0, 5);
@@ -95,6 +102,8 @@ function Header() {
   // Count unread by type
   const unreadMachineCount = machineNotifications.filter(n => !n.is_acknowledged).length;
   const unreadMaterialCount = materialNotifications.filter(n => !n.is_acknowledged).length;
+  const unreadInstrumentCalibrationCount = instrumentCalibrationNotifications.filter(n => !n.is_acknowledged).length;
+  const unreadMachineCalibrationCount = machineCalibrationNotifications.filter(n => !n.is_acknowledged).length;
 
   // Profile menu items
   const profileMenuItems = [
@@ -198,6 +207,22 @@ function Header() {
             )}
           </span>
         } key="material" />
+        <TabPane tab={
+          <span>
+            Instrument
+            {unreadInstrumentCalibrationCount > 0 && (
+              <Badge count={unreadInstrumentCalibrationCount} size="small" style={{ marginLeft: '4px' }} />
+            )}
+          </span>
+        } key="instrumentCalibration" />
+        <TabPane tab={
+          <span>
+            Calibration
+            {unreadMachineCalibrationCount > 0 && (
+              <Badge count={unreadMachineCalibrationCount} size="small" style={{ marginLeft: '4px' }} />
+            )}
+          </span>
+        } key="machineCalibration" />
       </Tabs>
       
       {/* Notification List */}
@@ -231,14 +256,14 @@ function Header() {
                     alignItems: 'center',
                     width: '30px',
                     height: '30px',
-                    background: item.notificationType === 'machine' ? '#e6f7ff' : '#f6ffed',
+                    background: getNotificationIconBackground(item.notificationType),
                     borderRadius: '50%',
                     flexShrink: 0
                   }}>
-                    {item.notificationType === 'machine' 
-                      ? <Wrench size={14} color="#1890ff" /> 
-                      : <Package size={14} color="#52c41a" />
-                    }
+                    {item.notificationType === 'machine' && <Wrench size={14} color="#1890ff" />}
+                    {item.notificationType === 'material' && <Package size={14} color="#52c41a" />}
+                    {item.notificationType === 'instrumentCalibration' && <Ruler size={14} color="#722ed1" />}
+                    {item.notificationType === 'machineCalibration' && <ToolFilled size={14} color="#fa8c16" />}
                   </div>
                   
                   {/* Content */}
@@ -246,14 +271,23 @@ function Header() {
                     {/* Title */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
                       <Text strong style={{ fontSize: '13px' }}>
-                        {item.notificationType === 'machine' 
-                          ? `Machine ${item.machine_make || ''} #${item.machine_id || ''}`
-                          : `Material #${item.part_number || ''}`
-                        }
+                        {getNotificationTitle(item)}
                       </Text>
-                      <Tag color={getStatusColor(item.status_name, item.notificationType)} style={{ margin: 0 }}>
-                        {item.status_name || 'UNKNOWN'}
-                      </Tag>
+                      {item.status_name && (
+                        <Tag color={getStatusColor(item.status_name, item.notificationType)} style={{ margin: 0 }}>
+                          {item.status_name || 'UNKNOWN'}
+                        </Tag>
+                      )}
+                      {item.notificationType === 'instrumentCalibration' && (
+                        <Tag color="purple" style={{ margin: 0 }}>
+                          {item.calibration_type || 'CALIBRATION'}
+                        </Tag>
+                      )}
+                      {item.notificationType === 'machineCalibration' && (
+                        <Tag color="orange" style={{ margin: 0 }}>
+                          CALIBRATION DUE
+                        </Tag>
+                      )}
                     </div>
                     
                     {/* Description - truncated */}
@@ -265,7 +299,7 @@ function Header() {
                       whiteSpace: 'nowrap',
                       marginTop: '4px'
                     }}>
-                      {item.description || 'No description'}
+                      {getNotificationDescription(item)}
                     </Text>
                     
                     {/* Footer */}
@@ -276,10 +310,10 @@ function Header() {
                       alignItems: 'center'
                     }}>
                       <Text type="secondary" style={{ fontSize: '11px' }}>
-                        {formatDate(item.updated_at)}
+                        {formatDate(item.updated_at || item.timestamp)}
                       </Text>
                       
-                      {!item.is_acknowledged && (
+                      {!item.is_acknowledged && item.notificationType !== 'instrumentCalibration' && item.notificationType !== 'machineCalibration' && (
                         <Button 
                           type="primary" 
                           size="small" 
@@ -290,7 +324,7 @@ function Header() {
                             padding: '0 8px', 
                             fontSize: '11px',
                             borderRadius: '4px',
-                            background: item.notificationType === 'machine' ? '#1890ff' : '#52c41a'
+                            background: getNotificationButtonColor(item.notificationType)
                           }}
                         >
                           Acknowledge
@@ -334,6 +368,69 @@ function Header() {
     </div>
   );
 
+  // Helper function to get the notification icon background color
+  const getNotificationIconBackground = (type) => {
+    switch (type) {
+      case 'machine':
+        return '#e6f7ff'; // Light blue
+      case 'material':
+        return '#f6ffed'; // Light green
+      case 'instrumentCalibration':
+        return '#f9f0ff'; // Light purple
+      case 'machineCalibration':
+        return '#fff7e6'; // Light orange
+      default:
+        return '#f0f0f0'; // Light gray
+    }
+  };
+
+  // Helper function to get the title for a notification
+  const getNotificationTitle = (notification) => {
+    switch (notification.notificationType) {
+      case 'machine':
+        return `Machine ${notification.machine_make || ''} #${notification.machine_id || ''}`;
+      case 'material':
+        return `Material #${notification.part_number || ''}`;
+      case 'instrumentCalibration':
+        return `Instrument: ${notification.item_name || notification.trade_name || notification.bel_part_number || 'Unknown'}`;
+      case 'machineCalibration':
+        return `${notification.machine_name || notification.machine_make || ''} #${notification.machine_id || ''}`;
+      default:
+        return 'Unknown Notification';
+    }
+  };
+
+  // Helper function to get the description for a notification
+  const getNotificationDescription = (notification) => {
+    switch (notification.notificationType) {
+      case 'machine':
+      case 'material':
+        return notification.description || 'No description';
+      case 'instrumentCalibration':
+        return `Due: ${notification.calibration_due_date || 'Unknown'} | Last: ${formatDate(notification.last_calibration) || 'N/A'}`;
+      case 'machineCalibration':
+        return `Calibration due on: ${notification.calibration_due_date || 'Unknown date'}`;
+      default:
+        return 'No details available';
+    }
+  };
+
+  // Helper function to get the button color for a notification type
+  const getNotificationButtonColor = (type) => {
+    switch (type) {
+      case 'machine':
+        return '#1890ff'; // Blue
+      case 'material':
+        return '#52c41a'; // Green
+      case 'instrumentCalibration':
+        return '#722ed1'; // Purple
+      case 'machineCalibration':
+        return '#fa8c16'; // Orange
+      default:
+        return '#1890ff'; // Default blue
+    }
+  };
+
   // Helper function to get color based on status and type
   const getStatusColor = (status, type) => {
     if (!status) return 'default';
@@ -356,7 +453,7 @@ function Header() {
       }
     } 
     // For material statuses
-    else {
+    else if (type === 'material') {
       switch (status.toUpperCase()) {
         case 'AVAILABLE':
           return 'green';
@@ -370,6 +467,8 @@ function Header() {
           return 'green';
       }
     }
+    // For other types, just return default
+    return 'default';
   };
 
   // Format date helper

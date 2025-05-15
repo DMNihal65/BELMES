@@ -526,7 +526,16 @@ const Report = () => {
         padding: '12px 16px',
         borderRadius: '8px'
       }}>
-        <Title level={4} style={{ margin: 0 }}>Energy Consumption Report</Title>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/admin/energy-monitoring-bel')}
+            style={{ marginRight: '12px' }}
+          >
+            Back
+          </Button>
+          <Title level={4} style={{ margin: 0 }}>Energy Consumption Report</Title>
+        </div>
         <Space>
           <Button
             type="primary"

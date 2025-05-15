@@ -210,11 +210,11 @@ function Sidebar() {
       icon: <Wrench size={20} />,
       label: 'Maintenance',
     },
-    {
-      key: '/supervisor/energy-monitoring',
-      icon: <BarChart2 size={20} />,
-      label: 'Energy Monitoring',
-    },
+    // {
+    //   key: '/supervisor/energy-monitoring',
+    //   icon: <BarChart2 size={20} />,
+    //   label: 'Energy Monitoring',
+    // },
     {
       key: '/supervisor/energy-monitoring-bel',
       icon: <BarChart2 size={20} />,
@@ -363,11 +363,11 @@ function Sidebar() {
       icon: <Wrench size={20} />,
       label: 'Maintenance',
     },
-    {
-      key: '/admin/energy-monitoring',
-      icon: <BarChart2 size={20} />,
-      label: 'Energy Monitoring',
-    },
+    // {
+    //   key: '/admin/energy-monitoring',
+    //   icon: <BarChart2 size={20} />,
+    //   label: 'Energy Monitoring',
+    // },
     {
       key: '/admin/energy-monitoring-bel',
       icon: <BarChart2 size={20} />,

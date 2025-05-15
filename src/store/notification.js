@@ -3,7 +3,7 @@ import { message } from 'antd';
 import { Wrench, Package } from 'lucide-react';
 
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.18.7.88:9999/api/v1';
+const API_BASE_URL = 'http://172.18.7.88:8888/api/v1';
 const API_ENDPOINTS = {
   // GET endpoints for notifications
   machineNotifications: `${API_BASE_URL}/maintainance/supervisor/machine-notifications/`,
@@ -18,6 +18,10 @@ const API_ENDPOINTS = {
   // WebSocket endpoints
   machineWs: `ws://${API_BASE_URL.replace('http://', '')}/notification/ws/machine-notifications`,
   materialWs: `ws://${API_BASE_URL.replace('http://', '')}/notification/ws/material-notifications`,
+  
+  // Calibration HTTP endpoints
+  instrumentCalibrationHttp: `http://172.18.7.89:9987/api/v1/notification/instrument-calibrations?limit=100`,
+  machineCalibrationHttp: `http://172.18.7.89:9987/api/v1/notification/machine-calibrations?limit=100`
 };
 
 // Utility function to play notification sound
@@ -73,6 +77,12 @@ const generateNotificationId = (notification) => {
   } else if (type === 'material') {
     // For material notifications, use part_number + timestamp
     return `material-${notification.id || notification.part_number}-${notification.updated_at}`;
+  } else if (type === 'instrumentCalibration') {
+    // For instrument calibration notifications, use instrument_id + timestamp
+    return `instrumentCalibration-${notification.id || notification.instrument_id}-${notification.timestamp}`;
+  } else if (type === 'machineCalibration') {
+    // For machine calibration notifications, use machine_id + timestamp
+    return `machineCalibration-${notification.id || notification.machine_id}-${notification.timestamp}`;
   }
   
   // Fallback
@@ -82,14 +92,18 @@ const generateNotificationId = (notification) => {
 /**
  * Helper function to standardize notification object format
  * @param {Object} notification - Raw notification data from API
- * @param {string} type - Either 'machine' or 'material'
+ * @param {string} type - Either 'machine', 'material', 'instrumentCalibration', or 'machineCalibration'
  * @returns {Object} Standardized notification object
  */
 const standardizeNotification = (notification, type) => {
   const baseNotification = {
     ...notification,
     notificationType: type,
-    is_acknowledged: notification.is_acknowledged || false,
+    // For calibration notifications, we'll manually set is_acknowledged since backend doesn't have this
+    is_acknowledged: notification.is_acknowledged || 
+                    (type === 'instrumentCalibration' || type === 'machineCalibration') ? 
+                    notification.is_acknowledged_frontend || false : 
+                    false,
     // Using a consistent approach to handle IDs
     _uniqueId: notification._uniqueId || generateNotificationId({ ...notification, notificationType: type }),
   };
@@ -343,7 +357,9 @@ const useNotificationStore = create((set, get) => ({
         machineResponse, 
         materialResponse, 
         machineUnackResponse, 
-        materialUnackResponse
+        materialUnackResponse,
+        instrumentCalibrationResponse,
+        machineCalibrationResponse
       ] = await Promise.all([
         fetch(API_ENDPOINTS.machineNotifications, {
           method: 'GET',
@@ -358,6 +374,14 @@ const useNotificationStore = create((set, get) => ({
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         }),
         fetch(API_ENDPOINTS.materialUnacknowledged, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        }),
+        fetch(API_ENDPOINTS.instrumentCalibrationHttp, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        }),
+        fetch(API_ENDPOINTS.machineCalibrationHttp, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
@@ -407,6 +431,28 @@ const useNotificationStore = create((set, get) => ({
         allNotifications = [...allNotifications, ...unackMaterialNotifications];
       } else if (showErrorMessages) {
         console.error('Failed to fetch unacknowledged material notifications:', materialUnackResponse.statusText);
+      }
+      
+      // Process instrument calibration notifications
+      if (instrumentCalibrationResponse.ok) {
+        const instrumentCalibrationData = await instrumentCalibrationResponse.json();
+        const instrumentCalibrationNotifications = (instrumentCalibrationData.notifications || []).map(n => 
+          standardizeNotification({ ...n, is_acknowledged: false }, 'instrumentCalibration')
+        );
+        allNotifications = [...allNotifications, ...instrumentCalibrationNotifications];
+      } else if (showErrorMessages) {
+        console.error('Failed to fetch instrument calibration notifications:', instrumentCalibrationResponse.statusText);
+      }
+      
+      // Process machine calibration notifications
+      if (machineCalibrationResponse.ok) {
+        const machineCalibrationData = await machineCalibrationResponse.json();
+        const machineCalibrationNotifications = (machineCalibrationData.notifications || []).map(n => 
+          standardizeNotification({ ...n, is_acknowledged: false }, 'machineCalibration')
+        );
+        allNotifications = [...allNotifications, ...machineCalibrationNotifications];
+      } else if (showErrorMessages) {
+        console.error('Failed to fetch machine calibration notifications:', machineCalibrationResponse.statusText);
       }
       
       // Replace the entire notifications collection
@@ -569,10 +615,17 @@ const useNotificationStore = create((set, get) => ({
     if (!notification) return false;
     
     try {
+      // Skip acknowledgment for instrument and machine calibration notifications
+      if (notification.notificationType === 'instrumentCalibration' || 
+          notification.notificationType === 'machineCalibration') {
+        console.log('Acknowledgment not required for this notification type:', notification.notificationType);
+        return true;
+      }
+      
       // Get username for acknowledgment
       const username = localStorage.getItem('username') || 'unknown-user';
       
-      // Determine which endpoint to use
+      // Determine which endpoint to use for backend acknowledgment
       const endpoint = notification.notificationType === 'machine'
         ? API_ENDPOINTS.machineAcknowledge
         : API_ENDPOINTS.materialAcknowledge;
@@ -617,7 +670,12 @@ const useNotificationStore = create((set, get) => ({
   
   // Mark all unacknowledged notifications as read
   markAllAsRead: async () => {
-    const unacknowledgedNotifications = get().notifications.filter(n => !n.is_acknowledged);
+    // Filter out calibration notifications since they don't need acknowledgment
+    const unacknowledgedNotifications = get().notifications.filter(n => 
+      !n.is_acknowledged && 
+      n.notificationType !== 'instrumentCalibration' && 
+      n.notificationType !== 'machineCalibration'
+    );
     
     if (unacknowledgedNotifications.length === 0) return true;
     

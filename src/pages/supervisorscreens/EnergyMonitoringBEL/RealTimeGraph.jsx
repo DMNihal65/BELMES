@@ -85,30 +85,15 @@ const RealTimeGraph = ({ machineId, machineName }) => {
         selectedParameter
       );
 
-      // Check the response structure
-      if (!data) {
-        throw new Error("Empty response received from the server");
+      // Check if data is empty or null
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        setChartError(`No data available for the selected date range: ${dateRange[0].format('YYYY-MM-DD')} to ${dateRange[1].format('YYYY-MM-DD')}`);
+        setChartData([]);
+        return;
       }
 
-      // Handle array format - the API returns an array directly
-      let dataPoints = Array.isArray(data) ? data : data.data;
-      
-      if (!dataPoints || dataPoints.length === 0) {
-        throw new Error("No data points available for the selected criteria");
-      }
-
-      console.log("Raw data points:", dataPoints);
-
-      // Sort data points by timestamp to ensure proper stepline rendering
-      dataPoints.sort((a, b) => {
-        const timeA = new Date(a.timestamp).getTime();
-        const timeB = new Date(b.timestamp).getTime();
-        return timeA - timeB;
-      });
-
-      // Format data for chart - map the actual parameter property name
-      const formattedData = dataPoints.map((point, index) => {
-        // Format timestamp for display
+      // Process data as before
+      const formattedData = data.map((point, index) => {
         let formattedTimestamp;
         try {
           const date = new Date(point.timestamp);
@@ -120,7 +105,6 @@ const RealTimeGraph = ({ machineId, machineName }) => {
           formattedTimestamp = `Point ${index + 1}`;
         }
         
-        // Get the value using the API parameter name
         const paramValue = point[apiParamName];
         let numericValue;
         
@@ -139,12 +123,11 @@ const RealTimeGraph = ({ machineId, machineName }) => {
           value: isNaN(numericValue) ? getDefaultValue(selectedParameter) : numericValue
         };
       });
-      
+
       if (formattedData.length === 0) {
-        setChartError("No valid data points available for the selected date range");
+        setChartError(`No valid data points available for ${getParameterDisplayName(selectedParameter)} between ${dateRange[0].format('YYYY-MM-DD')} and ${dateRange[1].format('YYYY-MM-DD')}`);
         setChartData([]);
       } else {
-        console.log(`Processed ${formattedData.length} data points for chart`);
         setChartData(formattedData);
       }
     } catch (error) {
@@ -754,10 +737,14 @@ const RealTimeGraph = ({ machineId, machineName }) => {
             </div>
           ) : chartError ? (
             <Alert 
-              message="Error" 
-              description={chartError} 
-              type="error" 
+              message="No Data Available"
+              description={chartError}
+              type="info" 
               showIcon 
+              style={{
+                margin: '20px',
+                textAlign: 'center'
+              }}
             />
           ) : chartData.length > 0 ? (
             <>
@@ -875,11 +862,17 @@ const RealTimeGraph = ({ machineId, machineName }) => {
               flexDirection: 'column', 
               justifyContent: 'center', 
               alignItems: 'center', 
-              height: '200px'
+              height: '200px',
+              color: '#666'
             }}>
-              <Text type="secondary">
+              <Text type="secondary" style={{ fontSize: '16px', marginBottom: '8px' }}>
                 {isLive ? 'Waiting for live data...' : 'Select dates and click Submit to view historical data'}
               </Text>
+              {!isLive && dateRange && (
+                <Text type="secondary" style={{ fontSize: '14px' }}>
+                  Date Range: {dateRange[0]?.format('YYYY-MM-DD')} to {dateRange[1]?.format('YYYY-MM-DD')}
+                </Text>
+              )}
             </div>
           )}
         </div>

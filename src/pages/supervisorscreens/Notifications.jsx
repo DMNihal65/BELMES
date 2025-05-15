@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Typography, 
@@ -15,10 +14,13 @@ import {
   Alert,
   Table,
   Tooltip,
-  Spin
+  Spin,
+  Input,
+  RangePicker
 } from 'antd';
-import { Wrench, Package, Bell, CheckCircle, RefreshCw } from 'lucide-react';
+import { Wrench, Package, Bell, CheckCircle, RefreshCw, Ruler, FilterOutlined } from 'lucide-react';
 import useNotificationStore from '../../store/notification';
+import { ToolFilled } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -106,12 +108,16 @@ const Notifications = () => {
   // Filter notifications by type and acknowledgment status
   const machineNotifications = notifications.filter(n => n.notificationType === 'machine');
   const materialNotifications = notifications.filter(n => n.notificationType === 'material');
+  const instrumentCalibrationNotifications = notifications.filter(n => n.notificationType === 'instrumentCalibration');
+  const machineCalibrationNotifications = notifications.filter(n => n.notificationType === 'machineCalibration');
   const unacknowledgedNotifications = notifications.filter(n => !n.is_acknowledged);
   
   // Calculate counts
   const unreadMachineCount = machineNotifications.filter(n => !n.is_acknowledged).length;
   const unreadMaterialCount = materialNotifications.filter(n => !n.is_acknowledged).length;
-  const totalUnacknowledgedCount = unacknowledgedNotifications.length;
+  const unreadInstrumentCalibrationCount = instrumentCalibrationNotifications.filter(n => !n.is_acknowledged).length;
+  const unreadMachineCalibrationCount = machineCalibrationNotifications.filter(n => !n.is_acknowledged).length;
+  const totalUnacknowledgedCount = unreadMachineCount + unreadMaterialCount;
 
   // Filter notifications based on active tab
   let filteredNotifications = activeTabKey === 'all' 
@@ -120,9 +126,13 @@ const Notifications = () => {
       ? machineNotifications 
       : activeTabKey === 'material'
         ? materialNotifications
-        : activeTabKey === 'unacknowledged'
-          ? unacknowledgedNotifications
-          : [];
+        : activeTabKey === 'instrumentCalibration'
+          ? instrumentCalibrationNotifications
+          : activeTabKey === 'machineCalibration'
+            ? machineCalibrationNotifications
+            : activeTabKey === 'unacknowledged'
+              ? unacknowledgedNotifications
+              : [];
 
   // Helper function to get color based on status and type
   const getStatusColor = (status, type) => {
@@ -296,8 +306,12 @@ const Notifications = () => {
         { text: 'Unacknowledged', value: false },
       ],
       onFilter: (value, record) => record.is_acknowledged === value,
-      render: (isAcknowledged, record) => (
-        isAcknowledged ? (
+      render: (isAcknowledged, record) => {
+        if (record.notificationType === 'instrumentCalibration' || record.notificationType === 'machineCalibration') {
+          return <Text type="secondary">Not Required</Text>;
+        }
+        
+        return isAcknowledged ? (
           <div>
             <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
             <span>By: {record.acknowledged_by || 'System'}</span>
@@ -308,12 +322,12 @@ const Notifications = () => {
             size="small" 
             onClick={() => handleAcknowledge(record)}
             loading={processingIds.includes(record._uniqueId)}
-            style={{ background: '#1890ff' }}
+            style={{ background: getTypeButtonColor(record.notificationType) }}
           >
             Acknowledge
           </Button>
-        )
-      )
+        );
+      }
     }
   ];
 
@@ -406,8 +420,12 @@ const Notifications = () => {
         { text: 'Unacknowledged', value: false },
       ],
       onFilter: (value, record) => record.is_acknowledged === value,
-      render: (isAcknowledged, record) => (
-        isAcknowledged ? (
+      render: (isAcknowledged, record) => {
+        if (record.notificationType === 'instrumentCalibration' || record.notificationType === 'machineCalibration') {
+          return <Text type="secondary">Not Required</Text>;
+        }
+        
+        return isAcknowledged ? (
           <div>
             <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
             <span>By: {record.acknowledged_by || 'System'}</span>
@@ -418,14 +436,283 @@ const Notifications = () => {
             size="small" 
             onClick={() => handleAcknowledge(record)}
             loading={processingIds.includes(record._uniqueId)}
-            style={{ background: '#52c41a' }}
+            style={{ background: getTypeButtonColor(record.notificationType) }}
           >
             Acknowledge
           </Button>
-        )
-      )
+        );
+      }
     }
   ];
+
+  // Define columns for instrument calibration notifications
+  const getInstrumentCalibrationColumns = () => [
+    {
+      title: 'Type',
+      key: 'type',
+      width: '80px',
+      render: () => (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          width: '40px',
+          height: '40px',
+          background: '#f9f0ff',
+          borderRadius: '50%',
+          border: '1px solid #d3adf7'
+        }}>
+          <Ruler size={18} color="#722ed1" />
+        </div>
+      )
+    },
+    {
+      title: 'Instrument',
+      key: 'instrument',
+      render: (_, record) => (
+        <span>
+          <strong>{record.item_name || record.trade_name || ''}</strong>
+          {record.bel_part_number && <div>Part #: {record.bel_part_number}</div>}
+        </span>
+      ),
+      sorter: (a, b) => {
+        const aName = a.item_name || a.trade_name || '';
+        const bName = b.item_name || b.trade_name || '';
+        return aName.localeCompare(bName);
+      },
+    },
+    {
+      title: 'Calibration Type',
+      dataIndex: 'calibration_type',
+      key: 'calibration_type',
+      render: (type) => (
+        <Tag color="purple">
+          {type || 'CALIBRATION'}
+        </Tag>
+      ),
+      filters: (() => {
+        const types = new Set();
+        instrumentCalibrationNotifications.forEach(item => {
+          if (item.calibration_type) {
+            types.add(item.calibration_type);
+          }
+        });
+        return Array.from(types).map(type => ({
+          text: type,
+          value: type
+        }));
+      })(),
+      onFilter: (value, record) => record.calibration_type === value,
+    },
+    {
+      title: 'Last Calibration',
+      dataIndex: 'last_calibration',
+      key: 'last_calibration',
+      render: (date) => formatDate(date) || 'Unknown',
+      sorter: (a, b) => {
+        const aDate = a.last_calibration ? new Date(a.last_calibration) : new Date(0);
+        const bDate = b.last_calibration ? new Date(b.last_calibration) : new Date(0);
+        return aDate - bDate;
+      },
+    },
+    {
+      title: 'Next Calibration',
+      dataIndex: 'next_calibration',
+      key: 'next_calibration',
+      render: (date) => formatDate(date) || 'Unknown',
+      sorter: (a, b) => {
+        const aDate = a.next_calibration ? new Date(a.next_calibration) : new Date(0);
+        const bDate = b.next_calibration ? new Date(b.next_calibration) : new Date(0);
+        return aDate - bDate;
+      },
+    },
+    {
+      title: 'Due Date',
+      dataIndex: 'calibration_due_date',
+      key: 'calibration_due_date',
+      render: (date) => (
+        <Tag color={isDateNear(date) ? 'red' : 'orange'}>
+          {date || 'Unknown'}
+        </Tag>
+      ),
+      sorter: (a, b) => {
+        const aDate = a.calibration_due_date ? new Date(a.calibration_due_date) : new Date(0);
+        const bDate = b.calibration_due_date ? new Date(b.calibration_due_date) : new Date(0);
+        return aDate - bDate;
+      },
+      defaultSortOrder: 'ascend',
+    },
+    {
+      title: 'Acknowledged',
+      dataIndex: 'is_acknowledged',
+      key: 'is_acknowledged',
+      filters: [
+        { text: 'Acknowledged', value: true },
+        { text: 'Unacknowledged', value: false },
+      ],
+      onFilter: (value, record) => record.is_acknowledged === value,
+      render: (isAcknowledged, record) => {
+        if (record.notificationType === 'instrumentCalibration' || record.notificationType === 'machineCalibration') {
+          return <Text type="secondary">Not Required</Text>;
+        }
+        
+        return isAcknowledged ? (
+          <div>
+            <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
+            <span>By: {record.acknowledged_by || 'System'}</span>
+          </div>
+        ) : (
+          <Button 
+            type="primary" 
+            size="small" 
+            onClick={() => handleAcknowledge(record)}
+            loading={processingIds.includes(record._uniqueId)}
+            style={{ background: getTypeButtonColor(record.notificationType) }}
+          >
+            Acknowledge
+          </Button>
+        );
+      }
+    }
+  ];
+
+  // Define columns for machine calibration notifications
+  const getMachineCalibrationColumns = () => [
+    {
+      title: 'Type',
+      key: 'type',
+      width: '80px',
+      render: () => (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          width: '40px',
+          height: '40px',
+          background: '#fff7e6',
+          borderRadius: '50%',
+          border: '1px solid #ffd591'
+        }}>
+          <ToolFilled size={18} color="#fa8c16" />
+        </div>
+      )
+    },
+    {
+      title: 'Machine',
+      key: 'machine',
+      render: (_, record) => (
+        <span>
+          <strong>{record.machine_name || record.machine_make || 'Unknown'}</strong>
+          <div>ID: {record.machine_id || 'N/A'}</div>
+        </span>
+      ),
+      sorter: (a, b) => {
+        const aName = a.machine_name || a.machine_make || '';
+        const bName = b.machine_name || b.machine_make || '';
+        return aName.localeCompare(bName);
+      },
+    },
+    {
+      title: 'Machine Type',
+      dataIndex: 'machine_type',
+      key: 'machine_type',
+      render: (type) => (
+        <Tag color="blue">
+          {type || 'Unknown Type'}
+        </Tag>
+      ),
+      filters: (() => {
+        const types = new Set();
+        machineCalibrationNotifications.forEach(item => {
+          if (item.machine_type) {
+            types.add(item.machine_type);
+          }
+        });
+        return Array.from(types).map(type => ({
+          text: type,
+          value: type
+        }));
+      })(),
+      onFilter: (value, record) => record.machine_type === value,
+    },
+    {
+      title: 'Due Date',
+      dataIndex: 'calibration_due_date',
+      key: 'calibration_due_date',
+      render: (date) => (
+        <Tag color={isDateNear(date) ? 'red' : 'orange'}>
+          {date || 'Unknown'}
+        </Tag>
+      ),
+      sorter: (a, b) => {
+        const aDate = a.calibration_due_date ? new Date(a.calibration_due_date) : new Date(0);
+        const bDate = b.calibration_due_date ? new Date(b.calibration_due_date) : new Date(0);
+        return aDate - bDate;
+      },
+      defaultSortOrder: 'ascend',
+    },
+    {
+      title: 'Notification Time',
+      dataIndex: 'timestamp',
+      key: 'timestamp',
+      render: (date) => formatDate(date),
+      sorter: (a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0),
+    },
+    {
+      title: 'Acknowledged',
+      dataIndex: 'is_acknowledged',
+      key: 'is_acknowledged',
+      filters: [
+        { text: 'Acknowledged', value: true },
+        { text: 'Unacknowledged', value: false },
+      ],
+      onFilter: (value, record) => record.is_acknowledged === value,
+      render: (isAcknowledged, record) => {
+        if (record.notificationType === 'instrumentCalibration' || record.notificationType === 'machineCalibration') {
+          return <Text type="secondary">Not Required</Text>;
+        }
+        
+        return isAcknowledged ? (
+          <div>
+            <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
+            <span>By: {record.acknowledged_by || 'System'}</span>
+          </div>
+        ) : (
+          <Button 
+            type="primary" 
+            size="small" 
+            onClick={() => handleAcknowledge(record)}
+            loading={processingIds.includes(record._uniqueId)}
+            style={{ background: getTypeButtonColor(record.notificationType) }}
+          >
+            Acknowledge
+          </Button>
+        );
+      }
+    }
+  ];
+
+  // Helper function to check if a date is near (within 7 days)
+  const isDateNear = (dateString) => {
+    if (!dateString) return false;
+    
+    try {
+      const dueDate = new Date(dateString);
+      const now = new Date();
+      
+      // Reset time portion for accurate day comparison
+      dueDate.setHours(0, 0, 0, 0);
+      now.setHours(0, 0, 0, 0);
+      
+      // Calculate difference in days
+      const diffTime = dueDate - now;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return diffDays <= 7 && diffDays >= 0;
+    } catch (error) {
+      return false;
+    }
+  };
 
   // Get combined columns for all and unacknowledged tabs
   const getCombinedColumns = () => [
@@ -440,19 +727,21 @@ const Notifications = () => {
           alignItems: 'center',
           width: '40px',
           height: '40px',
-          background: record.notificationType === 'machine' ? '#e6f7ff' : '#f6ffed',
+          background: getTypeBackground(record.notificationType),
           borderRadius: '50%',
-          border: `1px solid ${record.notificationType === 'machine' ? '#91d5ff' : '#b7eb8f'}`
+          border: `1px solid ${getTypeBorderColor(record.notificationType)}`
         }}>
-          {record.notificationType === 'machine' 
-            ? <Wrench size={18} color="#1890ff" /> 
-            : <Package size={18} color="#52c41a" />
-          }
+          {record.notificationType === 'machine' && <Wrench size={18} color="#1890ff" />}
+          {record.notificationType === 'material' && <Package size={18} color="#52c41a" />}
+          {record.notificationType === 'instrumentCalibration' && <Ruler size={18} color="#722ed1" />}
+          {record.notificationType === 'machineCalibration' && <ToolFilled size={18} color="#fa8c16" />}
         </div>
       ),
       filters: [
         { text: 'Machine', value: 'machine' },
         { text: 'Material', value: 'material' },
+        { text: 'Instrument Calibration', value: 'instrumentCalibration' },
+        { text: 'Machine Calibration', value: 'machineCalibration' },
       ],
       onFilter: (value, record) => record.notificationType === value,
     },
@@ -461,63 +750,107 @@ const Notifications = () => {
       key: 'details',
       render: (_, record) => (
         <span>
-          {record.notificationType === 'machine' 
-            ? <strong>{record.machine_make || 'Unknown'} #{record.machine_id || 'N/A'}</strong>
-            : <strong>Part #{record.part_number || 'Unknown'}</strong>
-          }
+          {record.notificationType === 'machine' && (
+            <strong>{record.machine_make || 'Unknown'} #{record.machine_id || 'N/A'}</strong>
+          )}
+          {record.notificationType === 'material' && (
+            <strong>Part #{record.part_number || 'Unknown'}</strong>
+          )}
+          {record.notificationType === 'instrumentCalibration' && (
+            <strong>{record.item_name || record.trade_name || 'Unknown Instrument'}</strong>
+          )}
+          {record.notificationType === 'machineCalibration' && (
+            <strong>{record.machine_name || record.machine_make || 'Unknown Machine'} #{record.machine_id || 'N/A'}</strong>
+          )}
         </span>
       ),
     },
     {
-      title: 'Status',
-      dataIndex: 'status_name',
-      key: 'status_name',
-      render: (status, record) => (
-        <Tag color={getStatusColor(status, record.notificationType)}>
-          {status?.toUpperCase() || 'UNKNOWN'}
-        </Tag>
-      ),
+      title: 'Status/Info',
+      key: 'status_info',
+      render: (_, record) => {
+        if (record.notificationType === 'machine' || record.notificationType === 'material') {
+          return (
+            <Tag color={getStatusColor(record.status_name, record.notificationType)}>
+              {record.status_name?.toUpperCase() || 'UNKNOWN'}
+            </Tag>
+          );
+        } else if (record.notificationType === 'instrumentCalibration') {
+          return (
+            <Tag color="purple">
+              {record.calibration_type || 'CALIBRATION'}
+            </Tag>
+          );
+        } else if (record.notificationType === 'machineCalibration') {
+          return (
+            <Tag color="orange">
+              CALIBRATION DUE: {record.calibration_due_date || 'Unknown'}
+            </Tag>
+          );
+        }
+        return null;
+      },
       filters: [
         ...getUniqueStatusFilters('machine').map(f => ({ ...f, text: `Machine: ${f.text}` })),
         ...getUniqueStatusFilters('material').map(f => ({ ...f, text: `Material: ${f.text}` }))
       ],
-      onFilter: (value, record) => record.status_name?.toLowerCase() === value.toLowerCase(),
+      onFilter: (value, record) => {
+        if (record.notificationType === 'machine' || record.notificationType === 'material') {
+          return record.status_name?.toLowerCase() === value.toLowerCase();
+        }
+        return false;
+      },
     },
     {
-      title: 'Description',
-      dataIndex: 'description',
+      title: 'Description/Due Date',
       key: 'description',
       width: '30%',
       ellipsis: { showTitle: false },
-      render: (text) => (
-        <Tooltip title={text || 'No description'} placement="topLeft">
-          <div style={{ 
-            maxHeight: '60px', 
-            overflow: 'hidden', 
-            textOverflow: 'ellipsis', 
-            whiteSpace: 'normal', 
-            display: '-webkit-box', 
-            WebkitLineClamp: 3, 
-            WebkitBoxOrient: 'vertical' 
-          }}>
-            {text || 'No description provided'}
-          </div>
-        </Tooltip>
-      )
+      render: (_, record) => {
+        if (record.notificationType === 'machine' || record.notificationType === 'material') {
+          return (
+            <Tooltip title={record.description || 'No description'} placement="topLeft">
+              <div style={{ 
+                maxHeight: '60px', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis', 
+                whiteSpace: 'normal', 
+                display: '-webkit-box', 
+                WebkitLineClamp: 3, 
+                WebkitBoxOrient: 'vertical' 
+              }}>
+                {record.description || 'No description provided'}
+              </div>
+            </Tooltip>
+          );
+        } else if (record.notificationType === 'instrumentCalibration') {
+          return (
+            <Tooltip title={`Last: ${formatDate(record.last_calibration) || 'N/A'}, Next: ${formatDate(record.next_calibration) || 'N/A'}`} placement="topLeft">
+              <div>
+                <div>Due Date: {record.calibration_due_date || 'Unknown'}</div>
+                <div>Last Calibration: {formatDate(record.last_calibration) || 'N/A'}</div>
+              </div>
+            </Tooltip>
+          );
+        } else if (record.notificationType === 'machineCalibration') {
+          return (
+            <Tooltip title={`Machine Type: ${record.machine_type || 'Unknown'}`} placement="topLeft">
+              <div>
+                <div>Due Date: {record.calibration_due_date || 'Unknown'}</div>
+                <div>Machine Type: {record.machine_type || 'Unknown'}</div>
+              </div>
+            </Tooltip>
+          );
+        }
+        return null;
+      }
     },
     {
-      title: 'Created By',
-      dataIndex: 'created_by',
-      key: 'created_by',
-      render: (text) => text || 'System',
-    },
-    {
-      title: 'Updated At',
-      dataIndex: 'updated_at',
+      title: 'Created/Updated',
       key: 'updated_at',
-      sorter: (a, b) => new Date(a.updated_at || 0) - new Date(b.updated_at || 0),
+      sorter: (a, b) => new Date(a.updated_at || a.timestamp || 0) - new Date(b.updated_at || b.timestamp || 0),
       defaultSortOrder: 'descend',
-      render: (date) => formatDate(date)
+      render: (_, record) => formatDate(record.updated_at || record.timestamp)
     },
     {
       title: 'Acknowledged',
@@ -528,8 +861,12 @@ const Notifications = () => {
         { text: 'Unacknowledged', value: false },
       ],
       onFilter: (value, record) => record.is_acknowledged === value,
-      render: (isAcknowledged, record) => (
-        isAcknowledged ? (
+      render: (isAcknowledged, record) => {
+        if (record.notificationType === 'instrumentCalibration' || record.notificationType === 'machineCalibration') {
+          return <Text type="secondary">Not Required</Text>;
+        }
+        
+        return isAcknowledged ? (
           <div>
             <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
             <span>By: {record.acknowledged_by || 'System'}</span>
@@ -540,14 +877,60 @@ const Notifications = () => {
             size="small" 
             onClick={() => handleAcknowledge(record)}
             loading={processingIds.includes(record._uniqueId)}
-            style={{ background: record.notificationType === 'machine' ? '#1890ff' : '#52c41a' }}
+            style={{ background: getTypeButtonColor(record.notificationType) }}
           >
             Acknowledge
           </Button>
-        )
-      )
+        );
+      }
     }
   ];
+
+  // Helper functions for type-specific colors
+  const getTypeBackground = (type) => {
+    switch (type) {
+      case 'machine':
+        return '#e6f7ff'; // Light blue
+      case 'material':
+        return '#f6ffed'; // Light green
+      case 'instrumentCalibration':
+        return '#f9f0ff'; // Light purple
+      case 'machineCalibration':
+        return '#fff7e6'; // Light orange
+      default:
+        return '#f0f0f0'; // Light gray
+    }
+  };
+
+  const getTypeBorderColor = (type) => {
+    switch (type) {
+      case 'machine':
+        return '#91d5ff'; // Blue border
+      case 'material':
+        return '#b7eb8f'; // Green border
+      case 'instrumentCalibration':
+        return '#d3adf7'; // Purple border
+      case 'machineCalibration':
+        return '#ffd591'; // Orange border
+      default:
+        return '#d9d9d9'; // Gray border
+    }
+  };
+
+  const getTypeButtonColor = (type) => {
+    switch (type) {
+      case 'machine':
+        return '#1890ff'; // Blue
+      case 'material':
+        return '#52c41a'; // Green
+      case 'instrumentCalibration':
+        return '#722ed1'; // Purple
+      case 'machineCalibration':
+        return '#fa8c16'; // Orange
+      default:
+        return '#1890ff'; // Default blue
+    }
+  };
 
   // Get the appropriate columns based on active tab
   const getColumns = () => {
@@ -556,6 +939,10 @@ const Notifications = () => {
         return getMachineColumns();
       case 'material':
         return getMaterialColumns();
+      case 'instrumentCalibration':
+        return getInstrumentCalibrationColumns();
+      case 'machineCalibration':
+        return getMachineCalibrationColumns();
       default:
         return getCombinedColumns();
     }
@@ -592,76 +979,46 @@ const Notifications = () => {
           </Row>
         )}
         
-        <Row justify="space-between" align="middle" style={{ marginBottom: '20px' }}>
-          <Col>
-            <Title level={3} style={{ margin: 0 }}>Notifications</Title>
-            <Text type="secondary">
-              View and manage all system notifications {notifications.length > 0 && `(${notifications.length} total)`}
-            </Text>
-          </Col>
-          <Col>
-            <Button 
-              type="primary"
-              onClick={handleManualRefresh}
-              loading={tableLoading}
-              icon={<RefreshCw size={16} />}
-            >
-              Refresh
-            </Button>
-          </Col>
-        </Row>
-        
-        {/* Summary card */}
-        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-          <Col xs={24} md={24}>
-            <Card 
-              size="small" 
-              style={{ 
-                background: 'linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%)',
-                borderRadius: '8px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-                  <div>
-                    <Text type="secondary">Total</Text>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{notifications.length}</div>
-                  </div>
-                  
-                  <div>
-                    <Space>
-                      <Wrench size={16} color="#1890ff" />
-                      <Text type="secondary">Machine</Text>
-                    </Space>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                      {machineNotifications.length}
-                      {unreadMachineCount > 0 && (
-                        <Badge 
-                          count={unreadMachineCount} 
-                          style={{ backgroundColor: '#1890ff', marginLeft: '8px' }} 
-                        />
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Space>
-                      <Package size={16} color="#52c41a" />
-                      <Text type="secondary">Material</Text>
-                    </Space>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                      {materialNotifications.length}
-                      {unreadMaterialCount > 0 && (
-                        <Badge 
-                          count={unreadMaterialCount} 
-                          style={{ backgroundColor: '#52c41a', marginLeft: '8px' }} 
-                        />
-                      )}
-                    </div>
-                  </div>
+        {/* Header section with improved design */}
+        <div className="notification-hero" style={{
+          background: 'linear-gradient(120deg, #f0f7ff 0%, #e6f7ff 100%)',
+          borderRadius: '12px',
+          padding: '24px',
+          marginBottom: '24px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+        }}>
+          <Row justify="space-between" align="middle" gutter={[16, 16]}>
+            <Col xs={24} md={12}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ 
+                  background: '#1890ff',
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  boxShadow: '0 4px 8px rgba(24,144,255,0.2)'
+                }}>
+                  <Bell size={24} color="#fff" />
                 </div>
-                
+                <div>
+                  <Title level={3} style={{ margin: 0 }}>Notifications Center</Title>
+                  <Text type="secondary">
+                    Monitor and manage all system alerts in one place
+                  </Text>
+                </div>
+              </div>
+            </Col>
+            <Col xs={24} md={12} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button 
+                  icon={<RefreshCw size={16} />}
+                  onClick={handleManualRefresh}
+                  loading={tableLoading}
+                >
+                  Refresh
+                </Button>
                 {totalUnacknowledgedCount > 0 && (
                   <Button 
                     type="primary" 
@@ -672,128 +1029,357 @@ const Notifications = () => {
                     Acknowledge All ({totalUnacknowledgedCount})
                   </Button>
                 )}
+              </Space>
+            </Col>
+          </Row>
+        </div>
+        
+        {/* Improved summary cards */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={24} lg={6}>
+            <Card 
+              size="small" 
+              style={{ 
+                background: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                height: '100%',
+                borderLeft: '4px solid #1890ff'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Text type="secondary">Machine Notifications</Text>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', marginTop: '4px' }}>
+                    {machineNotifications.length}
+                  </div>
+                  {unreadMachineCount > 0 && (
+                    <Tag color="#1890ff" style={{ marginTop: '4px' }}>
+                      {unreadMachineCount} Unacknowledged
+                    </Tag>
+                  )}
+                </div>
+                <div style={{ 
+                  background: '#e6f7ff',
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <Wrench size={24} color="#1890ff" />
+                </div>
+              </div>
+            </Card>
+          </Col>
+          
+          <Col xs={24} lg={6}>
+            <Card 
+              size="small" 
+              style={{ 
+                background: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                height: '100%',
+                borderLeft: '4px solid #52c41a'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Text type="secondary">Material Notifications</Text>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', marginTop: '4px' }}>
+                    {materialNotifications.length}
+                  </div>
+                  {unreadMaterialCount > 0 && (
+                    <Tag color="#52c41a" style={{ marginTop: '4px' }}>
+                      {unreadMaterialCount} Unacknowledged
+                    </Tag>
+                  )}
+                </div>
+                <div style={{ 
+                  background: '#f6ffed',
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <Package size={24} color="#52c41a" />
+                </div>
+              </div>
+            </Card>
+          </Col>
+          
+          <Col xs={24} lg={6}>
+            <Card 
+              size="small" 
+              style={{ 
+                background: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                height: '100%',
+                borderLeft: '4px solid #722ed1'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Text type="secondary">Instrument Calibrations</Text>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', marginTop: '4px' }}>
+                    {instrumentCalibrationNotifications.length}
+                  </div>
+                  <Tag color="#722ed1" style={{ marginTop: '4px' }}>
+                    Due for calibration
+                  </Tag>
+                </div>
+                <div style={{ 
+                  background: '#f9f0ff',
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <Ruler size={24} color="#722ed1" />
+                </div>
+              </div>
+            </Card>
+          </Col>
+          
+          <Col xs={24} lg={6}>
+            <Card 
+              size="small" 
+              style={{ 
+                background: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                height: '100%',
+                borderLeft: '4px solid #fa8c16'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Text type="secondary">Machine Calibrations</Text>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', marginTop: '4px' }}>
+                    {machineCalibrationNotifications.length}
+                  </div>
+                  <Tag color="#fa8c16" style={{ marginTop: '4px' }}>
+                    Due for calibration
+                  </Tag>
+                </div>
+                <div style={{ 
+                  background: '#fff7e6',
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <ToolFilled style={{ fontSize: '24px', color: '#fa8c16' }} />
+                </div>
               </div>
             </Card>
           </Col>
         </Row>
 
-        <Tabs 
-          activeKey={activeTabKey} 
-          onChange={setActiveTabKey}
-          style={{ marginBottom: '24px' }}
-          type="card"
+        {/* Tabs section with improved styling */}
+        <Card 
+          style={{ 
+            marginBottom: '24px', 
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+          }}
         >
-          <TabPane tab="All Notifications" key="all" />
-          <TabPane 
-            tab={
-              <span>
-                Machine Notifications
-                {unreadMachineCount > 0 && (
-                  <Badge 
-                    count={unreadMachineCount} 
-                    style={{ marginLeft: '8px' }} 
+          {/* Filter section */}
+          <div style={{ marginBottom: '20px' }}>
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} lg={8}>
+                <Input.Search
+                  placeholder="Search notifications..."
+                  allowClear
+                  enterButton
+                  size="middle"
+                  style={{ width: '100%' }}
+                  onSearch={(value) => {
+                    // Implementation will go here when connecting to backend filtering
+                    console.log('Search for:', value);
+                  }}
+                />
+              </Col>
+              <Col xs={24} lg={12}>
+                <Space size="middle">
+                  <span>Date Range:</span>
+                  <RangePicker 
+                    allowClear
+                    style={{ width: '100%' }}
+                    onChange={(dates, dateStrings) => {
+                      // Implementation will go here when connecting to backend filtering
+                      console.log('Selected dates:', dateStrings);
+                    }}
                   />
-                )}
-              </span>
-            } 
-            key="machine" 
-          />
-          <TabPane 
-            tab={
-              <span>
-                Material Notifications
-                {unreadMaterialCount > 0 && (
-                  <Badge 
-                    count={unreadMaterialCount} 
-                    style={{ marginLeft: '8px' }} 
-                  />
-                )}
-              </span>
-            } 
-            key="material" 
-          />
-          <TabPane 
-            tab={
-              <span>
-                Unacknowledged
-                {totalUnacknowledgedCount > 0 && (
-                  <Badge 
-                    count={totalUnacknowledgedCount} 
-                    style={{ marginLeft: '8px' }} 
-                  />
-                )}
-              </span>
-            } 
-            key="unacknowledged" 
-          />
-        </Tabs>
+                </Space>
+              </Col>
+              <Col xs={24} lg={4} style={{ textAlign: 'right' }}>
+                <Button 
+                  icon={<FilterOutlined />}
+                  onClick={() => {
+                    // Reset filters implementation
+                    console.log('Reset filters');
+                  }}
+                >
+                  Reset
+                </Button>
+              </Col>
+            </Row>
+          </div>
 
-        {/* Alert for unacknowledged tab */}
-        {activeTabKey === 'unacknowledged' && totalUnacknowledgedCount > 0 && (
-          <Alert
-            message={`${totalUnacknowledgedCount} notifications require your attention`}
-            type="warning"
-            showIcon
-            action={
-              <Button 
-                type="primary" 
-                onClick={handleAcknowledgeAll}
-                loading={isAcknowledgingAll}
-              >
-                Acknowledge All
-              </Button>
-            }
-            style={{ marginBottom: '24px', borderRadius: '4px' }}
-          />
-        )}
+          <Tabs 
+            activeKey={activeTabKey} 
+            onChange={setActiveTabKey}
+            type="card"
+            tabBarStyle={{ marginBottom: '16px' }}
+            tabBarGutter={8}
+          >
+            <TabPane tab="All Notifications" key="all" />
+            <TabPane 
+              tab={
+                <span>
+                  Machine Notifications
+                  {unreadMachineCount > 0 && (
+                    <Badge 
+                      count={unreadMachineCount} 
+                      style={{ marginLeft: '8px' }} 
+                    />
+                  )}
+                </span>
+              } 
+              key="machine" 
+            />
+            <TabPane 
+              tab={
+                <span>
+                  Material Notifications
+                  {unreadMaterialCount > 0 && (
+                    <Badge 
+                      count={unreadMaterialCount} 
+                      style={{ marginLeft: '8px' }} 
+                    />
+                  )}
+                </span>
+              } 
+              key="material" 
+            />
+            <TabPane 
+              tab={
+                <span>
+                  Instrument Calibrations
+                  {unreadInstrumentCalibrationCount > 0 && (
+                    <Badge 
+                      count={unreadInstrumentCalibrationCount} 
+                      style={{ marginLeft: '8px' }} 
+                    />
+                  )}
+                </span>
+              } 
+              key="instrumentCalibration" 
+            />
+            <TabPane 
+              tab={
+                <span>
+                  Machine Calibrations
+                  {unreadMachineCalibrationCount > 0 && (
+                    <Badge 
+                      count={unreadMachineCalibrationCount} 
+                      style={{ marginLeft: '8px' }} 
+                    />
+                  )}
+                </span>
+              } 
+              key="machineCalibration" 
+            />
+            <TabPane 
+              tab={
+                <span>
+                  Unacknowledged
+                  {totalUnacknowledgedCount > 0 && (
+                    <Badge 
+                      count={totalUnacknowledgedCount} 
+                      style={{ marginLeft: '8px' }} 
+                    />
+                  )}
+                </span>
+              } 
+              key="unacknowledged" 
+            />
+          </Tabs>
 
-        <Divider />
+          {/* Alert for unacknowledged tab */}
+          {activeTabKey === 'unacknowledged' && totalUnacknowledgedCount > 0 && (
+            <Alert
+              message={`${totalUnacknowledgedCount} notifications require your attention`}
+              type="warning"
+              showIcon
+              action={
+                <Button 
+                  type="primary" 
+                  onClick={handleAcknowledgeAll}
+                  loading={isAcknowledgingAll}
+                >
+                  Acknowledge All
+                </Button>
+              }
+              style={{ marginBottom: '16px', borderRadius: '4px' }}
+            />
+          )}
 
-        {isLoading || tableLoading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-            <div style={{ textAlign: 'center' }}>
-              <Spin size="large" style={{ marginBottom: '20px' }} />
-              <div>
-                <Text>Loading notifications...</Text>
+          {isLoading || tableLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+              <div style={{ textAlign: 'center' }}>
+                <Spin size="large" style={{ marginBottom: '20px' }} />
+                <div>
+                  <Text>Loading notifications...</Text>
+                </div>
               </div>
             </div>
-          </div>
-        ) : filteredNotifications.length > 0 ? (
-          <Table 
-            dataSource={filteredNotifications}
-            columns={getColumns()}
-            rowKey={(record) => record._uniqueId || `${record.notificationType}-${record.id || record.machine_id || record.part_number}-${record.updated_at}`}
-            pagination={{ 
-              pageSize: 10,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50'],
-              showTotal: (total) => `Total ${total} notification${total !== 1 ? 's' : ''}`,
-              style: { marginTop: '16px' }
-            }}
-            rowClassName={(record) => 
-              !record.is_acknowledged 
-                ? 'unread-row' 
-                : ''
-            }
-            style={{
-              background: '#fff',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-            }}
-          />
-        ) : (
-          <Empty 
-            description={
-              <span>
-                {activeTabKey === 'unacknowledged' 
-                  ? 'No unacknowledged notifications' 
-                  : 'No notifications found'}
-              </span>
-            }
-            style={{ padding: '40px 0' }}
-          />
-        )}
+          ) : filteredNotifications.length > 0 ? (
+            <Table 
+              dataSource={filteredNotifications}
+              columns={getColumns()}
+              rowKey={(record) => record._uniqueId || `${record.notificationType}-${record.id || record.machine_id || record.part_number}-${record.updated_at || record.timestamp}`}
+              pagination={{ 
+                pageSize: 10,
+                showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50'],
+                showTotal: (total) => `Total ${total} notification${total !== 1 ? 's' : ''}`,
+                style: { marginTop: '16px' }
+              }}
+              rowClassName={(record) => 
+                !record.is_acknowledged 
+                  ? 'unread-row' 
+                  : ''
+              }
+              style={{
+                background: '#fff',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}
+            />
+          ) : (
+            <Empty 
+              description={
+                <span>
+                  {activeTabKey === 'unacknowledged' 
+                    ? 'No unacknowledged notifications' 
+                    : 'No notifications found'}
+                </span>
+              }
+              style={{ padding: '40px 0' }}
+            />
+          )}
+        </Card>
       </Card>
     </div>
   );

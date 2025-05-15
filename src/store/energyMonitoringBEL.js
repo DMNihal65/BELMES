@@ -8,13 +8,13 @@ const API_TIMEOUT = 5000;
 const MAX_RETRIES = 1;
 
 // Use the correct WebSocket endpoint for machines data
-const WS_MACHINES_ENDPOINT = 'ws://172.18.7.88:9999/api/v1/energymonitoring/ws/machines_data';
+const WS_MACHINES_ENDPOINT = 'ws://172.18.7.88:8888/api/v1/energymonitoring/ws/machines_data';
 
 // Update the WebSocket endpoint for shiftwise energy data
-const WS_SHIFTWISE_ENERGY_ENDPOINT = 'ws://172.18.7.88:9999/api/v1/energymonitoring/ws/shiftwise_energy';
+const WS_SHIFTWISE_ENERGY_ENDPOINT = 'ws://172.18.7.88:8888/api/v1/energymonitoring/ws/shiftwise_energy';
 
 // Add the HTTP endpoint for historical data
-const HISTORY_API_ENDPOINT = 'http://172.18.7.88:9999/api/v1/energymonitoring/shiftwise_energy_history_by_date';
+const HISTORY_API_ENDPOINT = 'http://172.18.7.88:8888/api/v1/energymonitoring/shiftwise_energy_history_by_date';
 
 const useEnergyMonitoringBelStore = create((set, get) => ({
   // Machine data
@@ -127,7 +127,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
       
       // Create WebSocket connection
-      const wsUrl = `ws://172.18.7.88:9999/api/v1/energymonitoring/ws/live_data`;
+      const wsUrl = `ws://172.18.7.88:8888/api/v1/energymonitoring/ws/live_data`;
       console.log(`Connecting to WebSocket at ${wsUrl}`);
       
       const socket = new WebSocket(wsUrl);
@@ -307,13 +307,11 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      // Format dates for API
       const formattedStartDate = typeof startDate.format === 'function' ? 
         startDate.format('YYYY-MM-DD') : startDate;
       const formattedEndDate = typeof endDate.format === 'function' ? 
         endDate.format('YYYY-MM-DD') : endDate;
       
-      // Map frontend parameter name to API parameter name
       const apiParamMap = {
         'phaseAVoltage': 'phase_a_voltage',
         'phaseBVoltage': 'phase_b_voltage',
@@ -335,13 +333,12 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       
       const apiParamName = apiParamMap[parameterName] || parameterName;
       
-      // Use the direct endpoint URL as specified
-      const baseUrl = `http://172.18.7.88:9999/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      const baseUrl = `http://172.18.7.88:8888/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
       
-      console.log(`Attempting to fetch filtered history data from ${baseUrl}`);
+      console.log(`Fetching filtered history data from ${baseUrl}`);
       
       try {
-        const response = await fetchWithRetry(baseUrl, {
+        const response = await axios.get(baseUrl, {
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
@@ -351,33 +348,33 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
         
         console.log('API Response for filtered history data:', response.data);
         
-        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-          // Store the raw API response
-          set({ 
-            filteredHistoryData: response.data,
-            isLoading: false 
-          });
-          return response.data;
-        } else {
-          console.log('Empty data received from API, falling back to mock data');
-          throw new Error('Empty data received');
+        // Check if response data is empty or invalid
+        if (!response.data || 
+            (Array.isArray(response.data) && response.data.length === 0) || 
+            Object.keys(response.data).length === 0) {
+          throw new Error(`No data available for the selected date range: ${formattedStartDate} to ${formattedEndDate}`);
         }
+        
+        set({ 
+          filteredHistoryData: response.data,
+          isLoading: false 
+        });
+        return response.data;
+        
       } catch (error) {
-        console.error('API call failed, falling back to mock data:', error);
-        throw error; // Propagate to the outer catch block
+        if (error.response && error.response.status === 404) {
+          throw new Error(`No data available for the selected date range: ${formattedStartDate} to ${formattedEndDate}`);
+        }
+        throw error;
       }
     } catch (error) {
       console.error('Error in fetchFilteredHistoryData:', error);
-      
-      // Generate mock data for this specific machine
-      console.log(`Using fallback filtered history data for machine ${machineId} and parameter ${parameterName}`);
-      const mockData = generateMockFilteredHistoryData(machineId, parameterName);
       set({ 
-        filteredHistoryData: mockData,
+        filteredHistoryData: [],
         isLoading: false, 
         error: error.message 
       });
-      return mockData;
+      throw error; // Propagate the error to be handled by the component
     }
   },
   

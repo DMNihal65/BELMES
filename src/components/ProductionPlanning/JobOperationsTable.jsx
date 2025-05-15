@@ -325,7 +325,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
       const response = await fetch(
-        `http://172.18.7.88:9999/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
+        `http://172.18.7.88:8888/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
         {
           method: 'PUT',
           headers: {
@@ -1154,7 +1154,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
       const response = await fetch(
-        `http://172.18.7.88:9999/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
+        `http://172.18.7.88:8888/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
         {
           method: 'PUT',
           headers: {

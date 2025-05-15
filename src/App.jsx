@@ -32,7 +32,7 @@ import Notifications from './pages/supervisorscreens/Notifications';
 import MaintenanceNotifications from './pages/supervisorscreens/MachineMaintenance/Notifications';
 
 import Machines from './pages/supervisorscreens/EnergyMonitoring/Machines';
-import MachinesVisualization from './pages/supervisorscreens/EnergyMonitoringBEL/machines';
+import MachinesVisualization from './pages/supervisorscreens/EnergyMonitoringBEL/Machines';
 import MachineOverlay from './pages/supervisorscreens/EnergyMonitoring/MachineOverlay';
 import Report from './pages/supervisorscreens/EnergyMonitoring/Report';
 import Reportnew from './pages/supervisorscreens/EnergyMonitoringBEL/Reportnew';
@@ -128,9 +128,9 @@ const App = () => {
             <Route path="inventory_data_management/data_management" element={<DataManagement />} />
             <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
             <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
-            <Route path="energy-monitoring" element={<EnergyMonitoring />} />
+            {/* <Route path="energy-monitoring" element={<EnergyMonitoring />} /> */}
             <Route path="energy-monitoring-bel" element={<MachinesVisualization />} />
-            <Route path="energy-monitoring-bel/machines" element={<Machines />} />
+            {/* <Route path="energy-monitoring-bel/machines" element={<Machines />} /> */}
             <Route path="energy-monitoring-bel/report" element={<Reportnew />} />
 
             <Route path="quality-management/inspection-details" element={<QualityInspectionDetails />} />
@@ -156,11 +156,11 @@ const App = () => {
           </Route>
 
           {/* Shared Routes */}
-          <Route path="/machine-details/:machineId" element={<MachineDetails />} />
-          <Route path="/machines" element={<Machines />} />
-          <Route path="/machine/:machineId" element={<MachineOverlay />} />
-          <Route path="/report" element={<Report />} />
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          {/* <Route path="/machine-details/:machineId" element={<MachineDetails />} /> */}
+          {/* <Route path="/machines" element={<Machines />} /> */}
+          {/* <Route path="/machine/:machineId" element={<MachineOverlay />} /> */}
+          {/* <Route path="/report" element={<Report />} /> */}
+          {/* <Route path="/" element={<Navigate to="/login" replace />} /> */}
         </Routes>
       </BrowserRouter>
 

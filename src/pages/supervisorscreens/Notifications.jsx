@@ -16,14 +16,15 @@ import {
   Tooltip,
   Spin,
   Input,
-  RangePicker
+  DatePicker
 } from 'antd';
-import { Wrench, Package, Bell, CheckCircle, RefreshCw, Ruler, FilterOutlined } from 'lucide-react';
+import { Wrench, Package, Bell, CheckCircle, RefreshCw, Ruler, Filter } from 'lucide-react';
 import useNotificationStore from '../../store/notification';
-import { ToolFilled } from '@ant-design/icons';
+import { ToolFilled, FilterOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
+const { RangePicker } = DatePicker;
 
 const Notifications = () => {
   // Get notification store hooks and state

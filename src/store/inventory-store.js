@@ -7,7 +7,7 @@ import { read, utils } from 'xlsx';
 import dayjs from 'dayjs';
 import useAuthStore from './auth-store';
 
-const BASE_URL = 'http://172.18.7.88:8888/api/v1/api/inventory';
+const BASE_URL = 'http://172.18.7.85:7678/api/v1/api/inventory';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -29,7 +29,7 @@ const getUserId = () => {
 // Add these functions before the create function
 const addCalibration = async (calibrationData) => {
   try {
-    const response = await axios.post('http://172.18.7.88:8888/api/v1/api/inventory/calibrations/', {
+    const response = await axios.post('http://172.18.7.85:7678/api/v1/api/inventory/calibrations/', {
       ...calibrationData,
       created_by: getUserId()
     });
@@ -42,7 +42,7 @@ const addCalibration = async (calibrationData) => {
 
 const updateCalibration = async (id, calibrationData) => {
   try {
-    const response = await axios.put(`http://172.18.7.88:8888/api/v1/api/inventory/calibrations/${id}`, {
+    const response = await axios.put(`http://172.18.7.85:7678/api/v1/api/inventory/calibrations/${id}`, {
       ...calibrationData,
       created_by: getUserId()
     });
@@ -55,7 +55,7 @@ const updateCalibration = async (id, calibrationData) => {
 
 const getCalibrationByItemId = async (itemId) => {
   try {
-    const response = await axios.get(`http://172.18.7.88:8888/api/v1/api/inventory/calibrations/?inventory_item_id=${itemId}`);
+    const response = await axios.get(`http://172.18.7.85:7678/api/v1/api/inventory/calibrations/?inventory_item_id=${itemId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching calibration:', error);
@@ -505,7 +505,7 @@ const useInventoryStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ loading: true });
     try {
-      const response = await axios.get('http://172.18.7.88:8888/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.85:7678/api/v1/planning/all_orders');
       set({ 
         allOrders: response.data || [],
         loading: false 
@@ -538,7 +538,7 @@ const useInventoryStore = create((set, get) => ({
 
       // Create axios instance with default headers
       const axiosInstance = axios.create({
-        baseURL: 'http://172.18.7.88:8888/api/v1',
+        baseURL: 'http://172.18.7.85:7678/api/v1',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -583,7 +583,7 @@ const useInventoryStore = create((set, get) => ({
   fetchOperationsByPartNumber: async (partNumber) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`http://172.18.7.88:8888/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await axios.get(`http://172.18.7.85:7678/api/v1/planning/search_order?part_number=${partNumber}`);
       const operations = response.data?.orders?.[0]?.operations || [];
       set({ 
         operations: operations,

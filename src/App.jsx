@@ -160,7 +160,7 @@ const App = () => {
           {/* <Route path="/machines" element={<Machines />} /> */}
           {/* <Route path="/machine/:machineId" element={<MachineOverlay />} /> */}
           {/* <Route path="/report" element={<Report />} /> */}
-          {/* <Route path="/" element={<Navigate to="/login" replace />} /> */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
 

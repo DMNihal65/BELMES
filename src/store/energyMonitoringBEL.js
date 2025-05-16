@@ -8,13 +8,13 @@ const API_TIMEOUT = 5000;
 const MAX_RETRIES = 1;
 
 // Use the correct WebSocket endpoint for machines data
-const WS_MACHINES_ENDPOINT = 'ws://172.18.7.88:8888/api/v1/energymonitoring/ws/machines_data';
+const WS_MACHINES_ENDPOINT = 'ws://172.18.7.85:7678/api/v1/energymonitoring/ws/machines_data';
 
 // Update the WebSocket endpoint for shiftwise energy data
-const WS_SHIFTWISE_ENERGY_ENDPOINT = 'ws://172.18.7.88:8888/api/v1/energymonitoring/ws/shiftwise_energy';
+const WS_SHIFTWISE_ENERGY_ENDPOINT = 'ws://172.18.7.85:7678/api/v1/energymonitoring/ws/shiftwise_energy';
 
 // Add the HTTP endpoint for historical data
-const HISTORY_API_ENDPOINT = 'http://172.18.7.88:8888/api/v1/energymonitoring/shiftwise_energy_history_by_date';
+const HISTORY_API_ENDPOINT = 'http://172.18.7.85:7678/api/v1/energymonitoring/shiftwise_energy_history_by_date';
 
 const useEnergyMonitoringBelStore = create((set, get) => ({
   // Machine data
@@ -127,7 +127,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
       
       // Create WebSocket connection
-      const wsUrl = `ws://172.18.7.88:8888/api/v1/energymonitoring/ws/live_data`;
+      const wsUrl = `ws://172.18.7.85:7678/api/v1/energymonitoring/ws/live_data`;
       console.log(`Connecting to WebSocket at ${wsUrl}`);
       
       const socket = new WebSocket(wsUrl);
@@ -333,7 +333,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       
       const apiParamName = apiParamMap[parameterName] || parameterName;
       
-      const baseUrl = `http://172.18.7.88:8888/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      const baseUrl = `http://172.18.7.85:7678/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
       
       console.log(`Fetching filtered history data from ${baseUrl}`);
       

@@ -23,6 +23,7 @@ BarChart3,
 CalendarClock,
 BarChartBig, Monitor , LineChart , Boxes, Warehouse ,
 FileBarChart,
+LayoutDashboard,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
@@ -42,6 +43,11 @@ function Sidebar() {
       key: '/operator/dashboard',
       icon: <ClipboardList size={20} />,
       label: 'Dashboard',
+    },
+    {
+      key: '/operator/new-dashboard',
+      icon: <LayoutDashboard size={20} />,
+      label: 'Modern Dashboard',
     },
     // {
     //   key: '/operator/alerts',

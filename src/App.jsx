@@ -19,6 +19,7 @@ import DataManagement from './pages/supervisorscreens/InventoryDataManagement/Da
 import InventoryAllData from './pages/supervisorscreens/InventoryDataManagement/InventoryAllData';
 import InventoryAnalytics from './pages/supervisorscreens/InventoryDataManagement/InventoryAnalytics';
 import JobDetails from './pages/operatorscreens/jobdetails';
+import NewOperatorDashboard from './pages/operatorscreen/NewOperatorDashboard';
 // import Inventory from './pages/operatorscreens/inventory/inventoryRequest';
 import Inventory from './pages/operatorscreens/inventory/InventoryViewData';
 import HelpAndSupport from './pages/operatorscreens/HelpAndSupport';
@@ -147,7 +148,8 @@ const App = () => {
               <MainLayout />
             // </ProtectedRoute>
           }>
-            <Route path="dashboard" element={<JobDetails />} />
+            <Route path="dashboard" element={<NewOperatorDashboard />} />
+            <Route path="dashboard" element={<NewOperatorDashboard />} />
             <Route path="alerts" element={<AlertScreens />} />
             <Route path="maintenance" element={<MaintenanceDashboard />} />
             <Route path="inspection" element={<InspectionResult />} />

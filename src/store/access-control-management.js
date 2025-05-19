@@ -2,7 +2,7 @@ import axios from 'axios';
 import { create } from 'zustand';
 import { message } from 'antd';
 
-// const API_URL = 'http://172.16.0.229:8004/api/v1/auth';
+// const API_URL = 'http://172.18.7.88:5458/api/v1/auth';
 
 const useAccessControlStore = create((set) => ({
   users: [],
@@ -13,7 +13,7 @@ const useAccessControlStore = create((set) => ({
     set({ loading: true });
     try {
       const response = await axios.get(
-         `http://172.16.0.229:8004/api/v1/auth/api/v1/auth/users-get?skip=${skip}&limit=${limit}&active_only=true`,
+         `http://172.18.7.88:5458/api/v1/auth/api/v1/auth/users-get?skip=${skip}&limit=${limit}&active_only=true`,
         { timeout: 5000 } // Add timeout
       );
       
@@ -44,7 +44,7 @@ const useAccessControlStore = create((set) => ({
 
   registerUser: async (userData) => {
     try {
-      const response = await axios.post(`http://172.16.0.229:8004/api/v1/auth/register`, userData);
+      const response = await axios.post(`http://172.18.7.88:5458/api/v1/auth/register`, userData);
       message.success(response.data.message || 'User registered successfully');
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Registration failed';

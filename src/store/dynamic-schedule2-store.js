@@ -14,7 +14,7 @@ const useDynamicSchedule2Store = create((set, get) => ({
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.get('http://172.16.0.229:8004/api/schedule/data');
+      const response = await axios.get('http://172.18.7.88:5458/api/schedule/data');
       set({ 
         scheduleData: response.data,
         loading: false 

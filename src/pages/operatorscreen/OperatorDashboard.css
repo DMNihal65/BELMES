@@ -1,0 +1,225 @@
+/* Dashboard Layout */
+.operator-dashboard {
+  min-height: 100vh;
+}
+
+/* Card Components */
+.status-card {
+  height: 100%;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.status-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-indicator.idle {
+  background-color: #faad14;
+  box-shadow: 0 0 8px rgba(250, 173, 20, 0.6);
+}
+
+.status-indicator.running {
+  background-color: #52c41a;
+  box-shadow: 0 0 8px rgba(82, 196, 26, 0.6);
+  animation: pulse 1.5s infinite;
+}
+
+.status-indicator.off {
+  background-color: #ff4d4f;
+  box-shadow: 0 0 8px rgba(255, 77, 79, 0.6);
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Tab styles */
+.dashboard-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+  padding: 8px 16px;
+  transition: all 0.3s ease;
+  border-radius: 8px 8px 0 0;
+  margin-right: 2px;
+}
+
+.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab:hover {
+  background-color: #f0f7ff;
+}
+
+.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
+  background-color: #e6f7ff;
+  border-bottom-color: #e6f7ff;
+}
+
+.ant-tabs-content {
+  padding: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Status cards */
+.machine-status-idle {
+  background-color: #fffbe6;
+  border-color: #ffe58f;
+  position: relative;
+}
+
+.machine-status-idle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  background-color: #faad14;
+}
+
+.machine-status-running {
+  background-color: #f6ffed;
+  border-color: #b7eb8f;
+  position: relative;
+}
+
+.machine-status-running::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  background-color: #52c41a;
+}
+
+.machine-status-off {
+  background-color: #fff1f0;
+  border-color: #ffa39e;
+  position: relative;
+}
+
+.machine-status-off::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  background-color: #ff4d4f;
+}
+
+/* Table styles */
+.operations-table .ant-table-tbody > tr.highlight-row {
+  background-color: #e6f7ff;
+}
+
+.operations-table .ant-table-tbody > tr.current-row {
+  background-color: #f6ffed;
+  font-weight: 500;
+}
+
+.operations-table .ant-table-tbody > tr:hover {
+  background-color: #f0f7ff;
+}
+
+/* Timer display */
+.timer-display {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* Card content styling */
+.info-section {
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f1f1f;
+}
+
+/* Button styling */
+.ant-btn-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
+}
+
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .status-card {
+    margin-bottom: 12px;
+  }
+  
+  .ant-tabs-nav-wrap {
+    overflow-x: auto;
+  }
+  
+  .ant-tabs-tab {
+    margin-right: 4px;
+    padding: 6px 12px !important;
+  }
+  
+  .ant-table {
+    font-size: 12px;
+  }
+} 

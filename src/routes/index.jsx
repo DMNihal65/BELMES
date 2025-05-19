@@ -28,6 +28,7 @@ import DocumentManagement from '../pages/supervisorscreens/DocumentManagement';
 import QualityManagement from '../pages/supervisorscreens/QualityManagement';
 import EnergyMonitoring from '../pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
 import MaintenanceDashboard from '../pages/supervisorscreens/MachineMaintenance/MaintenanceDashboard';
+import NewOperatorDashboard from '../pages/operatorscreen/NewOperatorDashboard';
 // import HelpAndSupport from '../pages/operatorscreens/HelpAndSupport';
 
 
@@ -72,13 +73,17 @@ export const router = createBrowserRouter([
             path: 'dashboard',
             element: (
               <ProtectedRoute allowedRole="operator">
-                <OperatorDashboard />
+                <NewOperatorDashboard />
               </ProtectedRoute>
             ),
           },
           {
-            path: 'job-details',
-            element: <JobDetails />,
+            path: 'new-dashboard',
+            element: (
+              <ProtectedRoute allowedRole="operator">
+                <NewOperatorDashboard />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'alerts',

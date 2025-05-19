@@ -29,7 +29,8 @@ import {
   Statistic,
   Alert,
   Skeleton,
-  InputNumber
+  InputNumber,
+  Spin
 } from 'antd';
 import {
   FolderOutlined,
@@ -102,27 +103,7 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [customVersionNumber, setCustomVersionNumber] = useState("");
   const [useCustomVersion, setUseCustomVersion] = useState(false);
-  const { fetchDocumentVersions, uploadNewVersion, deleteDocumentVersion, updateVersion, fetchFolderDocuments } = useDocumentStore();
-
-  const loadVersions = async () => {
-    if (!document) return;
-    
-    setLoading(true);
-    try {
-      const data = await fetchDocumentVersions(document.id);
-      // Sort versions by version number
-      const sortedVersions = data.sort((a, b) => {
-        const aNum = parseFloat(a.version_number.replace('v', ''));
-        const bNum = parseFloat(b.version_number.replace('v', ''));
-        return bNum - aNum; // Sort in descending order
-      });
-      setVersions(sortedVersions);
-    } catch (error) {
-      message.error('Failed to load versions');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { fetchDocumentVersions, uploadNewVersion, deleteDocumentVersion, fetchFolderDocuments, documents } = useDocumentStore();
 
   // Calculate next version number for auto increment
   const getNextVersionNumber = () => {
@@ -135,12 +116,95 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
     return (highestVersion + 1).toString();
   };
 
-  // Refresh data when modal becomes visible
-  useEffect(() => {
-    if (visible && document) {
-      loadVersions();
+  const loadVersions = async () => {
+    if (!document) return;
+    
+    setLoading(true);
+    try {
+      const data = await fetchDocumentVersions(document.id);
+      const sortedVersions = data.sort((a, b) => {
+        const aNum = parseFloat(a.version_number.replace('v', ''));
+        const bNum = parseFloat(b.version_number.replace('v', ''));
+        return bNum - aNum;
+      });
+      setVersions(sortedVersions);
+    } catch (error) {
+      message.error('Failed to load versions');
+    } finally {
+      setLoading(false);
     }
-  }, [visible, document]);
+  };
+
+  const handleVersionDelete = async (versionId) => {
+    try {
+      // Optimistically update the UI
+      const updatedVersions = versions.filter(v => v.id !== versionId);
+      setVersions(updatedVersions);
+
+      // Make the API call
+      await deleteDocumentVersion(versionId);
+      message.success('Version deleted successfully');
+      
+      // If this was the last version, close modal
+      if (updatedVersions.length === 0) {
+        onClose();
+      }
+
+      // Refresh both the version list and the main document table
+      await loadVersions(); // Refresh version list
+      
+      // Update the document's versions in the main table
+      const updatedDocuments = documents.map(doc => {
+        if (doc.id === document.id) {
+          return {
+            ...doc,
+            versions: updatedVersions,
+            latest_version: updatedVersions[0] || null // Update latest version
+          };
+        }
+        return doc;
+      });
+      
+      // Update the documents state
+      useDocumentStore.setState({ documents: updatedDocuments });
+      
+      // Refresh the folder documents to ensure everything is in sync
+      // If we're in a subfolder, make sure to refresh that specific folder
+      if (document.folder_id) {
+        await fetchFolderDocuments(document.folder_id);
+      } else {
+        await fetchFolderDocuments();
+      }
+
+      // Close the version modal after successful deletion
+      onClose();
+    } catch (error) {
+      // Revert optimistic update on error
+      await loadVersions();
+      message.error('Failed to delete version: ' + error.message);
+    }
+  };
+
+  const handleNewVersion = async (file) => {
+    try {
+      const versionNumber = useCustomVersion ? customVersionNumber : null;
+      
+      // Make the API call
+      const result = await uploadNewVersion(document.id, file, versionNumber);
+      
+      // Update versions list
+      setVersions(prev => [result, ...prev]);
+      
+      message.success('New version uploaded successfully');
+      setCustomVersionNumber("");
+      setUseCustomVersion(false);
+      
+      // Refresh data in background
+      await fetchFolderDocuments();
+    } catch (error) {
+      message.error('Failed to upload new version');
+    }
+  };
 
   const handleFileUpdate = async (file, versionId) => {
     try {
@@ -153,30 +217,12 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
     }
   };
 
-  const handleNewVersion = async (file) => {
-    try {
-      const versionNumber = useCustomVersion ? customVersionNumber : null;
-      await uploadNewVersion(document.id, file, versionNumber);
-      message.success('New version uploaded successfully');
-      setCustomVersionNumber("");
-      setUseCustomVersion(false);
-      await loadVersions(); // Refresh versions list
-      await fetchFolderDocuments(); // Refresh main document list
-    } catch (error) {
-      message.error('Failed to upload new version');
+  // Load versions when modal becomes visible
+  useEffect(() => {
+    if (visible && document) {
+      loadVersions();
     }
-  };
-
-  const handleVersionDelete = async (versionId) => {
-    try {
-      await deleteDocumentVersion(versionId);
-      message.success('Version deleted successfully');
-      await loadVersions(); // Refresh versions list
-      await fetchFolderDocuments(); // Refresh main document list
-    } catch (error) {
-      message.error('Failed to delete version: ' + error.message);
-    }
-  };
+  }, [visible, document]);
 
   return (
     <Modal
@@ -292,24 +338,12 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
                     type="text"
                     danger
                     onClick={() => {
-                      // Don't allow deleting if it's the only version
-                      if (versions.length <= 1) {
-                        message.error('Cannot delete the only version of a document');
-                        return;
-                      }
-                      
                       Modal.confirm({
                         title: 'Delete Version',
                         content: 'Are you sure you want to delete this version? This action cannot be undone.',
                         okText: 'Delete',
                         okType: 'danger',
-                        onOk: async () => {
-                          try {
-                            await handleVersionDelete(record.id);
-                          } catch (error) {
-                            message.error('Failed to delete version');
-                          }
-                        },
+                        onOk: () => handleVersionDelete(record.id),
                       });
                     }}
                   />
@@ -648,21 +682,13 @@ const DocumentManagement = () => {
                   key="versions" 
                   icon={<HistoryOutlined />}
                   onClick={() => {
-                    if (record) {  // Add this check
+                    if (record) {
                       setSelectedVersionDoc(record);
                       setVersionModalVisible(true);
                     }
                   }}
                 >
                   Versions
-                </Menu.Item>
-                <Menu.Item 
-                  key="delete" 
-                  icon={<DeleteOutlined />}
-                  danger
-                  onClick={() => handleDelete(record)}
-                >
-                  Delete
                 </Menu.Item>
               </Menu>
             }
@@ -2023,7 +2049,11 @@ const DocumentManagement = () => {
     setVersionModalVisible(false);
     setSelectedVersionDoc(null);
     // Refresh the document list to show updated version numbers
-    await fetchFolderDocuments();
+    if (selectedFolder && selectedFolder !== 'all') {
+      await fetchFolderDocuments(selectedFolder);
+    } else {
+      await fetchFolderDocuments();
+    }
   };
 
   // Update the preview modal close handler
@@ -2591,7 +2621,7 @@ const DocumentManagement = () => {
               Manage and organize your documents
             </p>
           </div>
-          {/* <div className="flex gap-2">
+          {/* <div className="flex gap-2">Cannot delete the only version of a document
             <Button
               type="primary"
               icon={<CloudUploadOutlined />}

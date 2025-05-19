@@ -557,7 +557,7 @@ function InspectionResult() {
         console.log(`Fetching detailed measurements for inspection ID: ${inspectionId}, operation: ${selectedOperation}`);
         
         // Call the fetchDetailedInspection method from quality-store.js
-        // This uses the endpoint: http://172.16.0.229:8004/api/v1/quality/inspection/${inspectionId}/detailed
+        // This uses the endpoint: http://172.18.7.88:9905/api/v1/quality/inspection/${inspectionId}/detailed
         const response = await qualityStore.fetchDetailedInspection(inspectionId);
         console.log('Detailed measurements data received:', response);
         

@@ -4,18 +4,23 @@ import moment from 'moment';
 
 // Use a relative URL that will be handled by the proxy
 const API_BASE_URL = '/api/bel';
-const API_TIMEOUT = 5000;
+const API_TIMEOUT = 10000; // Increase timeout to 10 seconds
 const MAX_RETRIES = 1;
 
 // Use the correct WebSocket endpoint for machines data
-const WS_MACHINES_ENDPOINT = 'ws://172.16.0.229:8004/api/v1/energymonitoring/ws/machines_data';
+// const WS_MACHINES_ENDPOINT = 'ws://172.18.7.93:8989/api/v1/energymonitoring/ws/machines_data';
 
 // Update the WebSocket endpoint for shiftwise energy data
-const WS_SHIFTWISE_ENERGY_ENDPOINT = 'ws://172.16.0.229:8004/api/v1/energymonitoring/ws/shiftwise_energy';
+const WS_SHIFTWISE_ENERGY_ENDPOINT = 'http://172.18.7.93:8989/api/v1/energy-monitoring/shiftwise-energy-stream';
 
 // Add the HTTP endpoint for historical data
-const HISTORY_API_ENDPOINT = 'http://172.16.0.229:8004/api/v1/energymonitoring/shiftwise_energy_history_by_date';
+// const HISTORY_API_ENDPOINT = 'http://172.18.7.93:8989/api/v1/energymonitoring/shiftwise_energy_history_by_date';
 
+// Update the endpoint constant
+const MACHINE_STATUS_ENDPOINT = 'http://172.18.7.93:8989/api/v1/energy-monitoring/machine-status-stream';
+
+// Update the endpoint constant
+const COMBINED_HISTORY_ENDPOINT = 'http://172.18.7.93:8989/api/v1/energy-monitoring/combined-history';
 
 const useEnergyMonitoringBelStore = create((set, get) => ({
   // Machine data
@@ -30,88 +35,111 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
   allMachinesWebsocket: null,
   allMachinesEnergyData: {},
   
-  // Fetch machine names from the API using WebSocket instead of HTTP
+  eventSource: null,
+  
+  // Update fetchMachineNames to use SSE
   fetchMachineNames: async () => {
     set({ isLoading: true, error: null });
     
     try {
-      console.log(`Attempting to connect to WebSocket at ${WS_MACHINES_ENDPOINT}`);
-      
-      // Close existing connection if any
-      const existingSocket = get().allMachinesWebsocket;
-      if (existingSocket && existingSocket.readyState !== WebSocket.CLOSED) {
-        console.log('Closing existing machines WebSocket connection');
-        existingSocket.close();
+      // Close existing EventSource if any
+      const existingEventSource = get().eventSource;
+      if (existingEventSource) {
+        existingEventSource.close();
       }
+
+      // Create new EventSource with error handling
+      const eventSource = new EventSource(MACHINE_STATUS_ENDPOINT);
       
-      const socket = new WebSocket(WS_MACHINES_ENDPOINT);
-      
-      // Create a promise to handle the initial data from WebSocket
-      const dataPromise = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('WebSocket connection timeout'));
-        }, API_TIMEOUT);
-        
-        socket.onopen = () => {
-          console.log('WebSocket connection established for machines data');
-          set({ allMachinesWebsocket: socket });
-        };
-        
-        socket.onmessage = (event) => {
-          try {
-            clearTimeout(timeout);
-            const data = JSON.parse(event.data);
-            console.log('Received machines data from WebSocket:', data);
-            resolve(data);
-          } catch (error) {
-            console.error('Error parsing WebSocket data:', error);
-            reject(error);
+      // Store the EventSource instance
+      set({ eventSource });
+
+      // Handle connection open
+      eventSource.onopen = () => {
+        console.log('SSE connection established');
+        set({ isLoading: false });
+      };
+
+      // Handle incoming messages
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('Received SSE data:', data);
+          
+          if (Array.isArray(data)) {
+            // Get current machine names from store
+            const currentMachines = get().machineNames;
+            
+            // If this is the first load (no current machines), set all machines
+            if (!currentMachines || currentMachines.length === 0) {
+              const formattedMachines = data.map(machine => ({
+                machine_id: machine.machine_id,
+                machine_data: {
+                  id: machine.machine_id,
+                  work_center: 'N/A',
+                  type: 'Default',
+                  make: machine.machine_name,
+                  model: 'Default'
+                },
+                status: machine.status,
+                total_power: machine.total_power,
+                energy_consumed: machine.energy_consumed,
+                timestamp: machine.timestamp
+              }));
+              
+              set({ machineNames: formattedMachines });
+            } else {
+              // For subsequent updates, only update changed machines
+              const updatedMachines = currentMachines.map(currentMachine => {
+                // Find if this machine has an update
+                const updatedMachine = data.find(m => m.machine_id === currentMachine.machine_id);
+                
+                if (updatedMachine && updatedMachine.status !== currentMachine.status) {
+                  // Only update if status has changed
+                  return {
+                    ...currentMachine,
+                    status: updatedMachine.status,
+                    total_power: updatedMachine.total_power,
+                    energy_consumed: updatedMachine.energy_consumed,
+                    timestamp: updatedMachine.timestamp
+                  };
+                }
+                
+                // Return unchanged machine
+                return currentMachine;
+              });
+              
+              set({ machineNames: updatedMachines });
+            }
           }
-        };
+        } catch (error) {
+          console.error('Error parsing SSE data:', error);
+        }
+      };
+
+      // Handle errors
+      eventSource.onerror = (error) => {
+        console.error('SSE Error:', error);
+        set({ error: 'Connection error', isLoading: false });
         
-        socket.onerror = (error) => {
-          clearTimeout(timeout);
-          console.error('WebSocket error:', error);
-          reject(error);
-        };
-        
-        socket.onclose = (event) => {
-          console.log('WebSocket connection closed:', event.code, event.reason);
-          if (get().allMachinesWebsocket === socket) {
-            set({ allMachinesWebsocket: null });
-          }
-        };
-      });
-      
-      const data = await dataPromise;
-      
-      if (data && Array.isArray(data)) {
-        // Process and format the data to match our expected structure
-        const formattedMachines = data.map(machine => ({
-          machine_id: machine.machine_id || machine.id,
-          machine_data: {
-            id: machine.machine_id || machine.id,
-            work_center: machine.work_center || 'N/A',
-            type: machine.type || 'Default',
-            make: machine.name || `Machine ${machine.machine_id || machine.id}`,
-            model: machine.model || 'Default'
-          },
-          status: machine.status !== undefined ? machine.status : 0
-        }));
-        
-        set({ machineNames: formattedMachines, isLoading: false });
-        return formattedMachines;
-      } else {
-        throw new Error('Invalid data format received from WebSocket');
-      }
+        // Fallback to mock data only if we don't have any data yet
+        if (!get().machineNames || get().machineNames.length === 0) {
+          const fallbackMachines = generateMockMachineList();
+          set({ machineNames: fallbackMachines });
+        }
+      };
+
+      return eventSource;
     } catch (error) {
-      console.error('Error fetching machines via WebSocket:', error);
+      console.error('Error setting up SSE:', error);
+      set({ error: error.message, isLoading: false });
       
-      // Fallback to mock data
-      console.log('Using fallback machine data due to WebSocket error');
-      const fallbackMachines = generateMockMachineList();
-      set({ machineNames: fallbackMachines, isLoading: false, error: error.message });
-      return fallbackMachines;
+      // Fallback to mock data only if we don't have any data yet
+      if (!get().machineNames || get().machineNames.length === 0) {
+        const fallbackMachines = generateMockMachineList();
+        set({ machineNames: fallbackMachines });
+      }
+      return null;
     }
   },
   
@@ -128,7 +156,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
       
       // Create WebSocket connection
-      const wsUrl = `ws://172.16.0.229:8004/api/v1/energymonitoring/ws/live_data`;
+      const wsUrl = `ws://172.18.7.93:8989/api/v1/energymonitoring/ws/live_data`;
       console.log(`Connecting to WebSocket at ${wsUrl}`);
       
       const socket = new WebSocket(wsUrl);
@@ -334,7 +362,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       
       const apiParamName = apiParamMap[parameterName] || parameterName;
       
-      const baseUrl = `http://172.16.0.229:8004/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      const baseUrl = `http://172.18.7.93:8989/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
       
       console.log(`Fetching filtered history data from ${baseUrl}`);
       
@@ -428,82 +456,145 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     try {
       // Close existing connection if any
       const existingSocket = get().allMachinesWebsocket;
-      if (existingSocket && existingSocket.readyState !== WebSocket.CLOSED) {
-        console.log('Closing existing shiftwise energy WebSocket connection');
+      if (existingSocket) {
+        console.log('Closing existing shiftwise energy SSE connection');
         existingSocket.close();
       }
+
+      // Create EventSource connection
+      const eventSource = new EventSource(WS_SHIFTWISE_ENERGY_ENDPOINT);
       
-      // Create WebSocket connection with the exact endpoint
-      const wsUrl = WS_SHIFTWISE_ENERGY_ENDPOINT;
-      console.log(`Connecting to shiftwise energy WebSocket at ${wsUrl}`);
-      
-      const socket = new WebSocket(wsUrl);
-      
-      socket.onopen = () => {
-        console.log('Shiftwise energy WebSocket connection established');
-        set({ isLoading: false, allMachinesWebsocket: socket });
+      // Store the EventSource instance
+      set({ allMachinesWebsocket: eventSource });
+
+      // Handle connection open
+      eventSource.onopen = () => {
+        console.log('Shiftwise energy SSE connection established');
+        set({ isLoading: false, error: null });
       };
-      
-      socket.onmessage = (event) => {
+
+      // Handle incoming messages
+      eventSource.onmessage = (event) => {
         try {
-          const response = JSON.parse(event.data);
-          console.log('Received shiftwise energy WebSocket data:', response);
+          const data = JSON.parse(event.data);
+          console.log('Received shiftwise energy data:', data);
           
-          // Check if response has the expected structure (data array)
-          if (response && response.data && Array.isArray(response.data)) {
-            console.log('Extracted machine energy data:', response.data);
+          if (Array.isArray(data)) {
+            // Get current state
+            const currentState = get();
+            const currentMachines = currentState.allMachinesEnergyData || [];
             
-            // Update store with the array of machine data
-            set({ allMachinesEnergyData: response.data });
-          } else if (Array.isArray(response)) {
-            // In case the response is directly an array
-            console.log('Received array of machine energy data:', response);
-            set({ allMachinesEnergyData: response });
+            if (currentState.isInitialLoad || !currentState.machinesInitialized) {
+              // First load - initialize all machines
+              console.log('Initializing machines with first data load');
+              const processedData = data.map(machine => ({
+                machine_id: machine.machine_id,
+                machine_name: machine.machine_name,
+                total_energy: parseFloat(machine.total_energy || 0),
+                first_shift: parseFloat(machine.first_shift || 0),
+                second_shift: parseFloat(machine.second_shift || 0),
+                third_shift: parseFloat(machine.third_shift || 0),
+                timestamp: machine.timestamp
+              }));
+              
+              set({ 
+                allMachinesEnergyData: processedData,
+                isInitialLoad: false,
+                machinesInitialized: true
+              });
+            } else {
+              // Update only the machines that have new data
+              const updatedMachines = [...currentMachines];
+              
+              data.forEach(newMachineData => {
+                const existingMachineIndex = updatedMachines.findIndex(
+                  m => m.machine_id === newMachineData.machine_id
+                );
+                
+                if (existingMachineIndex !== -1) {
+                  // Update existing machine
+                  updatedMachines[existingMachineIndex] = {
+                    ...updatedMachines[existingMachineIndex],
+                    total_energy: parseFloat(newMachineData.total_energy || 0),
+                    first_shift: parseFloat(newMachineData.first_shift || 0),
+                    second_shift: parseFloat(newMachineData.second_shift || 0),
+                    third_shift: parseFloat(newMachineData.third_shift || 0),
+                    timestamp: newMachineData.timestamp
+                  };
+                } else {
+                  // Add new machine if it doesn't exist
+                  updatedMachines.push({
+                    machine_id: newMachineData.machine_id,
+                    machine_name: newMachineData.machine_name,
+                    total_energy: parseFloat(newMachineData.total_energy || 0),
+                    first_shift: parseFloat(newMachineData.first_shift || 0),
+                    second_shift: parseFloat(newMachineData.second_shift || 0),
+                    third_shift: parseFloat(newMachineData.third_shift || 0),
+                    timestamp: newMachineData.timestamp
+                  });
+                }
+              });
+              
+              console.log('Updating machines with new data:', updatedMachines);
+              set({ allMachinesEnergyData: updatedMachines });
+            }
           } else {
-            console.warn('Unexpected WebSocket data format:', response);
+            console.warn('Unexpected data format:', data);
           }
         } catch (error) {
-          console.error('Error parsing WebSocket data:', error);
+          console.error('Error parsing shiftwise energy data:', error);
         }
       };
-      
-      socket.onerror = (error) => {
-        console.error('Shiftwise energy WebSocket error:', error);
-        set({ error: 'WebSocket connection error', isLoading: false });
+
+      // Handle errors with retry logic
+      eventSource.onerror = (error) => {
+        console.error('Shiftwise energy SSE Error:', error);
         
-        // Fall back to mock data if WebSocket fails
-        const mockData = generateMockShiftwiseEnergyData();
-        set({ allMachinesEnergyData: mockData });
-      };
-      
-      socket.onclose = (event) => {
-        console.log('Shiftwise energy WebSocket connection closed:', event.code, event.reason);
-        // Only set socket to null if it's the current socket
-        if (get().allMachinesWebsocket === socket) {
-          set({ allMachinesWebsocket: null });
+        // Close the current connection
+        eventSource.close();
+        
+        // Set error state
+        set({ error: 'Connection error', isLoading: false });
+        
+        // Only use fallback data if we haven't initialized machines yet
+        if (!get().machinesInitialized) {
+          const mockData = generateMockShiftwiseEnergyData();
+          set({ allMachinesEnergyData: mockData });
         }
+        
+        // Attempt to reconnect after a delay
+        setTimeout(() => {
+          console.log('Attempting to reconnect shiftwise energy SSE...');
+          get().connectShiftwiseEnergyWebSocket();
+        }, 5000); // Retry after 5 seconds
       };
-      
-      return socket;
+
+      return eventSource;
     } catch (error) {
-      console.error('Error establishing shiftwise energy WebSocket connection:', error);
+      console.error('Error setting up shiftwise energy SSE:', error);
       set({ error: error.message, isLoading: false });
       
-      // Fall back to mock data
-      const mockData = generateMockShiftwiseEnergyData();
-      set({ allMachinesEnergyData: mockData });
+      // Only use fallback data if we haven't initialized machines yet
+      if (!get().machinesInitialized) {
+        const mockData = generateMockShiftwiseEnergyData();
+        set({ allMachinesEnergyData: mockData });
+      }
       return null;
     }
   },
   
-  // Add this function to disconnect the shiftwise energy WebSocket
+  // Update the disconnectShiftwiseEnergyWebSocket function
   disconnectShiftwiseEnergyWebSocket: () => {
-    const socket = get().allMachinesWebsocket;
-    if (socket && socket.readyState !== WebSocket.CLOSED) {
-      console.log('Manually closing shiftwise energy WebSocket connection');
-      socket.close();
+    const eventSource = get().allMachinesWebsocket;
+    if (eventSource) {
+      console.log('Closing shiftwise energy SSE connection');
+      eventSource.close();
+      set({ 
+        allMachinesWebsocket: null,
+        isInitialLoad: true,
+        machinesInitialized: false
+      });
     }
-    set({ allMachinesWebsocket: null });
   },
   
   // Add this function to get energy data for a specific machine
@@ -513,16 +604,16 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     if (!allMachinesEnergyData || !Array.isArray(allMachinesEnergyData) || allMachinesEnergyData.length === 0) {
       // Fallback data if no machine data is available
       return {
-        energy: Math.random() * 100,
-        cost: Math.random() * 1000,
-        max_energy: 100,
+        energy: 0,
+        cost: 0,
+        max_energy: 2,
         first_shift: 0,
         second_shift: 0,
         third_shift: 0
       };
     }
     
-    // Find the machine data in the WebSocket response array
+    // Find the machine data in the SSE response array
     const machineData = allMachinesEnergyData.find(
       machine => machine.machine_id === parseInt(machineId)
     );
@@ -530,9 +621,9 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     if (!machineData) {
       // Fallback data if specific machine is not found
       return {
-        energy: Math.random() * 100,
-        cost: Math.random() * 1000,
-        max_energy: 100,
+        energy: 0,
+        cost: 0,
+        max_energy: 2,
         first_shift: 0,
         second_shift: 0,
         third_shift: 0
@@ -553,21 +644,39 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     };
   },
   
-  // Add this function to the store to connect to historical WebSocket
+  // Update the fetchShiftwiseEnergyHistoryByDate function
   fetchShiftwiseEnergyHistoryByDate: async (date) => {
     set({ isLoading: true, error: null });
     
     try {
-      // Format the date to YYYY-MM-DD
-      const formattedDate = typeof date.format === 'function' ? 
-        date.format('YYYY-MM-DD') : date;
+      // Handle different date formats
+      let momentDate;
+      if (date && date._isAMomentObject) {
+        momentDate = date;
+      } else if (date && typeof date === 'string') {
+        momentDate = moment(date);
+      } else if (date && date.$d) {
+        // Handle Ant Design DatePicker date object
+        momentDate = moment(date.$d);
+      } else {
+        console.error('Invalid date format received:', date);
+        throw new Error('Invalid date format');
+      }
+
+      // Ensure we have a valid moment date
+      if (!momentDate.isValid()) {
+        console.error('Invalid moment date:', momentDate);
+        throw new Error('Invalid date');
+      }
+
+      // Set time to 8:30 AM local time
+      momentDate = momentDate.hours(8).minutes(30).seconds(0).milliseconds(0);
       
-      // Use the specific HTTP endpoint for historical data with the correct parameter
-      // Use date parameter instead of start_date and end_date
-      const apiUrl = `${HISTORY_API_ENDPOINT}?date=${formattedDate}`;
-      console.log(`Fetching historical energy data from: ${apiUrl}`);
+      // Convert to epoch timestamp
+      const epochTimestamp = momentDate.unix();
+      console.log(`Selected date and time: ${momentDate.format('YYYY-MM-DD HH:mm:ss')}, Epoch timestamp: ${epochTimestamp}`);
       
-      const response = await axios.get(apiUrl, {
+      const response = await axios.get(`${COMBINED_HISTORY_ENDPOINT}/${epochTimestamp}`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -577,27 +686,47 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       
       console.log('Historical energy data API response:', response.data);
       
-      // Check if we have valid data
-      let historyData = [];
-      
-      if (Array.isArray(response.data)) {
-        historyData = response.data;
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        // Extract the data array from the nested structure
-        console.log('Extracted data from nested response:', response.data.data);
-        historyData = response.data.data;
+      if (response.data && response.data.machines) {
+        // Get current machine names from store
+        const currentMachines = get().machineNames || [];
+        
+        // Process the machines data
+        const processedData = response.data.machines.map(machine => {
+          // Find matching machine in current machines list
+          const machineInfo = currentMachines.find(m => m.machine_id === machine.machine_id);
+          
+          // Use machine name from API response, fallback to machine info, or use default
+          const machineName = machine.machine_name || 
+                            (machineInfo?.machine_data?.make) || 
+                            `Machine-${machine.machine_id}`;
+          
+          console.log(`Processing machine ${machine.machine_id}:`, {
+            apiName: machine.machine_name,
+            storedName: machineInfo?.machine_data?.make,
+            finalName: machineName
+          });
+          
+          return {
+            id: machine.machine_id,
+            machine_name: machineName,
+            energy: parseFloat(machine.total_energy || 0),
+            first_shift: parseFloat(machine.first_shift || 0),
+            second_shift: parseFloat(machine.second_shift || 0),
+            third_shift: parseFloat(machine.third_shift || 0),
+            cost: parseFloat((machine.total_energy * 12.5).toFixed(2)) // Calculate cost based on energy
+          };
+        });
+        
+        // Store the data in the store
+        set({ 
+          allMachinesEnergyData: processedData,
+          isLoading: false 
+        });
+        
+        return processedData;
       } else {
-        console.warn('Unexpected data format from API:', response.data);
         throw new Error('Invalid data format from API');
       }
-      
-      // Store the data in the store
-      set({ 
-        allMachinesEnergyData: historyData,
-        isLoading: false 
-      });
-      
-      return historyData;
       
     } catch (error) {
       console.error('Error fetching historical energy data:', error);
@@ -611,7 +740,104 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       });
       return mockData;
     }
-  }
+  },
+  
+  // Update startMachineStatusPolling to use SSE
+  startMachineStatusPolling: () => {
+    const eventSource = get().fetchMachineNames();
+    
+    // Return cleanup function
+    return () => {
+      const currentEventSource = get().eventSource;
+      if (currentEventSource) {
+        currentEventSource.close();
+        set({ eventSource: null });
+      }
+    };
+  },
+
+  // Add cleanup function
+  cleanup: () => {
+    const currentEventSource = get().eventSource;
+    if (currentEventSource) {
+      currentEventSource.close();
+      set({ eventSource: null });
+    }
+  },
+
+  machineParameters: null,
+  parametersEventSource: null,
+
+  // Connect to parameters stream
+  connectToParametersStream: (machineId) => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      // Close existing EventSource if any
+      const existingEventSource = get().parametersEventSource;
+      if (existingEventSource) {
+        existingEventSource.close();
+      }
+
+      // Create new EventSource for parameters
+      const eventSource = new EventSource(`http://172.18.7.93:8989/api/v1/energy-monitoring/machine/${machineId}/parameters-stream`);
+      
+      // Store the EventSource instance
+      set({ parametersEventSource: eventSource });
+
+      // Handle connection open
+      eventSource.onopen = () => {
+        console.log('Parameters SSE connection established');
+        set({ isLoading: false });
+      };
+
+      // Handle incoming messages
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('Received parameters data:', data);
+          
+          // Update only the changed parameters
+          set(state => {
+            const currentParams = state.machineParameters || {};
+            return {
+              machineParameters: {
+                ...currentParams,
+                ...data
+              }
+            };
+          });
+        } catch (error) {
+          console.error('Error parsing parameters data:', error);
+        }
+      };
+
+      // Handle errors
+      eventSource.onerror = (error) => {
+        console.error('Parameters SSE Error:', error);
+        set({ error: 'Parameters connection error', isLoading: false });
+      };
+
+      return eventSource;
+    } catch (error) {
+      console.error('Error setting up parameters SSE:', error);
+      set({ error: error.message, isLoading: false });
+      return null;
+    }
+  },
+
+  // Cleanup function for parameters stream
+  cleanupParametersStream: () => {
+    const eventSource = get().parametersEventSource;
+    if (eventSource) {
+      eventSource.close();
+      set({ parametersEventSource: null, machineParameters: null });
+    }
+  },
+
+  // Add a new state for tracking initial load
+  isInitialLoad: true,
+  machinesInitialized: false,
 }));
 
 // Helper function to calculate runtime based on timestamp

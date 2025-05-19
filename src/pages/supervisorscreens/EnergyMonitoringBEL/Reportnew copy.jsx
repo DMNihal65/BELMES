@@ -18,8 +18,8 @@ const Report = () => {
   const reportRef = useRef(null);
   const chartRef = useRef(null);
   
-  // Calculate totals from the new data format
-  const totalEnergy = machineData.reduce((sum, machine) => sum + (machine.energy || 0), 0);
+  // Calculate totals
+  const totalEnergy = machineData.reduce((sum, machine) => sum + machine.energy, 0);
   const totalFirstShift = machineData.reduce((sum, machine) => sum + (machine.first_shift || 0), 0);
   const totalSecondShift = machineData.reduce((sum, machine) => sum + (machine.second_shift || 0), 0);
   const totalThirdShift = machineData.reduce((sum, machine) => sum + (machine.third_shift || 0), 0);
@@ -37,7 +37,7 @@ const Report = () => {
       title: 'FIRST SHIFT (kWh)',
       dataIndex: 'first_shift',
       key: 'first_shift',
-      render: (value) => parseFloat(value || 0).toFixed(3),
+      render: (value) => value.toFixed(2),
       align: 'right',
       width: '15%',
     },
@@ -45,7 +45,7 @@ const Report = () => {
       title: 'SECOND SHIFT (kWh)',
       dataIndex: 'second_shift',
       key: 'second_shift',
-      render: (value) => parseFloat(value || 0).toFixed(3),
+      render: (value) => value.toFixed(2),
       align: 'right',
       width: '15%',
     },
@@ -53,7 +53,7 @@ const Report = () => {
       title: 'THIRD SHIFT (kWh)',
       dataIndex: 'third_shift',
       key: 'third_shift',
-      render: (value) => parseFloat(value || 0).toFixed(3),
+      render: (value) => value.toFixed(2),
       align: 'right',
       width: '15%',
     },
@@ -61,7 +61,7 @@ const Report = () => {
       title: 'ALL SHIFTS (kWh)',
       dataIndex: 'energy',
       key: 'energy',
-      render: (value) => parseFloat(value || 0).toFixed(3),
+      render: (value) => value.toFixed(3),
       align: 'right',
       width: '15%',
     },
@@ -69,7 +69,7 @@ const Report = () => {
       title: 'TOTAL COST (₹)',
       dataIndex: 'cost',
       key: 'cost',
-      render: (value) => `₹${parseFloat(value || 0).toFixed(2)}`,
+      render: (value) => `₹${value.toFixed(2)}`,
       align: 'right',
       width: '15%',
     }
@@ -77,7 +77,7 @@ const Report = () => {
 
   // Prepare data for stacked bar chart - limit to top 10 machines for better readability
   const getChartOptions = () => {
-    const sortedData = [...machineData].sort((a, b) => (b.energy || 0) - (a.energy || 0));
+    const sortedData = [...machineData].sort((a, b) => b.energy - a.energy);
     const topMachines = sortedData.slice(0, Math.min(10, sortedData.length));
     
     return {
@@ -190,17 +190,17 @@ const Report = () => {
       series: [
         {
           name: 'First Shift',
-          data: topMachines.map(machine => parseFloat(machine.first_shift || 0)),
+          data: topMachines.map(machine => parseFloat(machine.first_shift.toFixed(2))),
           color: '#34D399' // green
         },
         {
           name: 'Second Shift',
-          data: topMachines.map(machine => parseFloat(machine.second_shift || 0)),
+          data: topMachines.map(machine => parseFloat(machine.second_shift.toFixed(2))),
           color: '#FBBF24' // yellow
         },
         {
           name: 'Third Shift',
-          data: topMachines.map(machine => parseFloat(machine.third_shift || 0)),
+          data: topMachines.map(machine => parseFloat(machine.third_shift.toFixed(2))),
           color: '#EF4444' // red
         }
       ]
@@ -370,35 +370,36 @@ const Report = () => {
         {
           name: 'First Shift',
           type: 'column',
-          data: displayedMachines.map(machine => parseFloat(machine.first_shift || 0)),
+          data: displayedMachines.map(machine => parseFloat(machine.first_shift.toFixed(2))),
           color: '#34D399', // green
           stack: 'shifts'
         },
         {
           name: 'Second Shift',
           type: 'column',
-          data: displayedMachines.map(machine => parseFloat(machine.second_shift || 0)),
+          data: displayedMachines.map(machine => parseFloat(machine.second_shift.toFixed(2))),
           color: '#FBBF24', // yellow
           stack: 'shifts'
         },
         {
           name: 'Third Shift',
           type: 'column',
-          data: displayedMachines.map(machine => parseFloat(machine.third_shift || 0)),
+          data: displayedMachines.map(machine => parseFloat(machine.third_shift.toFixed(2))),
           color: '#EF4444', // red
           stack: 'shifts'
         },
+        // Add a new series for total energy that stands next to the stacks
         {
           name: 'Total Energy',
           type: 'column',
-          data: displayedMachines.map(machine => parseFloat(machine.energy || 0)),
+          data: displayedMachines.map(machine => parseFloat(machine.energy.toFixed(2))),
           color: '#3B82F6', // blue
-          stack: 'total',
+          stack: 'total', // Different stack so it appears next to the stacked columns
           pointPadding: 0.3,
           pointPlacement: 0.2,
           dataLabels: {
             enabled: true,
-            format: '{point.y:.3f}',
+            format: '{point.y:.2f}',
             style: {
               fontWeight: 'bold',
               color: '#fff',

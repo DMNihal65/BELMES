@@ -16,12 +16,7 @@ import {
   Typography,
   Tooltip,
   Badge,
-  Divider,
-  Modal,
-  Checkbox,
-  Upload,
-  Popover,
-  Tag
+  Divider
 } from 'antd';
 import { 
   SearchOutlined,
@@ -56,48 +51,33 @@ const InspectionReport = () => {
   const [refreshingData, setRefreshingData] = useState(false);
   const [currentPath, setCurrentPath] = useState('');
   const [filteredReports, setFilteredReports] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalDocuments, setTotalDocuments] = useState(0);
-  const [selectedFolderId, setSelectedFolderId] = useState(null);
-  const [isVersionModalVisible, setIsVersionModalVisible] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState(null);
-  const [documentVersions, setDocumentVersions] = useState([]);
-  const [selectedVersion, setSelectedVersion] = useState(null);
-  const [selectedVersionIds, setSelectedVersionIds] = useState([]);
-  const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(null);
-  const [uploadLoading, setUploadLoading] = useState(false);
-  const [newVersionNumber, setNewVersionNumber] = useState('');
 
-  // Update the useEffect to fetch folders instead of report structure
+  // Fetch report structure data
   useEffect(() => {
-    fetchFolders();
+    fetchReportStructure();
   }, []);
 
-  // Replace fetchReportStructure with fetchFolders
-  const fetchFolders = async () => {
+  // Function to fetch the report structure
+  const fetchReportStructure = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const folders = await qualityStore.fetchFolders();
+      if (forceRefresh) {
+        setRefreshingData(true);
+      }
       
-      // Transform folders into tree data format
-      const formattedTreeData = folders.map(folder => ({
-        title: folder.name,
-        key: `folder-${folder.id}`,
-        icon: <FolderOutlined className="text-blue-500" />,
-        isLeaf: false,
-        selectable: true,
-        children: []
-      }));
+      const data = await qualityStore.fetchReportStructure(forceRefresh);
+      setReportStructure(data);
       
-      setTreeData(formattedTreeData);
-      
+      // Process the data to create tree structure and reports list
+      if (data) {
+        processReportData(data);
+      }
     } catch (error) {
-      console.error('Error fetching folders:', error);
-      message.error('Failed to load folders');
+      console.error('Error fetching report structure:', error);
+      message.error('Failed to load report structure');
     } finally {
       setLoading(false);
+      setRefreshingData(false);
     }
   };
 
@@ -177,7 +157,7 @@ const InspectionReport = () => {
   };
 
   // Handle tree selection
-  const handleTreeSelect = async (selectedKeys, info) => {
+  const handleTreeSelect = (selectedKeys, info) => {
     if (info && info.event) {
       info.event.preventDefault();
       info.event.stopPropagation();
@@ -189,121 +169,55 @@ const InspectionReport = () => {
       
       const [itemType, itemId] = selectedKey.split('-');
       
-      if (itemType === 'folder') {
-        setSelectedFolderId(itemId);
-        setCurrentPage(1); // Reset to first page when selecting new folder
-        
-        try {
-          setLoading(true);
-          console.log('Fetching subfolders for folder ID:', itemId);
+      if (itemType === 'document') {
+        // Find the selected document
+        const selectedReport = reports.find(r => r.key === parseInt(itemId));
+        if (selectedReport) {
+          // Clear any existing search and filters
+          setSearchText('');
+          setSelectedReportType('all');
           
-          // Fetch subfolders
-          const subfolders = await qualityStore.fetchFolders(parseInt(itemId));
-          console.log('Subfolders received:', subfolders);
+          // Set the current path
+          setCurrentPath(selectedReport.path);
           
-          // Update the tree data to include the new subfolders
-          const updateTreeData = (nodes) => {
-            return nodes.map(node => {
-              if (node.key === selectedKey) {
-                return {
-                  ...node,
-                  children: subfolders.map(subfolder => ({
-                    title: subfolder.name,
-                    key: `folder-${subfolder.id}`,
-                    icon: <FolderOutlined className="text-blue-500" />,
-                    isLeaf: false,
-                    selectable: true,
-                    children: []
-                  }))
-                };
-              }
-              if (node.children) {
-                return {
-                  ...node,
-                  children: updateTreeData(node.children)
-                };
-              }
-              return node;
-            });
-          };
+          // Filter to show only the selected report
+          const filtered = reports.filter(report => report.key === parseInt(itemId));
+          setFilteredReports(filtered);
           
-          const newTreeData = updateTreeData(treeData);
-          console.log('Updated tree data:', newTreeData);
-          setTreeData(newTreeData);
-          
-          // Also fetch documents for the selected folder
-          await fetchDocumentsForFolder(itemId);
-        } catch (error) {
-          console.error('Error fetching subfolders:', error);
-          message.error('Failed to load subfolders');
-        } finally {
-          setLoading(false);
+          toast.info(`Showing report: ${selectedReport.name}`, {
+            position: 'top-right',
+            autoClose: 2000,
+          });
         }
+      } else if (itemType === 'folder') {
+        // For folders, show all reports in that folder
+        setSearchText('');
+        setSelectedReportType('all');
+        
+        // Get the folder path from the tree node
+        const folderPath = info.node.title;
+        setCurrentPath(folderPath);
+        
+        // Filter reports to show only those in the selected folder
+        const filtered = reports.filter(report => 
+          report.path?.includes(folderPath) || report.category?.includes(folderPath)
+        );
+        setFilteredReports(filtered);
+        
+        toast.info(`Showing reports in folder: ${folderPath}`, {
+          position: 'top-right',
+          autoClose: 2000,
+        });
       }
     }
     
     return false;
   };
 
-  // Add new function to fetch documents for a folder
-  const fetchDocumentsForFolder = async (folderId) => {
-    try {
-      setLoading(true);
-      console.log('Fetching documents for folder ID:', folderId);
-      
-      const data = await qualityStore.fetchDocumentsByFolder(folderId, currentPage, pageSize);
-      console.log('Documents data received:', data);
-      
-      // Transform the data to match your table structure
-      const transformedData = await Promise.all(data.items.map(async item => {
-        const versions = await qualityStore.fetchDocumentVersions(item.id);
-        console.log(`Versions for document ${item.id}:`, versions);
-        
-        return {
-          key: item.id,
-          name: item.name,
-          type: 'REPORT',
-          date: item.created_at,
-          status: 'Available',
-          description: item.description || '',
-          part_number: item.part_number || '',
-          production_order_id: item.production_order_id,
-          file_path: item.file_path || '',
-          file_size: item.file_size || 0,
-          version: versions.length > 0 ? versions[0].version_number : '1.0',
-          version_id: versions.length > 0 ? versions[0].id : '1.0',
-          category: item.category || 'Unknown',
-          path: item.path || '',
-          versions: versions
-        };
-      }));
-
-      // Update both reports and filtered reports
-      setReports(transformedData);
-      setFilteredReports(transformedData);
-      setTotalDocuments(data.total || 0);
-      
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-      message.error('Failed to load documents');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Add pagination handler
-  const handleTableChange = (pagination) => {
-    setCurrentPage(pagination.current);
-    setPageSize(pagination.pageSize);
-    if (selectedFolderId) {
-      fetchDocumentsForFolder(selectedFolderId);
-    }
-  };
-
-  // Update handleRefresh to use fetchFolders
+  // Handle refreshing the report structure
   const handleRefresh = () => {
-    fetchFolders();
-    message.loading({ content: 'Refreshing folders...', key: 'refresh', duration: 1 });
+    fetchReportStructure(true);
+    message.loading({ content: 'Refreshing report structure...', key: 'refresh', duration: 1 });
   };
 
   // Handle downloading a report
@@ -490,24 +404,34 @@ const InspectionReport = () => {
     }
   };
 
-  // Update the handleDeleteReport function
+  // Update the handleDeleteReport function to handle server connection issues better
   const handleDeleteReport = async (record) => {
     try {
+      // Extract the document ID from the record
       const documentId = record.key;
       
+      // Show a confirmation dialog before deleting
       if (!window.confirm(`Are you sure you want to delete "${record.name}"?`)) {
-        return;
+        return; // User canceled the deletion
       }
       
+      // Show a loading message
       const toastId = toast.loading('Deleting report...', {
         position: 'top-right',
       });
       
+      console.log(`Attempting to delete document with ID: ${documentId}`);
+      
+      // Optimistically update the UI by removing the report from the local state
+      const originalReports = [...reports]; // Keep a copy of the original reports
+      const updatedReports = reports.filter(r => r.key !== documentId);
+      setReports(updatedReports);
+      
+      // Call the deleteDocument function from the quality store
       try {
-        // Call the deleteDocumentVersion function
-        const result = await qualityStore.deleteDocumentVersion(documentId);
+        const result = await qualityStore.deleteDocument(documentId);
         
-        // Dismiss loading toast
+        // Dismiss the loading toast
         toast.dismiss(toastId);
         
         // Show success message
@@ -515,47 +439,91 @@ const InspectionReport = () => {
           position: 'top-right',
           autoClose: 3000,
         });
-
-        // Update the reports list by removing the deleted item
-        setReports(prevReports => {
-          const updatedReports = prevReports.filter(report => report.key !== documentId);
-          console.log('Updated reports after deletion:', updatedReports);
-          return updatedReports;
-        });
-
-        // Update the filtered reports
-        setFilteredReports(prevFiltered => {
-          const updatedFiltered = prevFiltered.filter(report => report.key !== documentId);
-          console.log('Updated filtered reports after deletion:', updatedFiltered);
-          return updatedFiltered;
-        });
-
-        // Update total count
-        setTotalDocuments(prevTotal => prevTotal - 1);
         
-        // If we're in a folder view, refresh the folder contents
-        if (selectedFolderId) {
-          await fetchDocumentsForFolder(selectedFolderId);
-        }
-        
+        // Refresh the report structure in the background
+        fetchReportStructure(true);
       } catch (error) {
-        console.error('Delete operation failed:', error);
+        console.error('Error deleting report:', error);
+        
+        // Revert the optimistic update if the deletion fails
+        setReports(originalReports);
+        
+        // Dismiss loading toast
         toast.dismiss(toastId);
         
-        toast.error(
-          <div>
-            <div><strong>Error Deleting Report</strong></div>
-            <div>{error.message}</div>
-          </div>,
-          {
-            position: 'top-right',
-            autoClose: 5000,
-            closeOnClick: false,
+        // Show error message with more helpful information
+        let errorMsg = 'Failed to delete report';
+        
+        if (error.message && error.message.includes('Server did not respond')) {
+          // Show a more detailed error with possible solutions
+          toast.error(
+            <div>
+              <div><strong>Connection Error</strong></div>
+              <div>The server did not respond to the delete request.</div>
+              <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
+                <div>API Endpoint:</div>
+                <div style={{ 
+                  fontFamily: 'monospace', 
+                  background: '#f0f0f0', 
+                  padding: '4px 8px',
+                  margin: '4px 0',
+                  borderRadius: '4px',
+                  fontSize: '0.9em',
+                  wordBreak: 'break-all'
+                }}>
+                  DELETE http://172.18.7.88:9905/api/v1/document-management/report/structure/document/{documentId}
+                </div>
+                <div style={{ marginTop: '8px' }}>
+                  Possible solutions:
+                  <ul style={{ paddingLeft: '20px', marginTop: '4px' }}>
+                    <li>Verify the API endpoint is correct</li>
+                    <li>Check if the server is running</li>
+                    <li>Ensure your network can reach the server</li>
+                    <li>Check server logs for errors</li>
+                  </ul>
+                </div>
+              </div>
+            </div>,
+            {
+              position: 'top-right',
+              autoClose: 10000,
+              closeOnClick: false,
+              pauseOnHover: true,
+              draggable: true,
+            }
+          );
+          return;
+        }
+        
+        if (error.response) {
+          switch (error.response.status) {
+            case 404:
+              errorMsg = 'Report not found on server';
+              break;
+            case 403:
+              errorMsg = 'You do not have permission to delete this report';
+              break;
+            case 500:
+              errorMsg = 'Server error occurred while deleting the report';
+              break;
+            default:
+              errorMsg = `Server returned error (${error.response.status})`;
           }
-        );
+        } else if (error.request) {
+          errorMsg = 'No response from server. Please check your network connection';
+        } else {
+          errorMsg = error.message || 'Unknown error occurred';
+        }
+        
+        toast.error(errorMsg, {
+          position: 'top-right',
+          autoClose: 4000,
+        });
       }
     } catch (error) {
       console.error('Unexpected error in handleDeleteReport:', error);
+      
+      // Show error message
       toast.error('An unexpected error occurred while trying to delete the report', {
         position: 'top-right',
         autoClose: 4000,
@@ -588,7 +556,7 @@ const InspectionReport = () => {
         });
         
         // Refresh the report structure to update the UI
-        fetchFolders();
+        fetchReportStructure(true);
       } else {
         throw new Error(result.message || 'Failed to delete folder');
       }
@@ -600,76 +568,6 @@ const InspectionReport = () => {
         position: 'top-right',
         autoClose: 4000,
       });
-    }
-  };
-
-  // Add function to handle version preview
-  const handleVersionPreview = async (record) => {
-    try {
-      setLoading(true);
-      setSelectedDocument(record);
-      const versions = await qualityStore.fetchDocumentVersions(record.key);
-      setDocumentVersions(versions);
-      setIsVersionModalVisible(true);
-    } catch (error) {
-      console.error('Error fetching versions:', error);
-      message.error('Failed to load document versions');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update the handleVersionSelect function
-  const handleVersionSelect = async (version) => {
-    setSelectedVersion(version);
-    try {
-      const downloadData = await qualityStore.downloadDocument(selectedDocument.key, version.id);
-      // Open PDF in new window
-      window.open(downloadData.url, '_blank');
-    } catch (error) {
-      console.error('Error previewing version:', error);
-      message.error('Failed to preview document version');
-    }
-  };
-
-  // Add function to handle checkbox selection
-  const handleVersionCheckboxChange = (versionId, checked) => {
-    if (checked) {
-      setSelectedVersionIds([...selectedVersionIds, versionId]);
-    } else {
-      setSelectedVersionIds(selectedVersionIds.filter(id => id !== versionId));
-    }
-  };
-
-  // Add function to handle file upload
-  const handleFileUpload = async (file) => {
-    setUploadingFile(file);
-  };
-
-  // Add function to handle version upload
-  const handleVersionUpload = async () => {
-    if (!uploadingFile || !selectedDocument || !newVersionNumber) {
-      message.error('Please provide both file and version number');
-      return;
-    }
-    
-    try {
-      setUploadLoading(true);
-      await qualityStore.uploadNewVersion(selectedDocument.key, uploadingFile, newVersionNumber);
-      
-      // Refresh the versions list
-      const versions = await qualityStore.fetchDocumentVersions(selectedDocument.key);
-      setDocumentVersions(versions);
-      
-      message.success('New version uploaded successfully');
-      setIsUploadModalVisible(false);
-      setUploadingFile(null);
-      setNewVersionNumber(''); // Reset version number
-    } catch (error) {
-      console.error('Error uploading new version:', error);
-      message.error('Failed to upload new version');
-    } finally {
-      setUploadLoading(false);
     }
   };
 
@@ -747,72 +645,42 @@ const InspectionReport = () => {
       },
     },
     {
+      title: 'Size',
+      dataIndex: 'file_size',
+      key: 'file_size',
+      width: 100,
+      render: (size) => {
+        if (!size) return '-';
+        // Convert bytes to KB or MB
+        let formattedSize;
+        if (size < 1024) formattedSize = `${size} B`;
+        else if (size < 1024 * 1024) formattedSize = `${(size / 1024).toFixed(1)} KB`;
+        else formattedSize = `${(size / (1024 * 1024)).toFixed(1)} MB`;
+        
+        return (
+          <Tooltip title={`${size} bytes`}>
+            <span className="text-gray-600">{formattedSize}</span>
+          </Tooltip>
+        );
+      }
+    },
+    {
       title: 'Version',
       dataIndex: 'version',
       key: 'version',
-      width: 120,
-      render: (version, record) => {
-        // Get all versions from the record
-        const versions = record.versions || [];
-        
-        return (
-          <Popover
-            content={
-              <div className="version-list">
-                {versions.map((v) => (
-                  <div 
-                    key={v.id} 
-                    className="version-item p-2 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => handleVersionSelect(v)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>v{v.version_number}</span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(v.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            }
-            title="All Versions"
-            trigger="click"
-          >
-            <div className="flex items-center space-x-1">
-              <Tag color="blue">v{version}</Tag>
-              {versions.length > 1 && (
-                <span className="text-xs text-gray-500">
-                  (+{versions.length - 1})
-                </span>
-              )}
-            </div>
-          </Popover>
-        );
-      },
+      width: 80,
+      render: (version) => version ? (
+        <div className="px-2 py-1 bg-blue-50 text-blue-600 rounded-full inline-block text-xs">
+          v{version}
+        </div>
+      ) : 'v1.0',
     },
     {
       title: 'Actions',
       key: 'actions',
-      width: 250,
+      width: 200,
       render: (_, record) => (
         <Space>
-          <Tooltip title="View versions">
-            <Button 
-              icon={<FileSearchOutlined />} 
-              type="text" 
-              onClick={() => handleVersionPreview(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Add new version">
-            <Button 
-              icon={<UploadOutlined />} 
-              type="text"
-              onClick={() => {
-                setSelectedDocument(record);
-                setIsUploadModalVisible(true);
-              }}
-            />
-          </Tooltip>
           <Tooltip title="Delete report">
             <Button 
               icon={<DeleteOutlined />} 
@@ -948,18 +816,18 @@ const InspectionReport = () => {
           />
         </Col>
         <Col span={8}>
-          {/* <div className="font-medium mb-2 flex items-center">
+          <div className="font-medium mb-2 flex items-center">
             <AppstoreOutlined className="mr-2 text-blue-500" />
             <span>Actions</span>
-          </div> */}
-          {/* <Button 
+          </div>
+          <Button 
             type="primary"
             icon={<AppstoreOutlined />}
             onClick={handleLaunchQMS}
             className="w-full bg-gradient-to-r from-blue-500 to-blue-600 border-none shadow-sm hover:shadow-md transition-all"
           >
             Launch QMS
-          </Button> */}
+          </Button>
         </Col>
       </Row>
 
@@ -1002,12 +870,15 @@ const InspectionReport = () => {
                   blockNode
                   className="custom-tree"
                   selectable={true}
-                  onExpand={(expandedKeys, { expanded, node }) => {
-                    // If expanding a node, fetch its subfolders
-                    if (expanded && node.key.startsWith('folder-')) {
-                      const folderId = node.key.split('-')[1];
-                      handleTreeSelect([node.key], { node });
-                    }
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                  }}
+                  expandAction="click"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                   }}
                 />
               </div>
@@ -1058,13 +929,13 @@ const InspectionReport = () => {
                   className="rounded-md w-64"
                   allowClear
                 />
-                {/* <Button 
+                <Button 
                   type="primary"
                   icon={<UploadOutlined />}
                   className="bg-green-500 hover:bg-green-600 border-none"
                 >
                   Upload New
-                </Button> */}
+                </Button>
               </Space>
             }
             headStyle={{ borderBottom: '1px solid #e6f0ff', backgroundColor: '#f7faff' }}
@@ -1078,181 +949,21 @@ const InspectionReport = () => {
                 columns={columns}
                 dataSource={filteredReports}
                 pagination={{
-                  current: currentPage,
-                  pageSize: pageSize,
-                  total: totalDocuments,
+                  pageSize: 10,
                   showSizeChanger: true,
                   showTotal: (total) => `Total ${total} reports`
                 }}
-                onChange={handleTableChange}
                 rowKey="key"
                 className="reports-table"
                 rowClassName="hover:bg-blue-50 transition-colors"
                 bordered={false}
                 size="middle"
                 locale={{ emptyText: 'No reports found' }}
-                key={`table-${filteredReports.length}-${Date.now()}`}
               />
             )}
           </Card>
         </Col>
       </Row>
-
-      {/* Version Preview Modal */}
-      <Modal
-        title="Select Version to Preview"
-        open={isVersionModalVisible}
-        onCancel={() => {
-          setIsVersionModalVisible(false);
-          setSelectedDocument(null);
-          setDocumentVersions([]);
-          setSelectedVersion(null);
-          setSelectedVersionIds([]); // Reset selected versions
-        }}
-        footer={[
-          <Button 
-            key="cancel" 
-            onClick={() => {
-              setIsVersionModalVisible(false);
-              setSelectedDocument(null);
-              setDocumentVersions([]);
-              setSelectedVersion(null);
-              setSelectedVersionIds([]);
-            }}
-          >
-            Cancel
-          </Button>,
-          <Button
-            key="preview"
-            type="primary"
-            onClick={() => {
-              // Preview the first selected version
-              const selectedVersion = documentVersions.find(v => v.id === selectedVersionIds[0]);
-              if (selectedVersion) {
-                handleVersionSelect(selectedVersion);
-              }
-            }}
-            disabled={selectedVersionIds.length === 0}
-          >
-            Preview Selected
-          </Button>
-        ]}
-        width={600}
-      >
-        {loading ? (
-          <div className="flex justify-center items-center py-8">
-            <Spin tip="Loading versions..." />
-          </div>
-        ) : (
-          <div className="version-list">
-            {documentVersions.map((version) => (
-              <div 
-                key={version.id}
-                className={`version-item p-4 mb-2 rounded-lg transition-colors ${
-                  selectedVersionIds.includes(version.id) ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center">
-                  <Checkbox
-                    checked={selectedVersionIds.includes(version.id)}
-                    onChange={(e) => handleVersionCheckboxChange(version.id, e.target.checked)}
-                    className="mr-4"
-                  />
-                  <div className="flex-grow">
-                    <div className="font-medium">Version {version.version_number}</div>
-                    <div className="text-sm text-gray-500">
-                      Created: {new Date(version.created_at).toLocaleString()}
-                    </div>
-                    {version.metadata && version.metadata.operation_number && (
-                      <div className="text-sm text-gray-500">
-                        Operation: {version.metadata.operation_number}
-                      </div>
-                    )}
-                  </div>
-                  <Button 
-                    type="primary"
-                    size="small"
-                    onClick={() => handleVersionSelect(version)}
-                  >
-                    Preview
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Modal>
-
-      {/* Version Upload Modal */}
-      <Modal
-        title="Upload New Version"
-        open={isUploadModalVisible}
-        onCancel={() => {
-          setIsUploadModalVisible(false);
-          setSelectedDocument(null);
-          setUploadingFile(null);
-          setNewVersionNumber(''); // Reset version number
-        }}
-        footer={[
-          <Button 
-            key="cancel" 
-            onClick={() => {
-              setIsUploadModalVisible(false);
-              setSelectedDocument(null);
-              setUploadingFile(null);
-              setNewVersionNumber(''); // Reset version number
-            }}
-          >
-            Cancel
-          </Button>,
-          <Button
-            key="upload"
-            type="primary"
-            onClick={handleVersionUpload}
-            loading={uploadLoading}
-            disabled={!uploadingFile || !newVersionNumber}
-          >
-            Upload
-          </Button>
-        ]}
-        width={500}
-      >
-        <div className="upload-container">
-          <div className="mb-4">
-            <div className="text-sm text-gray-500 mb-2">
-              Selected document: {selectedDocument?.name}
-            </div>
-            
-            {/* Add version number input */}
-            <div className="mb-4">
-              <div className="text-sm font-medium mb-2">Version Number</div>
-              <Input
-                placeholder="Enter version number (e.g., 1.0)"
-                value={newVersionNumber}
-                onChange={(e) => setNewVersionNumber(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            
-            <Upload
-              accept=".pdf"
-              beforeUpload={(file) => {
-                handleFileUpload(file);
-                return false; // Prevent auto upload
-              }}
-              showUploadList={true}
-              maxCount={1}
-            >
-              <Button icon={<UploadOutlined />}>Select PDF File</Button>
-            </Upload>
-          </div>
-          {uploadingFile && (
-            <div className="text-sm text-gray-500">
-              Selected file: {uploadingFile.name}
-            </div>
-          )}
-        </div>
-      </Modal>
 
       {/* ToastContainer for notifications */}
       <ToastContainer />
@@ -1300,23 +1011,6 @@ const InspectionReport = () => {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-        }
-
-        .version-list {
-          max-height: 300px;
-          overflow-y: auto;
-        }
-        
-        .version-item {
-          border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .version-item:last-child {
-          border-bottom: none;
-        }
-        
-        .version-item:hover {
-          background-color: #f5f5f5;
         }
       `}</style>
     </div>

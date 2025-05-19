@@ -136,20 +136,51 @@ const Productivity = ({ onBack }) => {
       // If switching to history mode, disconnect WebSocket
       disconnectShiftwiseEnergyWebSocket();
       
-      // Format the date for logging
+      // Format the date for the API call
       const formattedDate = date.format('YYYY-MM-DD');
       console.log(`Fetching historical data for date: ${formattedDate}`);
       
       try {
-        // Pass the moment date object directly to the store function
+        // Call the store function to fetch historical data using REST API endpoint
         const historyData = await fetchShiftwiseEnergyHistoryByDate(date);
         
         // Process the data if available
         if (historyData && Array.isArray(historyData) && historyData.length > 0) {
-          // The data is already processed with correct machine names from the store
-          console.log('Processed historical data:', historyData);
-          setMachineData(historyData);
-          prevDataRef.current = historyData;
+          // Process the data for display
+          const processedData = historyData.map(machine => {
+            const id = machine.machine_id;
+            
+            // Find machine name in machineNames
+            const machineInfo = machineNames && machineNames.length > 0 
+              ? machineNames.find(m => m.machine_id === id) 
+              : null;
+            
+            const machineName = machineInfo?.machine_data?.make || `Machine ${id}`;
+            
+            // Log raw values to debug
+            console.log(`Machine ${id} raw values:`, {
+              total_energy: machine.total_energy,
+              type: typeof machine.total_energy,
+              first_shift: machine.first_shift,
+              second_shift: machine.second_shift,
+              third_shift: machine.third_shift
+            });
+            
+            // Make sure to convert all values to numbers
+            return {
+              id,
+              machine_name: machineName,
+              energy: parseFloat(machine.total_energy || 0),
+              max_energy: 2,
+              first_shift: parseFloat(machine.first_shift || 0),
+              second_shift: parseFloat(machine.second_shift || 0),
+              third_shift: parseFloat(machine.third_shift || 0)
+            };
+          });
+          
+          console.log('Processed historical data:', processedData);
+          setMachineData(processedData);
+          prevDataRef.current = processedData;
         } else {
           console.warn('No historical data available for the selected date');
           // Show empty data with message instead of fallback data

@@ -134,7 +134,7 @@ export default function MachineMaintenance() {
       width: '20%',
     },
     {
-      title: 'Available From',
+      title: 'From',
       dataIndex: 'available_from',
       key: 'available_from',
       sorter: (a, b) => new Date(a.available_from) - new Date(b.available_from),
@@ -160,7 +160,7 @@ export default function MachineMaintenance() {
       width: '20%',
     },
     {
-      title: 'Available To',
+      title: 'To',
       dataIndex: 'available_to',
       key: 'available_to',
       sorter: (a, b) => {

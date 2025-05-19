@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 // import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Typography, Spin, Badge, Space, Alert, Select, DatePicker, Button } from 'antd';
 import { ThunderboltOutlined, SearchOutlined, PlayCircleOutlined } from '@ant-design/icons';
-import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBel';
+import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBEL';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area } from 'recharts';
 import dayjs from 'dayjs';
 
@@ -406,34 +406,35 @@ const RealTimeGraph = ({ machineId, machineName }) => {
   }
   
   return (
-    <div style={{ padding: '0 8px' }}>
+    <div style={{ padding: '0 4px' }}>
       <Card 
         style={{ 
-          marginBottom: '16px',
-          borderRadius: '8px',
+          marginBottom: '8px',
+          borderRadius: '6px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         }}
       >
         {/* Header with machine name and status */}
-        <Row justify="space-between" align="middle" style={{ marginBottom: '16px' }}>
-          <Col>
-            <Space align="center">
+        <Row justify="space-between" align="middle" style={{ marginBottom: '8px' }}>
+          <Col xs={24} sm={16}>
+            <Space align="center" wrap>
               <Badge status={statusInfo.badgeStatus} dot size="large" />
-              <Title level={4} style={{ margin: 0 }}>{machineName}</Title>
+              <Title level={4} style={{ margin: 0, fontSize: '16px' }}>{machineName}</Title>
               <Text strong style={{ 
                 color: statusInfo.color,
-                marginLeft: '8px',
+                marginLeft: '4px',
                 backgroundColor: statusInfo.bgColor,
-                padding: '2px 8px',
-                borderRadius: '4px'
+                padding: '1px 6px',
+                borderRadius: '4px',
+                fontSize: '12px'
               }}>
                 {statusInfo.text}
               </Text>
             </Space>
           </Col>
-          <Col>
-            <Space>
-              <Text type="secondary">
+          <Col xs={24} sm={8}>
+            <Space size="small" wrap style={{ justifyContent: 'flex-end' }}>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
                 Updated: {new Date().toLocaleTimeString()}
               </Text>
               {parameters.status === 2 && (
@@ -447,7 +448,7 @@ const RealTimeGraph = ({ machineId, machineName }) => {
         </Row>
 
         {/* Four cards layout */}
-        <Row gutter={[16, 16]}>
+        <Row gutter={[8, 8]}>
           <Col xs={24} sm={12} lg={6}>
             <Card
               style={{
@@ -651,26 +652,27 @@ const RealTimeGraph = ({ machineId, machineName }) => {
       {/* Production Timeline Card */}
       <Card
         style={{
-          borderRadius: '8px',
+          borderRadius: '6px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          marginBottom: '16px'
+          marginBottom: '8px'
         }}
       >
-        <Row justify="space-between" align="middle" style={{ marginBottom: '16px' }}>
-          <Col>
-            <Title level={4} style={{ margin: 0 }}>
+        <Row justify="space-between" align="middle" style={{ marginBottom: '8px' }}>
+          <Col xs={24} sm={12}>
+            <Title level={4} style={{ margin: 0, fontSize: '16px' }}>
               {isLive ? 'Live Production Timeline' : 'Historical Production Timeline'}
             </Title>
-            <Text type="secondary">{machineName}</Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>{machineName}</Text>
           </Col>
-          <Col>
-            <Space size="middle" wrap>
+          <Col xs={24} sm={12}>
+            <Space size="small" wrap style={{ justifyContent: 'flex-end' }}>
               <Select
-                style={{ width: 200 }}
+                style={{ width: '180px' }}
                 placeholder="Select Parameter"
                 value={selectedParameter}
                 onChange={setSelectedParameter}
                 allowClear={false}
+                size="small"
               >
                 <Option value="phaseAVoltage">Phase A Voltage</Option>
                 <Option value="phaseBVoltage">Phase B Voltage</Option>
@@ -691,11 +693,12 @@ const RealTimeGraph = ({ machineId, machineName }) => {
               </Select>
               
               <RangePicker 
-                style={{ width: 280 }}
+                style={{ width: '240px' }}
                 onChange={setDateRange}
                 value={dateRange}
                 allowClear={false}
                 disabled={isLive}
+                size="small"
               />
               
               <Button 
@@ -704,6 +707,7 @@ const RealTimeGraph = ({ machineId, machineName }) => {
                 onClick={handleSubmitFilteredData}
                 disabled={isSubmitDisabled()}
                 loading={chartLoading}
+                size="small"
               >
                 Submit
               </Button>
@@ -718,6 +722,7 @@ const RealTimeGraph = ({ machineId, machineName }) => {
                   })
                 }}
                 onClick={handleLiveToggle}
+                size="small"
               >
                 {isLive ? 'Live' : 'Go Live'}
               </Button>
@@ -725,14 +730,14 @@ const RealTimeGraph = ({ machineId, machineName }) => {
           </Col>
         </Row>
         <div style={{ 
-          padding: '12px',
+          padding: '8px',
           background: '#f8fafc',
-          borderRadius: '6px',
-          minHeight: '200px',
+          borderRadius: '4px',
+          minHeight: '250px',
           border: '1px solid #e2e8f0'
         }}>
           {chartLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '250px' }}>
               <Spin size="large" />
             </div>
           ) : chartError ? (
@@ -742,27 +747,27 @@ const RealTimeGraph = ({ machineId, machineName }) => {
               type="info" 
               showIcon 
               style={{
-                margin: '20px',
+                margin: '16px',
                 textAlign: 'center'
               }}
             />
           ) : chartData.length > 0 ? (
             <>
-              <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong>
+              <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text strong style={{ fontSize: '12px' }}>
                   {selectedParameter && getParameterDisplayName(selectedParameter)}
                   {!isLive && dateRange && dateRange[0] && dateRange[1] && ` - ${dateRange[0].format('YYYY-MM-DD')} to ${dateRange[1].format('YYYY-MM-DD')}`}
                 </Text>
                 {isLive ? (
-                  <Badge status="processing" text="Live Data" style={{ color: '#22c55e' }} />
+                  <Badge status="processing" text="Live Data" style={{ color: '#22c55e', fontSize: '12px' }} />
                 ) : (
-                  <Text type="secondary">Historical Data</Text>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>Historical Data</Text>
                 )}
               </div>
-              <ResponsiveContainer width="100%" height={200} minHeight={200}>
+              <ResponsiveContainer width="100%" height={250} minHeight={250}>
                 <LineChart 
                   data={chartData} 
-                  margin={{ top: 15, right: 15, left: 15, bottom: 15 }}
+                  margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
                   style={{ overflow: 'visible' }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -862,14 +867,14 @@ const RealTimeGraph = ({ machineId, machineName }) => {
               flexDirection: 'column', 
               justifyContent: 'center', 
               alignItems: 'center', 
-              height: '200px',
+              height: '250px',
               color: '#666'
             }}>
-              <Text type="secondary" style={{ fontSize: '16px', marginBottom: '8px' }}>
+              <Text type="secondary" style={{ fontSize: '14px', marginBottom: '4px' }}>
                 {isLive ? 'Waiting for live data...' : 'Select dates and click Submit to view historical data'}
               </Text>
               {!isLive && dateRange && (
-                <Text type="secondary" style={{ fontSize: '14px' }}>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
                   Date Range: {dateRange[0]?.format('YYYY-MM-DD')} to {dateRange[1]?.format('YYYY-MM-DD')}
                 </Text>
               )}

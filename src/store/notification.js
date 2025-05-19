@@ -3,7 +3,7 @@ import { message } from 'antd';
 import { Wrench, Package } from 'lucide-react';
 
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.16.0.229:8004/api/v1';
+const API_BASE_URL = 'http://172.18.7.88:9905/api/v1';
 const API_ENDPOINTS = {
   // GET endpoints for notifications
   machineNotifications: `${API_BASE_URL}/maintainance/supervisor/machine-notifications/`,
@@ -20,8 +20,8 @@ const API_ENDPOINTS = {
   materialWs: `ws://${API_BASE_URL.replace('http://', '')}/notification/ws/material-notifications`,
   
   // Calibration HTTP endpoints
-  instrumentCalibrationHttp: `http://172.16.0.229:8004/api/v1/notification/instrument-calibrations?limit=100`,
-  machineCalibrationHttp: `http://172.16.0.229:8004/api/v1/notification/machine-calibrations?limit=100`
+  instrumentCalibrationHttp: `http://172.18.7.88:9905/api/v1/notification/instrument-calibrations?limit=100`,
+  machineCalibrationHttp: `http://172.18.7.88:9905/api/v1/notification/machine-calibrations?limit=100`
 };
 
 // Utility function to play notification sound

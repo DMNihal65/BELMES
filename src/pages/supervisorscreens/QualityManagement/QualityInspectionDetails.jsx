@@ -59,6 +59,13 @@ const QualityInspectionDetails = ({
   const [approvedStatus, setApprovedStatus] = useState({});
   const [isApprovingAll, setIsApprovingAll] = useState(false);
   const [isFinalInspectionModalVisible, setIsFinalInspectionModalVisible] = useState(false);
+  const [allApproved, setAllApproved] = useState(false);
+  const [isFinalApprovingAll, setIsFinalApprovingAll] = useState(false);
+  const [isFinalAllApproved, setIsFinalAllApproved] = useState(false);
+  const [finalInspectionApproved, setFinalInspectionApproved] = useState(false);
+  const [ftpApprovalStatus, setFtpApprovalStatus] = useState(null);
+  const [finalInspectionDrawing, setFinalInspectionDrawing] = useState(null);
+  const [loadingFinalDrawing, setLoadingFinalDrawing] = useState(false);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
 
@@ -393,6 +400,14 @@ const QualityInspectionDetails = ({
       // Fetch inspection data using the quality store
       const response = await qualityStore.fetchInspectionByOrderId(inspectionDetails.order_id);
       
+      // Check FTP approval status
+      const orderId = inspectionDetails.order_id;
+      const ipid = inspectionDetails.operation_groups?.[0]?.ipid;
+      if (orderId && ipid) {
+        const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+        setFtpApprovalStatus(ftpStatus);
+      }
+      
       // Check if we have valid data with the correct structure
       if (response && response.inspection_data && response.inspection_data.length > 0) {
         setMeasuredData(response);
@@ -525,39 +540,37 @@ const QualityInspectionDetails = ({
             </Col>
             <Col span={6} className="text-right">
               <Button 
-                type="primary" 
+                type={ftpApprovalStatus?.is_completed ? "primary" : "default"}
                 icon={<CheckCircleOutlined />}
                 onClick={handleApproveAll}
                 loading={isApprovingAll}
                 size="large"
                 className="approve-all-btn"
+                style={ftpApprovalStatus?.is_completed ? { 
+                  backgroundColor: "#52c41a", 
+                  borderColor: "#52c41a", 
+                  color: "#fff",
+                  cursor: 'not-allowed',
+                  opacity: 0.8
+                } : {}}
+                disabled={ftpApprovalStatus?.is_completed}
               >
-                Approve All Measurements
+                {ftpApprovalStatus?.is_completed ? "Already Approved" : "Approve All Measurements"}
               </Button>
             </Col>
           </Row>
         </div>
 
-        {/* Legend for tolerance colors with enhanced styling */}
-        <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="text-sm font-medium mb-2">Measurement Status Guide:</div>
-          <div className="flex gap-6">
-            <div className="flex items-center">
-              <div className="w-5 h-5 bg-green-50 mr-2 border border-green-300 rounded"></div>
-              <span className="text-sm">Within Tolerance (Acceptable)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-5 h-5 bg-red-50 mr-2 border border-red-300 rounded"></div>
-              <span className="text-sm">Out of Tolerance (Requires Review)</span>
-            </div>
-            <div className="ml-auto">
-              <Text type="secondary" className="text-xs">
-                <InfoCircleOutlined className="mr-1" /> 
-                Rows are color-coded based on whether the measured mean is within the specified tolerance limits
-              </Text>
-            </div>
-          </div>
-        </div>
+        {/* Show approval status alert */}
+        {ftpApprovalStatus?.is_completed && (
+          <Alert
+            message="Inspection Approved"
+            description={`This inspection was approved on ${moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY HH:mm')}`}
+            type="success"
+            showIcon
+            className="mb-4"
+          />
+        )}
 
         {/* Filter and search controls with updated functionality */}
         <div className="mb-4 flex flex-wrap gap-4 justify-between items-center">
@@ -960,98 +973,43 @@ const QualityInspectionDetails = ({
 
   // Function to handle approving all measurements
   const handleApproveAll = async () => {
-    // Check if we have inspection data to process
-    if (!measuredData?.inspection_data || measuredData.inspection_data.length === 0) {
-      message.warning('No inspection data available to approve');
-      return;
-    }
-    
-    // Get all inspection IDs that are not already marked as done
-    const allInspectionIds = [];
-    measuredData.inspection_data.forEach(opData => {
-      if (opData.inspections && opData.inspections.length > 0) {
-        opData.inspections.forEach(inspection => {
-          if (inspection.is_done !== true) {
-            allInspectionIds.push(inspection.id);
-          }
-        });
-      }
-    });
-    
-    // If no inspections to update, show message and return
-    if (allInspectionIds.length === 0) {
-      message.info('All inspections are already approved');
-      return;
-    }
-    
-    try {
-      // Set loading state
-      setIsApprovingAll(true);
-      
-      // Show a loading message
-      message.loading({
-        content: `Approving ${allInspectionIds.length} inspections...`,
-        key: 'approveAll',
-        duration: 0
+    // First check if already approved
+    if (ftpApprovalStatus?.is_completed) {
+      Modal.info({
+        title: 'Already Approved',
+        content: 'This inspection has already been approved.',
+        okText: 'OK'
       });
+      return;
+    }
+
+    const orderId = inspectionDetails?.order_id;
+    const ipid = inspectionDetails?.operation_groups?.[0]?.ipid;
+    
+    if (!orderId || !ipid) {
+      message.error('Order ID or IPID not found.');
+      return;
+    }
+
+    setIsApprovingAll(true);
+    try {
+      await qualityStore.approveAllMeasurements(orderId, ipid);
+      message.success('All measurements approved');
+      setAllApproved(true);
       
-      // Process each inspection in sequence
-      let successCount = 0;
-      let failCount = 0;
+      // Update FTP status after approval
+      const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+      setFtpApprovalStatus(ftpStatus);
       
-      for (const id of allInspectionIds) {
-        try {
-          // Set loading state for this specific item
-          setApprovingIds(prev => ({ ...prev, [id]: true }));
-          
-          // Call the API to update the status
-          const response = await qualityStore.updateInspectionStatus(id, true);
-          
-          // Update local state
-          setApprovedStatus(prev => ({ ...prev, [id]: 'approved' }));
-          
-          // Update the measurement data in our local state
-          setMeasuredData(prevData => {
-            if (!prevData || !prevData.inspection_data) return prevData;
-            
-            const newData = {...prevData};
-            
-            // Update is_done value in all operations' inspections
-            newData.inspection_data = newData.inspection_data.map(op => {
-              if (!op.inspections) return op;
-              
-              const updatedInspections = op.inspections.map(insp => {
-                if (insp.id === id) {
-                  return {...insp, is_done: true};
-                }
-                return insp;
-              });
-              
-              return {...op, inspections: updatedInspections};
-            });
-            
-            return newData;
-          });
-          
-          successCount++;
-        } catch (error) {
-          console.error(`Error approving measurement #${id}:`, error);
-          failCount++;
-        } finally {
-          // Clear loading state
-          setApprovingIds(prev => ({ ...prev, [id]: false }));
-        }
-      }
-      
-      // Show success message
-      message.success({
-        content: `Successfully approved ${successCount} inspections. ${failCount} inspections failed.`,
-        key: 'approveAll',
-        duration: 5
+      Modal.success({
+        title: 'Approval Successful',
+        content: 'All measurements have been approved successfully.',
+        okText: 'OK'
       });
     } catch (error) {
-      console.error('Error approving all measurements:', error);
       message.error('Failed to approve all measurements');
+    } finally {
+      setIsApprovingAll(false);
     }
   };
 
@@ -1190,10 +1148,11 @@ const QualityInspectionDetails = ({
   useEffect(() => {
     if (orderId) {
       fetchMeasuredData();
+      checkFTPStatus();
     }
   }, [orderId]);
 
-  // Add missing fetchMeasuredData function
+  // Update the fetchMeasuredData function to properly check final inspection status
   const fetchMeasuredData = async () => {
     if (!orderId) return;
     
@@ -1201,6 +1160,20 @@ const QualityInspectionDetails = ({
       const response = await qualityStore.fetchInspectionByOrderId(orderId);
       if (response && response.inspection_data && response.inspection_data.length > 0) {
         setMeasuredData(response);
+        
+        // Check if final inspection is already approved
+        const finalInspection = response.inspection_data.find(
+          op => op.operation_number === 999
+        );
+        
+        // Check both is_approved and is_done flags
+        const isApproved = finalInspection?.is_approved || 
+                          (finalInspection?.inspections?.every(insp => insp.is_done === true));
+        
+        if (isApproved) {
+          setFinalInspectionApproved(true);
+          setIsFinalAllApproved(true);
+        }
         
         // Initialize approved status from fetched data
         const statusMap = {};
@@ -1254,7 +1227,100 @@ const QualityInspectionDetails = ({
       }));
   };
 
-  // Add final inspection modal render function
+  // Add function to check FTP approval status
+  const checkFTPStatus = async () => {
+    const orderId = inspectionDetails?.order_id;
+    const ipid = inspectionDetails?.operation_groups?.[0]?.ipid;
+    
+    if (!orderId || !ipid) return;
+
+    try {
+      const response = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+      setFtpApprovalStatus(response);
+      if (response.is_completed) {
+        setFinalInspectionApproved(true);
+        setIsFinalAllApproved(true);
+      }
+    } catch (error) {
+      console.error('Error checking FTP status:', error);
+    }
+  };
+
+  // Update handleFinalApproveAll function
+  const handleFinalApproveAll = async () => {
+    // First check if already approved
+    if (ftpApprovalStatus?.is_completed) {
+      Modal.info({
+        title: 'Already Approved',
+        content: 'This final inspection has already been approved.',
+        okText: 'OK'
+      });
+      return;
+    }
+
+    const orderId = inspectionDetails?.order_id;
+    const ipid = inspectionDetails?.operation_groups?.[0]?.ipid;
+    
+    if (!orderId || !ipid) {
+      message.error('Order ID or IPID not found.');
+      return;
+    }
+
+    setIsFinalApprovingAll(true);
+    try {
+      await qualityStore.approveAllMeasurements(orderId, ipid);
+      message.success('All final inspection measurements approved');
+      setIsFinalAllApproved(true);
+      setFinalInspectionApproved(true);
+      
+      // Update FTP status after approval
+      await checkFTPStatus();
+      
+      Modal.success({
+        title: 'Approval Successful',
+        content: 'Final inspection has been approved successfully.',
+        okText: 'OK'
+      });
+    } catch (error) {
+      message.error('Failed to approve all final inspection measurements');
+    } finally {
+      setIsFinalApprovingAll(false);
+    }
+  };
+
+  // Add a function to fetch the final inspection drawing
+  const fetchFinalInspectionDrawing = async () => {
+    try {
+      setLoadingFinalDrawing(true);
+      const drawingId = '10557513'; // Your drawing ID
+      const operationId = '30'; // Your operation ID
+      const data = await qualityStore.fetchBalloonedDrawing(drawingId, operationId);
+      setFinalInspectionDrawing(data);
+    } catch (error) {
+      message.error('Failed to load final inspection drawing');
+      console.error('Error loading final inspection drawing:', error);
+    } finally {
+      setLoadingFinalDrawing(false);
+    }
+  };
+
+  // Move useEffect to component level
+  useEffect(() => {
+    if (isFinalInspectionModalVisible) {
+      fetchFinalInspectionDrawing();
+    }
+  }, [isFinalInspectionModalVisible]);
+
+  // Clean up drawing URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (finalInspectionDrawing?.url) {
+        URL.revokeObjectURL(finalInspectionDrawing.url);
+      }
+    };
+  }, [finalInspectionDrawing]);
+
+  // Update the renderFinalInspectionModal function
   const renderFinalInspectionModal = () => {
     const finalInspectionData = getFinalInspectionData();
     
@@ -1306,26 +1372,163 @@ const QualityInspectionDetails = ({
           </div>
         }
         visible={isFinalInspectionModalVisible}
-        onCancel={() => setIsFinalInspectionModalVisible(false)}
+        onCancel={() => {
+          setIsFinalInspectionModalVisible(false);
+          setFinalInspectionDrawing(null);
+        }}
+        width={1600}
         footer={[
-          <Button key="close" onClick={() => setIsFinalInspectionModalVisible(false)}>
+          <Button key="close" onClick={() => {
+            setIsFinalInspectionModalVisible(false);
+            setFinalInspectionDrawing(null);
+          }}>
             Close
           </Button>
         ]}
-        width={1200}
       >
-        <div className="mb-4">
-          <Text strong>Operation: 999</Text>
-          <br />
-          <Text strong>IPID: {inspectionDetails?.operation_groups?.[0]?.ipid || 'No IPID'}</Text>
+        <div className="flex gap-6">
+          {/* Left side - Measurements */}
+          <div className="flex-1 min-w-[45%]">
+            {/* Header section */}
+            <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
+              <Row gutter={16} align="middle">
+                <Col span={24}>
+                  <Row gutter={[16, 8]}>
+                    <Col span={8}>
+                      <div className="flex flex-col">
+                        <Text type="secondary" className="text-xs">Order ID</Text>
+                        <Text strong className="text-base">{inspectionDetails?.order_id || '-'}</Text>
+                      </div>
+                    </Col>
+                    <Col span={8}>
+                      <div className="flex flex-col">
+                        <Text type="secondary" className="text-xs">Production Order</Text>
+                        <Text strong className="text-base">{inspectionDetails?.production_order || '-'}</Text>
+                      </div>
+                    </Col>
+                    <Col span={8}>
+                      <div className="flex flex-col">
+                        <Text type="secondary" className="text-xs">Part Number</Text>
+                        <Text strong className="text-base">{inspectionDetails?.part_number || '-'}</Text>
+                      </div>
+                    </Col>
+                  </Row>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Show approval status alert */}
+            {ftpApprovalStatus?.is_completed && (
+              <Alert
+                message="Final Inspection Approved"
+                description={`This final inspection was approved on ${moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY HH:mm')}`}
+                type="success"
+                showIcon
+                className="mb-4"
+              />
+            )}
+
+            <div className="mb-4">
+              <Text strong>Operation: 999</Text>
+              <br />
+              <Text strong>IPID: {inspectionDetails?.operation_groups?.[0]?.ipid || 'No IPID'}</Text>
+            </div>
+            <Table
+              columns={columns}
+              dataSource={finalInspectionData}
+              pagination={false}
+              scroll={{ x: 800, y: 400 }}
+              size="small"
+            />
+          </div>
+
+          {/* Right side - Drawing */}
+          <div className="flex-1 min-w-[55%]">
+            <div className="bg-white rounded-lg shadow-sm h-[calc(100vh-240px)] flex flex-col">
+              {/* Drawing Header */}
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <Typography.Title level={5} className="mb-0">
+                    Ballooned Drawing
+                  </Typography.Title>
+                  <Space>
+                    <Button 
+                      type={ftpApprovalStatus?.is_completed ? "primary" : "default"}
+                      icon={<CheckCircleOutlined />}
+                      onClick={handleFinalApproveAll}
+                      loading={isFinalApprovingAll}
+                      size="middle"
+                      className="approve-all-btn"
+                      style={ftpApprovalStatus?.is_completed ? { 
+                        backgroundColor: "#52c41a", 
+                        borderColor: "#52c41a", 
+                        color: "#fff",
+                        cursor: 'not-allowed',
+                        opacity: 0.8
+                      } : {}}
+                      disabled={ftpApprovalStatus?.is_completed}
+                    >
+                      {ftpApprovalStatus?.is_completed ? "Already Approved" : "Approve All Measurements"}
+                    </Button>
+                    {finalInspectionDrawing && (
+                      <Button
+                        type="default"
+                        icon={<DownloadOutlined />}
+                        size="middle"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = finalInspectionDrawing.url;
+                          link.download = finalInspectionDrawing.fileName;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                      >
+                        Download Drawing
+                      </Button>
+                    )}
+                  </Space>
+                </div>
+              </div>
+
+              {/* Drawing Content */}
+              <div className="flex-1 p-4">
+                {loadingFinalDrawing ? (
+                  <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                    <div className="text-center">
+                      <Spin size="large" />
+                      <div className="mt-4 text-gray-500">Loading drawing...</div>
+                    </div>
+                  </div>
+                ) : finalInspectionDrawing ? (
+                  <div className="h-full rounded-lg overflow-hidden border border-gray-200">
+                    <iframe
+                      src={finalInspectionDrawing.url}
+                      type="application/pdf"
+                      className="w-full h-full"
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        border: 'none'
+                      }}
+                      title="Ballooned Drawing View"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description={
+                        <span className="text-gray-500">
+                          No drawing available
+                        </span>
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-        <Table
-          columns={columns}
-          dataSource={finalInspectionData}
-          pagination={false}
-          scroll={{ x: 800, y: 400 }}
-          size="small"
-        />
       </Modal>
     );
   };

@@ -9,7 +9,7 @@ import { useSpring, animated } from '@react-spring/three';
 import styled from 'styled-components';
 import MachineOverlay from './MachineOverlay';
 import Productivity from './Productivity';
-import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBel';
+import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBEL';
 import { MeshStandardMaterial } from 'three';
 
 const { Title, Text } = Typography;
@@ -465,7 +465,7 @@ function MachineModel({
               fontSize: '12px', 
               color: '#4a5568' 
             }}>
-              WC: {data.workCenter}
+              {/* WC: {data.workCenter} */}
             </div>
           </div>
         </div>
@@ -581,17 +581,25 @@ const MachinesVisualization = () => {
   const [showProductivity, setShowProductivity] = useState(false);
 
   // Get machine data from the store
-  const { fetchMachineNames, machineNames, isLoading } = useEnergyMonitoringBelStore();
+  const { fetchMachineNames, startMachineStatusPolling, cleanup, machineNames, isLoading } = useEnergyMonitoringBelStore();
   
-  // Fetch machine names on component mount
+  // Set up SSE connection
   useEffect(() => {
+    // Initial fetch and SSE setup
     fetchMachineNames();
-  }, [fetchMachineNames]);
+    const cleanupFn = startMachineStatusPolling();
+    
+    // Cleanup on unmount
+    return () => {
+      cleanupFn();
+      cleanup();
+    };
+  }, [fetchMachineNames, startMachineStatusPolling, cleanup]);
 
   // Reset renderError when data changes
   useEffect(() => {
     if (machineNames && machineNames.length > 0) {
-      setRenderError(false); // Reset error state when we have data
+      setRenderError(false);
     }
   }, [machineNames]);
 
@@ -626,7 +634,7 @@ const MachinesVisualization = () => {
         name: machineName, // Use the make field as machine name
         status: machine.status,
         type: machine.machine_data?.type || 'Default',
-        workCenter: machine.machine_data?.work_center || 'N/A',
+        // workCenter: machine.machine_data?.work_center || 'N/A',
         model: machine.machine_data?.model || 'Default'
       };
     });

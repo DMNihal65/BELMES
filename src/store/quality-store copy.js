@@ -21,7 +21,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.93:9999/api/v1/planning/all_orders',
+        'http://172.18.7.88:9905/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -44,7 +44,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.93:9999/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.88:9905/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -79,7 +79,7 @@ class QualityStore {
       
       const config = {
         method: 'get',
-        url: `http://172.18.7.93:9999/api/v1/quality/master-boc/ipids/${orderId}`,
+        url: `http://172.18.7.88:9905/api/v1/quality/master-boc/ipids/${orderId}`,
         ...this.getAuthHeaders()
       };
 
@@ -128,7 +128,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://172.18.7.93:9999/api/v1/quality/run',
+        'http://172.18.7.88:9905/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;
@@ -145,7 +145,7 @@ class QualityStore {
   async fetchBalloonedDrawing(drawingId, operationId) {
     try {
       const response = await axios.get(
-        `http://172.18.7.93:9999/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
+        `http://172.18.7.88:9905/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`,
         {
           ...this.getAuthHeaders(),
           responseType: 'blob' // Important: set responseType to blob for PDF data
@@ -180,7 +180,7 @@ class QualityStore {
           
           const response = await axios({
             method: method,
-            url: `http://172.18.7.93:9999/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
+            url: `http://172.18.7.88:9905/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
             ...this.getAuthHeaders(),
             timeout: 5000
           });
@@ -223,7 +223,7 @@ class QualityStore {
       // Try to ping the server with a HEAD request
       await axios({
         method: 'head',
-        url: 'http://172.18.7.93:9999/api/v1/health', // Use a health endpoint if available
+        url: 'http://172.18.7.88:9905/api/v1/health', // Use a health endpoint if available
         timeout: 5000 // 5 second timeout
       });
       
@@ -234,7 +234,7 @@ class QualityStore {
       try {
         await axios({
           method: 'head',
-          url: 'http://172.18.7.93:9999/',
+          url: 'http://172.18.7.88:9905/',
           timeout: 5000
         });
         
@@ -251,8 +251,15 @@ class QualityStore {
     try {
       console.log('Fetching report structure data...');
       
-      // Return empty array since we're removing the endpoint
-      return [];
+      const response = await axios.get(
+        `http://172.18.7.88:9905/api/v1/document-management/report/structure/?force_refresh=${forceRefresh}`,
+        this.getAuthHeaders()
+      );
+      
+      console.log('Report structure data received:', response.data);
+      
+      // Return the data as-is
+      return response.data;
       
     } catch (error) {
       console.error('Error fetching report structure:', error);
@@ -266,7 +273,7 @@ class QualityStore {
       console.log(`Downloading report from path: ${filePath}`);
       
       // Log the request URL
-      const requestUrl = `http://172.18.7.93:9999/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`;
+      const requestUrl = `http://172.18.7.88:9905/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -325,7 +332,7 @@ class QualityStore {
       console.log(`Downloading report with document ID: ${documentId}, version: ${versionNumber}`);
       
       // Log the request URL and headers
-      const requestUrl = `http://172.18.7.93:9999/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`;
+      const requestUrl = `http://172.18.7.88:9905/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -378,7 +385,7 @@ class QualityStore {
       console.log(`Fetching detailed inspection data for ID: ${inspectionId}`);
       
       const response = await axios.get(
-        `http://172.18.7.93:9999/api/v1/quality/inspection/${inspectionId}/detailed`,
+        `http://172.18.7.88:9905/api/v1/quality/inspection/${inspectionId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -397,7 +404,7 @@ class QualityStore {
       console.log(`Downloading document ID: ${documentId}, version: ${versionId}`);
       
       // Log the request URL and headers
-      const requestUrl = `http://172.18.7.93:9999/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
+      const requestUrl = `http://172.18.7.88:9905/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -451,7 +458,7 @@ class QualityStore {
       
       // Use the correct URL format
       // Note: Check if the port number is correct (6688)
-      const requestUrl = `http://172.18.7.93:9999/api/v1/document-management/report/structure/document/${documentId}`;
+      const requestUrl = `http://172.18.7.88:9905/api/v1/document-management/report/structure/document/${documentId}`;
       console.log('Delete request URL:', requestUrl);
       
       // Try with increased timeout and better error handling
@@ -491,7 +498,7 @@ class QualityStore {
         console.log('Trying alternative URL format...');
         
         // Alternative URL format (some APIs use query parameters instead of path parameters)
-        const alternativeUrl = `http://172.18.7.93:9999/api/v1/document-management/report/structure/document?id=${documentId}`;
+        const alternativeUrl = `http://172.18.7.88:9905/api/v1/document-management/report/structure/document?id=${documentId}`;
         console.log('Alternative delete request URL:', alternativeUrl);
         
         const altResponse = await axios({
@@ -545,7 +552,7 @@ class QualityStore {
       console.log(`Deleting folder with ID: ${folderId}`);
       
       // Log the request URL
-      const requestUrl = `http://172.18.7.93:9999/api/v1/document-management/report/structure/folder/${folderId}`;
+      const requestUrl = `http://172.18.7.88:9905/api/v1/document-management/report/structure/folder/${folderId}`;
       console.log('Delete folder request URL:', requestUrl);
       
       const response = await axios.delete(
@@ -574,15 +581,10 @@ class QualityStore {
 
   async approveAllMeasurements(orderId, ipid) {
     try {
-      const url = `http://172.18.7.93:9999/api/v1/quality/ftp/${orderId}/${ipid}/update`;
-      // Send an empty object as the request body since the API doesn't expect any specific attributes
+      const url = `http://172.18.7.88:9905/api/v1/quality/ftp/${orderId}/${ipid}/update`;
       const response = await axios.post(url, {}, this.getAuthHeaders());
       return response.data;
     } catch (error) {
-      console.error('Error approving all measurements:', error);
-      if (error.response) {
-        console.error('Error response:', error.response.data);
-      }
       this.handleAuthError(error);
       throw error;
     }
@@ -592,76 +594,11 @@ class QualityStore {
   async checkFTPApprovalStatus(orderId, ipid) {
     try {
       const response = await axios.get(
-        `http://172.18.7.93:9999/api/v1/quality/ftp/${orderId}/${ipid}`,
+        `http://172.18.7.88:9905/api/v1/quality/ftp/${orderId}/${ipid}`,
         this.getAuthHeaders()
       );
       return response.data;
     } catch (error) {
-      this.handleAuthError(error);
-      throw error;
-    }
-  }
-
-  async fetchDocumentsByFolder(folderId, page = 1, pageSize = 10) {
-    try {
-      console.log(`Fetching documents for folder ID: ${folderId}, page: ${page}`);
-      
-      const response = await axios.get(
-        `http://172.18.7.93:9999/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${pageSize}`,
-        this.getAuthHeaders()
-      );
-      
-      console.log('Documents data received:', response.data);
-      return response.data;
-      
-    } catch (error) {
-      console.error('Error fetching documents by folder:', error);
-      this.handleAuthError(error);
-      throw error;
-    }
-  }
-
-  async fetchDocumentVersions(documentId) {
-    try {
-      console.log(`Fetching versions for document ID: ${documentId}`);
-      
-      const response = await axios.get(
-        `http://172.18.7.93:9999/api/v1/document-management/documents/${documentId}/versions`,
-        this.getAuthHeaders()
-      );
-      
-      console.log('Document versions received:', response.data);
-      return response.data;
-      
-    } catch (error) {
-      console.error('Error fetching document versions:', error);
-      this.handleAuthError(error);
-      throw error;
-    }
-  }
-
-  async fetchFolders(parentId = 1) {
-    try {
-      console.log(`Fetching folders for parent ID: ${parentId}`);
-      
-      const response = await axios.get(
-        `http://172.18.7.93:9999/api/v1/document-management/folders/?parent_id=${parentId}`,
-        this.getAuthHeaders()
-      );
-      
-      console.log('Raw response data:', response.data);
-      
-      // Only filter for IPID and REPORT if we're fetching root folders (parentId === 1)
-      const folders = parentId === 1 
-        ? response.data.filter(folder => folder.name === 'IPID' || folder.name === 'REPORT')
-        : response.data.filter(folder => folder.is_active); // Only show active folders for subfolders
-      
-      console.log('Processed folders data:', folders);
-      return folders;
-      
-    } catch (error) {
-      console.error('Error fetching folders:', error);
-      console.error('Error details:', error.response?.data);
       this.handleAuthError(error);
       throw error;
     }
@@ -675,109 +612,6 @@ class QualityStore {
       throw new Error('Authentication failed. Please log in again.');
     }
     console.error('API Error:', error);
-  }
-
-  async uploadNewVersion(documentId, file, versionNumber) {
-    try {
-      console.log(`Uploading new version for document ID: ${documentId}, version: ${versionNumber}`);
-      
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('version_number', versionNumber);
-      
-      const response = await axios.post(
-        `http://172.18.7.93:9999/api/v1/document-management/documents/${documentId}/versions`,
-        formData,
-        {
-          ...this.getAuthHeaders(),
-          headers: {
-            ...this.getAuthHeaders().headers,
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
-      
-      console.log('New version upload response:', response.data);
-      return response.data;
-      
-    } catch (error) {
-      console.error('Error uploading new version:', error);
-      this.handleAuthError(error);
-      throw error;
-    }
-  }
-
-  async deleteDocumentVersion(versionId) {
-    try {
-      console.log(`Attempting to delete document version ID: ${versionId}`);
-      
-      // Log the full request details
-      const requestConfig = {
-        method: 'delete',
-        url: `http://172.18.7.93:9999/api/v1/document-management/document-versions/${versionId}`,
-        ...this.getAuthHeaders(),
-        validateStatus: function (status) {
-          return status >= 200 && status < 500; // Accept all status codes to handle them manually
-        }
-      };
-      
-      console.log('Delete request configuration:', {
-        url: requestConfig.url,
-        method: requestConfig.method,
-        headers: requestConfig.headers
-      });
-      
-      const response = await axios(requestConfig);
-      
-      // Log the full response
-      console.log('Delete version response:', {
-        status: response.status,
-        statusText: response.statusText,
-        data: response.data,
-        headers: response.headers
-      });
-      
-      if (response.status >= 200 && response.status < 300) {
-        return {
-          success: true,
-          message: 'Version deleted successfully',
-          data: response.data
-        };
-      } else {
-        throw {
-          status: response.status,
-          message: response.data?.message || `Server returned status ${response.status}`,
-          data: response.data
-        };
-      }
-      
-    } catch (error) {
-      console.error('Error deleting document version:', {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        config: error.config
-      });
-      
-      // Handle specific error cases
-      if (error.response) {
-        switch (error.response.status) {
-          case 404:
-            throw new Error('Document version not found');
-          case 403:
-            throw new Error('You do not have permission to delete this version');
-          case 500:
-            throw new Error('Server error occurred while deleting the version');
-          default:
-            throw new Error(`Server returned error (${error.response.status}): ${error.response.data?.message || 'Unknown error'}`);
-        }
-      } else if (error.request) {
-        throw new Error('No response from server. Please check your network connection');
-      } else {
-        throw new Error(error.message || 'Failed to delete document version');
-      }
-    }
   }
 }
 

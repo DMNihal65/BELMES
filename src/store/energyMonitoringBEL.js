@@ -16,6 +16,7 @@ const WS_SHIFTWISE_ENERGY_ENDPOINT = 'ws://172.16.0.229:8004/api/v1/energymonito
 // Add the HTTP endpoint for historical data
 const HISTORY_API_ENDPOINT = 'http://172.16.0.229:8004/api/v1/energymonitoring/shiftwise_energy_history_by_date';
 
+
 const useEnergyMonitoringBelStore = create((set, get) => ({
   // Machine data
   machineData: {},

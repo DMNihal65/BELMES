@@ -50,11 +50,11 @@ import AccessControlManagement from './pages/adminscreens/AccessControlManagemen
 
 const App = () => {
 
-  console.log("Deployed on 09-04-2025")
+  console.log("Deployed on 16-05-2025")
   return (
     <ConfigProvider>
-      {/* basename="/belmes" this should be added in the deployment mode */}
-      <BrowserRouter>
+      {/* basename="/belmes" this should be added in the deployment mode ISNIDE BROWSER ROUTER*/}
+      <BrowserRouter >
         <Routes>
           <Route path="/login" element={<Login />} />
 

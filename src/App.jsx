@@ -47,6 +47,7 @@ import RegisterNewUser from './pages/adminscreens/userManagement/RegisterNewuser
 import MachinePasswordManagement from './pages/adminscreens/machineManagement/MachinePasswordManagement'
 import UserManagement from './pages/adminscreens/userManagement/userManagement';
 import AccessControlManagement from './pages/adminscreens/AccessControlManagement';
+import NewOperatorDashboard from './pages/operatorscreen/NewOperatorDashboard';
 
 const App = () => {
 
@@ -147,7 +148,7 @@ const App = () => {
               <MainLayout />
             // </ProtectedRoute>
           }>
-            <Route path="dashboard" element={<JobDetails />} />
+            <Route path="dashboard" element={<NewOperatorDashboard />} />
             <Route path="alerts" element={<AlertScreens />} />
             <Route path="maintenance" element={<MaintenanceDashboard />} />
             <Route path="inspection" element={<InspectionResult />} />

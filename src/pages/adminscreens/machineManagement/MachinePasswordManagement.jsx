@@ -16,13 +16,35 @@ const MachinePasswordManagement = ({ onClose }) => {
     fetchMachines();
   }, []);
 
+  // const fetchMachines = async () => {
+  //   setIsLoading(true);
+  //   try {
+  //     const response = await axios.get(
+  //       "http://172.18.7.88:9922/api/v1/master-order/all-machines/"
+  //     );
+  //     setMachines(response.data || []);
+  //   } catch (error) {
+  //     console.error("Failed to fetch machines:", error);
+  //     message.error("Failed to fetch machines");
+  //     toast.error(`Error: ${error.message}`);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const fetchMachines = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(
-        "http://172.18.7.88:9905/api/v1/master-order/all-machines/"
-      );
-      setMachines(response.data || []);
+      const response = await fetch('http://172.18.7.88:6153/api/v1/master-order/all-machines/');
+      const data = await response.json();
+      // Filter machines where work_center_boolean is true and extract the code
+      const machinesWithCode = data
+        .filter(machine => machine.work_center_boolean === true)
+        .map(machine => ({
+          ...machine,
+          code: machine.work_center.code
+        }));
+      setMachines(machinesWithCode);
     } catch (error) {
       console.error("Failed to fetch machines:", error);
       message.error("Failed to fetch machines");
@@ -32,12 +54,13 @@ const MachinePasswordManagement = ({ onClose }) => {
     }
   };
 
+
   const onFinish = async (values) => {
     const { machineName, password } = values;
     setSubmitLoading(true);
     try {
       const response = await axios.post(
-        `http://172.18.7.88:9905/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
+        `http://172.18.7.88:9922/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
       );
       message.success(response.data.status || "Password set successfully");
       toast.success(response.data.status || "Password set successfully");

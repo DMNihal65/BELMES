@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.18.7.88:9905';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.18.7.88:9922';
 
 const usePokayokeStore = create((set, get) => ({
   // Checklists state

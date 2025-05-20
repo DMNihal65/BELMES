@@ -2,8 +2,14 @@ import { create } from 'zustand';
 import { message } from 'antd';
 import { Wrench, Package } from 'lucide-react';
 
+
+
+
+
+
+
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.18.7.88:9905/api/v1';
+const API_BASE_URL = 'http://172.18.7.88:9922/api/v1';
 const API_ENDPOINTS = {
   // GET endpoints for notifications
   machineNotifications: `${API_BASE_URL}/maintainance/supervisor/machine-notifications/`,
@@ -20,8 +26,11 @@ const API_ENDPOINTS = {
   materialWs: `ws://${API_BASE_URL.replace('http://', '')}/notification/ws/material-notifications`,
   
   // Calibration HTTP endpoints
-  instrumentCalibrationHttp: `http://172.18.7.88:9905/api/v1/notification/instrument-calibrations?limit=100`,
-  machineCalibrationHttp: `http://172.18.7.88:9905/api/v1/notification/machine-calibrations?limit=100`
+  instrumentCalibrationHttp: `http://172.18.7.88:9922/api/v1/notification/instrument-calibrations?limit=100`,
+  machineCalibrationHttp: `http://172.18.7.88:9922/api/v1/notification/machine-calibrations?limit=100`,
+
+  // User endpoint
+  users: `${API_BASE_URL}/auth/api/v1/auth/users-get?active_only=true`
 };
 
 // Utility function to play notification sound
@@ -122,13 +131,15 @@ const useNotificationStore = create((set, get) => ({
   materialSocket: null,
   isMachineSocketConnected: false,
   isMaterialSocketConnected: false,
+  userMap: new Map(),
   
   // Initialize the store and connect to WebSockets
-  initialize: () => {
+  initialize: async () => {
     if (get().isInitialized) return;
     
     console.log('Initializing notification store...');
     get().connectWebSockets();
+    await get().fetchUsers();
     get().fetchNotifications(false);
     
     set({ isInitialized: true });
@@ -345,6 +356,8 @@ const useNotificationStore = create((set, get) => ({
       console.error('Error disconnecting WebSockets:', error);
     }
   },
+
+
   
   // Fetch notifications from the API
   fetchNotifications: async (showErrorMessages = false) => {
@@ -592,7 +605,7 @@ const useNotificationStore = create((set, get) => ({
           return {
             ...notification,
             is_acknowledged: true,
-            acknowledged_by: acknowledgedBy || notification.acknowledged_by || 'System',
+            acknowledged_by: acknowledgedBy || notification.acknowledged_by || '',
             acknowledged_at: acknowledgedAt || new Date().toISOString()
           };
         }
@@ -704,6 +717,53 @@ const useNotificationStore = create((set, get) => ({
   // Clear all notifications (for testing/debugging)
   clearNotifications: () => {
     set({ notifications: [], unreadCount: 0 });
+  },
+
+  // Add new function to fetch users
+  fetchUsers: async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.users, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+
+      const data = await response.json();
+      const userMap = new Map();
+      
+      // Create a map of user IDs to user names
+      if (Array.isArray(data)) {
+        data.forEach(user => {
+          // Map both id and _id to handle different response formats
+          if (user.id) {
+            userMap.set(user.id.toString(), user.name || user.username || user.email);
+          }
+          if (user._id) {
+            userMap.set(user._id.toString(), user.name || user.username || user.email);
+          }
+        });
+      } else if (data.users && Array.isArray(data.users)) {
+        // Handle case where users are nested in a users property
+        data.users.forEach(user => {
+          if (user.id) {
+            userMap.set(user.id.toString(), user.name || user.username || user.email);
+          }
+          if (user._id) {
+            userMap.set(user._id.toString(), user.name || user.username || user.email);
+          }
+        });
+      }
+
+      // console.log('User map created:', Object.fromEntries(userMap));
+      set({ userMap });
+      return userMap;
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      return new Map();
+    }
   }
 }));
 

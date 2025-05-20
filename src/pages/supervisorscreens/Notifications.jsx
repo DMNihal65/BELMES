@@ -20,7 +20,8 @@ import {
 } from 'antd';
 import { Wrench, Package, Bell, CheckCircle, RefreshCw, Ruler, Filter } from 'lucide-react';
 import useNotificationStore from '../../store/notification';
-import { ToolFilled, FilterOutlined } from '@ant-design/icons';
+import { ToolFilled, FilterOutlined, ToolOutlined, } from '@ant-design/icons';
+import useInventoryStore from '../../store/inventory-store';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -35,7 +36,8 @@ const Notifications = () => {
     fetchNotifications,
     initialize,
     isLoading,
-    error: storeError
+    error: storeError,
+    userMap
   } = useNotificationStore();
 
   // Local state
@@ -44,6 +46,10 @@ const Notifications = () => {
   const [processingIds, setProcessingIds] = useState([]);
   const [isAcknowledgingAll, setIsAcknowledgingAll] = useState(false);
   const [tableLoading, setTableLoading] = useState(false);
+  const [itemDetailsMap, setItemDetailsMap] = useState(new Map());
+  const [searchText, setSearchText] = useState('');
+  const [dateRange, setDateRange] = useState(null);
+  const { getItemDetails } = useInventoryStore();
 
   // Initialize store on component mount
   useEffect(() => {
@@ -56,6 +62,37 @@ const Notifications = () => {
       setError(storeError);
     }
   }, [storeError]);
+
+  // Add new effect to fetch item details
+  useEffect(() => {
+    const fetchItemDetails = async () => {
+      const detailsMap = new Map();
+      
+      // Get unique item names from notifications
+      const uniqueItemNames = [...new Set(
+        notifications
+          .filter(n => n.notificationType === 'instrumentCalibration')
+          .map(n => n.item_name)
+          .filter(Boolean)
+      )];
+
+      // Fetch details for each unique item
+      for (const itemName of uniqueItemNames) {
+        if (!itemDetailsMap.has(itemName)) {
+          const details = await getItemDetails(itemName);
+          if (details) {
+            detailsMap.set(itemName, details);
+          }
+        }
+      }
+
+      setItemDetailsMap(prev => new Map([...prev, ...detailsMap]));
+    };
+
+    if (notifications.length > 0) {
+      fetchItemDetails();
+    }
+  }, [notifications]);
 
   // Handle manual refresh
   const handleManualRefresh = async () => {
@@ -134,6 +171,54 @@ const Notifications = () => {
             : activeTabKey === 'unacknowledged'
               ? unacknowledgedNotifications
               : [];
+
+  // Filter notifications based on search text and date range
+  const getFilteredNotifications = () => {
+    let filtered = [...filteredNotifications];
+
+    // Apply search text filter
+    if (searchText) {
+      const searchLower = searchText.toLowerCase();
+      filtered = filtered.filter(notification => {
+        // Search in all relevant fields
+        return (
+          // Machine notifications
+          (notification.machine_make?.toLowerCase().includes(searchLower)) ||
+          (notification.machine_id?.toString().includes(searchLower)) ||
+          (notification.status_name?.toLowerCase().includes(searchLower)) ||
+          (notification.description?.toLowerCase().includes(searchLower)) ||
+          // Material notifications
+          (notification.part_number?.toString().includes(searchLower)) ||
+          // Instrument calibration notifications
+          (notification.item_name?.toLowerCase().includes(searchLower)) ||
+          (notification.trade_name?.toLowerCase().includes(searchLower)) ||
+          (notification.calibration_type?.toLowerCase().includes(searchLower)) ||
+          // Machine calibration notifications
+          (notification.machine_name?.toLowerCase().includes(searchLower)) ||
+          (notification.machine_type?.toLowerCase().includes(searchLower))
+        );
+      });
+    }
+
+    // Apply date range filter
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      const startDate = dateRange[0].startOf('day');
+      const endDate = dateRange[1].endOf('day');
+      
+      filtered = filtered.filter(notification => {
+        const notificationDate = new Date(notification.updated_at || notification.timestamp);
+        return notificationDate >= startDate && notificationDate <= endDate;
+      });
+    }
+
+    return filtered;
+  };
+
+  // Reset all filters
+  const handleResetFilters = () => {
+    setSearchText('');
+    setDateRange(null);
+  };
 
   // Helper function to get color based on status and type
   const getStatusColor = (status, type) => {
@@ -216,6 +301,33 @@ const Notifications = () => {
     }));
   };
 
+  // Helper function to get user name - REMOVE THIS FUNCTION
+  const getUserName = (userId) => {
+    if (!userId) return '';
+    
+    // Convert userId to string for consistent comparison
+    const userIdStr = userId.toString();
+    
+    // Log for debugging
+    // console.log('Looking up user:', userIdStr, 'in map:', Object.fromEntries(userMap));
+    
+    const userName = userMap.get(userIdStr);
+    if (userName) {
+      return userName;
+    }
+    
+    // If not found, try fetching users again
+    useNotificationStore.getState().fetchUsers();
+    
+    // Return the ID as fallback
+    return userIdStr;
+  };
+
+  // Add effect to fetch users when component mounts
+  // useEffect(() => {
+  //   useNotificationStore.getState().fetchUsers();
+  // }, []);
+
   // Define columns for machine notifications
   const getMachineColumns = () => [
     {
@@ -288,7 +400,7 @@ const Notifications = () => {
       title: 'Created By',
       dataIndex: 'created_by',
       key: 'created_by',
-      render: (text) => text || 'System',
+      render: (text) => text || '',
     },
     {
       title: 'Updated At',
@@ -315,7 +427,7 @@ const Notifications = () => {
         return isAcknowledged ? (
           <div>
             <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
-            <span>By: {record.acknowledged_by || 'System'}</span>
+            <span>By: {record.acknowledged_by || ''}</span>
           </div>
         ) : (
           <Button 
@@ -402,7 +514,7 @@ const Notifications = () => {
       title: 'Created By',
       dataIndex: 'created_by',
       key: 'created_by',
-      render: (text) => text || 'System',
+      render: (text) => text || '',
     },
     {
       title: 'Updated At',
@@ -429,7 +541,7 @@ const Notifications = () => {
         return isAcknowledged ? (
           <div>
             <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
-            <span>By: {record.acknowledged_by || 'System'}</span>
+            <span>By: {record.acknowledged_by || ''}</span>
           </div>
         ) : (
           <Button 
@@ -470,15 +582,35 @@ const Notifications = () => {
     {
       title: 'Instrument',
       key: 'instrument',
-      render: (_, record) => (
-        <span>
-          <strong>{record.item_name || record.trade_name || ''}</strong>
-          {record.bel_part_number && <div>Part #: {record.bel_part_number}</div>}
-        </span>
-      ),
+      render: (_, record) => {
+        const details = itemDetailsMap.get(record.item_name);
+        const displayText = details
+          ? `${details.categoryName} - ${details.subcategoryName}`
+          : record.item_name || record.trade_name || 'Unknown';
+    
+        return (
+          <span>
+            <Tooltip title="Click to view calibration history for this item">
+              <Tag
+                icon={<ToolOutlined />}
+                style={{ cursor: 'pointer', color: '#1890ff' }}
+              >
+                <strong>{displayText}</strong>
+              </Tag>
+            </Tooltip>
+            {record.bel_part_number && <div>Part #: {record.bel_part_number}</div>}
+          </span>
+        );
+      },
       sorter: (a, b) => {
-        const aName = a.item_name || a.trade_name || '';
-        const bName = b.item_name || b.trade_name || '';
+        const aDetails = itemDetailsMap.get(a.item_name);
+        const bDetails = itemDetailsMap.get(b.item_name);
+        const aName = aDetails 
+          ? `${aDetails.categoryName} - ${aDetails.subcategoryName}`
+          : a.item_name || a.trade_name || '';
+        const bName = bDetails 
+          ? `${bDetails.categoryName} - ${bDetails.subcategoryName}`
+          : b.item_name || b.trade_name || '';
         return aName.localeCompare(bName);
       },
     },
@@ -544,6 +676,12 @@ const Notifications = () => {
       defaultSortOrder: 'ascend',
     },
     {
+      title: 'Created By',
+      dataIndex: 'created_by',
+      key: 'created_by',
+      render: (text) => text || '',
+    },
+    {
       title: 'Acknowledged',
       dataIndex: 'is_acknowledged',
       key: 'is_acknowledged',
@@ -560,7 +698,7 @@ const Notifications = () => {
         return isAcknowledged ? (
           <div>
             <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
-            <span>By: {record.acknowledged_by || 'System'}</span>
+            <span>By: {record.acknowledged_by || ''}</span>
           </div>
         ) : (
           <Button 
@@ -660,6 +798,12 @@ const Notifications = () => {
       sorter: (a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0),
     },
     {
+      title: 'Created By',
+      dataIndex: 'created_by',
+      key: 'created_by',
+      render: (text) => text || '',
+    },
+    {
       title: 'Acknowledged',
       dataIndex: 'is_acknowledged',
       key: 'is_acknowledged',
@@ -676,7 +820,7 @@ const Notifications = () => {
         return isAcknowledged ? (
           <div>
             <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
-            <span>By: {record.acknowledged_by || 'System'}</span>
+            <span>By: {record.acknowledged_by || ''}</span>
           </div>
         ) : (
           <Button 
@@ -854,6 +998,12 @@ const Notifications = () => {
       render: (_, record) => formatDate(record.updated_at || record.timestamp)
     },
     {
+      title: 'Created By',
+      dataIndex: 'created_by',
+      key: 'created_by',
+      render: (text) => text || '',
+    },
+    {
       title: 'Acknowledged',
       dataIndex: 'is_acknowledged',
       key: 'is_acknowledged',
@@ -870,7 +1020,7 @@ const Notifications = () => {
         return isAcknowledged ? (
           <div>
             <CheckCircle size={16} color="green" style={{ marginRight: '8px' }} />
-            <span>By: {record.acknowledged_by || 'System'}</span>
+            <span>By: {record.acknowledged_by || ''}</span>
           </div>
         ) : (
           <Button 
@@ -1203,11 +1353,9 @@ const Notifications = () => {
                   allowClear
                   enterButton
                   size="middle"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
                   style={{ width: '100%' }}
-                  onSearch={(value) => {
-                    // Implementation will go here when connecting to backend filtering
-                    console.log('Search for:', value);
-                  }}
                 />
               </Col>
               <Col xs={24} lg={12}>
@@ -1215,21 +1363,16 @@ const Notifications = () => {
                   <span>Date Range:</span>
                   <RangePicker 
                     allowClear
+                    value={dateRange}
+                    onChange={setDateRange}
                     style={{ width: '100%' }}
-                    onChange={(dates, dateStrings) => {
-                      // Implementation will go here when connecting to backend filtering
-                      console.log('Selected dates:', dateStrings);
-                    }}
                   />
                 </Space>
               </Col>
               <Col xs={24} lg={4} style={{ textAlign: 'right' }}>
                 <Button 
                   icon={<FilterOutlined />}
-                  onClick={() => {
-                    // Reset filters implementation
-                    console.log('Reset filters');
-                  }}
+                  onClick={handleResetFilters}
                 >
                   Reset
                 </Button>
@@ -1345,9 +1488,9 @@ const Notifications = () => {
                 </div>
               </div>
             </div>
-          ) : filteredNotifications.length > 0 ? (
+          ) : getFilteredNotifications().length > 0 ? (
             <Table 
-              dataSource={filteredNotifications}
+              dataSource={getFilteredNotifications()}
               columns={getColumns()}
               rowKey={(record) => record._uniqueId || `${record.notificationType}-${record.id || record.machine_id || record.part_number}-${record.updated_at || record.timestamp}`}
               pagination={{ 
@@ -1372,7 +1515,8 @@ const Notifications = () => {
             <Empty 
               description={
                 <span>
-                  {activeTabKey === 'unacknowledged' 
+                  {searchText || dateRange ? 'No notifications match your search criteria' : 
+                   activeTabKey === 'unacknowledged' 
                     ? 'No unacknowledged notifications' 
                     : 'No notifications found'}
                 </span>

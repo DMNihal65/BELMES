@@ -1,0 +1,276 @@
+import React, { useEffect, useState } from 'react';
+import { Layout, Tabs, Card, Button, message, Spin, Badge, Dropdown, Row, Col, Tooltip } from 'antd';
+import { 
+  LayoutDashboard, 
+  Gauge, 
+  Package, 
+  ClipboardList, 
+  FileText, 
+  AlertTriangle,
+  Clock,
+  Menu as MenuIcon,
+  RefreshCw,
+  User,
+  MessageCircle,
+  Activity,
+  BarChart3
+} from 'lucide-react';
+import JobSelectionPanel from './OperatorComponents/JobSelectionPanel';
+import MachineStatusCard from './OperatorComponents/MachineStatusCard';
+import CurrentJobCard from './OperatorComponents/CurrentJobCard';
+import OperationDetailsCard from './OperatorComponents/OperationDetailsCard';
+import ProductionCard from './OperatorComponents/ProductionCard';
+import DocumentsCard from './OperatorComponents/DocumentsCard';
+import FeedbackCard from './OperatorComponents/FeedbackCard';
+import FeedbackModal from '../operatorscreens/FeedbackModal';
+import useOperatorStore from '../../store/operator-store';
+import './OperatorDashboard.css';
+
+const { Content } = Layout;
+const { TabPane } = Tabs;
+
+const NewOperatorDashboard = () => {
+  const { 
+    initializeDashboard,
+    isInitializing,
+    selectedJob,
+    selectedOperation,
+    machineStatus,
+    error,
+    isJobSelectionModalVisible,
+    setJobSelectionModalVisible,
+    fetchMachineOperations,
+    machineId
+  } = useOperatorStore();
+
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleString());
+  const [refreshing, setRefreshing] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+
+  // Update clock
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleString());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    // Initialize the dashboard on component mount
+    initializeDashboard();
+  }, [initializeDashboard]);
+
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchMachineOperations(machineId, true);
+      message.success('Dashboard refreshed');
+    } catch (error) {
+      message.error('Failed to refresh dashboard');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Handle feedback submission
+  const handleFeedbackSubmit = (feedback) => {
+    message.success('Feedback submitted successfully');
+    setFeedbackModalVisible(false);
+  };
+
+  // Get user info
+  const getUserInfo = () => {
+    try {
+      const authStorage = localStorage.getItem('auth-storage');
+      if (authStorage) {
+        const parsedData = JSON.parse(authStorage);
+        return parsedData?.state?.user || {};
+      }
+      return {};
+    } catch (error) {
+      return {};
+    }
+  };
+
+  const userInfo = getUserInfo();
+  const userMenu = (
+    <Dropdown
+      menu={{
+        items: [
+          {
+            key: '1',
+            label: 'User: ' + (userInfo.username || 'Unknown'),
+          },
+          {
+            key: '2',
+            label: 'Role: ' + (userInfo.role || 'Operator'),
+          },
+          {
+            type: 'divider',
+          },
+          {
+            key: '3',
+            label: 'Last Login: ' + (new Date().toLocaleDateString()),
+          },
+        ],
+      }}
+      placement="bottomRight"
+      trigger={['click']}
+    >
+      <Button type="text" icon={<User size={18} />} className="text-sky-500" />
+    </Dropdown>
+  );
+
+  if (isInitializing) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-sky-50">
+        <div className="text-center bg-white p-8 rounded-lg shadow-sm">
+          <Spin size="large" />
+          <div className="mt-4 text-gray-600 font-medium">Initializing dashboard...</div>
+          <p className="text-gray-500 text-sm mt-2">Loading machine data and configurations</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Layout className="min-h-screen bg-sky-50">
+      {/* Header with Dashboard Title and Status */}
+      <div className="bg-white shadow-sm p-2 flex justify-between items-center sticky top-0 z-10 border-b border-sky-100">
+        <div className="flex items-center gap-2">
+          <LayoutDashboard className="text-sky-600" size={20} />
+          <div>
+            <h1 className="text-lg font-bold mb-0 text-sky-800">Operator Dashboard</h1>
+            <p className="text-xs text-gray-500 mt-0">
+              {machineStatus?.machine_name || 'Loading machine...'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Badge status={machineStatus?.status === 'PRODUCTION' ? 'success' : machineStatus?.status === 'IDLE' ? 'warning' : 'error'} />
+          <div className="text-xs flex flex-col items-end">
+            <span className="text-gray-700 font-medium">{currentTime}</span>
+            <span className="text-gray-500">Machine ID: {machineId}</span>
+          </div>
+          
+          
+          
+          <Tooltip title="Select Job">
+            <Button 
+              type="primary" 
+              className="bg-sky-500 hover:bg-sky-600 flex items-center"
+              size="small"
+              icon={<Package size={14} />}
+              onClick={() => setJobSelectionModalVisible(true)}
+            >
+              Select Job
+            </Button>
+          </Tooltip>
+          
+          <Tooltip title="Refresh Dashboard">
+            <Button 
+              icon={<RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />} 
+              onClick={handleRefresh}
+              disabled={refreshing}
+              type="text"
+              className="text-sky-500"
+            />
+          </Tooltip>
+          
+          {userMenu}
+        </div>
+      </div>
+
+      {/* Main Dashboard Content */}
+      <Content className="p-3 overflow-auto">
+        {error && (
+          <div className="mb-3">
+            <Card className="bg-red-50 border-red-200 shadow-sm">
+              <div className="flex items-center gap-2 text-red-700">
+                <AlertTriangle size={20} />
+                <span>{error}</span>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Dashboard Layout - Based on the reference image with lines */}
+        <Row gutter={[12, 12]}>
+          {/* Left Column - Machine Status */}
+          <Col xs={24} lg={8}>
+            <MachineStatusCard />
+          </Col>
+          
+          {/* Middle Column - Production Progress */}
+          <Col xs={24} lg={8}>
+            <ProductionCard />
+          </Col>
+          
+          {/* Right Column - Feedback Form */}
+          <Col xs={24} lg={8}>
+            <FeedbackCard />
+          </Col>
+          
+          {/* Bottom Row - Current Job Card */}
+          <Col xs={24} lg={8}>
+            <CurrentJobCard />
+          </Col>
+          
+          {/* Bottom Middle/Right - Operations/Documents Tabs */}
+          <Col xs={24} lg={16}>
+            <Card 
+              className="shadow-sm status-card border-sky-100" 
+              bodyStyle={{ padding: 0 }}
+            >
+              <Tabs 
+                defaultActiveKey="operations" 
+                type="card"
+                className="dashboard-tabs"
+                tabBarStyle={{ marginBottom: 0, paddingLeft: 8, paddingRight: 8, paddingTop: 8 }}
+                tabBarExtraContent={
+                  <div className="text-xs text-gray-500 px-3">
+                    {selectedJob ? (
+                      <div className="flex items-center">
+                        <Package size={14} className="mr-1" />
+                        <span>{selectedJob.part_number} · {selectedOperation?.operation_description || 'No operation selected'}</span>
+                      </div>
+                    ) : 'No job selected'}
+                  </div>
+                }
+              >
+                <TabPane 
+                  tab={<span className="flex items-center gap-1"><ClipboardList size={14} />Operations</span>} 
+                  key="operations"
+                >
+                  <OperationDetailsCard />
+                </TabPane>
+                <TabPane 
+                  tab={<span className="flex items-center gap-1"><FileText size={14} />Documents</span>} 
+                  key="documents"
+                >
+                  <DocumentsCard />
+                </TabPane>
+              </Tabs>
+            </Card>
+          </Col>
+        </Row>
+      </Content>
+
+      {/* Modals */}
+      <JobSelectionPanel
+        visible={isJobSelectionModalVisible}
+        onClose={() => setJobSelectionModalVisible(false)}
+      />
+      
+      <FeedbackModal
+        visible={feedbackModalVisible}
+        onClose={() => setFeedbackModalVisible(false)}
+        onSubmit={handleFeedbackSubmit}
+      />
+    </Layout>
+  );
+};
+
+export default NewOperatorDashboard; 

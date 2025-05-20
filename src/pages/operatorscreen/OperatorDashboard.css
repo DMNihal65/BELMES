@@ -117,14 +117,7 @@
   border-radius: 3px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #7dd3fc; /* sky-300 */
-  border-radius: 3px;
-}
 
-::-webkit-scrollbar-thumb:hover {
-  background: #38bdf8; /* sky-400 */
-}
 
 /* Status cards with subtle indicators */
 .machine-status-idle {

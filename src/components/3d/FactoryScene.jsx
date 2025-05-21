@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect, useRef, useMemo } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 import { Canvas, useLoader, useFrame } from '@react-three/fiber';
 import { 
   Environment, 
@@ -8,11 +8,10 @@ import {
   SpotLight, 
   useHelper, 
   Text,
-  Html,
-  useTexture,
-  Grid
+  Html
 } from '@react-three/drei';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import WebGLErrorBoundary from './WebGLErrorBoundary';
 import { ToolOutlined, AppstoreOutlined, ProjectOutlined } from '@ant-design/icons';
 
@@ -21,15 +20,11 @@ import FactoryFloor from './FactoryFloor';
 import AdvancedMachine from './AdvancedMachine';
 import CameraController from './CameraController';
 
-// Custom-built Turning Machine Model without GLB dependency
+// Model loader components
 const TurningMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected, machineData }) => {
+  const gltf = useLoader(GLTFLoader, '/turning.glb');
   const model = useRef();
   const statusLightRef = useRef();
-  
-  // Make sure position, rotation, and scale are valid numbers, not NaN or undefined
-  const safePosition = position?.map(val => Number.isFinite(val) ? val : 0) || [0, 0, 0];
-  const safeRotation = rotation?.map(val => Number.isFinite(val) ? val : 0) || [0, 0, 0];
-  const safeScale = Number.isFinite(scale) ? scale : 0.5;
   
   // Get status color
   const getStatusColor = (status) => {
@@ -62,84 +57,45 @@ const TurningMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
     }
   });
   
+  useEffect(() => {
+    if (model.current) {
+      // Apply any model-specific adjustments if needed
+      model.current.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          
+          // If machine is OFF or has error, adjust appearance
+          if (machineData?.status === 'OFF' && node.material) {
+            const material = node.material.clone();
+            material.transparent = true;
+            material.opacity = 0.8;
+            node.material = material;
+          } else if (machineData?.status === 'ERROR' && node.material) {
+            const material = node.material.clone();
+            material.emissive = new THREE.Color('#ef4444');
+            material.emissiveIntensity = 0.1;
+            node.material = material;
+          }
+        }
+      });
+    }
+  }, [machineData?.status]);
+  
   const statusColor = getStatusColor(machineData?.status);
-  const statusHeight = 2; // Adjusted for custom model height
+  
+  // Calculate appropriate status indicator height for the larger scale
+  const statusHeight = 0.5; // Adjust based on actual model height
   
   return (
     <group 
       ref={model} 
-      position={safePosition} 
-      rotation={safeRotation} 
-      scale={[safeScale, safeScale, safeScale]}
+      position={position} 
+      rotation={rotation} 
+      scale={[scale, scale, scale]}
       onClick={onClick}
     >
-      {/* Machine base */}
-      <mesh receiveShadow castShadow>
-        <boxGeometry args={[6, 1, 3]} />
-        <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Machine bed */}
-      <mesh position={[0, 1, 0]} receiveShadow castShadow>
-        <boxGeometry args={[8, 0.5, 2]} />
-        <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Headstock */}
-      <mesh position={[-3, 2, 0]} receiveShadow castShadow>
-        <boxGeometry args={[2, 2, 2.5]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
-      </mesh>
-      
-      {/* Spindle */}
-      <mesh position={[-3.6, 2, 0]} rotation={[0, Math.PI/2, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[0.6, 0.6, 1, 16]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-      </mesh>
-      
-      {/* Chuck */}
-      <mesh position={[-4.1, 2, 0]} rotation={[0, Math.PI/2, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[0.8, 0.8, 0.4, 16]} />
-        <meshStandardMaterial color="#475569" metalness={0.8} roughness={0.3} />
-      </mesh>
-      
-      {/* Tailstock */}
-      <mesh position={[3, 1.75, 0]} receiveShadow castShadow>
-        <boxGeometry args={[1.5, 1.5, 2]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
-      </mesh>
-      
-      {/* Carriage */}
-      <mesh position={[0, 1.5, 0]} receiveShadow castShadow>
-        <boxGeometry args={[3, 1, 2.2]} />
-        <meshStandardMaterial color="#334155" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Tool post */}
-      <mesh position={[0, 2, 0.8]} receiveShadow castShadow>
-        <boxGeometry args={[1, 1, 0.6]} />
-        <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Control panel */}
-      <mesh position={[-3, 2.5, -1.5]} receiveShadow castShadow rotation={[0.2, 0, 0]}>
-        <boxGeometry args={[1.5, 1, 0.2]} />
-        <meshStandardMaterial color="#0f172a" metalness={0.4} roughness={0.6} />
-      </mesh>
-      
-      {/* Control buttons */}
-      <group position={[-3, 2.5, -1.4]}>
-        {[[-0.5, 0.3], [0, 0.3], [0.5, 0.3], [-0.5, 0], [0, 0], [0.5, 0]].map((pos, i) => (
-          <mesh key={i} position={[pos[0], pos[1], 0]} receiveShadow castShadow>
-            <cylinderGeometry args={[0.07, 0.07, 0.05, 8]} />
-            <meshStandardMaterial 
-              color={i === 0 ? "#22c55e" : i === 1 ? "#ef4444" : "#f59e0b"} 
-              metalness={0.5} 
-              roughness={0.5} 
-            />
-          </mesh>
-        ))}
-      </group>
+      <primitive object={gltf.scene.clone()} />
       
       {/* Status light */}
       <group position={[0, statusHeight, 0]}>
@@ -163,7 +119,7 @@ const TurningMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
       </group>
       
       {isSelected && (
-        <mesh position={[0, 3, 0]}>
+        <mesh position={[0, 0.8, 0]}>
           <sphereGeometry args={[0.1, 16, 16]} />
           <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.5} />
         </mesh>
@@ -174,8 +130,6 @@ const TurningMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
           position={[0, statusHeight + 0.2, 0]}
           center
           distanceFactor={15}
-          transform
-          sprite
         >
           <div className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-200 w-40">
             <div className="text-sm font-bold mb-1 truncate">{machineData.name}</div>
@@ -201,15 +155,10 @@ const TurningMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
   );
 };
 
-// Custom-built Milling Machine Model without GLB dependency
 const MillingMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected, machineData }) => {
+  const gltf = useLoader(GLTFLoader, '/machine.glb');
   const model = useRef();
   const statusLightRef = useRef();
-  
-  // Make sure position, rotation, and scale are valid numbers, not NaN or undefined
-  const safePosition = position?.map(val => Number.isFinite(val) ? val : 0) || [0, 0, 0];
-  const safeRotation = rotation?.map(val => Number.isFinite(val) ? val : 0) || [0, 0, 0];
-  const safeScale = Number.isFinite(scale) ? scale : 0.5;
   
   // Get status color
   const getStatusColor = (status) => {
@@ -242,88 +191,53 @@ const MillingMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
     }
   });
   
+  useEffect(() => {
+    if (model.current) {
+      // Apply any model-specific adjustments if needed
+      model.current.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          
+          // If machine is OFF or has error, adjust appearance
+          if (machineData?.status === 'OFF' && node.material) {
+            const material = node.material.clone();
+            material.transparent = true;
+            material.opacity = 0.8;
+            node.material = material;
+          } else if (machineData?.status === 'ERROR' && node.material) {
+            const material = node.material.clone();
+            material.emissive = new THREE.Color('#ef4444');
+            material.emissiveIntensity = 0.1;
+            node.material = material;
+          }
+        }
+      });
+    }
+  }, [machineData?.status]);
+  
   const statusColor = getStatusColor(machineData?.status);
-  const statusHeight = 3; // Adjusted for custom model height
+  
+  // Calculate appropriate status indicator height for the larger scale
+  const statusHeight = 0.5; // Adjust based on actual model height
   
   return (
     <group 
       ref={model} 
-      position={safePosition} 
-      rotation={safeRotation} 
-      scale={[safeScale, safeScale, safeScale]}
+      position={position} 
+      rotation={rotation} 
+      scale={[scale, scale, scale]}
       onClick={onClick}
     >
-      {/* Machine base */}
-      <mesh receiveShadow castShadow>
-        <boxGeometry args={[5, 1, 4]} />
-        <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Column */}
-      <mesh position={[0, 2.25, -1.5]} receiveShadow castShadow>
-        <boxGeometry args={[2, 4.5, 1]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
-      </mesh>
-      
-      {/* Table */}
-      <mesh position={[0, 1.4, 0.5]} receiveShadow castShadow>
-        <boxGeometry args={[4, 0.8, 3]} />
-        <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* X-axis ways */}
-      <mesh position={[0, 1, 0.5]} receiveShadow castShadow>
-        <boxGeometry args={[4.5, 0.2, 0.4]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-      </mesh>
-      
-      {/* Y-axis ways */}
-      <mesh position={[0, 1, 0.5]} receiveShadow castShadow rotation={[0, Math.PI/2, 0]}>
-        <boxGeometry args={[3.5, 0.2, 0.4]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-      </mesh>
-      
-      {/* Spindle head */}
-      <mesh position={[0, 3.5, 0]} receiveShadow castShadow>
-        <boxGeometry args={[2, 1.5, 2]} />
-        <meshStandardMaterial color="#334155" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Spindle */}
-      <mesh position={[0, 2.5, 0.5]} rotation={[Math.PI/2, 0, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[0.4, 0.4, 1, 16]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
-      </mesh>
-      
-      {/* Tool */}
-      <mesh position={[0, 2, 0.5]} rotation={[Math.PI/2, 0, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[0.2, 0.3, 0.5, 16]} />
-        <meshStandardMaterial color="#475569" metalness={0.8} roughness={0.3} />
-      </mesh>
-      
-      {/* Control panel */}
-      <mesh position={[2, 2.5, -1.5]} receiveShadow castShadow rotation={[0, -0.5, 0]}>
-        <boxGeometry args={[0.2, 1.5, 1]} />
-        <meshStandardMaterial color="#0f172a" metalness={0.4} roughness={0.6} />
-      </mesh>
-      
-      {/* Control screen */}
-      <mesh position={[2.05, 2.5, -1.5]} receiveShadow castShadow rotation={[0, -0.5, 0]}>
-        <planeGeometry args={[0.8, 0.6]} />
-        <meshStandardMaterial 
-          color="#0369a1" 
-          emissive="#0369a1"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
+      <primitive object={gltf.scene.clone()} />
       
       {/* Status light */}
-      <group position={[0, statusHeight, 0]}>
+      <group position={[0, statusHeight , 0]}>
         <mesh 
           ref={statusLightRef}
           position={[0, 0, 0]}
         >
-          <sphereGeometry args={[0.08, 16, 16]} />
+          <sphereGeometry args={[0.06, 16, 16]} />
           <meshStandardMaterial 
             color={statusColor}
             emissive={statusColor}
@@ -333,13 +247,13 @@ const MillingMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
         
         {/* Status ring */}
         <mesh rotation={[Math.PI/2, 0, 0]}>
-          <torusGeometry args={[0.12, 0.02, 16, 32]} />
+          <torusGeometry args={[0.1, 0.02, 16, 32]} />
           <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.2} />
         </mesh>
       </group>
       
       {isSelected && (
-        <mesh position={[0, 4, 0]}>
+        <mesh position={[0, 0.8, 0]}>
           <sphereGeometry args={[0.1, 16, 16]} />
           <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.5} />
         </mesh>
@@ -350,8 +264,6 @@ const MillingMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
           position={[0, statusHeight + 0.2, 0]}
           center
           distanceFactor={15}
-          transform
-          sprite
         >
           <div className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-200 w-40">
             <div className="text-sm font-bold mb-1 truncate">{machineData.name}</div>
@@ -377,15 +289,10 @@ const MillingMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
   );
 };
 
-// Custom-built EDM Machine Model without GLB dependency
 const EDMMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected, machineData }) => {
+  const gltf = useLoader(GLTFLoader, '/wireedm.glb');
   const model = useRef();
   const statusLightRef = useRef();
-  
-  // Make sure position, rotation, and scale are valid numbers, not NaN or undefined
-  const safePosition = position?.map(val => Number.isFinite(val) ? val : 0) || [0, 0, 0];
-  const safeRotation = rotation?.map(val => Number.isFinite(val) ? val : 0) || [0, 0, 0];
-  const safeScale = Number.isFinite(scale) ? scale : 0.5;
   
   // Get status color
   const getStatusColor = (status) => {
@@ -418,88 +325,45 @@ const EDMMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected,
     }
   });
   
+  useEffect(() => {
+    if (model.current) {
+      // Apply any model-specific adjustments if needed
+      model.current.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          
+          // If machine is OFF or has error, adjust appearance
+          if (machineData?.status === 'OFF' && node.material) {
+            const material = node.material.clone();
+            material.transparent = true;
+            material.opacity = 0.8;
+            node.material = material;
+          } else if (machineData?.status === 'ERROR' && node.material) {
+            const material = node.material.clone();
+            material.emissive = new THREE.Color('#ef4444');
+            material.emissiveIntensity = 0.1;
+            node.material = material;
+          }
+        }
+      });
+    }
+  }, [machineData?.status]);
+  
   const statusColor = getStatusColor(machineData?.status);
-  const statusHeight = 3.5; // Adjusted for custom model height
+  
+  // Calculate appropriate status indicator height for the larger scale
+  const statusHeight = 0.5; // Adjust based on actual model height
   
   return (
     <group 
       ref={model} 
-      position={safePosition} 
-      rotation={safeRotation} 
-      scale={[safeScale, safeScale, safeScale]}
+      position={position} 
+      rotation={rotation} 
+      scale={[scale, scale, scale]}
       onClick={onClick}
     >
-      {/* Machine base */}
-      <mesh receiveShadow castShadow>
-        <boxGeometry args={[6, 1, 5]} />
-        <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Work tank */}
-      <mesh position={[0, 1.5, 0]} receiveShadow castShadow>
-        <boxGeometry args={[5, 1, 4]} />
-        <meshStandardMaterial color="#1e40af" metalness={0.3} roughness={0.4} transparent opacity={0.8} />
-      </mesh>
-      
-      {/* Left column */}
-      <mesh position={[-2, 2.5, -1.5]} receiveShadow castShadow>
-        <boxGeometry args={[1, 4, 1]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
-      </mesh>
-      
-      {/* Right column */}
-      <mesh position={[2, 2.5, -1.5]} receiveShadow castShadow>
-        <boxGeometry args={[1, 4, 1]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
-      </mesh>
-      
-      {/* Upper beam */}
-      <mesh position={[0, 4.5, -1.5]} receiveShadow castShadow>
-        <boxGeometry args={[5, 0.8, 1]} />
-        <meshStandardMaterial color="#334155" metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* EDM wire guides */}
-      <mesh position={[0, 3, 0]} receiveShadow castShadow>
-        <boxGeometry args={[1, 2, 0.5]} />
-        <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Wire visualization */}
-      <mesh position={[0, 1.5, 0]} rotation={[Math.PI/2, 0, 0]} receiveShadow>
-        <cylinderGeometry args={[0.01, 0.01, 3, 8]} />
-        <meshStandardMaterial color="#f1f5f9" metalness={0.9} roughness={0.1} />
-      </mesh>
-      
-      {/* Control cabinet */}
-      <mesh position={[3, 2, 0]} receiveShadow castShadow>
-        <boxGeometry args={[1, 3, 3]} />
-        <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.5} />
-      </mesh>
-      
-      {/* Control screen */}
-      <mesh position={[3.51, 2.5, 0]} rotation={[0, Math.PI/2, 0]} receiveShadow castShadow>
-        <planeGeometry args={[1.5, 1]} />
-        <meshStandardMaterial 
-          color="#0369a1" 
-          emissive="#0369a1"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-      
-      {/* Control buttons */}
-      <group position={[3.51, 1.5, 0]}>
-        {[[-0.5, 0], [0, 0], [0.5, 0]].map((pos, i) => (
-          <mesh key={i} position={[0, pos[0], pos[1]]} rotation={[0, Math.PI/2, 0]} receiveShadow castShadow>
-            <cylinderGeometry args={[0.07, 0.07, 0.05, 8]} />
-            <meshStandardMaterial 
-              color={i === 0 ? "#22c55e" : i === 1 ? "#ef4444" : "#f59e0b"} 
-              metalness={0.5} 
-              roughness={0.5} 
-            />
-          </mesh>
-        ))}
-      </group>
+      <primitive object={gltf.scene.clone()} />
       
       {/* Status light */}
       <group position={[0, statusHeight, 0]}>
@@ -523,7 +387,7 @@ const EDMMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected,
       </group>
       
       {isSelected && (
-        <mesh position={[0, 5, 0]}>
+        <mesh position={[0, 0.8, 0]}>
           <sphereGeometry args={[0.1, 16, 16]} />
           <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.5} />
         </mesh>
@@ -531,11 +395,9 @@ const EDMMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected,
       
       {machineData && (
         <Html
-          position={[0, statusHeight + 0.2, 0]}
+          position={[0, statusHeight + 0.15, 0]}
           center
           distanceFactor={15}
-          transform
-          sprite
         >
           <div className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-200 w-40">
             <div className="text-sm font-bold mb-1 truncate">{machineData.name}</div>
@@ -575,7 +437,6 @@ const FactoryScene = ({
   const [webGLSupported, setWebGLSupported] = useState(true);
   const [fallbackMode, setFallbackMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [retryCount, setRetryCount] = useState(0);
 
   // Check WebGL support on component mount
   useEffect(() => {
@@ -601,27 +462,9 @@ const FactoryScene = ({
           const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
           if (debugInfo) {
             const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-            console.log('Graphics renderer:', renderer);
-            
             // Check if using software renderer like SwiftShader (Chrome) or ANGLE (Firefox)
             if (renderer.includes('SwiftShader') || renderer.includes('ANGLE') || renderer.includes('llvmpipe')) {
-              console.log('Software renderer detected, using low quality settings');
               setQuality('low');
-            } else if (navigator.userAgent.indexOf("Firefox") !== -1) {
-              // Firefox optimization
-              console.log('Firefox detected, using optimized settings');
-              setQuality('medium');
-            }
-          }
-          
-          // Set optimal quality based on device memory (if available)
-          if (navigator.deviceMemory) {
-            if (navigator.deviceMemory <= 4) {
-              console.log('Low memory device detected, using lower quality settings');
-              setQuality('low');
-            } else if (navigator.deviceMemory >= 8) {
-              console.log('High memory device detected, using high quality settings');
-              setQuality('high');
             }
           }
         }
@@ -634,7 +477,7 @@ const FactoryScene = ({
     };
 
     checkWebGLSupport();
-  }, [retryCount]);
+  }, []);
 
   // Divide machines into types
   const categorizeMachines = () => {
@@ -696,10 +539,10 @@ const FactoryScene = ({
   };
 
   useEffect(() => {
-    // Simulate loading
+    // Load actual models
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 500); // Reduced from 1000ms to 500ms as we're not loading external models
+    }, 1000);
     
     return () => clearTimeout(timer);
   }, []);
@@ -707,9 +550,9 @@ const FactoryScene = ({
   // Get pixel ratio based on quality setting
   const getPixelRatio = () => {
     switch(quality) {
-      case 'high': return window.devicePixelRatio || 2;
-      case 'medium': return Math.min(window.devicePixelRatio || 1, 1.5);
-      case 'low': default: return Math.min(window.devicePixelRatio || 1, 1); // Limited to 1x for better performance
+      case 'high': return [1, 2];
+      case 'medium': return [1, 1.5];
+      case 'low': default: return [0.5, 1]; // Reduced for better performance
     }
   };
 
@@ -723,40 +566,6 @@ const FactoryScene = ({
   // Get categorized machines
   const machinesByType = categorizeMachines();
 
-  // Machine component helper function
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'PRODUCTION': return 'green';
-      case 'ON': return 'orange';
-      case 'IDLE': return 'blue';
-      case 'SETUP': return 'purple';
-      case 'ERROR': return 'red';
-      case 'MAINTENANCE': return 'indigo';
-      case 'OFF': default: return 'gray';
-    }
-  };
-
-  // Handle quality change
-  const handleQualityChange = (newQuality) => {
-    setQuality(newQuality);
-    localStorage.setItem('factorySceneQuality', newQuality);
-  };
-
-  // Load saved quality setting
-  useEffect(() => {
-    const savedQuality = localStorage.getItem('factorySceneQuality');
-    if (savedQuality) {
-      setQuality(savedQuality);
-    }
-  }, []);
-
-  // Allow retry with reset function
-  const handleRetry = () => {
-    setFallbackMode(false);
-    setErrorMessage('');
-    setRetryCount(prev => prev + 1);
-  };
-
   // Fallback view when WebGL is not supported
   if (fallbackMode) {
     return (
@@ -767,13 +576,6 @@ const FactoryScene = ({
           <p className="mt-2 text-sm">
             Try using the latest version of Chrome, Firefox, or Edge, and ensure your graphics drivers are updated.
           </p>
-          <Button 
-            type="primary"
-            className="mt-3"
-            onClick={handleRetry}
-          >
-            Try Again
-          </Button>
         </div>
         
         <div className="bg-white rounded-lg shadow-lg p-4 w-full h-[calc(100%-130px)] flex flex-col">
@@ -833,7 +635,114 @@ const FactoryScene = ({
               
               {/* Main shop floor */}
               <div className="absolute bottom-2 left-2 right-2 h-[60%] flex">
-                {/* Rest of the fallback view UI */}
+                {/* Turning side */}
+                <div className="w-[45%] flex flex-col">
+                  <div className="text-xs font-medium text-blue-800 mb-1 text-center">Turning</div>
+                  <div className="flex-1 flex flex-col justify-around">
+                    {machines.filter(m => m.type === 'turning').slice(0, 5).map(machine => (
+                      <div 
+                        key={machine.id}
+                        onClick={() => onMachineSelect(machine)}
+                        className={`h-8 bg-white rounded-md shadow-sm flex items-center justify-between px-2 cursor-pointer
+                          ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''}
+                          border border-${getStatusColor(machine.status)}-300`}
+                      >
+                        <div className={`w-2 h-2 rounded-full bg-${getStatusColor(machine.status)}-500`}></div>
+                        <span className="text-xs truncate max-w-[70%]">{machine.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Center space */}
+                <div className="w-[10%]"></div>
+                
+                {/* Milling side */}
+                <div className="w-[45%] flex flex-col">
+                  <div className="text-xs font-medium text-green-800 mb-1 text-center">Milling</div>
+                  <div className="flex-1 flex flex-col justify-around">
+                    {machines.filter(m => m.type === 'milling').slice(0, 5).map(machine => (
+                      <div 
+                        key={machine.id}
+                        onClick={() => onMachineSelect(machine)}
+                        className={`h-8 bg-white rounded-md shadow-sm flex items-center justify-between px-2 cursor-pointer
+                          ${selectedMachine?.id === machine.id ? 'ring-2 ring-blue-500' : ''}
+                          border border-${getStatusColor(machine.status)}-300`}
+                      >
+                        <span className="text-xs truncate max-w-[70%]">{machine.name}</span>
+                        <div className={`w-2 h-2 rounded-full bg-${getStatusColor(machine.status)}-500`}></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Label */}
+              <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
+                Main Shop Floor
+              </div>
+            </div>
+            
+            {/* Right: Machine cards */}
+            <div className="grid grid-rows-3 gap-4 overflow-hidden">
+              {/* Machine categories */}
+              <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+                <div className="bg-blue-50 p-2 border-b border-blue-100">
+                  <h4 className="text-blue-800 font-medium text-sm flex items-center">
+                    <ToolOutlined className="mr-1" /> Turning Machines
+                  </h4>
+                </div>
+                <div className="p-2 grid grid-cols-2 gap-2 overflow-hidden">
+                  {machines.filter(m => m.type === 'turning').slice(0, 4).map(machine => (
+                    <MachineSummaryCard 
+                      key={machine.id} 
+                      machine={machine} 
+                      isSelected={selectedMachine?.id === machine.id}
+                      onSelect={() => onMachineSelect(machine)}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+                <div className="bg-green-50 p-2 border-b border-green-100">
+                  <h4 className="text-green-800 font-medium text-sm flex items-center">
+                    <AppstoreOutlined className="mr-1" /> Milling Machines
+                  </h4>
+                </div>
+                <div className="p-2 grid grid-cols-2 gap-2 overflow-hidden">
+                  {machines.filter(m => m.type === 'milling').slice(0, 4).map(machine => (
+                    <MachineSummaryCard 
+                      key={machine.id} 
+                      machine={machine} 
+                      isSelected={selectedMachine?.id === machine.id}
+                      onSelect={() => onMachineSelect(machine)}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+                <div className="bg-purple-50 p-2 border-b border-purple-100">
+                  <h4 className="text-purple-800 font-medium text-sm flex items-center">
+                    <ProjectOutlined className="mr-1" /> EDM Machines
+                  </h4>
+                </div>
+                <div className="p-2 grid grid-cols-2 gap-2 overflow-hidden">
+                  {machines.filter(m => m.type === 'edm').slice(0, 4).map(machine => (
+                    <MachineSummaryCard 
+                      key={machine.id} 
+                      machine={machine} 
+                      isSelected={selectedMachine?.id === machine.id}
+                      onSelect={() => onMachineSelect(machine)}
+                    />
+                  ))}
+                  {machines.filter(m => m.type === 'edm').length === 0 && (
+                    <div className="col-span-2 flex items-center justify-center p-2 text-gray-500 text-sm">
+                      No EDM machines available
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -842,146 +751,155 @@ const FactoryScene = ({
     );
   }
 
-  // Custom loading indicator
-  if (isLoading) {
-    return (
-      <div className={`${className} h-full w-full flex flex-col items-center justify-center bg-gray-900`}>
-        <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin mb-4"></div>
-        <p className="text-blue-300">Loading 3D Factory View...</p>
-      </div>
-    );
-  }
-
-  // Main 3D factory view
   return (
-    <div className={`${className} relative h-full w-full`}>
-      {/* Quality selection and details toggle */}
-      <div className="absolute top-2 right-2 z-10 flex space-x-2">
-        <div className="bg-black/40 backdrop-blur-sm p-2 rounded-md flex space-x-2">
+    <div className={`relative h-full w-full ${className}`}>
+      {/* Quality controls */}
+      <div className="absolute top-4 left-4 z-10 flex items-center">
+        <span className="text-xs text-white bg-black/50 px-2 py-1 rounded-l">Quality:</span>
+        {["low", "medium", "high"].map((q) => (
           <button 
-            className={`px-2 py-1 rounded-sm text-xs ${quality === 'low' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'}`}
-            onClick={() => handleQualityChange('low')}
+            key={q}
+            className={`px-2 py-1 text-xs ${quality === q ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'} ${q === "low" ? "" : ""} ${q === "high" ? "rounded-r" : ""}`}
+            onClick={() => setQuality(q)}
           >
-            Low
+            {q.charAt(0).toUpperCase() + q.slice(1)}
           </button>
-          <button 
-            className={`px-2 py-1 rounded-sm text-xs ${quality === 'medium' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'}`}
-            onClick={() => handleQualityChange('medium')}
-          >
-            Medium
-          </button>
-          <button 
-            className={`px-2 py-1 rounded-sm text-xs ${quality === 'high' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-300'}`}
-            onClick={() => handleQualityChange('high')}
-          >
-            High
-          </button>
-        </div>
-        <button 
-          className={`bg-black/40 backdrop-blur-sm p-2 rounded-md text-xs ${viewDetails ? 'text-white' : 'text-gray-400'}`}
-          onClick={() => setViewDetails(!viewDetails)}
-        >
-          {viewDetails ? 'Hide Details' : 'Show Details'}
-        </button>
+        ))}
       </div>
 
-      {/* WebGL error boundary wrapper */}
-      {webGLSupported && (
+      {isLoading ? (
+        <div className="h-full w-full flex items-center justify-center bg-gray-800">
+          <div className="text-white">Loading factory scene...</div>
+        </div>
+      ) : (
         <WebGLErrorBoundary onError={handleCreationError}>
           <Canvas
-            className="h-full w-full bg-gray-900"
             shadows={quality !== 'low'}
-            camera={{ position: [0, 20, 40], fov: 60 }}
-            onCreated={({ gl }) => {
-              // Set renderer parameters for better performance
-              gl.physicallyCorrectLights = true;
-              gl.outputEncoding = THREE.sRGBEncoding;
-              gl.toneMapping = THREE.ACESFilmicToneMapping;
-              gl.toneMappingExposure = 1.2;
-              
-              // Apply quality settings
-              if (quality === 'high') {
-                gl.shadowMap.type = THREE.PCFSoftShadowMap;
-              } else if (quality === 'medium') {
-                gl.shadowMap.type = THREE.PCFShadowMap;
-              } else {
-                gl.shadowMap.enabled = false;
-              }
-            }}
             dpr={getPixelRatio()}
+            gl={{ 
+              antialias: quality !== 'low',
+              toneMapping: THREE.ACESFilmicToneMapping,
+              toneMappingExposure: 1.0,
+              alpha: true,
+              stencil: false,
+              depth: true,
+              precision: quality === 'low' ? 'lowp' : 'mediump',
+              powerPreference: 'low-power',
+              failIfMajorPerformanceCaveat: false
+            }}
+            camera={{ position: [0, 30, 30], fov: 45 }}
+            performance={{ min: 0.5 }}
+            onCreated={({ gl }) => {
+              // Optional: Apply additional WebGL context optimizations
+              gl.getContext().getExtension('WEBGL_lose_context');
+            }}
           >
-            {/* Camera controls for user interaction */}
-            <CameraController
-              cameraTarget={selectedMachine ? getMachinePosition(selectedMachine.type, 0) : [0, 0, 0]}
-              cameraView={selectedMachine ? 'focusMachine' : cameraView}
-              enableDamping={quality !== 'low'} // Disable damping on low quality for better performance
+            <CameraController 
+              selectedMachine={selectedMachine} 
+              view={cameraView}
+              enableTransitions={quality !== 'low'} 
             />
-
-            {/* Scene lighting */}
+            
             <Suspense fallback={null}>
+              {/* Scene lighting */}
+              <ambientLight intensity={0.4} color="#d4d4d8" />
+              
+              {/* Main factory lighting */}
               <Factory3DLighting quality={quality} />
               
-              {/* Environment map for better reflections - using local HDR */}
+              {/* Environment */}
               {quality !== 'low' && (
-                <Environment files="/machine_shop_02_4k.hdr" background={false} />
+                <Environment
+                  files="/warehouse.hdr"
+                  background={false}
+                  blur={0.7}
+                />
               )}
               
-              {/* Sky and stars for visual appeal */}
+              {/* Simple environment and atmosphere */}
               {quality !== 'low' && (
                 <>
-                  <Sky distance={450000} sunPosition={[10, 5, 10]} />
-                  <Stars radius={300} depth={100} count={quality === 'high' ? 5000 : 2000} factor={4} />
+                  <fog attach="fog" args={['#c8c8d0', 30, 100]} />
+                  {quality === 'high' && (
+                    <>
+                      <Sky 
+                        distance={450000} 
+                        sunPosition={[10, 5, 10]} 
+                        inclination={0.5} 
+                        azimuth={0.25} 
+                        turbidity={8}
+                        rayleigh={1.5}
+                        mieCoefficient={0.007}
+                        mieDirectionalG={0.8}
+                      />
+                      <Stars radius={100} depth={50} count={1000} factor={4} fade speed={1} />
+                    </>
+                  )}
                 </>
               )}
               
-              {/* Factory floor */}
-              <FactoryFloor
-                quality={quality}
-                position={[0, 0, 0]}
-                size={[100, 1, 100]}
-              />
+              {/* Factory environment */}
+              <FactoryFloor size={80} />
               
-              {/* EDM Room area */}
+              {/* EDM Room - Glass enclosure */}
               <EDMRoom position={[0, 0, -30]} />
               
-              {/* EDM Machines */}
-              {machinesByType.edm.map((machine, index) => (
-                <EDMMachineModel
-                  key={machine.id}
-                  position={getMachinePosition('edm', index)}
-                  rotation={getMachineRotation('edm', index)}
-                  scale={0.7}
-                  machineData={machine}
-                  isSelected={selectedMachine?.id === machine.id}
-                  onClick={() => onMachineSelect(machine)}
-                />
-              ))}
+              {/* Section Labels */}
+              {quality !== 'low' && <SectionLabels />}
               
-              {/* Turning Machines */}
-              {machinesByType.turning.map((machine, index) => (
-                <TurningMachineModel
-                  key={machine.id}
-                  position={getMachinePosition('turning', index)}
-                  rotation={getMachineRotation('turning', index)}
-                  scale={0.6}
-                  machineData={machine}
-                  isSelected={selectedMachine?.id === machine.id}
-                  onClick={() => onMachineSelect(machine)}
-                />
-              ))}
+              {/* Machine display - Turning Machines */}
+              {machinesByType.turning.map((machine, index) => {
+                const position = getMachinePosition('turning', index);
+                const rotation = getMachineRotation('turning', index);
+                
+                return (
+                  <TurningMachineModel
+                    key={machine.id || `turning-${index}`}
+                    position={position}
+                    rotation={rotation}
+                    scale={12.0}
+                    onClick={() => onMachineSelect(machine)}
+                    isSelected={selectedMachine?.id === machine.id}
+                    machineData={machine}
+                  />
+                );
+              })}
               
-              {/* Milling Machines */}
-              {machinesByType.milling.map((machine, index) => (
-                <MillingMachineModel
-                  key={machine.id}
-                  position={getMachinePosition('milling', index)}
-                  rotation={getMachineRotation('milling', index)}
-                  scale={0.7}
-                  machineData={machine}
-                  isSelected={selectedMachine?.id === machine.id}
-                  onClick={() => onMachineSelect(machine)}
-                />
-              ))}
+              {/* Machine display - Milling Machines */}
+              {machinesByType.milling.map((machine, index) => {
+                const position = getMachinePosition('milling', index);
+                const rotation = getMachineRotation('milling', index);
+                
+                return (
+                  <MillingMachineModel
+                    key={machine.id || `milling-${index}`}
+                    position={position}
+                    rotation={rotation}
+                    scale={8.0}
+                    onClick={() => onMachineSelect(machine)}
+                    isSelected={selectedMachine?.id === machine.id}
+                    machineData={machine}
+                  />
+                );
+              })}
+              
+              {/* Machine display - EDM Machines */}
+              {machinesByType.edm.map((machine, index) => {
+                const position = getMachinePosition('edm', index);
+                const rotation = getMachineRotation('edm', index);
+                
+                return (
+                  <EDMMachineModel
+                    key={machine.id || `edm-${index}`}
+                    position={position}
+                    rotation={rotation}
+                    scale={12.0}
+                    onClick={() => onMachineSelect(machine)}
+                    isSelected={selectedMachine?.id === machine.id}
+                    machineData={machine}
+                  />
+                );
+              })}
               
               {/* Add workbenches and chairs */}
               {quality !== 'low' && <ShopFloorFurniture />}
@@ -1117,10 +1035,8 @@ const Workbench = ({ position, rotation = [0, 0, 0] }) => {
       
       {/* Legs - simplified to two legs for performance */}
       {[
-        [-2.2, 1.5, -0.8], 
-        [2.2, 1.5, -0.8],
-        [-2.2, 1.5, 0.8],
-        [2.2, 1.5, 0.8]
+        [-2.2, 1.5, 0], 
+        [2.2, 1.5, 0]
       ].map((pos, i) => (
         <mesh key={i} position={pos} castShadow receiveShadow>
           <boxGeometry args={[0.2, 3, 2]} />
@@ -1502,20 +1418,20 @@ const SecondFloorViewing = () => {
         <meshStandardMaterial color="#d1d5db" metalness={0.2} roughness={0.8} />
       </mesh>
 
-      {/* Replace the problematic geometry with a properly defined one */}
-      <mesh position={[0, 10, 10]} receiveShadow>
-        <boxGeometry args={[50, 0.3, 20]} />
-        <meshStandardMaterial color="#d1d5db" metalness={0.2} roughness={0.8} />
-      </mesh>
+      <mesh position={[0,10, 19.2]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
+  <boxGeometry args={[50, 0.3, 20]} />
+  <meshStandardMaterial color="#d1d5db" metalness={0.2} roughness={0.8} />
+</mesh>
+
       
       {/* Railings */}
-      <mesh position={[0, 1, 0]} castShadow>
+      <mesh position={[0, 1, 5]} castShadow>
         <boxGeometry args={[50, 2, 0.1]} />
         <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.5} />
       </mesh>
       
       {/* Viewing windows */}
-      <mesh position={[-15, 1.5, 0.1]} castShadow>
+      <mesh position={[-15, 1.5, 5.1]} castShadow>
         <boxGeometry args={[10, 3, 0.1]} />
         <meshPhysicalMaterial 
           color="#d1e5f6" 
@@ -1526,7 +1442,7 @@ const SecondFloorViewing = () => {
         />
       </mesh>
       
-      <mesh position={[0, 1.5, 0.1]} castShadow>
+      <mesh position={[0, 1.5, 5.1]} castShadow>
         <boxGeometry args={[10, 3, 0.1]} />
         <meshPhysicalMaterial 
           color="#d1e5f6" 
@@ -1537,7 +1453,7 @@ const SecondFloorViewing = () => {
         />
       </mesh>
       
-      <mesh position={[15, 1.5, 0.1]} castShadow>
+      <mesh position={[15, 1.5, 5.1]} castShadow>
         <boxGeometry args={[10, 3, 0.1]} />
         <meshPhysicalMaterial 
           color="#d1e5f6" 
@@ -1550,14 +1466,21 @@ const SecondFloorViewing = () => {
       
       {/* Information banners on the second floor */}
       <Banner 
-        position={[-12, 3, 10]} 
+        position={[-12, 3, 20]} 
         rotation={[0, 0, 0]} 
         text="SAFETY FIRST" 
         color="#ef4444"
       />
       
+      {/* <Banner 
+        position={[0, 3, 10]} 
+        rotation={[0, 0, 0]} 
+        text="QUALITY CONTROL" 
+        color="#3b82f6"
+      /> */}
+      
       <Banner 
-        position={[12, 3, 10]} 
+        position={[12, 3, 20]} 
         rotation={[0, 0, 0]} 
         text="EFFICIENCY" 
         color="#10b981"
@@ -1701,12 +1624,27 @@ const MachineSummaryCard = ({ machine, isSelected, onSelect }) => {
     >
       <div className={`flex justify-between items-center p-1 ${getStatusBg(machine.status)} border-b`}>
         <div className="font-medium text-xs truncate max-w-[70%]">{machine.name}</div>
-        <div className={`text-xs font-semibold px-2 py-0.5 rounded ${getStatusText(machine.status)}`}>
+        <div className={`text-xs font-semibold px-1 py-0.5 rounded ${getStatusText(machine.status)}`}>
           {machine.status}
+        </div>
+      </div>
+      
+      <div className="p-1">
+        <div className="flex justify-between items-center text-xs">
+          <div className="truncate max-w-[70%]">{machine.partNumber || 'No part'}</div>
+          <div>{machine.totalCount || 0}/{machine.targetCount || 0}</div>
+        </div>
+        
+        <div className="w-full h-1 mt-1 bg-gray-200 rounded overflow-hidden">
+          <div 
+            className={`h-full ${machine.status === 'PRODUCTION' ? 'bg-green-500' : 
+              machine.status === 'ERROR' ? 'bg-red-500' : 'bg-blue-500'}`}
+            style={{ width: `${completionPercentage}%` }}
+          ></div>
         </div>
       </div>
     </div>
   );
 };
 
-export default FactoryScene;
+export default FactoryScene; 

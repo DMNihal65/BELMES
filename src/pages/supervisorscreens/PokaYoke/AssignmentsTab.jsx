@@ -75,10 +75,33 @@ const AssignmentsTab = () => {
   };
   
   const getMachineName = (machine) => {
-    if (machine.work_center && machine.work_center.description) {
-      return `${machine.work_center.description} (${machine.work_center.code})`;
+    if (!machine) return 'Unknown Machine';
+    
+    const make = machine.make || '';
+    const model = machine.model || '';
+    const workCenter = machine.work_center?.description || '';
+    const workCenterCode = machine.work_center?.code || '';
+    
+    // Format the display string
+    let displayName = '';
+    
+    if (make) {
+      displayName += make;
     }
-    return machine.make ? `${machine.make} ${machine.model || ''}` : `Machine ${machine.id}`;
+    
+    if (model) {
+      displayName += ` ${model}`;
+    }
+    
+    if (workCenter) {
+      displayName += ` (${workCenter})`;
+    }
+    
+    if (workCenterCode) {
+      displayName += ` [${workCenterCode}]`;
+    }
+    
+    return displayName.trim() || `Machine ${machine.id}`;
   };
   
   const columns = [
@@ -172,12 +195,23 @@ const AssignmentsTab = () => {
           <Select
             placeholder="Select a machine to see its assigned checklists"
             onChange={handleMachineChange}
-            style={{ width: 300 }}
+            style={{ width: 400 }}
             loading={loading}
+            optionLabelProp="label"
           >
             {machines.map(machine => (
-              <Option key={machine.id} value={machine.id}>
-                {getMachineName(machine)}
+              <Option 
+                key={machine.id} 
+                value={machine.id}
+                label={getMachineName(machine)}
+              >
+                <div className="flex flex-col">
+                  <div className="font-medium">{getMachineName(machine)}</div>
+                  <div className="text-xs text-gray-500">
+                    {machine.type && <span className="mr-2">Type: {machine.type}</span>}
+                    {machine.cnc_controller && <span>Controller: {machine.cnc_controller}</span>}
+                  </div>
+                </div>
               </Option>
             ))}
           </Select>

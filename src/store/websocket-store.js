@@ -52,7 +52,7 @@ const useWebSocketStore = create((set, get) => ({
       }
     }
 
-    const ws = new WebSocket('ws://172.18.7.88:9922/production_monitoring/ws/live-status/');
+    const ws = new WebSocket('ws://172.16.0.203:8002/production_monitoring/ws/live-status/');
     
     ws.onmessage = (event) => {
       try {
@@ -278,7 +278,7 @@ const useWebSocketStore = create((set, get) => ({
 
       console.log(`Fetching machine operations for machine ID: ${machineId}`);
       const response = await fetch(
-        `http://172.18.7.88:9922/api/v1/operator/machines/${machineId}/operations`
+        `http://172.16.0.203:8002/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -591,7 +591,7 @@ const useWebSocketStore = create((set, get) => ({
     };
 
     try {
-      const response = await fetch('http://172.18.7.88:9922/api/v1/maintainance/downtimes/', {
+      const response = await fetch('http://172.16.0.203:8002/api/v1/maintainance/downtimes/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -630,7 +630,7 @@ const useWebSocketStore = create((set, get) => ({
         return;
       }
       const response = await fetch(
-        `http://172.18.7.88:9922/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://172.16.0.203:8002/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -691,7 +691,7 @@ const useWebSocketStore = create((set, get) => ({
       set({ maintenanceLoading: true });
       
       const response = await fetch(
-        `http://172.18.7.88:9922/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://172.16.0.203:8002/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -744,7 +744,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:9922/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.16.0.203:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -780,7 +780,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.88:9922/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        `http://172.16.0.203:8002/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -811,7 +811,7 @@ const useWebSocketStore = create((set, get) => ({
   fetchMppDetails: async (partNumber, operationNumber) => {
     try {
       const response = await fetch(
-        `http://172.18.7.88:9922/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
+        `http://172.16.0.203:8002/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
       );
 
       if (!response.ok) {
@@ -850,7 +850,7 @@ const useWebSocketStore = create((set, get) => ({
       
       // First try to fetch documents from documents API
       const response = await fetch(
-        `http://172.18.7.88:9922/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.16.0.203:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           method: 'GET',
           headers: {
@@ -886,7 +886,7 @@ const useWebSocketStore = create((set, get) => ({
         try {
           console.log(`Fetching MPP data directly for part ${partNumber}, operation ${operationNumber}`);
           const mppResponse = await fetch(
-            `http://172.18.7.88:9922/api/v1/mpp/by-part/${partNumber}/${operationNumber}`,
+            `http://172.16.0.203:8002/api/v1/mpp/by-part/${partNumber}/${operationNumber}`,
             {
               method: 'GET',
               headers: {
@@ -960,9 +960,9 @@ const useWebSocketStore = create((set, get) => ({
 
       // Fetch both operation and document data in parallel
       const [operationsResponse, documentsResponse] = await Promise.all([
-        fetch(`http://172.18.7.88:9922/api/v1/operator/machines/${machineId}/operations`),
+        fetch(`http://172.16.0.203:8002/api/v1/operator/machines/${machineId}/operations`),
         fetch(
-          `http://172.18.7.88:9922/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+          `http://172.16.0.203:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -1043,7 +1043,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Downloading document with ID: ${documentId}`);
       
       // Make sure we're using the correct endpoint URL with token
-      const endpoint = `http://172.18.7.88:9922/api/v1/document-management/documents/${documentId}/download-latest`;
+      const endpoint = `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download-latest`;
       console.log(`Making request to: ${endpoint}`);
       
       // Instead of using window.open, use fetch with proper authentication headers
@@ -1121,7 +1121,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Opening document with ID: ${documentId} in new tab`);
       
       // Create the endpoint URL - same as in downloadDocumentById
-      const endpoint = `http://172.18.7.88:9922/api/v1/document-management/documents/${documentId}/download-latest`;
+      const endpoint = `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download-latest`;
       
       // Open in new tab and handle the request there
       const newWindow = window.open('', '_blank');

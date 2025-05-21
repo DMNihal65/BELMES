@@ -20,7 +20,7 @@ const MachinePasswordManagement = ({ onClose }) => {
   //   setIsLoading(true);
   //   try {
   //     const response = await axios.get(
-  //       "http://172.18.7.88:9922/api/v1/master-order/all-machines/"
+  //       "http://172.16.0.203:8002/api/v1/master-order/all-machines/"
   //     );
   //     setMachines(response.data || []);
   //   } catch (error) {
@@ -60,7 +60,7 @@ const MachinePasswordManagement = ({ onClose }) => {
     setSubmitLoading(true);
     try {
       const response = await axios.post(
-        `http://172.18.7.88:9922/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
+        `http://172.16.0.203:8002/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
       );
       message.success(response.data.status || "Password set successfully");
       toast.success(response.data.status || "Password set successfully");

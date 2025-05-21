@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Tabs, Card, Button, message, Spin, Badge, Dropdown, Row, Col, Tooltip } from 'antd';
+import { Layout, Tabs, Card, Button, message, Spin, Badge, Dropdown, Row, Col, Tooltip, Modal } from 'antd';
 import { 
   LayoutDashboard, 
   Gauge, 
@@ -13,7 +13,8 @@ import {
   User,
   MessageCircle,
   Activity,
-  BarChart3
+  BarChart3,
+  CheckCircle2
 } from 'lucide-react';
 import JobSelectionPanel from './OperatorComponents/JobSelectionPanel';
 import MachineStatusCard from './OperatorComponents/MachineStatusCard';
@@ -23,6 +24,7 @@ import ProductionCard from './OperatorComponents/ProductionCard';
 import DocumentsCard from './OperatorComponents/DocumentsCard';
 import FeedbackCard from './OperatorComponents/FeedbackCard';
 import FeedbackModal from '../operatorscreens/FeedbackModal';
+import PokaYokeChecklist from '../operatorscreens/JobDetails/PokaYokeChecklist';
 import useOperatorStore from '../../store/operator-store';
 import './OperatorDashboard.css';
 
@@ -46,6 +48,7 @@ const NewOperatorDashboard = () => {
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleString());
   const [refreshing, setRefreshing] = useState(false);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [showPokaYoke, setShowPokaYoke] = useState(false);
 
   // Update clock
   useEffect(() => {
@@ -210,7 +213,28 @@ const NewOperatorDashboard = () => {
           
           {/* Right Column - Feedback Form */}
           <Col xs={24} lg={8}>
-            <FeedbackCard />
+            <Card className="shadow-sm status-card border-sky-100">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="text-sky-600" size={18} />
+                  <span className="font-medium">Poka Yoke & Feedback</span>
+                </div>
+              </div>
+              
+              {/* Poka Yoke Button */}
+              <Button 
+                type="primary"
+                onClick={() => setShowPokaYoke(true)}
+                className="w-full bg-white hover:bg-sky-50 text-sky-600 border-sky-200 hover:border-sky-300 flex items-center justify-center gap-2 h-auto py-3 mb-4"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="font-medium">Open Poka Yoke Checklist</span>
+                  <span className="text-xs text-sky-400">Review and complete poka yoke checkpoints</span>
+                </div>
+              </Button>
+
+              <FeedbackCard />
+            </Card>
           </Col>
           
           {/* Bottom Row - Current Job Card */}
@@ -269,6 +293,28 @@ const NewOperatorDashboard = () => {
         onClose={() => setFeedbackModalVisible(false)}
         onSubmit={handleFeedbackSubmit}
       />
+
+      {/* Poka Yoke Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="text-sky-500" />
+            <span>Poka Yoke Checklist</span>
+          </div>
+        }
+        open={showPokaYoke}
+        onCancel={() => setShowPokaYoke(false)}
+        footer={null}
+        width={800}
+        className="quality-modal"
+      >
+        <PokaYokeChecklist 
+          jobId={selectedJob?.id} 
+          machineId={machineId}
+          visible={showPokaYoke}
+          onClose={() => setShowPokaYoke(false)}
+        />
+      </Modal>
     </Layout>
   );
 };

@@ -38,9 +38,6 @@ const BrowserCompatCheck = ({ onCompatibilityChange }) => {
 
       // Check for Internet Explorer
       const isIE = /MSIE|Trident/.test(navigator.userAgent);
-      
-      // Check for Firefox
-      const isFirefox = navigator.userAgent.indexOf("Firefox") !== -1;
 
       // Create a canvas element to test WebGL support
       const canvas = document.createElement('canvas');
@@ -49,102 +46,44 @@ const BrowserCompatCheck = ({ onCompatibilityChange }) => {
       let hardwareAcceleration = true;
       let warning = null;
       let error = null;
-      let renderer = '';
-      let vendor = '';
 
-      // Check WebGL2 support first
-      try {
-        let gl2 = canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: true });
-        webGL2Supported = !!gl2;
-        
-        if (gl2) {
-          const debugInfo = gl2.getExtension('WEBGL_debug_renderer_info');
-          if (debugInfo) {
-            renderer = gl2.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '';
-            vendor = gl2.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || '';
-          }
-        }
-      } catch (e) {
-        console.warn("Error checking WebGL2 support:", e);
-        webGL2Supported = false;
-      }
+      // Check WebGL2 support
+      let gl2 = canvas.getContext('webgl2');
+      webGL2Supported = !!gl2;
 
-      // If WebGL2 fails, try WebGL1
+      // Check WebGL support if WebGL2 is not available
       if (!webGL2Supported) {
-        try {
-          let gl = canvas.getContext('webgl', { failIfMajorPerformanceCaveat: true }) || 
-                  canvas.getContext('experimental-webgl', { failIfMajorPerformanceCaveat: true });
-          webGLSupported = !!gl;
-          
-          if (gl) {
-            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-            if (debugInfo) {
-              renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '';
-              vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || '';
-            }
-          }
-        } catch (e) {
-          console.warn("Error checking WebGL1 support:", e);
-          webGLSupported = false;
-        }
-        
-        // Try one more time without performance caveat check
-        if (!webGLSupported) {
-          try {
-            let gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-            webGLSupported = !!gl;
-            
-            if (gl) {
-              const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-              if (debugInfo) {
-                renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '';
-                vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || '';
-              }
-              hardwareAcceleration = false;
-              warning = 'Hardware acceleration might be disabled or limited. 3D performance will be reduced.';
-            }
-          } catch (e) {
-            console.error("Final WebGL check failed:", e);
-            webGLSupported = false;
-          }
-        }
+        let gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        webGLSupported = !!gl;
 
         if (webGLSupported) {
           warning = 'Your browser supports WebGL but not WebGL2. You may experience reduced performance or visual quality.';
         }
       }
 
-      // Log renderer info for debugging
-      if (renderer || vendor) {
-        console.log(`Graphics: ${renderer}, Vendor: ${vendor}`);
-      }
-
-      // Check for software renderers or problematic implementations
-      if (renderer) {
-        if (
-          renderer.includes('SwiftShader') ||
-          renderer.includes('ANGLE') ||
-          renderer.includes('llvmpipe') ||
-          renderer.includes('Software') ||
-          renderer.includes('Microsoft Basic Render')
-        ) {
-          hardwareAcceleration = false;
-          warning = 'Hardware acceleration appears to be disabled. Performance of 3D visualizations will be reduced.';
-        }
-      }
-
       // If no WebGL support at all
       if (!webGLSupported && !webGL2Supported) {
         error = 'WebGL is not supported by your browser. The 3D visualization will not work.';
-      }
-
-      // Firefox specific warnings
-      if (isFirefox && (renderer.includes('ANGLE') || !hardwareAcceleration)) {
-        warning = 'Firefox may have hardware acceleration disabled. To fix this:'+
-                  '1. Type about:config in the address bar\n'+
-                  '2. Search for "webgl.force-enabled" and set it to true\n'+
-                  '3. Search for "layers.acceleration.force-enabled" and set it to true\n'+
-                  '4. Restart the browser';
+      } else {
+        // Check if hardware acceleration is enabled
+        const gl = gl2 || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (gl) {
+          const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+          if (debugInfo) {
+            const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+            // Check for software renderers
+            if (
+              renderer.includes('SwiftShader') ||
+              renderer.includes('ANGLE') ||
+              renderer.includes('llvmpipe') ||
+              renderer.includes('Software') ||
+              renderer.includes('Microsoft Basic Render')
+            ) {
+              hardwareAcceleration = false;
+              warning = 'Hardware acceleration appears to be disabled. Performance of 3D visualizations will be reduced.';
+            }
+          }
+        }
       }
 
       // Internet Explorer warning
@@ -159,8 +98,6 @@ const BrowserCompatCheck = ({ onCompatibilityChange }) => {
         hardwareAcceleration,
         isMobile,
         isIE,
-        isFirefox,
-        renderer,
         warning,
         error
       });
@@ -200,7 +137,6 @@ const BrowserCompatCheck = ({ onCompatibilityChange }) => {
                     <li>Update your browser to the latest version</li>
                     <li>Enable hardware acceleration in your browser settings</li>
                     <li>Update your graphics drivers</li>
-                    <li>Try using Chrome or Edge if other browsers don't work</li>
                   </ul>
                 </p>
               )}
@@ -211,11 +147,6 @@ const BrowserCompatCheck = ({ onCompatibilityChange }) => {
           icon={<WarningOutlined />}
           closable
           onClose={() => setDismissed(true)}
-          action={
-            <Button size="small" type="primary" onClick={() => window.location.reload()}>
-              Retry
-            </Button>
-          }
         />
       )}
 
@@ -237,9 +168,6 @@ const BrowserCompatCheck = ({ onCompatibilityChange }) => {
               )}
               {compatibility.isMobile && (
                 <p>The 3D visualization may be slower on mobile devices. Consider using a desktop computer for the best experience.</p>
-              )}
-              {compatibility.isFirefox && compatibility.renderer && compatibility.renderer.includes('ANGLE') && (
-                <p>Firefox with ANGLE detected. This may cause rendering issues. Try updating graphics drivers or using a different browser.</p>
               )}
             </div>
           }

@@ -29,6 +29,7 @@ import InspectionResult from './pages/operatorscreens/Inspection/InspectionResul
 import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
 import MachineDetails from './pages/supervisorscreens/EnergyMonitoring/MachineDetails';
 import Notifications from './pages/supervisorscreens/Notifications';
+import NotificationsNew from './pages/supervisorscreens/NotificationsNew';
 import MaintenanceNotifications from './pages/supervisorscreens/MachineMaintenance/Notifications';
 
 import Machines from './pages/supervisorscreens/EnergyMonitoring/Machines';
@@ -97,6 +98,7 @@ const App = () => {
             <Route path="logs" element={<LogsDashboard />} />
             <Route path="pokayoke" element={<PokaYokeDashboard />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="notifications_new" element={<NotificationsNew />} />
             <Route path="access_control_management" element={<AccessControlManagement />} />
             <Route path="access_control_management/user_management" element={<UserManagement />} />
             <Route path="access_control_management/machine_password_management" element={<MachinePasswordManagement />} />
@@ -140,6 +142,7 @@ const App = () => {
             <Route path="logs" element={<LogsDashboard />} />
             <Route path="pokayoke" element={<PokaYokeDashboard />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="notifications_new" element={<NotificationsNew />} />
           </Route>
 
           {/* Operator Routes */}

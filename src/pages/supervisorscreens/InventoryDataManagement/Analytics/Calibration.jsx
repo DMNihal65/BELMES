@@ -64,6 +64,10 @@ function Calibration() {
   const [historyDateRange, setHistoryDateRange] = useState([null, null]);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState(null);
   const [searchText, setSearchText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(5);
 
   const {
     calibrations,
@@ -115,29 +119,21 @@ function Calibration() {
     };
 
     initializeData();
-  }, [fetchCalibrations, fetchCalibrationHistory, fetchCategories, daysFilter]);
+  }, [fetchCalibrations, fetchCalibrationHistory, fetchCategories, daysFilter, calibrations.length, calibrationHistory.length]);
 
-
-
-
-  // Add a new useEffect to refresh upcoming calibrations periodically
   useEffect(() => {
-    // Initial fetch
     fetchUpcomingCalibrations(daysFilter);
 
-    // Set up interval to refresh every 5 minutes
     const intervalId = setInterval(() => {
       fetchUpcomingCalibrations(daysFilter);
     }, 5 * 60 * 1000);
 
-    // Cleanup interval on component unmount
     return () => clearInterval(intervalId);
   }, [daysFilter]);
 
   const loadInventoryItems = async () => {
     try {
       const items = await fetchItems();
-      // console.log('Loaded items:', items); // Debug log
       setInventoryItems(items || []);
     } catch (error) {
       console.error('Error loading inventory items:', error);
@@ -149,7 +145,6 @@ function Calibration() {
   const loadSubcategories = async () => {
     try {
       const subCats = await fetchAllSubcategories();
-      // console.log('Loaded subcategories:', subCats); // Debug log
       setSubcategories(subCats || []);
     } catch (error) {
       console.error('Error loading subcategories:', error);
@@ -186,9 +181,19 @@ function Calibration() {
       onOk: async () => {
         try {
           await deleteCalibration(id);
-          // Update the local state instead of fetching
           const updatedCalibrations = calibrations.filter(cal => cal.id !== id);
           useInventoryStore.setState({ calibrations: updatedCalibrations });
+          
+          // Also update calibration history to remove related records
+          const updatedHistory = calibrationHistory.filter(history => history.calibration_schedule_id !== id);
+          useInventoryStore.setState({ calibrationHistory: updatedHistory });
+          
+          // Refresh both calibrations and history data
+          await Promise.all([
+            fetchCalibrations(),
+            fetchCalibrationHistory()
+          ]);
+          
           toast.success('Calibration record deleted successfully');
         } catch (error) {
           toast.error('Failed to delete calibration record');
@@ -210,7 +215,6 @@ function Calibration() {
 
       if (editingCalibration) {
         await updateCalibration(editingCalibration.id, formattedValues);
-        // Update the local state instead of fetching
         const updatedCalibrations = calibrations.map(cal => 
           cal.id === editingCalibration.id ? { ...cal, ...formattedValues } : cal
         );
@@ -218,7 +222,6 @@ function Calibration() {
         toast.success('Calibration record updated successfully');
       } else {
         const newCalibration = await addCalibration(formattedValues);
-        // Update the local state instead of fetching
         const updatedCalibrations = [...calibrations, newCalibration];
         useInventoryStore.setState({ calibrations: updatedCalibrations });
         toast.success('Calibration record added successfully');
@@ -238,32 +241,32 @@ function Calibration() {
     if (daysRemaining < 0) {
       return { 
         status: 'overdue', 
-        color: '#ffccc7',  // Light Red background
-        textColor: '#cf1322', // Dark Red text
+        color: '#ffccc7',
+        textColor: '#cf1322',
         icon: <ExclamationCircleOutlined style={{ color: '#cf1322' }} />, 
         text: 'OVERDUE' 
       };
     } else if (daysRemaining <= 2) {
       return { 
         status: 'due_soon', 
-        color: '#fff1b8',  // Light Yellow background
-        textColor: '#d48806', // Dark Yellow text
+        color: '#fff1b8',
+        textColor: '#d48806',
         icon: <WarningOutlined style={{ color: '#d48806' }} />, 
         text: 'DUE SOON' 
       };
     } else if (daysRemaining <= 15) {
       return { 
         status: 'warning', 
-        color: '#ffe7ba',  // Light Orange background
-        textColor: '#d46b08', // Dark Orange text
+        color: '#ffe7ba',
+        textColor: '#d46b08',
         icon: <WarningOutlined style={{ color: '#d46b08' }} />, 
         text: 'WARNING' 
       };
     } else {
       return { 
         status: 'normal', 
-        color: '#d9f7be',  // Light Green background
-        textColor: '#389e0d', // Dark Green text
+        color: '#d9f7be',
+        textColor: '#389e0d',
         icon: <CheckCircleOutlined style={{ color: '#389e0d' }} />, 
         text: 'NORMAL' 
       };
@@ -294,9 +297,8 @@ function Calibration() {
 
   const handleInventoryItemClick = (itemId) => {
     setSelectedInventoryItem(itemId);
-    setActiveTab('history');  // Switch to history tab
+    setActiveTab('history');
     
-    // Get item details for the message
     const item = inventoryItems.find(item => item.id === itemId);
     const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
     const itemName = item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId;
@@ -309,25 +311,23 @@ function Calibration() {
 
     let filtered = [...calibrationHistory];
 
-    // Filter by selected inventory item if any
     if (selectedInventoryItem) {
       filtered = filtered.filter(history => {
-        // Find the calibration record for this history
         const calibration = calibrations.find(cal => cal.id === history.calibration_schedule_id);
-        // Check if this calibration belongs to the selected item
         return calibration && calibration.inventory_item_id === selectedInventoryItem;
       });
     }
 
-    // Apply date range filter for history
     if (historyDateRange && historyDateRange[0] && historyDateRange[1]) {
+      const startDate = moment(historyDateRange[0]).startOf('day');
+      const endDate = moment(historyDateRange[1]).endOf('day');
+      
       filtered = filtered.filter(history => {
         const calibrationDate = moment(history.calibration_date);
-        return calibrationDate.isBetween(historyDateRange[0], historyDateRange[1], 'day', '[]');
+        return calibrationDate.isSameOrAfter(startDate) && calibrationDate.isSameOrBefore(endDate);
       });
     }
 
-    // Sort by calibration date in descending order (newest first)
     filtered.sort((a, b) => moment(b.calibration_date).valueOf() - moment(a.calibration_date).valueOf());
 
     return filtered;
@@ -344,7 +344,6 @@ function Calibration() {
 
   const columns = [
     {
-      //Inventory1111
       title: 'Inventory Item',
       dataIndex: 'inventory_item_id',
       key: 'inventory_item_id',
@@ -358,7 +357,6 @@ function Calibration() {
               style={{ cursor: 'pointer', color: '#1890ff' }}
               onClick={() => handleInventoryItemClick(itemId)}
             >
-              {/* {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId} */}
               {item ? `${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}` : itemId}
             </Tag>
           </Tooltip>
@@ -495,7 +493,6 @@ function Calibration() {
               calibration_date: moment(),
               next_due_date: moment().add(record.frequency_days, 'days')
             });
-            // console.log('Selected Calibration ID:', record.id);
           }}
         >
           Calibrate
@@ -550,10 +547,8 @@ function Calibration() {
     }
   ];
   
-
   const historyColumns = [
     {
-      //Inventory1111
       title: 'Inventory Item',
       dataIndex: 'inventory_item',
       key: 'inventory_item',
@@ -563,13 +558,12 @@ function Calibration() {
         const item = inventoryItems.find(item => item.id === calibration?.inventory_item_id);
         const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
         return (
-          <Tooltip >
+          <Tooltip>
             <Tag 
               icon={<ToolOutlined />} 
               style={{ cursor: 'pointer', color: '#135095' }}
-              // onClick={() => handleInventoryItemClick(itemId)}
             >
-              {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId}
+              {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"] || 'N/A'}` : 'Item Not Found'}
             </Tag>
           </Tooltip>
         );
@@ -625,33 +619,6 @@ function Calibration() {
         </Tooltip>
       )
     },
-    {
-      title: 'Actions',
-      key: 'actions',
-      fixed: 'right',
-      width: 100,
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="primary"
-            ghost
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => {
-              // Handle edit if needed
-            }}
-          />
-          <Button
-            danger
-            icon={<DeleteOutlined />}
-            size="small"
-            onClick={() => {
-              // Handle delete if needed
-            }}
-          />
-        </Space>
-      )
-    }
   ];
 
   const handleSearch = (value) => {
@@ -661,7 +628,23 @@ function Calibration() {
   const getFilteredCalibrations = () => {
     if (!calibrations) return [];
     
-    // Return only upcoming calibrations for due_soon status
+    let filtered = [...calibrations];
+
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      const startDate = moment(dateRange[0]).startOf('day');
+      const endDate = moment(dateRange[1]).endOf('day');
+      
+      filtered = filtered.filter(cal => {
+        const nextCalDate = moment(cal.next_calibration);
+        const lastCalDate = moment(cal.last_calibration);
+        
+        return (
+          (nextCalDate.isSameOrAfter(startDate) && nextCalDate.isSameOrBefore(endDate)) ||
+          (lastCalDate.isSameOrAfter(startDate) && lastCalDate.isSameOrBefore(endDate))
+        );
+      });
+    }
+
     if (selectedStatus === 'due_soon') {
       const dueSoonItems = upcomingCalibrations.map(cal => {
         const item = inventoryItems.find(item => item.id === cal.item_id);
@@ -681,18 +664,6 @@ function Calibration() {
       return dueSoonItems;
     }
 
-    // For other statuses, work with the main calibrations array
-    let filtered = [...calibrations];
-
-    // Apply date range filter if exists
-    if (dateRange && dateRange[0] && dateRange[1]) {
-      filtered = filtered.filter(cal => {
-        const nextCalDate = moment(cal.next_calibration);
-        return nextCalDate.isBetween(dateRange[0], dateRange[1], 'day', '[]');
-      });
-    }
-    
-    // Apply status filter for up_to_date and overdue
     if (selectedStatus === 'up_to_date') {
       filtered = filtered.filter(cal => {
         const nextCalDate = moment(cal.next_calibration);
@@ -706,7 +677,6 @@ function Calibration() {
       });
     }
 
-    // Add status to all items
     filtered = filtered.map(cal => {
       const status = getCalibrationStatus(cal.next_calibration);
       return {
@@ -715,7 +685,6 @@ function Calibration() {
       };
     });
     
-    // Apply category filter if not 'all'
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(cal => {
         const category = categories.find(cat => 
@@ -725,15 +694,12 @@ function Calibration() {
       });
     }
 
-    // Apply master search filter
     if (searchText) {
       const searchLower = searchText.toLowerCase();
       filtered = filtered.filter(cal => {
-        // Get the inventory item details for searching
         const item = inventoryItems.find(item => item.id === cal.inventory_item_id);
         const subcategory = subcategories.find(sub => sub.id === item?.subcategory_id);
         
-        // Search across all relevant fields
         return (
           (cal.calibration_type?.toLowerCase().includes(searchLower)) ||
           (cal.remarks?.toLowerCase().includes(searchLower)) ||
@@ -754,7 +720,7 @@ function Calibration() {
     
     const total = calibrations.length;
     const upToDate = calibrations.filter(cal => moment(cal.next_calibration).isAfter(moment())).length;
-    const dueSoon = upcomingCalibrations.length; // Use the separate upcoming calibrations data
+    const dueSoon = upcomingCalibrations.length;
     const overdue = calibrations.filter(cal => moment(cal.next_calibration).isBefore(moment())).length;
 
     return { total, upToDate, dueSoon, overdue };
@@ -775,7 +741,6 @@ function Calibration() {
       };
 
       const newHistory = await addCalibrationHistory(formattedValues);
-      // Update the local state instead of fetching
       const updatedHistory = [...calibrationHistory, newHistory];
       useInventoryStore.setState({ calibrationHistory: updatedHistory });
       
@@ -789,14 +754,7 @@ function Calibration() {
   };
 
   const dueSoonColumns = [
-    // {
-    //   title: 'Item Code',
-    //   dataIndex: 'item_code',
-    //   key: 'item_code',
-    //   render: (text) => <Text strong>{text}</Text>
-    // },
     {
-      //Inventory1111
       title: 'Inventory Item',
       dataIndex: 'inventory_item_id',
       key: 'inventory_item_id',
@@ -810,7 +768,6 @@ function Calibration() {
               style={{ cursor: 'pointer', color: '#1890ff' }}
               onClick={() => handleInventoryItemClick(itemId)}
             >
-              {/* {item ? `${subcategory?.name || 'N/A'} - ${item.dynamic_data["Instrument code"]}` : itemId} */}
               {item ? `${subcategory?.name || 'N/A'}${item.dynamic_data["Instrument code"] ? ` - ${item.dynamic_data["Instrument code"]}` : ''}` : itemId}
             </Tag>
           </Tooltip>
@@ -884,7 +841,7 @@ function Calibration() {
               calibration_schedule_id: record.item_id,
               certificate_number: certificateNumber,
               calibration_date: moment(),
-              next_due_date: moment().add(30, 'days') // Default to 30 days for due soon items
+              next_due_date: moment().add(30, 'days')
             });
           }}
         >
@@ -906,7 +863,6 @@ function Calibration() {
       };
 
       await updateCalibration(id, formattedValues);
-      // Update the local state instead of fetching
       const updatedCalibrations = calibrations.map(cal => 
         cal.id === id ? { ...cal, ...formattedValues } : cal
       );
@@ -925,6 +881,23 @@ function Calibration() {
     return calibrations.filter(cal => moment(cal.next_calibration).isBefore(moment())).length;
   };
 
+  const handleTableChange = (pagination, filters, sorter) => {
+    setCurrentPage(pagination.current);
+    setPageSize(pagination.pageSize);
+  };
+
+  const handleHistoryTableChange = (pagination, filters, sorter) => {
+    setHistoryCurrentPage(pagination.current);
+    setHistoryPageSize(pagination.pageSize);
+  };
+
+  // Add a separate useEffect for history tab data refresh
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchCalibrationHistory();
+    }
+  }, [activeTab, calibrations.length]);
+
   if (loading) {
     return (
       <div className="p-6">
@@ -938,7 +911,6 @@ function Calibration() {
 
   return (
     <div className="calibration-container">
-      {/* Header Card */}
       <Card className="header-card">
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={24} md={24} lg={24}>
@@ -965,7 +937,6 @@ function Calibration() {
         </Row>
       </Card>
 
-      {/* Statistics Cards */}
       {activeTab === 'current' && (
         <div className="stats-container">
           <Row gutter={[16, 16]}>
@@ -1109,14 +1080,13 @@ function Calibration() {
         </div>
       )}
 
-      {/* Main Content */}
       <Card className="main-content">
         <Tabs
           activeKey={activeTab}
           onChange={(key) => {
             setActiveTab(key);
             if (key === 'current') {
-              setSelectedInventoryItem(null); // Clear selected item when switching back to current
+              setSelectedInventoryItem(null);
             }
           }}
           className="custom-tabs"
@@ -1200,6 +1170,13 @@ function Calibration() {
                     </div>
                   </Col>
                 </Row>
+                {dateRange && dateRange[0] && dateRange[1] && (
+                  <div style={{ marginTop: '8px' }}>
+                    <Text type="secondary">
+                      Showing calibrations between {moment(dateRange[0]).format('DD MMM YYYY')} and {moment(dateRange[1]).format('DD MMM YYYY')}
+                    </Text>
+                  </div>
+                )}
               </Card>
             </div>
 
@@ -1210,10 +1187,17 @@ function Calibration() {
                 loading={loading}
                 rowKey="id"
                 pagination={{
-                  pageSize: 5,
+                  current: currentPage,
+                  pageSize: pageSize,
                   showSizeChanger: true,
+                  pageSizeOptions: ['5', '10', '50', '100'],
                   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-                  responsive: true
+                  responsive: true,
+                  onChange: handleTableChange,
+                  onShowSizeChange: (current, size) => {
+                    setPageSize(size);
+                    setCurrentPage(1); // Reset to first page when changing page size
+                  }
                 }}
                 scroll={{ x: 'max-content' }}
                 className="responsive-table"
@@ -1272,10 +1256,17 @@ function Calibration() {
                 loading={loading}
                 rowKey="id"
                 pagination={{
-                  pageSize: 5,
+                  current: historyCurrentPage,
+                  pageSize: historyPageSize,
                   showSizeChanger: true,
+                  pageSizeOptions: ['5', '10', '50', '100'],
                   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-                  responsive: true
+                  responsive: true,
+                  onChange: handleHistoryTableChange,
+                  onShowSizeChange: (current, size) => {
+                    setHistoryPageSize(size);
+                    setHistoryCurrentPage(1); // Reset to first page when changing page size
+                  }
                 }}
                 scroll={{ x: 1500, y: 500 }}
                 className="responsive-table"
@@ -1285,7 +1276,6 @@ function Calibration() {
         </Tabs>
       </Card>
 
-      {/* Add/Edit Modal */}
       <Modal
         title={editingCalibration ? "Edit Calibration Record" : "Add New Calibration Record"}
         open={isModalVisible}
@@ -1321,66 +1311,54 @@ function Calibration() {
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
 
+          <Form.Item
+            name="inventory_selection"
+            label="Inventory Item Details"
+            rules={[{ required: true, message: 'Please select an inventory item' }]}
+          >
+            <Cascader
+              placeholder="Select Category > Subcategory > Item"
+              loading={isLoading}
+              style={{ width: '100%' }}
+              options={categories.map(category => ({
+                label: category.name,
+                value: category.id,
+                isLeaf: false,
+                children: subcategories
+                  .filter(sub => sub.category_id === category.id)
+                  .map(subcategory => ({
+                    label: subcategory.name,
+                    value: subcategory.id,
+                    isLeaf: false,
+                    children: inventoryItems
+                      .filter(item => item.subcategory_id === subcategory.id)
+                      .map(item => ({
+                        label: item.dynamic_data["Instrument code"] ? `${item.dynamic_data["Instrument code"]}` 
+                          : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
+                        value: item ? item.id : item.id,
+                        isLeaf: true,
+                      }))
+                  }))
+              }))}
+              showSearch={{
+                filter: (inputValue, path) =>
+                  path.some(option =>
+                    option.label.toLowerCase().includes(inputValue.toLowerCase())
+                  )
+              }}
+              displayRender={(labels) => labels.join(' > ')}
+              onChange={(value) => {
+                const selectedItem = inventoryItems.find(item => item.id === value[2]);
+                form.setFieldsValue({
+                  inventory_item_id: selectedItem ? selectedItem.id : null
+                });
+              }}
+            />
+          </Form.Item>
 
-          {/* Inventory Item Select and pass the inventory_item_id */}
-            <Form.Item
-              name="inventory_selection"
-              label="Inventory Item Details"
-              rules={[{ required: true, message: 'Please select an inventory item' }]}
-            >
-              <Cascader
-                placeholder="Select Category > Subcategory > Item"
-                loading={isLoading}
-                style={{ width: '100%' }}
-                options={categories.map(category => ({
-                  label: category.name,
-                  value: category.id,
-                  isLeaf: false,
-                  children: subcategories
-                    .filter(sub => sub.category_id === category.id)
-                    .map(subcategory => ({
-                      label: subcategory.name,
-                      value: subcategory.id,
-                      isLeaf: false,
-                      children: inventoryItems
-                        .filter(item => item.subcategory_id === subcategory.id)
-                        .map(item => ({
-                          label: item.dynamic_data["Instrument code"] ? `${item.dynamic_data["Instrument code"]}` 
-                            : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
-                          value: item ? item.id : item.id,
-                          isLeaf: true,
-                        }))
-                    }))
-                }))}
-                showSearch={{
-                  filter: (inputValue, path) =>
-                    path.some(option =>
-                      option.label.toLowerCase().includes(inputValue.toLowerCase())
-                    )
-                }}
-                displayRender={(labels) => labels.join(' > ')}
-                onChange={(value) => {
-                  const selectedItem = inventoryItems.find(item => item.id === value[2]);
-                  form.setFieldsValue({
-                    inventory_item_id: selectedItem ? selectedItem.id : null
-                  });
-                }}
-              />
-            </Form.Item>
-
-
-
-
-
-
-
-
-            
-
-            {/* Hidden field to submit inventory_item_id only */}
-            <Form.Item name="inventory_item_id" noStyle>
-              <Input type="hidden" />
-            </Form.Item>
+          <Form.Item name="inventory_item_id" noStyle>
+            <Input type="hidden" />
+          </Form.Item>
 
           <Row gutter={16}>
             <Col xs={24} sm={12}>
@@ -1420,7 +1398,6 @@ function Calibration() {
         </Form>
       </Modal>
 
-      {/* Add History Modal */}
       <Modal
         title="Add Calibration History Record"
         open={isHistoryModalVisible}
@@ -1677,16 +1654,16 @@ function Calibration() {
           overflow-x: auto;
           white-space: nowrap;
           -webkit-overflow-scrolling: touch;
-          scrollbar-width: none; /* Firefox */
-          -ms-overflow-style: none; /* IE and Edge */
+          scrollbar-width: none;
+          -ms-overflow-style: none;
         }
 
         .filter-buttons::-webkit-scrollbar {
-          display: none; /* Chrome, Safari, Opera */
+          display: none;
         }
 
         .filter-buttons .ant-space {
-          padding-bottom: 4px; /* Add some padding to account for scroll bar */
+          padding-bottom: 4px;
         }
 
         .filter-buttons .ant-btn {
@@ -1881,8 +1858,6 @@ function Calibration() {
           margin-bottom: 4px;
         }
 
-        
-
         .filter-card .ant-card-body {
           padding: 8px;
         }
@@ -1957,3 +1932,6 @@ function Calibration() {
 }
 
 export default Calibration;
+
+
+

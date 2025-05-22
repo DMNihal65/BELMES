@@ -3,9 +3,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { message } from 'antd';
 
 // API endpoints
-const API_BASE_URL = "http://172.16.0.203:8002";
-const MPP_API_BASE_URL = "http://172.16.0.203:8002";
-const WS_URL = "ws://172.16.0.203:8002/production_monitoring/ws/live-status/";
+const API_BASE_URL = "http://172.18.7.88:5656";
+const MPP_API_BASE_URL = "http://172.18.7.88:5656";
+const WS_URL = "ws://172.18.7.88:5656/production_monitoring/ws/live-status/";
 
 // Helper function to get authentication token
 const getAuthToken = () => {
@@ -151,7 +151,7 @@ const useOperatorStore = create((set, get) => ({
           });
           
           // Fetch detailed job data
-          await get().fetchJobDetails(parsedJobData.part_number);
+          await get().fetchJobDetails(parsedJobData.production_order);
           
           // Fetch job documents
           await get().fetchJobDocuments(parsedJobData.part_number);
@@ -174,7 +174,7 @@ const useOperatorStore = create((set, get) => ({
         });
         
         // Fetch detailed job data
-        await get().fetchJobDetails(inProgressJob.part_number);
+        await get().fetchJobDetails(inProgressJob.production_order);
         
         // Fetch job documents
         await get().fetchJobDocuments(inProgressJob.part_number);
@@ -346,11 +346,11 @@ const useOperatorStore = create((set, get) => ({
   },
   
   // Fetch job details by part number
-  fetchJobDetails: async (partNumber) => {
+  fetchJobDetails: async (productionOrder) => {
     try {
       set({ isLoadingJobs: true });
       
-      const response = await fetch(`${MPP_API_BASE_URL}/api/v1/planning/search_order?part_number=${partNumber}`, {
+      const response = await fetch(`${MPP_API_BASE_URL}/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`, {
         headers: createAuthHeaders()
       });
       
@@ -358,25 +358,22 @@ const useOperatorStore = create((set, get) => ({
         throw new Error('Failed to fetch job details');
       }
       
-      const data = await response.json();
+      const jobDetails = await response.json();
       
-      if (data.orders && data.orders.length > 0) {
-        const jobDetails = data.orders[0];
+      if (jobDetails && jobDetails.operations) {
+        // Filter operations where work_center_schedulable is true
+        const schedulableOperations = jobDetails.operations.filter(op => op.work_center_schedulable);
         
-        // Update operations list
-        if (jobDetails.operations) {
-          // Sort operations by operation number
-          const sortedOperations = [...jobDetails.operations].sort((a, b) => 
-            a.operation_number - b.operation_number
-          );
-          
-          set({ availableOperations: sortedOperations });
-        }
+        // Sort operations by operation number
+        const sortedOperations = [...schedulableOperations].sort((a, b) => 
+          a.operation_number - b.operation_number
+        );
         
+        set({ availableOperations: sortedOperations });
         set({ jobDetails });
         return { success: true, data: jobDetails };
       } else {
-        throw new Error('No job details found for this part number');
+        throw new Error('No job details found for this production order');
       }
     } catch (error) {
       console.error('Error fetching job details:', error);
@@ -464,11 +461,12 @@ const useOperatorStore = create((set, get) => ({
         })
       });
       
-      const activateData = await activateResponse.json();
-      
       if (!activateResponse.ok) {
-        throw new Error(activateData.detail || 'Failed to activate job');
+        const errorData = await activateResponse.json();
+        throw new Error(errorData.detail || 'Failed to activate job');
       }
+      
+      const activateData = await activateResponse.json();
       
       // Mark this as a user-selected job in localStorage
       localStorage.setItem('jobSource', 'user-selected');
@@ -514,12 +512,16 @@ const useOperatorStore = create((set, get) => ({
         operationId = get().inProgressJobs[0].operation_id;
       } 
       // If selectedOperation exists
-      else if (get().selectedOperation && get().selectedOperation.id) {
-        operationId = get().selectedOperation.id;
+      else if (get().selectedOperation) {
+        operationId = get().selectedOperation.operation_id || get().selectedOperation.id;
+      }
+      
+      if (!operationId) {
+        throw new Error('No active operation found to deactivate');
       }
       
       // Deactivate the job
-      const response = await fetch(`${MPP_API_BASE_URL}/api/v1/logs/machine-raw-live-deactive/`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/logs/machine-raw-live-deactive/`, {
         method: 'POST',
         headers: createAuthHeaders(),
         body: JSON.stringify({
@@ -528,11 +530,12 @@ const useOperatorStore = create((set, get) => ({
         })
       });
       
-      const responseData = await response.json();
-      
       if (!response.ok) {
-        throw new Error(responseData.detail || 'Failed to deactivate job');
+        const errorData = await response.json();
+        throw new Error(errorData.detail?.message || errorData.detail || 'Failed to deactivate job');
       }
+      
+      const responseData = await response.json();
       
       message.success('Job deactivated successfully');
       
@@ -572,13 +575,18 @@ const useOperatorStore = create((set, get) => ({
       let operationId = 0;
       
       if (get().selectedOperation) {
-        operationId = get().selectedOperation.id;
+        operationId = get().selectedOperation.operation_id || get().selectedOperation.id;
       } else if (get().inProgressJobs.length > 0) {
         operationId = get().inProgressJobs[0].operation_id;
       }
       
       if (!operationId) {
         throw new Error('No operation selected');
+      }
+      
+      // Check if the operation can log
+      if (get().selectedOperation && get().selectedOperation.can_log === false) {
+        throw new Error(get().selectedOperation.validation_reason || 'This operation cannot be logged at this time');
       }
       
       const payload = {
@@ -588,24 +596,36 @@ const useOperatorStore = create((set, get) => ({
         ...logData
       };
       
-      const response = await fetch(`${API_BASE_URL}/api/v1/logs/operator-log`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/operatorlogs2/operator-log`, {
         method: 'POST',
         headers: createAuthHeaders(),
         body: JSON.stringify(payload)
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to submit operator log');
-      }
-      
       const responseData = await response.json();
+      
+      if (!response.ok) {
+        // Handle the new error format
+        if (responseData.detail && typeof responseData.detail === 'object') {
+          if (responseData.detail.message) {
+            throw new Error(responseData.detail.message);
+          } else if (responseData.detail.validation_reason) {
+            throw new Error(responseData.detail.validation_reason);
+          }
+        }
+        throw new Error('Failed to submit operator log');
+      }
       
       message.success('Production log submitted successfully');
       
       // Refresh production stats
       if (operationId) {
         await get().fetchProductionStats(operationId);
+      }
+      
+      // Refresh job details to get updated completion status
+      if (get().selectedJob && get().selectedJob.production_order) {
+        await get().fetchJobDetails(get().selectedJob.production_order);
       }
       
       return { success: true, data: responseData };
@@ -621,8 +641,8 @@ const useOperatorStore = create((set, get) => ({
     set({ selectedJob: job });
     
     // Fetch job details if part number is available
-    if (job?.part_number) {
-      get().fetchJobDetails(job.part_number);
+    if (job?.production_order) {
+      get().fetchJobDetails(job.production_order);
       get().fetchJobDocuments(job.part_number);
     }
   },
@@ -630,9 +650,10 @@ const useOperatorStore = create((set, get) => ({
   selectOperation: (operation) => {
     set({ selectedOperation: operation });
     
-    // Fetch production stats if operation ID is available
-    if (operation?.id) {
-      get().fetchProductionStats(operation.id);
+    // Fetch production stats if operation ID is available and can log
+    if (operation?.id || operation?.operation_id) {
+      const operationId = operation.id || operation.operation_id;
+      get().fetchProductionStats(operationId);
     }
   },
   
@@ -725,7 +746,22 @@ const useOperatorStore = create((set, get) => ({
   // Download document
   downloadDocument: async (documentId) => {
     try {
-      window.open(`${MPP_API_BASE_URL}/api/v1/document-management/documents/${documentId}/download-latest`, '_blank');
+      const response = await fetch(
+        `${MPP_API_BASE_URL}/api/v1/document-management/documents/${documentId}/download-latest`,
+        {
+          headers: createAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+     
+
       return { success: true };
     } catch (error) {
       console.error('Error downloading document:', error);

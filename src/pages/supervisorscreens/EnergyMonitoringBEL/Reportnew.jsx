@@ -209,17 +209,18 @@ const Report = () => {
 
   // Add this function for landscape-optimized chart options
   const getLandscapeChartOptions = () => {
-    // Use the original order of machines instead of sorting them
-    const displayedMachines = machineData.slice(0, Math.min(12, machineData.length));
+    // Remove the slice limit to show all machines
+    const displayedMachines = machineData;
     
     return {
       chart: {
         type: 'column',
-        height: 400,
-        width: 800,
+        height: 500,
+        width: 1000,
         style: {
           fontFamily: 'Arial, sans-serif'
-        }
+        },
+        spacing: [20, 20, 20, 20]
       },
       title: {
         text: 'Energy Consumption by Machine and Shift',
@@ -248,53 +249,41 @@ const Report = () => {
         labels: {
           rotation: -45,
           style: {
-            fontSize: '12px',
+            fontSize: '10px', // Reduced font size for better fit
             color: '#333'
+          },
+          y: 35,
+          x: -5
+        },
+        tickLength: 0
+      },
+      yAxis: {
+        min: 0,
+        title: {
+          text: 'Energy (kWh)',
+          style: {
+            fontWeight: 'bold',
+            color: '#333'
+          }
+        },
+        stackLabels: {
+          enabled: true,
+          style: {
+            fontWeight: 'bold',
+            color: '#333',
+            textOutline: 'none'
+          },
+          formatter: function() {
+            return this.total.toFixed(2);
+          }
+        },
+        gridLineColor: '#e6e6e6',
+        labels: {
+          formatter: function() {
+            return this.value.toFixed(2);
           }
         }
       },
-      yAxis: [
-        { // Primary yAxis for the stacked bars
-          min: 0,
-          title: {
-            text: 'Energy per Shift (kWh)',
-            style: {
-              fontWeight: 'bold',
-              color: '#333'
-            }
-          },
-          stackLabels: {
-            enabled: true,
-            style: {
-              fontWeight: 'bold',
-              color: '#333',
-              textOutline: 'none'
-            },
-            formatter: function() {
-              return this.total.toFixed(2);
-            }
-          },
-          gridLineColor: '#e6e6e6'
-        },
-        { // Secondary yAxis for the total consumption line
-          min: 0,
-          title: {
-            text: 'Total Energy (kWh)',
-            style: {
-              fontWeight: 'bold',
-              color: '#333'
-            }
-          },
-          labels: {
-            format: '{value} kWh',
-            style: {
-              color: '#000'
-            }
-          },
-          opposite: true,
-          visible: false // We'll hide this axis but use it for the series
-        }
-      ],
       legend: {
         align: 'center',
         verticalAlign: 'bottom',
@@ -303,23 +292,24 @@ const Report = () => {
         borderWidth: 1,
         borderRadius: 5,
         layout: 'horizontal',
-        shadow: false
+        shadow: false,
+        itemStyle: {
+          fontWeight: 'bold'
+        }
       },
       tooltip: {
         shared: true,
         formatter: function() {
           let tooltipText = `<b>${this.x}</b><br/>`;
           
-          // Add each point's data
           this.points.forEach(point => {
-            if (point.series.name === 'Total Energy') {
-              tooltipText += `<span style="color:${point.color}">●</span> <b>${point.series.name}: ${point.y.toFixed(2)} kWh</b><br/>`;
-            } else {
-              tooltipText += `<span style="color:${point.color}">●</span> ${point.series.name}: ${point.y.toFixed(2)} kWh<br/>`;
-            }
+            tooltipText += `<span style="color:${point.color}">●</span> ${point.series.name}: ${point.y.toFixed(2)} kWh<br/>`;
           });
           
           return tooltipText;
+        },
+        style: {
+          fontSize: '12px'
         }
       },
       plotOptions: {
@@ -333,31 +323,16 @@ const Report = () => {
               }
             },
             style: {
-              fontSize: '10px',
+              fontSize: '9px',
               fontWeight: 'bold',
               color: '#fff',
               textOutline: '1px contrast'
-            }
+            },
+            y: -5
           },
           borderWidth: 0,
-          pointPadding: 0.2
-        },
-        line: {
-          dataLabels: {
-            enabled: true,
-            formatter: function() {
-              return this.y.toFixed(2);
-            },
-            style: {
-              fontWeight: 'bold'
-            }
-          },
-          marker: {
-            lineWidth: 2,
-            lineColor: null,
-            symbol: 'circle',
-            radius: 4
-          }
+          pointPadding: 0.1,
+          groupPadding: 0.2
         }
       },
       credits: {
@@ -394,11 +369,11 @@ const Report = () => {
           data: displayedMachines.map(machine => parseFloat(machine.energy || 0)),
           color: '#3B82F6', // blue
           stack: 'total',
-          pointPadding: 0.3,
-          pointPlacement: 0.2,
+          pointPadding: 0.1,
+          pointPlacement: 0,
           dataLabels: {
             enabled: true,
-            format: '{point.y:.3f}',
+            format: '{point.y:.2f}',
             style: {
               fontWeight: 'bold',
               color: '#fff',
@@ -552,14 +527,14 @@ const Report = () => {
       
       <Row gutter={[24, 24]} style={{ marginBottom: '20px' }}>
         {/* First A4 page - Table */}
-        <Col xs={24} xl={12}>
+        <Col xs={24}>
           <div 
             id="report-content" 
             ref={reportRef}
             style={{ 
-        backgroundColor: 'white', 
+              backgroundColor: 'white', 
               padding: '24px', 
-        borderRadius: '8px',
+              borderRadius: '8px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
               maxWidth: '210mm', // A4 width
               width: '100%',
@@ -640,7 +615,7 @@ const Report = () => {
         </Col>
         
         {/* Second A4 page - Graph (Landscape) */}
-        <Col xs={24} xl={12}>
+        <Col xs={24}>
           <div 
             id="chart-content" 
             ref={chartRef}

@@ -127,7 +127,13 @@ const MachineIssueModal = ({
 
         case 'machine':
           values = await machineForm.validateFields();
-          const machineId = machineStatus?.machine_id;
+          let machineId;
+          // const machineId = machineStatus?.machine_id;
+          const storedMachine = localStorage.getItem('currentMachine');
+        if (storedMachine) {
+          const machineData = JSON.parse(storedMachine);
+          machineId = machineData?.id;
+        }
           
           if (!machineId) {
             toast.error('No machine ID available');

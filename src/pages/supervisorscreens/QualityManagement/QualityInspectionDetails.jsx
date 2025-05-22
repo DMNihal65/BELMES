@@ -17,7 +17,8 @@ import {
   Badge,
   Tabs,
   Empty,
-  Switch
+  Switch,
+  Progress
 } from 'antd';
 import { 
   EyeOutlined, 
@@ -66,6 +67,9 @@ const QualityInspectionDetails = ({
   const [ftpApprovalStatus, setFtpApprovalStatus] = useState(null);
   const [finalInspectionDrawing, setFinalInspectionDrawing] = useState(null);
   const [loadingFinalDrawing, setLoadingFinalDrawing] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
 
@@ -80,12 +84,34 @@ const QualityInspectionDetails = ({
   const handleDrawingDownload = async (productionOrder, operationNo) => {
     try {
       setLoadingDrawing(true);
-      const drawingId = '10582891'; // Your drawing ID
-      const operationId = '10'; // Your operation ID
-      const data = await qualityStore.fetchBalloonedDrawing(drawingId, operationId);
+      setDownloadProgress(0);
+      setRetryCount(0);
+      setIsRetrying(false);
+      
+      // Add a loading message
+      message.loading({ 
+        content: 'Loading drawing...', 
+        key: 'drawingLoading',
+        duration: 0 // Keep the message until we explicitly destroy it
+      });
+      
+      const data = await qualityStore.fetchBalloonedDrawing(productionOrder, operationNo);
       setDrawingData(data);
+      
+      // Show success message
+      message.success({ content: 'Drawing loaded successfully', key: 'drawingLoading' });
     } catch (error) {
-      message.error('Failed to load drawing');
+      if (error.message.includes('timed out')) {
+        setIsRetrying(true);
+        setRetryCount(prev => prev + 1);
+        message.loading({ 
+          content: `Retrying download (attempt ${retryCount + 1} of 3)...`, 
+          key: 'drawingLoading',
+          duration: 0
+        });
+      } else {
+        message.error({ content: error.message || 'Failed to load drawing', key: 'drawingLoading' });
+      }
       console.error('Error loading drawing:', error);
     } finally {
       setLoadingDrawing(false);
@@ -104,16 +130,39 @@ const QualityInspectionDetails = ({
       setOperationMeasurements(operationData);
       setIsModalVisible(true);
       
-      // Fetch and show drawing
+      // Fetch and show drawing with loading state
       try {
         setLoadingDrawing(true);
+        setDownloadProgress(0);
+        setRetryCount(0);
+        setIsRetrying(false);
+        
+        message.loading({ 
+          content: 'Loading drawing...', 
+          key: 'drawingLoading',
+          duration: 0
+        });
+        
         const data = await qualityStore.fetchBalloonedDrawing(
           inspectionDetails.production_order, 
           op
         );
         setDrawingData(data);
+        
+        message.success({ content: 'Drawing loaded successfully', key: 'drawingLoading' });
       } catch (error) {
-        message.error('Failed to load drawing');
+        if (error.message.includes('timed out')) {
+          setIsRetrying(true);
+          setRetryCount(prev => prev + 1);
+          message.loading({ 
+            content: `Retrying download (attempt ${retryCount + 1} of 3)...`, 
+            key: 'drawingLoading',
+            duration: 0
+          });
+        } else {
+          message.error({ content: error.message || 'Failed to load drawing', key: 'drawingLoading' });
+        }
+        console.error('Error loading drawing:', error);
       } finally {
         setLoadingDrawing(false);
       }
@@ -231,7 +280,7 @@ const QualityInspectionDetails = ({
                 : 'bg-gray-100 hover:bg-gray-200 border-gray-200 hover:border-gray-300 text-gray-700'}
             `}
           >
-            View Measurements
+            Final Inspection
           </Button>
         );
       }
@@ -513,50 +562,30 @@ const QualityInspectionDetails = ({
         width={1600}
         className="measured-data-modal"
       >
-        {/* Header with order information */}
+        {/* Header section */}
         <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
           <Row gutter={16} align="middle">
-            <Col span={18}>
+            <Col span={24}>
               <Row gutter={[16, 8]}>
                 <Col span={8}>
                   <div className="flex flex-col">
                     <Text type="secondary" className="text-xs">Order ID</Text>
-                    <Text strong className="text-base">{measuredData?.order_id || '-'}</Text>
+                    <Text strong className="text-base">{inspectionDetails?.order_id || '-'}</Text>
                   </div>
                 </Col>
                 <Col span={8}>
                   <div className="flex flex-col">
                     <Text type="secondary" className="text-xs">Production Order</Text>
-                    <Text strong className="text-base">{measuredData?.production_order || '-'}</Text>
+                    <Text strong className="text-base">{inspectionDetails?.production_order || '-'}</Text>
                   </div>
                 </Col>
                 <Col span={8}>
                   <div className="flex flex-col">
                     <Text type="secondary" className="text-xs">Part Number</Text>
-                    <Text strong className="text-base">{measuredData?.part_number || '-'}</Text>
+                    <Text strong className="text-base">{inspectionDetails?.part_number || '-'}</Text>
                   </div>
                 </Col>
               </Row>
-            </Col>
-            <Col span={6} className="text-right">
-              <Button 
-                type={ftpApprovalStatus?.is_completed ? "primary" : "default"}
-                icon={<CheckCircleOutlined />}
-                onClick={handleApproveAll}
-                loading={isApprovingAll}
-                size="large"
-                className="approve-all-btn"
-                style={ftpApprovalStatus?.is_completed ? { 
-                  backgroundColor: "#52c41a", 
-                  borderColor: "#52c41a", 
-                  color: "#fff",
-                  cursor: 'not-allowed',
-                  opacity: 0.8
-                } : {}}
-                disabled={ftpApprovalStatus?.is_completed}
-              >
-                {ftpApprovalStatus?.is_completed ? "Already Approved" : "Approve All Measurements"}
-              </Button>
             </Col>
           </Row>
         </div>
@@ -1028,7 +1057,7 @@ const QualityInspectionDetails = ({
               <Button
                 type="primary"
                 icon={<FileSearchOutlined />}
-                onClick={handleViewMeasuredData} // Call the new function
+                onClick={handleViewMeasuredData}
               >
                 View Measured Data
               </Button>
@@ -1073,45 +1102,82 @@ const QualityInspectionDetails = ({
 
           {/* Drawing Content */}
           <div className="flex-1 p-4">
-            {loadingDrawing ? (
-              <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <Spin size="large" />
-                  <div className="mt-4 text-gray-500">Loading drawing...</div>
-                </div>
-              </div>
-            ) : drawingData ? (
-              <div className="h-full rounded-lg overflow-hidden border border-gray-200">
-                <iframe
-                  src={drawingData.url}
-                  type="application/pdf"
-                  className="w-full h-full"
-                  style={{
-                    backgroundColor: '#f8fafc',
-                    border: 'none'
-                  }}
-                  title="Drawing View"
-                />
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    <span className="text-gray-500">
-                      No drawing available
-                    </span>
-                  }
-                />
+            {renderDrawingContent()}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderDrawingContent = () => {
+    if (loadingDrawing) {
+      return (
+        <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+          <div className="text-center">
+            <Spin size="large" />
+            <div className="mt-4 text-gray-500">
+              {isRetrying ? (
+                <>
+                  <div>Retrying download...</div>
+                  <div className="text-sm text-gray-400">Attempt {retryCount} of 3</div>
+                </>
+              ) : (
+                <>
+                  <div>Loading drawing...</div>
+                  <div className="text-sm text-gray-400">This may take a few moments</div>
+                </>
+              )}
+            </div>
+            {downloadProgress > 0 && (
+              <div className="mt-2">
+                <Progress percent={downloadProgress} size="small" status="active" />
               </div>
             )}
           </div>
         </div>
+      );
+    }
+
+    if (drawingData) {
+      return (
+        <div className="h-full rounded-lg overflow-hidden border border-gray-200">
+          <iframe
+            src={drawingData.url}
+            type="application/pdf"
+            className="w-full h-full"
+            style={{
+              backgroundColor: '#f8fafc',
+              border: 'none'
+            }}
+            title="Drawing View"
+            onLoad={() => {
+              message.destroy('drawingLoading');
+              setDownloadProgress(0);
+              setIsRetrying(false);
+              setRetryCount(0);
+            }}
+            onError={() => {
+              message.error('Failed to load drawing in viewer');
+              setDrawingData(null);
+            }}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={
+            <span className="text-gray-500">
+              No drawing available
+            </span>
+          }
+        />
       </div>
-
-
-    </div>
-  );
+    );
+  };
 
   const renderQmsModal = () => (
     <Modal
@@ -1236,20 +1302,33 @@ const QualityInspectionDetails = ({
 
     try {
       const response = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+      console.log('FTP Approval Status:', response);
+      
+      // Update FTP status
       setFtpApprovalStatus(response);
-      if (response.is_completed) {
+      
+      // If is_completed is true, update all related states
+      if (response.is_completed === true) {
         setFinalInspectionApproved(true);
         setIsFinalAllApproved(true);
+        setAllApproved(true);
       }
     } catch (error) {
       console.error('Error checking FTP status:', error);
     }
   };
 
+  // Update useEffect to check FTP status when component mounts and when inspection details change
+  useEffect(() => {
+    if (inspectionDetails?.order_id && inspectionDetails?.operation_groups?.[0]?.ipid) {
+      checkFTPStatus();
+    }
+  }, [inspectionDetails]);
+
   // Update handleFinalApproveAll function
   const handleFinalApproveAll = async () => {
     // First check if already approved
-    if (ftpApprovalStatus?.is_completed) {
+    if (ftpApprovalStatus?.is_completed === true) {
       Modal.info({
         title: 'Already Approved',
         content: 'This final inspection has already been approved.',
@@ -1272,6 +1351,7 @@ const QualityInspectionDetails = ({
       message.success('All final inspection measurements approved');
       setIsFinalAllApproved(true);
       setFinalInspectionApproved(true);
+      setAllApproved(true);
       
       // Update FTP status after approval
       await checkFTPStatus();
@@ -1292,8 +1372,8 @@ const QualityInspectionDetails = ({
   const fetchFinalInspectionDrawing = async () => {
     try {
       setLoadingFinalDrawing(true);
-      const drawingId = '10557513'; // Your drawing ID
-      const operationId = '30'; // Your operation ID
+      const drawingId = inspectionDetails?.production_order; // Use production order from inspection details
+      const operationId = '999'; // Final Inspection operation
       const data = await qualityStore.fetchBalloonedDrawing(drawingId, operationId);
       setFinalInspectionDrawing(data);
     } catch (error) {
@@ -1319,6 +1399,38 @@ const QualityInspectionDetails = ({
       }
     };
   }, [finalInspectionDrawing]);
+
+  // Add new function to handle viewing final inspection measurements
+  const handleViewFinalMeasurements = async () => {
+    try {
+      if (!inspectionDetails?.order_id) {
+        message.error('Order ID not found');
+        return;
+      }
+      
+      const response = await qualityStore.fetchDetailedInspection(inspectionDetails.order_id);
+      
+      // Check if we have data for Operation 999
+      const hasOperation999 = response?.inspection_data?.some(
+        data => data.operation_number === 999
+      );
+
+      if (!hasOperation999) {
+        Modal.warning({
+          title: 'No Measurements Found',
+          content: 'No measurements have been recorded for Final Inspection (Operation 999) yet.',
+          okText: 'OK'
+        });
+        return;
+      }
+
+      setMeasuredData(response);
+      setIsMeasuredDataModalVisible(true);
+    } catch (error) {
+      message.error('Failed to load final inspection measurements');
+      console.error('Error loading final inspection measurements:', error);
+    }
+  };
 
   // Update the renderFinalInspectionModal function
   const renderFinalInspectionModal = () => {
@@ -1452,23 +1564,30 @@ const QualityInspectionDetails = ({
                     Ballooned Drawing
                   </Typography.Title>
                   <Space>
+                    <Button
+                      type="primary"
+                      icon={<EyeOutlined />}
+                      onClick={handleViewFinalMeasurements}
+                    >
+                      View Measurements
+                    </Button>
                     <Button 
-                      type={ftpApprovalStatus?.is_completed ? "primary" : "default"}
+                      type={ftpApprovalStatus?.is_completed === true ? "primary" : "default"}
                       icon={<CheckCircleOutlined />}
                       onClick={handleFinalApproveAll}
                       loading={isFinalApprovingAll}
                       size="middle"
                       className="approve-all-btn"
-                      style={ftpApprovalStatus?.is_completed ? { 
+                      style={ftpApprovalStatus?.is_completed === true ? { 
                         backgroundColor: "#52c41a", 
                         borderColor: "#52c41a", 
                         color: "#fff",
                         cursor: 'not-allowed',
                         opacity: 0.8
                       } : {}}
-                      disabled={ftpApprovalStatus?.is_completed}
+                      disabled={ftpApprovalStatus?.is_completed === true}
                     >
-                      {ftpApprovalStatus?.is_completed ? "Already Approved" : "Approve All Measurements"}
+                      {ftpApprovalStatus?.is_completed === true ? "Already Approved" : "Approve All Measurements"}
                     </Button>
                     {finalInspectionDrawing && (
                       <Button

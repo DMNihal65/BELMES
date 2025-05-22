@@ -30,6 +30,9 @@ function InspectionResult() {
   const [detailedMeasurements, setDetailedMeasurements] = useState(null);
   const [isDetailedMeasurementsVisible, setIsDetailedMeasurementsVisible] = useState(false);
   const [loadingDetailedMeasurements, setLoadingDetailedMeasurements] = useState(false);
+  const [ftpApprovalStatus, setFtpApprovalStatus] = useState(null);
+  const [measuredData, setMeasuredData] = useState(null);
+  const [isMeasuredDataModalVisible, setIsMeasuredDataModalVisible] = useState(false);
 
   useEffect(() => {
     const fetchPartNumbers = async () => {
@@ -136,21 +139,111 @@ function InspectionResult() {
     setIsDetailModalVisible(true);
   };
 
-  const handleOperationClick = (operation, record) => {
-    // Find inspection data for the selected operation
-    const operationData = record.inspection_data.find(
-      data => data.operation_number === operation
-    );
+  const handleOperationClick = async (operation, record) => {
+    if (operation === 'final') {
+      try {
+        setLoading(true);
+        // Fetch inspection details for final inspection
+        const inspectionDetails = await qualityStore.fetchInspectionDetails(record.order_id);
+        
+        // Filter only operation 999 data
+        const finalInspectionData = inspectionDetails.operation_groups.filter(
+          group => group.op_no === 999
+        );
 
-    setSelectedOperation(operation);
-    
-    if (operationData && operationData.inspections && operationData.inspections.length > 0) {
-      // If measurements exist, show measurements modal
-      setSelectedOperationData(operationData);
-      setIsOperationModalVisible(true);
+        if (finalInspectionData.length > 0) {
+          // Get the IPID for operation 999
+          const ipid = finalInspectionData[0].ipid;
+          
+          if (!ipid) {
+            message.warning('No IPID found for final inspection');
+            return;
+          }
+
+          try {
+            // Check FTP approval status
+            const ftpStatus = await qualityStore.checkFinalInspectionStatus(record.order_id, ipid);
+            
+            // Format the data for display
+            const formattedData = {
+              key: record.order_id,
+              order_id: inspectionDetails.order_id,
+              production_order: inspectionDetails.production_order,
+              part_number: inspectionDetails.part_number,
+              operations: inspectionDetails.operations,
+              inspection_data: [{
+                operation_number: 999,
+                inspections: finalInspectionData.map(group => ({
+                  id: `${group.op_no}-${group.details.zone}`,
+                  dimension_type: group.details.dimension_type,
+                  nominal_value: group.details.nominal,
+                  uppertol: group.details.uppertol,
+                  lowertol: group.details.lowertol,
+                  zone: group.details.zone,
+                  measured_instrument: group.details.measured_instrument,
+                  is_approved: ftpStatus.is_completed
+                }))
+              }]
+            };
+
+            setSelectedOperationData(formattedData.inspection_data[0]);
+            setSelectedOperation('999');
+            setFtpApprovalStatus(ftpStatus);
+            setIsOperationModalVisible(true);
+          } catch (ftpError) {
+            console.error('Error checking FTP status:', ftpError);
+            message.warning('Could not verify approval status');
+            
+            // Still show the data even if FTP check fails
+            const formattedData = {
+              key: record.order_id,
+              order_id: inspectionDetails.order_id,
+              production_order: inspectionDetails.production_order,
+              part_number: inspectionDetails.part_number,
+              operations: inspectionDetails.operations,
+              inspection_data: [{
+                operation_number: 999,
+                inspections: finalInspectionData.map(group => ({
+                  id: `${group.op_no}-${group.details.zone}`,
+                  dimension_type: group.details.dimension_type,
+                  nominal_value: group.details.nominal,
+                  uppertol: group.details.uppertol,
+                  lowertol: group.details.lowertol,
+                  zone: group.details.zone,
+                  measured_instrument: group.details.measured_instrument,
+                  is_approved: false
+                }))
+              }]
+            };
+
+            setSelectedOperationData(formattedData.inspection_data[0]);
+            setSelectedOperation('999');
+            setFtpApprovalStatus({ is_completed: false });
+            setIsOperationModalVisible(true);
+          }
+        } else {
+          message.warning('No final inspection data available');
+        }
+      } catch (error) {
+        console.error('Error fetching final inspection data:', error);
+        message.error('Failed to load final inspection data');
+      } finally {
+        setLoading(false);
+      }
     } else {
-      // If no measurements, show QMS modal
-      setIsQmsModalVisible(true);
+      // Existing operation click logic
+      const operationData = record.inspection_data.find(
+        data => data.operation_number === operation
+      );
+
+      setSelectedOperation(operation);
+      
+      if (operationData && operationData.inspections && operationData.inspections.length > 0) {
+        setSelectedOperationData(operationData);
+        setIsOperationModalVisible(true);
+      } else {
+        setIsQmsModalVisible(true);
+      }
     }
   };
 
@@ -409,21 +502,6 @@ function InspectionResult() {
                 size="small"
               >
                 OP {op}
-                {hasData ? (
-                  <Tag color="success" className="ml-2">
-                    {record.inspection_data.find(d => d.operation_number === op)?.inspections.length || 0}
-                  </Tag>
-                ) : (
-                  <Tooltip title="Launch QMS Software">
-                    <Tag color="warning" className="ml-2 cursor-pointer" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleLaunchQMS();
-                      }}>
-                      QMS
-                    </Tag>
-                  </Tooltip>
-                )}
               </Button>
             );
           })}
@@ -431,63 +509,22 @@ function InspectionResult() {
       ),
     },
     {
-      title: 'Inspection Data',
+      title: 'Final Inspection',
       dataIndex: 'inspection_data',
       key: 'inspection_data',
       width: '20%',
       fixed: 'right',
-      render: (inspectionData) => {
-        if (!inspectionData || inspectionData.length === 0) {
-          return (
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Tag color="warning">No inspection data</Tag>
-              <Button 
-                type="primary" 
-                size="small"
-                icon={<Wrench size={14} />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleLaunchQMS();
-                }}
-                loading={isLaunching}
-                style={{ 
-                  background: '#1890ff', 
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 0 rgba(0, 0, 0, 0.045)' 
-                }}
-              >
-                Open QMS Software
-              </Button>
-            </Space>
-          );
-        }
+      render: (inspectionData, record) => {
         return (
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Space direction="vertical" size="small">
-              {inspectionData.map((item, index) => (
-                <Tag key={index} color="processing">
-                  {`Inspection ${index + 1}`}
-                </Tag>
-              ))}
-            </Space>
-            <Button 
-              type="primary" 
-              size="small"
-              icon={<Wrench size={14} />}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLaunchQMS();
-              }}
-              loading={isLaunching}
-              style={{ 
-                background: '#1890ff', 
-                borderRadius: '4px',
-                boxShadow: '0 2px 0 rgba(0, 0, 0, 0.045)' 
-              }}
-            >
-              Open QMS Software
-            </Button>
-          </Space>
+          <Button
+            type="primary"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleOperationClick('final', record)}
+            className="hover:scale-105 transition-transform"
+          >
+            View Final Inspection
+          </Button>
         );
       },
     }
@@ -531,11 +568,14 @@ function InspectionResult() {
       try {
         setLoadingDrawing(true);
         
-        // Use the provided endpoint - assuming drawingId=10557513 and operation=selectedOperation
-        const drawingId = '10557513';
-        const operation = selectedOperation;
+        // Get the production order from the inspection data
+        const productionOrder = inspectionData?.[0]?.production_order;
+        if (!productionOrder) {
+          throw new Error('No production order found');
+        }
         
-        const response = await qualityStore.fetchBalloonedDrawing(drawingId, operation);
+        // Use the production order as the drawing ID and the selected operation
+        const response = await qualityStore.fetchBalloonedDrawing(productionOrder, selectedOperation);
         setDrawingData(response);
       } catch (error) {
         console.error('Error fetching drawing:', error);
@@ -551,15 +591,43 @@ function InspectionResult() {
         setLoadingDetailedMeasurements(true);
         
         // Use the actual order ID from the selected data
-        // Instead of hardcoded ID, use the selected order ID and operation
-        const inspectionId = selectedOrderId || '21'; // Default to 21 if no order selected
+        const inspectionId = selectedOrderId;
+        if (!inspectionId) {
+          throw new Error('No order ID selected');
+        }
         
         console.log(`Fetching detailed measurements for inspection ID: ${inspectionId}, operation: ${selectedOperation}`);
         
         // Call the fetchDetailedInspection method from quality-store.js
-        // This uses the endpoint: http://172.16.0.203:8002/api/v1/quality/inspection/${inspectionId}/detailed
         const response = await qualityStore.fetchDetailedInspection(inspectionId);
         console.log('Detailed measurements data received:', response);
+        
+        // Check FTP approval status
+        const orderId = inspectionId;
+        const ipid = 'IPID-213301910108-10';
+        
+        console.log('Checking FTP status for orderId:', orderId, 'ipid:', ipid);
+        
+        try {
+          const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+          console.log('FTP Status received:', ftpStatus);
+          setFtpApprovalStatus(ftpStatus);
+          
+          // If FTP is approved, update all measurements to show as done
+          if (ftpStatus?.is_completed === true && response?.inspection_data) {
+            console.log('FTP is completed, updating all measurements to done');
+            response.inspection_data = response.inspection_data.map(op => ({
+              ...op,
+              inspections: op.inspections.map(insp => ({
+                ...insp,
+                is_done: true
+              }))
+            }));
+          }
+        } catch (error) {
+          console.error('Error checking FTP status:', error);
+          message.error('Failed to check FTP approval status');
+        }
         
         if (response) {
           // If we have a selected operation, filter the data to show only that operation
@@ -764,11 +832,26 @@ function InspectionResult() {
         dataIndex: 'is_done',
         key: 'is_done',
         width: '8%',
-        render: (isDone) => (
-          isDone ? 
+        render: (isDone, record) => {
+          console.log('Rendering status for record:', record);
+          console.log('Current FTP status:', ftpApprovalStatus);
+          
+          // If FTP is approved, always show as done
+          if (ftpApprovalStatus?.is_completed === true) {
+            console.log('FTP is completed, showing Done status');
+            return (
+              <Tag color="success" icon={<CheckCircleOutlined />}>
+                Done
+              </Tag>
+            );
+          }
+          
+          // Otherwise show based on individual measurement status
+          console.log('FTP not completed, showing individual status:', isDone);
+          return isDone ? 
             <Tag color="success" icon={<CheckCircleOutlined />}>Done</Tag> : 
-            <Tag color="warning" icon={<ClockCircleOutlined />}>Pending</Tag>
-        )
+            <Tag color="warning" icon={<ClockCircleOutlined />}>Pending</Tag>;
+        }
       },
       {
         title: 'Operator',
@@ -917,85 +1000,61 @@ function InspectionResult() {
               <div className="flex justify-center items-center p-12">
                 <Spin size="large" tip="Loading measurement data..." />
               </div>
-            ) : detailedMeasurements ? (
+            ) : measurements && measurements.length > 0 ? (
               <div>
                 <Alert
-                  message="Inspection Details"
+                  message="Inspection Status"
                   description={
-                    <Row gutter={[16, 16]} className="pt-2">
-                      <Col span={6}>
-                        <Text strong>Order ID:</Text> {detailedMeasurements.order_id || 'N/A'}
-                      </Col>
-                      <Col span={6}>
-                        <Text strong>Part Number:</Text> {detailedMeasurements.part_number || 'N/A'}
-                      </Col>
-                      <Col span={6}>
-                        <Text strong>Production Order:</Text> {detailedMeasurements.production_order || 'N/A'}
-                      </Col>
-                      <Col span={6}>
-                        <Text strong>Operation:</Text> {selectedOperation || 'N/A'}
-                      </Col>
-                    </Row>
+                    <div className="flex items-center gap-2">
+                      <Text strong>FTP Approval Status:</Text>
+                      {ftpApprovalStatus?.is_completed ? (
+                        <Tag color="success" icon={<CheckCircleOutlined />}>
+                          Approved
+                        </Tag>
+                      ) : (
+                        <Tag color="warning" icon={<ClockCircleOutlined />}>
+                          Pending Approval
+                        </Tag>
+                      )}
+                      {ftpApprovalStatus?.updated_at && (
+                        <Text type="secondary" className="ml-4">
+                          Last Updated: {new Date(ftpApprovalStatus.updated_at).toLocaleString()}
+                        </Text>
+                      )}
+                    </div>
                   }
-                  type="info"
+                  type={ftpApprovalStatus?.is_completed ? "success" : "warning"}
                   showIcon
                   className="mb-4"
                 />
                 
-                {measurements && measurements.length > 0 ? (
-                  <Table
-                    columns={detailedMeasurementColumns}
-                    dataSource={measurements.map(item => ({
-                      ...item,
-                      key: item.id || `${item.zone}-${item.dimension_type}`
-                    }))}
-                    bordered
-                    size="middle"
-                    scroll={{ y: 500, x: 1300 }}
-                    pagination={{ pageSize: 10, showSizeChanger: false }}
-                    className="detailed-measurements-table"
-                    summary={data => {
-                      return (
-                        <Table.Summary fixed>
-                          <Table.Summary.Row className="bg-gray-50">
-                            <Table.Summary.Cell index={0} colSpan={2}>
-                              <Text strong>Total Items: {data.length}</Text>
-                            </Table.Summary.Cell>
-                            <Table.Summary.Cell index={1} colSpan={5}>
-                              <Space>
-                                <Badge status="success" text={`Completed: ${data.filter(item => item.is_done).length}`} />
-                                <Badge status="warning" text={`Pending: ${data.filter(item => !item.is_done).length}`} />
-                              </Space>
-                            </Table.Summary.Cell>
-                            <Table.Summary.Cell index={2} colSpan={3}>
-                              <Text type="secondary">
-                                {data.length > 0 && data[0].created_at ? 
-                                  `Last Updated: ${new Date(Math.max(...data.filter(item => item.created_at).map(item => new Date(item.created_at)))).toLocaleString()}` 
-                                  : ''}
-                              </Text>
-                            </Table.Summary.Cell>
-                          </Table.Summary.Row>
-                        </Table.Summary>
-                      );
-                    }}
-                  />
-                ) : (
-                  <Empty description={
-                    <span>
-                      No measurements found for Operation {selectedOperation}. 
-                      <Button 
-                        type="link" 
-                        onClick={handleLaunchQMS}
-                        className="ml-2"
-                      >
-                        Launch QMS Software
-                      </Button>
-                    </span>
-                  } />
-                )}
+                <Table
+                  columns={detailedMeasurementColumns}
+                  dataSource={measurements.map(item => ({
+                    ...item,
+                    key: item.id || `${item.zone}-${item.dimension_type}`
+                  }))}
+                  bordered
+                  size="middle"
+                  scroll={{ y: 500, x: 1300 }}
+                  pagination={{ pageSize: 10, showSizeChanger: false }}
+                  className="detailed-measurements-table"
+                />
               </div>
             ) : (
-              <Empty description="No detailed measurements available" />
+              <Empty 
+                description={
+                  <div className="text-center">
+                    <p className="text-gray-500 mb-4">No measurements found for Operation {selectedOperation}</p>
+                    {!ftpApprovalStatus?.is_completed && (
+                      <Tag color="warning" icon={<ClockCircleOutlined />}>
+                        Pending Approval
+                      </Tag>
+                    )}
+                  </div>
+                }
+                className="my-12"
+              />
             )}
           </div>
         </Modal>
@@ -1124,7 +1183,7 @@ function InspectionResult() {
                         onClick={fetchDetailedMeasurements}
                         loading={loadingDetailedMeasurements}
                       >
-                        View Measurements
+                        View Measurements 
                       </Button>
                       
                       {drawingData && (
@@ -1233,6 +1292,102 @@ function InspectionResult() {
       </div>
     </Modal>
   );
+
+  // Update the handleViewMeasuredData function to check FTP status
+  const handleViewMeasuredData = async () => {
+    if (!inspectionDetails?.order_id) return;
+
+    try {
+      // Show loading indicator
+      message.loading({ content: 'Loading measured data...', key: 'measuredDataLoading' });
+      
+      // Fetch inspection data using the quality store
+      const response = await qualityStore.fetchInspectionByOrderId(inspectionDetails.order_id);
+      
+      // Check FTP approval status
+      const orderId = inspectionDetails.order_id;
+      const ipid = inspectionDetails.operation_groups?.[0]?.ipid;
+      if (orderId && ipid) {
+        const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+        setFtpApprovalStatus(ftpStatus);
+        
+        // If FTP is approved, update all measurements to show as done
+        if (ftpStatus?.is_completed === true && response?.inspection_data) {
+          response.inspection_data = response.inspection_data.map(op => ({
+            ...op,
+            inspections: op.inspections.map(insp => ({
+              ...insp,
+              is_done: true
+            }))
+          }));
+        }
+      }
+      
+      // Check if we have valid data with the correct structure
+      if (response && response.inspection_data && response.inspection_data.length > 0) {
+        setMeasuredData(response);
+        setIsMeasuredDataModalVisible(true);
+        message.success({ content: 'Data loaded successfully', key: 'measuredDataLoading', duration: 1 });
+      } else {
+        message.warning({ content: 'No measurement data available', key: 'measuredDataLoading' });
+      }
+    } catch (error) {
+      console.error('Error loading measured data:', error);
+      message.error({ content: 'Failed to load measured data', key: 'measuredDataLoading' });
+    }
+  };
+
+  const prepareInspectionData = () => {
+    if (!measuredData || !measuredData.inspection_data) return [];
+    
+    console.log('Preparing inspection data with FTP status:', ftpApprovalStatus);
+    
+    // Flatten the nested structure for table display
+    const flatData = [];
+    
+    measuredData.inspection_data.forEach(operationData => {
+      const operationNumber = operationData.operation_number;
+      
+      if (operationData.inspections && operationData.inspections.length > 0) {
+        operationData.inspections.forEach(inspection => {
+          // Calculate upper and lower tolerance limits
+          const nominal = parseFloat(inspection.nominal_value) || 0;
+          const upperTol = parseFloat(inspection.uppertol) || 0;
+          const lowerTol = parseFloat(inspection.lowertol) || 0;
+          const mean = parseFloat(inspection.measured_mean) || 0;
+          
+          // Calculate the actual upper and lower limits
+          const upperLimit = nominal + upperTol;
+          const lowerLimit = nominal + lowerTol; // Note: lowerTol is typically negative
+          
+          // Check if mean is within tolerance
+          const isWithinTolerance = mean <= upperLimit && mean >= lowerLimit;
+          
+          // If FTP is approved, all measurements should be marked as done
+          const isDone = ftpApprovalStatus?.is_completed === true ? true : inspection.is_done;
+          
+          console.log('Processing inspection:', {
+            id: inspection.id,
+            isDone: isDone,
+            ftpCompleted: ftpApprovalStatus?.is_completed
+          });
+          
+          flatData.push({
+            ...inspection,
+            operation_number: operationNumber,
+            key: `${operationNumber}-${inspection.id}`,
+            upperLimit,
+            lowerLimit,
+            isWithinTolerance,
+            is_done: isDone // Override is_done based on FTP approval status
+          });
+        });
+      }
+    });
+    
+    console.log('Prepared flat data:', flatData);
+    return flatData;
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">

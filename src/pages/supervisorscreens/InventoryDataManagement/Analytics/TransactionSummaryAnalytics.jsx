@@ -39,6 +39,8 @@ const TransactionSummaryAnalytics = () => {
   const [subcategories, setSubcategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [itemDetails, setItemDetails] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const {
     // loading,
@@ -150,7 +152,9 @@ const TransactionSummaryAnalytics = () => {
     searchTransactionHistory(value, dateRange);
   };
 
-  const handleChange = (pagination, filters, sorter) => {
+  const handleTableChange = (pagination, filters, sorter) => {
+    setCurrentPage(pagination.current);
+    setPageSize(pagination.pageSize);
     setFilteredInfo(filters);
     setSortedInfo(sorter);
   };
@@ -576,12 +580,23 @@ const TransactionSummaryAnalytics = () => {
           columns={transactionHistoryColumns}
           dataSource={filteredData}
           rowKey={(record) => record.transaction.id}
-          onChange={handleChange}
+          onChange={handleTableChange}
           pagination={{
+            current: currentPage,
+            pageSize: pageSize,
             total: transactionHistory.metadata?.total_count,
-            pageSize: 5,
             showSizeChanger: true,
             showQuickJumper: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+            pageSizeOptions: ['5', '10', '20', '50'],
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            onShowSizeChange: (current, size) => {
+              setCurrentPage(1);
+              setPageSize(size);
+            }
           }}
           scroll={{ x: true }}
         />

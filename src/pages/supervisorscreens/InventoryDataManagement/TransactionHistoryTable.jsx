@@ -18,6 +18,8 @@ const TransactionHistoryTable = () => {
   const [subcategories, setSubcategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [itemDetails, setItemDetails] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const {
     transactions,
@@ -166,6 +168,10 @@ const TransactionHistoryTable = () => {
     setSearchText(value.toLowerCase());
   };
 
+  const handleReset = () => {
+    setSearchText('');
+  };
+
   const filteredData = transactions.filter(record => {
     if (!searchText) return true;
     return (
@@ -180,6 +186,11 @@ const TransactionHistoryTable = () => {
       formatDate(record.created_at)?.toLowerCase().includes(searchText)
     );
   });
+
+  const handleTableChange = (pagination, filters, sorter) => {
+    setCurrentPage(pagination.current);
+    setPageSize(pagination.pageSize);
+  };
 
   const columns = [
     // {
@@ -316,18 +327,19 @@ const TransactionHistoryTable = () => {
             <Input.Search
               placeholder="Search transactions..."
               allowClear
-              onSearch={handleSearch}
+              onChange={(e) => handleSearch(e.target.value)}
               style={{ width: 300 }}
               className="mr-2"
             />
             <Button
-              type="primary"
+              type="default"
               icon={<ReloadOutlined />}
-              onClick={() => fetchTransactionHistory()}
-              loading={loading}
+              onClick={handleReset}
+              className="mr-2"
             >
-              Refresh
+              Reset
             </Button>
+           
           </Space>
         </div>
 
@@ -338,10 +350,12 @@ const TransactionHistoryTable = () => {
             rowKey="id"
             scroll={{ x: 1500 }}
             pagination={{
+              current: currentPage,
+              pageSize: pageSize,
               total: filteredData.length,
-              pageSize: 10,
               showSizeChanger: true,
               showTotal: (total) => `Total ${total} transactions`,
+              onChange: handleTableChange,
             }}
             className="shadow-sm"
             rowClassName={(record) => 

@@ -204,6 +204,7 @@ const Scheduling = () => {
   const styleElementRef = useRef(null);
   const componentStatus = scheduleData?.component_status || {};
   const dailyProduction = scheduleData?.daily_production || {};
+  const [partDescriptions, setPartDescriptions] = useState({});
 
   const [dateRange, setDateRange] = useState(null);
 
@@ -302,11 +303,11 @@ const Scheduling = () => {
           return matchesComponent && matchesOrder && matchesMachine;
         });
 
-        // Generate and store component colors for filtered operations
-        const colors = getComponentColors(operations);
+        // Generate and store component colors for ALL operations, not just filtered ones
+        const colors = getComponentColors(scheduleData.scheduled_operations);
         setComponentColors(colors);
 
-        // Create items from filtered operations
+        // Create items from filtered operations but use the colors from all operations
         const items = new DataSet(
           operations.map((op, index) => ({
             id: index,
@@ -329,21 +330,51 @@ const Scheduling = () => {
           }))
         );
 
-        // Create groups with all available machines in the correct order
+        // Create groups with multiple selected machines in the correct order
         const groups = new DataSet(
-          availableMachines.map(machine => ({
-            id: machine.machineId,  // Use our unique internal machine ID
-            content: `
-              <div class="machine-group">
-                <span class="machine-name">
-                  ${machine.displayName}
-                </span>
-              </div>
-            `,
-            className: operations.some(op => machineMapping.get(op.machine) === machine.machineId) ? 'machine-with-ops' : 'machine-without-ops',
-            order: machine.order // Add order property to maintain sorting
-          }))
+          availableMachines
+            .filter(machine => {
+              // If no components or production orders are selected, show all machines
+              if (selectedComponents.length === 0 && selectedProductionOrders.length === 0) {
+                return selectedMachines.length === 0 || selectedMachines.includes(machine.machineId);
+              }
+              
+              // Check if machine has operations for selected components
+              const hasSelectedComponentOperations = selectedComponents.length === 0 || 
+                operations.some(op => 
+                  selectedComponents.includes(op.component) && 
+                  machineMapping.get(op.machine) === machine.machineId
+                );
+              
+              // Check if machine has operations for selected production orders
+              const hasSelectedOrderOperations = selectedProductionOrders.length === 0 || 
+                operations.some(op => 
+                  selectedProductionOrders.includes(op.production_order) && 
+                  machineMapping.get(op.machine) === machine.machineId
+                );
+              
+              // Show machine if it has operations for both selected components and production orders
+              return hasSelectedComponentOperations && 
+                     hasSelectedOrderOperations && 
+                     (selectedMachines.length === 0 || selectedMachines.includes(machine.machineId));
+            })
+            .map(machine => ({
+              id: machine.machineId,
+              content: `
+                <div class="machine-group">
+                  <span class="machine-name">
+                    ${machine.displayName}
+                  </span>
+                </div>
+              `,
+              className: operations.some(op => machineMapping.get(op.machine) === machine.machineId) ? 'machine-with-ops' : 'machine-without-ops',
+              order: machine.order
+            }))
         );
+
+
+
+        
 
         // Remove previous dynamic styles
         if (styleElementRef.current) {
@@ -676,6 +707,28 @@ const Scheduling = () => {
     }
   };
 
+  // Add useEffect to fetch part descriptions
+  useEffect(() => {
+    const fetchPartDescriptions = async () => {
+      try {
+        const response = await fetch('http://172.18.7.88:5656/api/v1/planning/all_orders');
+        const data = await response.json();
+        
+        // Create a mapping of part numbers to their descriptions
+        const descriptions = data.reduce((acc, order) => {
+          acc[order.part_number] = order.part_description;
+          return acc;
+        }, {});
+        
+        setPartDescriptions(descriptions);
+      } catch (error) {
+        console.error('Error fetching part descriptions:', error);
+      }
+    };
+
+    fetchPartDescriptions();
+  }, []);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -874,13 +927,26 @@ const Scheduling = () => {
                           onChange={setSelectedComponents}
                           style={{ minWidth: 200 }}
                           allowClear
+                          optionLabelProp="label"
                         >
-                          {availableComponents.map(component => (
-                            <Option key={component} value={component}>
-                              {component}
-                            </Option>
-                          ))}
+                          {availableComponents.map(component => {
+                            const description = partDescriptions[component] || '';
+                            return (
+                              <Option 
+                                key={component} 
+                                value={component}
+                                label={component}
+                              >
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span>{component}</span>
+                                  <span style={{ fontSize: '12px', color: '#666' }}>{description}</span>
+                                </div>
+                              </Option>
+                            );
+                          })}
                         </Select>
+
+
                       
                           <Select
                           mode="multiple"
@@ -1477,3 +1543,17 @@ const getTimeRange = (viewType, dateRange, selectedComponents, selectedMachines,
 };
 
 export default Scheduling;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

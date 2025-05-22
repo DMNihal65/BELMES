@@ -112,12 +112,12 @@ function Header() {
       label: `Role: ${user?.role || ''}`,
       disabled: true,
     },
-    {
-      key: 'profile',
-      icon: <User size={16} />,
-      label: 'Profile',
-      onClick: () => navigate('/profile'),
-    },
+    // {
+    //   key: 'profile',
+    //   icon: <User size={16} />,
+    //   label: 'Profile',
+    //   onClick: () => navigate('/profile'),
+    // },
     {
       type: 'divider',
     },

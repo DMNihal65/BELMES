@@ -72,7 +72,7 @@ function ProductionAnalytics() {
   const fetchWorkCenters = async () => {
     setLoadingWorkCenters(true);
     try {
-      const response = await axios.get('http://172.16.0.203:8002/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await axios.get('http://172.18.7.88:5656/api/v1/master-order/workcenters/?skip=0&limit=100');
       const workCentersData = response.data;
       
       // No longer filtering by is_schedulable
@@ -920,11 +920,11 @@ function ProductionAnalytics() {
             )}
           </Tabs.TabPane>
 
-          <Tabs.TabPane 
+          {/* <Tabs.TabPane 
             tab={
               <TabTitle 
                 icon={<i className="fas fa-chart-line mr-1" />}
-                title="Daily Production" 
+                title="Daizly Production" 
                 tooltip="View daily production metrics over time"
               />
             } 
@@ -945,7 +945,7 @@ function ProductionAnalytics() {
             ) : (
               <Empty description="No daily production data available" />
             )}
-          </Tabs.TabPane>
+          </Tabs.TabPane> */}
         </Tabs>
       </Card>
     </div>

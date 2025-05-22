@@ -47,7 +47,8 @@ import {
   MenuUnfoldOutlined,
   InfoCircleOutlined,
   DownOutlined,
-  MenuOutlined
+  MenuOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import useInventoryStore from '../../../store/inventory-store';
 import useAuthStore from '../../../store/auth-store';
@@ -81,6 +82,11 @@ const InventoryAllData = () => {
   const [isCalibrationModalVisible, setIsCalibrationModalVisible] = useState(false);
   const [selectedItemForCalibration, setSelectedItemForCalibration] = useState(null);
   const [calibrationForm] = Form.useForm();
+  // Add pagination state
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 5,
+  });
 
   // Store hooks
   const { 
@@ -1688,7 +1694,18 @@ const InventoryAllData = () => {
     );
   };
 
-  // Update the table title section
+  // Add reset function
+  const handleReset = () => {
+    setPagination({
+      current: 1,
+      pageSize: 5,
+    });
+    setSearchText('');
+    form.resetFields();
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  // Update the renderTableTitle function
   const renderTableTitle = () => (
     <div className="w-full">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
@@ -1697,13 +1714,7 @@ const InventoryAllData = () => {
           <div className="flex items-center gap-2 mb-2">
             <Title level={4} className="!m-0 !text-lg">
               {subcategories.find(sub => sub.id === selectedCategory.id)?.name} 
-              {/* all data */}
             </Title>
-            {/* <Badge 
-              count={getTableData().length} 
-              style={{ backgroundColor: '#52c41a' }} 
-              title="Total Items"
-            /> */}
           </div>
           <div className="flex items-center gap-2">
             <Text type="secondary" className="text-sm">
@@ -1770,6 +1781,14 @@ const InventoryAllData = () => {
               onClick={handleExportExcel}
             >
               Export
+            </Button>
+
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={handleReset}
+              title="Reset to default view"
+            >
+              Reset
             </Button>
           </div>
         </div>
@@ -2081,12 +2100,31 @@ const InventoryAllData = () => {
                     title={renderTableTitle}
                     rowKey="id"
                     pagination={{
-                      onChange: cancel,
-                      pageSize: 5,
+                      current: pagination.current,
+                      pageSize: pagination.pageSize,
                       showSizeChanger: true,
+                      pageSizeOptions: ['5', '10', '20', '50'],  
+                      
                       showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
                       position: ['bottomRight'],
-                      className: 'px-4'
+                      className: 'px-4',
+                      showQuickJumper: true,
+                      size: 'default',
+                      locale: {
+                        items_per_page: '/ page'
+                      },
+                      onChange: (page, pageSize) => {
+                        setPagination({
+                          current: page,
+                          pageSize: pageSize,
+                        });
+                      },
+                      onShowSizeChange: (current, size) => {
+                        setPagination({
+                          current: 1,
+                          pageSize: size,
+                        });
+                      }
                     }}
                     className="border border-gray-200 rounded"
                     style={{

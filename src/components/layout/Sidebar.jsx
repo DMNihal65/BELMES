@@ -232,8 +232,17 @@ function Sidebar() {
       icon: <Files size={20} />,
       label: 'Document Management',
     },
+    // {
+    //   key: '/supervisor/notifications',
+    //   icon: unreadCount > 0 ? (
+    //     <Badge count={unreadCount} size="small" offset={[5, 0]}>
+    //       <Bell size={20} />
+    //     </Badge>
+    //   ) : <Bell size={20} />,
+    //   label: 'Notifications',
+    // },
     {
-      key: '/supervisor/notifications',
+      key: '/supervisor/notifications_new',
       icon: unreadCount > 0 ? (
         <Badge count={unreadCount} size="small" offset={[5, 0]}>
           <Bell size={20} />
@@ -241,11 +250,11 @@ function Sidebar() {
       ) : <Bell size={20} />,
       label: 'Notifications',
     },
-    {
-      key: '/supervisor/logs',
-      icon: <ScrollText  size={20} />,
-      label: 'Logs',
-    },
+    // {
+    //   key: '/supervisor/logs',
+    //   icon: <ScrollText  size={20} />,
+    //   label: 'Logs',
+    // },
   ];
 
 
@@ -385,8 +394,17 @@ function Sidebar() {
       icon: <Files size={20} />,
       label: 'Document Management',
     },
+    // {
+    //   key: '/admin/notifications',
+    //   icon: unreadCount > 0 ? (
+    //     <Badge count={unreadCount} size="small" offset={[5, 0]}>
+    //       <Bell size={20} />
+    //     </Badge>
+    //   ) : <Bell size={20} />,
+    //   label: 'Notifications',
+    // },
     {
-      key: '/admin/notifications',
+      key: '/admin/notifications_new',
       icon: unreadCount > 0 ? (
         <Badge count={unreadCount} size="small" offset={[5, 0]}>
           <Bell size={20} />
@@ -394,11 +412,11 @@ function Sidebar() {
       ) : <Bell size={20} />,
       label: 'Notifications',
     },
-    {
-      key: '/admin/logs',
-      icon: <ScrollText  size={20} />,
-      label: 'Logs',
-    },
+    // {
+    //   key: '/admin/logs',
+    //   icon: <ScrollText  size={20} />,
+    //   label: 'Logs',
+    // },
     {
       key: '/admin/access_control_management',
       icon: <LockKeyhole />,

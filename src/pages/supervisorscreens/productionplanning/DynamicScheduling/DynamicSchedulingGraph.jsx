@@ -108,7 +108,7 @@ const getTimeRange = (viewType, dateRange) => {
   return { start, end };
 };
 
-const DynamicSchedulingGraph2 = () => {
+const DynamicSchedulingGraph = () => {
   const [timelineRef, setTimelineRef] = useState(null);
   const [timelineContainerRef, setTimelineContainerRef] = useState(null);
   const [dateRange, setDateRange] = useState(null);
@@ -118,9 +118,21 @@ const DynamicSchedulingGraph2 = () => {
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [productionOrders, setProductionOrders] = useState([]);
   const [components, setComponents] = useState([]);
+  const [partDetails, setPartDetails] = useState([]);
 
   // Get store values and functions
   const { scheduleData, loading, error, fetchDynamicScheduleData, pdcData, fetchPDCData } = useDynamicStore();
+
+  // Add new function to fetch part details
+  const fetchPartDetails = async () => {
+    try {
+      const response = await axios.get('http://172.18.7.88:9933/api/v1/planning/all_orders');
+      setPartDetails(response.data);
+    } catch (err) {
+      console.error('Error fetching part details:', err);
+      message.error('Failed to fetch part details');
+    }
+  };
 
   const fetchScheduleData = async () => {
     try {
@@ -164,10 +176,8 @@ const DynamicSchedulingGraph2 = () => {
   useEffect(() => {
     setTimelineContainerRef(document.createElement('div'));
     fetchScheduleData();
+    fetchPartDetails();
   }, []);
-
-
-  
 
   // Initialize timeline when container is ready
   useEffect(() => {
@@ -198,88 +208,125 @@ const DynamicSchedulingGraph2 = () => {
       }
     });
 
-    // Add groups for each machine with subgroups
+    // Update the groups creation logic to handle multiple selected machines and production orders
     scheduleData.work_centers.forEach(wc => {
       // Only add groups for schedulable work centers
       if (wc.is_schedulable) {
         wc.machines.forEach(machine => {
-          const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
-          const machineLabel = `${wc.work_center_code} - ${machine.name}`;
-          
-          // Add machine header group
-          groups.add({
-            id: machineFullName,
-            content: `<strong>${machineLabel}</strong>`,
-            title: wc.work_center_name,
-            nestedGroups: [
-              `${machineFullName}-planned`,
-              `${machineFullName}-actual`,
-              `${machineFullName}-rescheduled`
-            ],
-            showNested: true
-          });
+          // Check if this machine has any operations for the selected parts and production orders
+          const hasRelevantOperations = () => {
+            // If no filters are applied, show all machines
+            if (!selectedComponent?.length && !selectedProductionOrder?.length) return true;
 
-          // Add subgroups for each type in order
-          groups.add({
-            id: `${machineFullName}-planned`,
-            content: 'Planned',
-            className: 'planned-group',
-            title: 'Planned Operations',
-            order: 1
-          });
-          groups.add({
-            id: `${machineFullName}-actual`,
-            content: 'Actual',
-            className: 'actual-group',
-            title: 'Actual Production',
-            order: 2
-          });
-          groups.add({
-            id: `${machineFullName}-rescheduled`,
-            content: 'Rescheduled',
-            className: 'rescheduled-group',
-            title: 'Rescheduled Operations',
-            order: 3
-          });
+            // Check scheduled operations
+            const hasScheduledOps = scheduleData.scheduled_operations.some(op => {
+              const matchesMachine = op.machine === `${wc.work_center_code}-${machine.name}`;
+              const matchesPart = !selectedComponent?.length || selectedComponent.includes(op.component);
+              const matchesPO = !selectedProductionOrder?.length || selectedProductionOrder.includes(op.production_order);
+              return matchesMachine && matchesPart && matchesPO;
+            });
+
+            // Check production logs
+            const hasActualOps = scheduleData.production_logs.some(log => {
+              const matchesMachine = log.machine_name === `${wc.work_center_code}-${machine.name}`;
+              const matchesPart = !selectedComponent?.length || selectedComponent.includes(log.part_number);
+              const matchesPO = !selectedProductionOrder?.length || selectedProductionOrder.includes(log.production_order);
+              return matchesMachine && matchesPart && matchesPO;
+            });
+
+            // Check rescheduled operations
+            const hasRescheduledOps = scheduleData.reschedule.some(reschedule => {
+              const matchesMachine = reschedule.machine_id.toString() === machine.id.toString();
+              const matchesPart = !selectedComponent?.length || selectedComponent.includes(reschedule.part_number);
+              const matchesPO = !selectedProductionOrder?.length || selectedProductionOrder.includes(reschedule.production_order);
+              return matchesMachine && matchesPart && matchesPO;
+            });
+
+            return hasScheduledOps || hasActualOps || hasRescheduledOps;
+          };
+
+          // Only add groups for machines that are either selected or have relevant operations
+          if ((!selectedMachine?.length || selectedMachine.includes(machine.id.toString())) && hasRelevantOperations()) {
+            const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
+            const machineLabel = `${wc.work_center_code} - ${machine.name}`;
+            
+            // Add machine header group
+            groups.add({
+              id: machineFullName,
+              content: `<strong>${machineLabel}</strong>`,
+              title: wc.work_center_name,
+              nestedGroups: [
+                `${machineFullName}-planned`,
+                `${machineFullName}-actual`,
+                `${machineFullName}-rescheduled`
+              ],
+              showNested: true
+            });
+
+            // Add subgroups for each type in order
+            groups.add({
+              id: `${machineFullName}-planned`,
+              content: 'Planned',
+              className: 'planned-group',
+              title: 'Planned Operations',
+              order: 1
+            });
+            groups.add({
+              id: `${machineFullName}-actual`,
+              content: 'Actual',
+              className: 'actual-group',
+              title: 'Actual Production',
+              order: 2
+            });
+            groups.add({
+              id: `${machineFullName}-rescheduled`,
+              content: 'Rescheduled',
+              className: 'rescheduled-group',
+              title: 'Rescheduled Operations',
+              order: 3
+            });
+          }
         });
       }
     });
 
-    // Update the filter operation function to handle machine filtering
+    // Update the filter operation function to handle multiple machine filtering
     const filterOperation = (op, type) => {
       // First check production order filter
-      if (selectedProductionOrder && op.production_order !== selectedProductionOrder) {
-        return false;
+      if (selectedProductionOrder?.length) {
+        if (!selectedProductionOrder.includes(op.production_order)) {
+          return false;
+        }
       }
       
       // Then check component filter
-      if (selectedComponent) {
+      if (selectedComponent?.length) {
         switch (type) {
           case 'planned':
-            if (op.component !== selectedComponent) return false;
+            if (!selectedComponent.includes(op.component)) return false;
             break;
           case 'actual':
+            if (!selectedComponent.includes(op.part_number)) return false;
+            break;
           case 'rescheduled':
-            if (op.part_number !== selectedComponent) return false;
+            if (!selectedComponent.includes(op.part_number)) return false;
             break;
         }
       }
 
       // Finally check machine filter
-      if (selectedMachine) {
+      if (selectedMachine?.length) {
         switch (type) {
           case 'planned':
-            // For planned operations, we need to find the machine ID from the name
             const plannedMachineId = Object.entries(machineNameToId).find(([key]) => key.includes(op.machine))?.[1];
-            if (plannedMachineId !== selectedMachine) return false;
+            if (!selectedMachine.includes(plannedMachineId)) return false;
             break;
           case 'actual':
-            // For actual operations, we need to find the machine ID from the name
             const actualMachineId = Object.entries(machineNameToId).find(([key]) => key.includes(op.machine_name))?.[1];
-            if (actualMachineId !== selectedMachine) return false;
+            if (!selectedMachine.includes(actualMachineId)) return false;
             break;
           case 'rescheduled':
-            if (op.machine_id.toString() !== selectedMachine) return false;
+            if (!selectedMachine.includes(op.machine_id.toString())) return false;
             break;
         }
       }
@@ -613,10 +660,18 @@ const DynamicSchedulingGraph2 = () => {
 
   const handleProductionOrderChange = (value) => {
     setSelectedProductionOrder(value);
+    // If no production orders are selected, show all data
+    if (!value || value.length === 0) {
+      setSelectedProductionOrder(null);
+    }
   };
 
   const handleComponentChange = (value) => {
     setSelectedComponent(value);
+    // If no components are selected, show all data
+    if (!value || value.length === 0) {
+      setSelectedComponent(null);
+    }
   };
 
   const handleMachineChange = (value) => {
@@ -669,6 +724,9 @@ const DynamicSchedulingGraph2 = () => {
             onChange={handleMachineChange}
             style={{ width: 200 }}
             allowClear
+            mode="multiple"
+            maxTagCount={3}
+            maxTagTextLength={10}
           >
             {scheduleData?.work_centers
               .filter(wc => wc.is_schedulable) // Only show schedulable work centers
@@ -687,6 +745,9 @@ const DynamicSchedulingGraph2 = () => {
             onChange={handleProductionOrderChange}
             style={{ width: 200 }}
             allowClear
+            mode="multiple"
+            maxTagCount={3}
+            maxTagTextLength={10}
           >
             {productionOrders.map(po => (
               <Option key={po} value={po}>{po}</Option>
@@ -694,14 +755,22 @@ const DynamicSchedulingGraph2 = () => {
           </Select>
 
           <Select
+            mode="multiple"
             placeholder="Select Part Number"
             value={selectedComponent}
             onChange={handleComponentChange}
-            style={{ width: 200 }}
+            style={{ width: 300 }}
             allowClear
+            optionLabelProp="label"
           >
-            {components.map(component => (
-              <Option key={component} value={component}>{component}</Option>
+            {partDetails.map(part => (
+              <Option key={part.part_number} value={part.part_number}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>{part.part_number}</span>
+                  <span style={{ fontSize: '12px', color: '#666' }}>{part.part_description}</span>
+                </div>
+                {/* {`${part.part_number} - ${part.part_description}`} */}
+              </Option>
             ))}
           </Select>
 
@@ -783,4 +852,20 @@ const DynamicSchedulingGraph2 = () => {
   );
 };
 
-export default DynamicSchedulingGraph2;
+
+
+
+export default DynamicSchedulingGraph;
+
+
+
+
+
+
+
+
+
+
+//testing
+
+

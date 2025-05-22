@@ -206,15 +206,15 @@ const StatusLegend = () => (
     <Space direction="vertical">
       <Space>
         <Badge color="#22c55e" />
-        <Text>Production (2)</Text>
+        <Text>Production</Text>
       </Space>
       <Space>
         <Badge color="#eab308" />
-        <Text>Idle/On (1)</Text>
+        <Text>Idle/On</Text>
       </Space>
       <Space>
         <Badge color="#94A3B8" />
-        <Text>Off (0)</Text>
+        <Text>Off</Text>
       </Space>
     </Space>
   </div>
@@ -581,20 +581,29 @@ const MachinesVisualization = () => {
   const [showProductivity, setShowProductivity] = useState(false);
 
   // Get machine data from the store
-  const { fetchMachineNames, startMachineStatusPolling, cleanup, machineNames, isLoading } = useEnergyMonitoringBelStore();
+  const { fetchMachineNames, startMachineStatusPolling, cleanup, machineNames, isLoading, connectShiftwiseEnergyWebSocket, disconnectShiftwiseEnergyWebSocket, isLive } = useEnergyMonitoringBelStore();
   
   // Set up SSE connection
   useEffect(() => {
-    // Initial fetch and SSE setup
-    fetchMachineNames();
-    const cleanupFn = startMachineStatusPolling();
-    
-    // Cleanup on unmount
-    return () => {
-      cleanupFn();
-      cleanup();
+    const loadData = async () => {
+      // Fetch machine names if they haven't been loaded yet
+      if (!machineNames || machineNames.length === 0) {
+        await fetchMachineNames();
+      }
+      
+      // Connect to WebSocket if in live mode
+      if (isLive) {
+        connectShiftwiseEnergyWebSocket();
+      }
     };
-  }, [fetchMachineNames, startMachineStatusPolling, cleanup]);
+    
+    loadData();
+    
+    // Cleanup - disconnect WebSocket when component unmounts
+    return () => {
+      disconnectShiftwiseEnergyWebSocket();
+    };
+  }, [connectShiftwiseEnergyWebSocket, disconnectShiftwiseEnergyWebSocket, fetchMachineNames, isLive, machineNames]);
 
   // Reset renderError when data changes
   useEffect(() => {

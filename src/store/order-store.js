@@ -6,9 +6,9 @@ import { LoadingOutlined } from '@ant-design/icons';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.88:5656',
-  QUALITY_URL: 'http://172.18.7.88:5656',
-  PLANNING_URL: 'http://172.18.7.88:5656',
+  BASE_URL: 'http://172.18.7.88:6997',
+  QUALITY_URL: 'http://172.18.7.88:6997',
+  PLANNING_URL: 'http://172.18.7.88:6997',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
     saveOrder: '/api/v1/planning/save-to-db',
@@ -145,7 +145,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.88:5656/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:6997/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -205,64 +205,86 @@ const useOrderStore = create((set, get) => ({
     }
   },
 
-  updateOrder: async (orderId, payload, orderNumber) => {
+  updateOrder: async (updatedOrder) => {
     set({ isLoading: true, error: null });
     try {
-      // Transform the payload to match API expectations
-      const transformedPayload = {
-        production_order: payload.orderNumber,
-        sale_order: payload.salesOrderNumber,
-        wbs_element: payload.wbsElement,
-        part_number: payload.partNumber,
-        part_description: payload.materialDescription,
-        total_operations: payload.totalOperations,
-        required_quantity: payload.targetQuantity,
-        launched_quantity: payload.launchedQuantity,
-        plant_id: payload.plant,
-        project_name: payload.projectName,
-        priority: payload.priority,
-        delivery_date: payload.deliveryDate 
-          ? Math.floor(payload.deliveryDate.valueOf() / 1000)
-          : null
-      };
+      // First update the order in the save-to-db endpoint
+      const saveToDbResponse = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.saveOrder}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            data: {
+              "Project Name": updatedOrder.project.name,
+              "Sale Order": updatedOrder.sale_order,
+              "Part No": updatedOrder.part_number,
+              "Part Desc": updatedOrder.part_description,
+              "Required Qty": updatedOrder.required_quantity.toString(),
+              "Plant": updatedOrder.plant_id?.toString() || "1",
+              "WBS": updatedOrder.wbs_element,
+              "Rtg Seq No": "0",
+              "Sequence No": "0",
+              "Launched Qty": updatedOrder.launched_quantity?.toString() || "0",
+              "Prod Order No": updatedOrder.production_order,
+              "Operations": [],
+              "Document Verification": {},
+              "Raw Materials": []
+            }
+          })
+        }
+      );
 
-      console.log('Transformed Payload:', transformedPayload);
+      if (!saveToDbResponse.ok) {
+        const errorData = await saveToDbResponse.json();
+        throw new Error(errorData.message || 'Failed to update order in save-to-db');
+      }
 
-      // Use the orderNumber parameter instead of hardcoded value
-      const response = await fetch(
-        `http://172.18.7.88:5656/api/v1/planning/update_order/${payload.orderNumber}`,
+      // Then update the order in the all_orders endpoint
+      const allOrdersResponse = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.allOrders}`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
-          body: JSON.stringify(transformedPayload),
+          body: JSON.stringify({
+            id: updatedOrder.id,
+            part_description: updatedOrder.part_description,
+            required_quantity: updatedOrder.required_quantity,
+            wbs_element: updatedOrder.wbs_element,
+            sale_order: updatedOrder.sale_order,
+            project: {
+              name: updatedOrder.project.name,
+              priority: updatedOrder.project.priority
+            }
+          })
         }
       );
-  
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Server Error Response:', data);
-        const errorMessage = data.detail 
-          ? Array.isArray(data.detail)
-            ? data.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join('; ')
-            : data.detail
-          : 'Failed to update order';
-        throw new Error(errorMessage);
+
+      if (!allOrdersResponse.ok) {
+        const errorData = await allOrdersResponse.json();
+        throw new Error(errorData.message || 'Failed to update order in all_orders');
       }
-      
-      // Update the orders list with the new data
+
+      // Update the order in the local state
       set(state => ({
         orders: state.orders.map(order => 
-          order.id === orderId ? data : order
+          order.id === updatedOrder.id ? updatedOrder : order
         ),
         isLoading: false
       }));
-  
-      return data;
+
+      // Fetch fresh data to ensure consistency
+      await get().fetchAllOrders();
+
+      return { success: true, message: 'Order updated successfully' };
     } catch (error) {
-      console.error('Update Error:', error);
+      console.error('Error updating order:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -495,7 +517,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.88:5656/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.88:6997/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -878,7 +900,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.18.7.88:5656/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.18.7.88:6997/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -935,7 +957,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.88:5656/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.18.7.88:6997/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -1276,7 +1298,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.18.7.88:5656/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:6997/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1526,7 +1548,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.18.7.88:5656/api/v1/master-order/machines/${machineId}`,
+        `http://172.18.7.88:6997/api/v1/master-order/machines/${machineId}`,
         {
           method: 'DELETE',
           headers: {

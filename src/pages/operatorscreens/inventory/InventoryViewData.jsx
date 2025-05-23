@@ -26,7 +26,7 @@ import {
   CompressOutlined,
   FileExcelOutlined,
   MenuFoldOutlined,
-  MenuUnfoldOutlined,
+  MenuUnfoldOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import useInventoryStore from '../../../store/inventory-store';
 import dayjs from 'dayjs';
@@ -52,6 +52,8 @@ const InventoryViewData = () => {
   const [isRequestModalVisible, setIsRequestModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pageSize, setPageSize] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Store hooks
   const { 
@@ -282,13 +284,26 @@ const InventoryViewData = () => {
             ? `${selectedCategory.type === 'category' ? 'Category' : 'Subcategory'} Items` 
             : 'All Items'}
         </Text>
-        <Input.Search
-          placeholder="Search items..."
-          allowClear
-          onSearch={handleSearch}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="min-w-[200px] max-w-[300px] flex-1 xl:flex-none"
-        />
+        <Space>
+          <Input.Search
+            placeholder="Search items..."
+            allowClear
+            onSearch={handleSearch}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="min-w-[200px] max-w-[300px] flex-1 xl:flex-none"
+          />
+          <Button 
+            onClick={() => {
+              setSearchTerm('');
+              setPageSize(5);
+              setCurrentPage(1);
+              handleSearch('');
+            }}
+            icon={<ReloadOutlined />}
+          >
+            Reset
+          </Button>
+        </Space>
       </Space>
     </Space>
   );
@@ -883,12 +898,21 @@ const InventoryViewData = () => {
                     title={renderTableTitle}
                     rowKey="id"
                     pagination={{
-                      onChange: cancel,
-                      pageSize: 5,
+                      current: currentPage,
+                      onChange: (page) => {
+                        setCurrentPage(page);
+                        cancel();
+                      },
+                      pageSize: pageSize,
                       showSizeChanger: true,
                       showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
                       position: ['bottomRight'],
-                      className: 'px-4'
+                      className: 'px-4',
+                      pageSizeOptions: ['5', '10', '20', '50'],
+                      onShowSizeChange: (current, size) => {
+                        setPageSize(size);
+                        setCurrentPage(1);
+                      }
                     }}
                     className="border border-gray-200 rounded"
                   />

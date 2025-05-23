@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { Table, Tag, Badge, Button, Space, Tooltip, Popconfirm } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { Table, Tag, Badge, Button, Space, Tooltip, Popconfirm, Modal, Form, Input, InputNumber, Select } from 'antd';
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { message } from 'antd';
 import dayjs from 'dayjs';
 import useOrderStore from '../../store/order-store';
 
 const OrderTable = ({ orders, onRefresh }) => {
-  const { deleteOrder } = useOrderStore();
+  const { deleteOrder, updateOrder } = useOrderStore();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deletingOrder, setDeletingOrder] = useState(null);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [form] = Form.useForm();
 
   // Add useEffect for initial load and polling
   React.useEffect(() => {
@@ -42,6 +45,48 @@ const OrderTable = ({ orders, onRefresh }) => {
       message.error('Failed to delete order: ' + error.message);
     } finally {
       setDeletingOrder(null);
+    }
+  };
+
+  // Handle edit action
+  const handleEdit = (record) => {
+    setEditingOrder(record);
+    form.setFieldsValue({
+      part_description: record.part_description,
+      required_quantity: record.required_quantity,
+      wbs_element: record.wbs_element,
+      sale_order: record.sale_order,
+      project: record.project?.name,
+      project_priority: record.project?.priority
+    });
+    setIsEditModalVisible(true);
+  };
+
+  const handleEditSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      const updatedOrder = {
+        ...editingOrder,
+        part_description: values.part_description,
+        required_quantity: values.required_quantity,
+        wbs_element: values.wbs_element,
+        sale_order: values.sale_order,
+        project: {
+          ...editingOrder.project,
+          name: values.project,
+          priority: values.project_priority
+        }
+      };
+
+      await updateOrder(updatedOrder);
+      message.success('Order updated successfully');
+      setIsEditModalVisible(false);
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('Error updating order:', error);
+      message.error('Failed to update order: ' + error.message);
     }
   };
 
@@ -147,25 +192,35 @@ const OrderTable = ({ orders, onRefresh }) => {
     {
       title: 'Actions',
       key: 'actions',
-      width: 80,
+      width: 120,
       fixed: 'right',
       render: (_, record) => (
-        <Tooltip title="Delete Order">
-          <Popconfirm
-            title="Are you sure you want to delete this order?"
-            onConfirm={() => handleDelete(record)}
-            okText="Yes"
-            cancelText="No"
-          >
+        <Space>
+          <Tooltip title="Edit Order">
             <Button
               type="text"
-              danger
-              icon={<DeleteOutlined />}
+              icon={<EditOutlined />}
               size="small"
-              loading={deletingOrder === record.id}
+              onClick={() => handleEdit(record)}
             />
-          </Popconfirm>
-        </Tooltip>
+          </Tooltip>
+          <Tooltip title="Delete Order">
+            <Popconfirm
+              title="Are you sure you want to delete this order?"
+              onConfirm={() => handleDelete(record)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+                loading={deletingOrder === record.id}
+              />
+            </Popconfirm>
+          </Tooltip>
+        </Space>
       ),
     },
   ];
@@ -196,41 +251,113 @@ const OrderTable = ({ orders, onRefresh }) => {
   }, [orders]);
 
   return (
-    <Table
-      columns={columns}
-      dataSource={sortedOrders} // Use sorted orders
-      rowKey="id"
-      scroll={{ 
-        x: 1800, 
-        y: 'calc(100vh - 420px)'
-      }}
-      pagination={{
-        pageSize: pageSize,
-        position: ['bottomCenter'],
-        showSizeChanger: true,
-        showTotal: (total) => `Total ${total} items`,
-        onChange: (page, newPageSize) => {
-          setCurrentPage(page);
-          if (pageSize !== newPageSize) {
-            setPageSize(newPageSize);
-            setCurrentPage(1);
+    <>
+      <Table
+        columns={columns}
+        dataSource={sortedOrders}
+        rowKey="id"
+        scroll={{ 
+          x: 1800, 
+          y: 'calc(100vh - 420px)'
+        }}
+        pagination={{
+          pageSize: pageSize,
+          position: ['bottomCenter'],
+          showSizeChanger: true,
+          showTotal: (total) => `Total ${total} items`,
+          onChange: (page, newPageSize) => {
+            setCurrentPage(page);
+            if (pageSize !== newPageSize) {
+              setPageSize(newPageSize);
+              setCurrentPage(1);
+            }
+          },
+          style: { 
+            marginBottom: '8px',
+            marginTop: '8px'
           }
-        },
-        style: { 
-          marginBottom: '8px',
-          marginTop: '8px'
-        }
-      }}
-      size="middle"
-      bordered
-      rowClassName={(record) => {
-        const priority = record.project?.priority;
-        if (priority === 1) return 'bg-red-50';
-        if (priority === 2) return 'bg-orange-50';
-        if (priority === 3) return 'bg-yellow-50';
-        return '';
-      }}
-    />
+        }}
+        size="middle"
+        bordered
+        rowClassName={(record) => {
+          const priority = record.project?.priority;
+          if (priority === 1) return 'bg-red-50';
+          if (priority === 2) return 'bg-orange-50';
+          if (priority === 3) return 'bg-yellow-50';
+          return '';
+        }}
+      />
+
+      <Modal
+        title="Edit Order"
+        open={isEditModalVisible}
+        onOk={handleEditSubmit}
+        onCancel={() => {
+          setIsEditModalVisible(false);
+          form.resetFields();
+        }}
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={editingOrder}
+        >
+          <Form.Item
+            name="part_description"
+            label="Material Description"
+            rules={[{ required: true, message: 'Please enter material description' }]}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item
+            name="required_quantity"
+            label="Quantity"
+            rules={[{ required: true, message: 'Please enter quantity' }]}
+          >
+            <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item
+            name="wbs_element"
+            label="WBS Element"
+            rules={[{ required: true, message: 'Please enter WBS element' }]}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item
+            name="sale_order"
+            label="Sales Order"
+            rules={[{ required: true, message: 'Please enter sales order' }]}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item
+            name="project"
+            label="Project Name"
+            rules={[{ required: true, message: 'Please enter project name' }]}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item
+            name="project_priority"
+            label="Project Priority"
+            rules={[{ required: true, message: 'Please select project priority' }]}
+          >
+            <Select>
+              <Select.Option value={1}>High (1)</Select.Option>
+              <Select.Option value={2}>Medium-High (2)</Select.Option>
+              <Select.Option value={3}>Medium (3)</Select.Option>
+              <Select.Option value={4}>Low (4)</Select.Option>
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   );
 };
 

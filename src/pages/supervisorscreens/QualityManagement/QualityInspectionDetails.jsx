@@ -147,22 +147,40 @@ const QualityInspectionDetails = ({
           inspectionDetails.production_order, 
           op
         );
-        setDrawingData(data);
         
-        message.success({ content: 'Drawing loaded successfully', key: 'drawingLoading' });
+        if (data && data.url) {
+          setDrawingData(data);
+          message.success({ content: 'Drawing loaded successfully', key: 'drawingLoading' });
+        } else {
+          throw new Error('Invalid drawing data received');
+        }
       } catch (error) {
+        console.error('Error loading drawing:', error);
+        
         if (error.message.includes('timed out')) {
           setIsRetrying(true);
           setRetryCount(prev => prev + 1);
-          message.loading({ 
-            content: `Retrying download (attempt ${retryCount + 1} of 3)...`, 
-            key: 'drawingLoading',
-            duration: 0
-          });
+          
+          if (retryCount < 3) {
+            message.loading({ 
+              content: `Retrying download (attempt ${retryCount + 1} of 3)...`, 
+              key: 'drawingLoading',
+              duration: 0
+            });
+          } else {
+            message.error({ 
+              content: 'Failed to load drawing after multiple attempts. Please try again later.', 
+              key: 'drawingLoading',
+              duration: 5
+            });
+          }
         } else {
-          message.error({ content: error.message || 'Failed to load drawing', key: 'drawingLoading' });
+          message.error({ 
+            content: error.message || 'Failed to load drawing', 
+            key: 'drawingLoading',
+            duration: 5
+          });
         }
-        console.error('Error loading drawing:', error);
       } finally {
         setLoadingDrawing(false);
       }

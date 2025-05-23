@@ -145,7 +145,7 @@ const NotificationsNew = () => {
       
       // Handle both machine and material notifications
       if (notification.notificationType === 'material') {
-        const response = await fetch('http://172.18.7.88:6997/api/v1/newlogs/raw_material_status_logs/acknowledge', {
+        const response = await fetch('http://172.18.7.93:8800/api/v1/newlogs/raw_material_status_logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -168,7 +168,7 @@ const NotificationsNew = () => {
         setLastAcknowledgedId(notification.id);
         setLastAcknowledgedType('material');
       } else if (notification.notificationType === 'machine') {
-        const response = await fetch('http://172.18.7.88:6997/api/v1/newlogs/machine-status-logs/acknowledge', {
+        const response = await fetch('http://172.18.7.93:8800/api/v1/newlogs/machine-status-logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -999,7 +999,7 @@ const NotificationsNew = () => {
                   <Bell size={24} color="#fff" />
                 </div>
                 <div>
-                  <Title level={3} style={{ margin: 0 }}>Notifications Center New</Title>
+                  <Title level={3} style={{ margin: 0 }}>Notifications Center</Title>
                   <Text type="secondary">
                     Monitor and manage all system alerts in one place
                   </Text>

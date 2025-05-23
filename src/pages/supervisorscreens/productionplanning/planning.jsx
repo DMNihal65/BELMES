@@ -3245,6 +3245,9 @@ const handleAddTool = async (values) => {
                     layout="vertical"
                     onFinish={handleAddTool}
                   >
+
+
+                    
                   <Form.Item
                     label="Select Tool"
                     rules={[{ required: true, message: 'Please select an inventory item' }]}
@@ -3268,7 +3271,7 @@ const handleAddTool = async (values) => {
                               .map(item => ({
                                 label: item.dynamic_data["Instrument code"] 
                                   ? `${item.dynamic_data["Instrument code"]}` 
-                                  : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
+                                  : `${item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "] ? (item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "]) : ''}${((item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "]) && item.dynamic_data["BEL Part Description"]) ? ' - ' : ''}${item.dynamic_data["BEL Part Description"] || ''}`,
                                 value: item.id,
                                 isLeaf: true,
                               }))
@@ -3318,6 +3321,10 @@ const handleAddTool = async (values) => {
                       }}
                     />
                   </Form.Item>
+
+
+
+                  
 
                     <Form.Item label="Selected Subcategory">
                       <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />

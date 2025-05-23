@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Modal, Alert, Table } from 'antd';
+import { Card, Row, Col, Statistic, Modal, Alert, Table, Button, Input, Space } from 'antd';
+import { ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 
@@ -9,6 +10,12 @@ const TicketAnalytics = () => {
   const [mtbf, setMtbf] = useState(0);
   const [totalFailures, setTotalFailures] = useState(0);
   const [tableData, setTableData] = useState([]);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [searchText, setSearchText] = useState('');
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 5,
+  });
   const [machineData, setMachineData] = useState({
     machines: [],
     mtbf: [],
@@ -177,39 +184,197 @@ const TicketAnalytics = () => {
     ]
   };
 
+  const onSelectChange = (newSelectedRowKeys) => {
+    setSelectedRowKeys(newSelectedRowKeys);
+  };
+
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: onSelectChange,
+    selections: [
+      Table.SELECTION_ALL,
+      Table.SELECTION_INVERT,
+      Table.SELECTION_NONE,
+    ],
+  };
+
+  const handleTableChange = (newPagination) => {
+    setPagination(newPagination);
+  };
+
+  const handleReset = () => {
+    setSelectedRowKeys([]);
+    setSearchText('');
+    setPagination({
+      current: 1,
+      pageSize: 5,
+    });
+  };
+
+  const handleSearch = (value) => {
+    setSearchText(value);
+    setPagination({
+      ...pagination,
+      current: 1,
+    });
+  };
+
+  const getFilteredData = () => {
+    if (!searchText) return tableData;
+    
+    return tableData.filter(item => 
+      Object.values(item).some(val => 
+        String(val).toLowerCase().includes(searchText.toLowerCase())
+      )
+    );
+  };
+
+  const columns = [
+    {
+      title: 'Machine',
+      dataIndex: 'machine',
+      key: 'machine',
+      sorter: (a, b) => a.machine.localeCompare(b.machine),
+      filterSearch: true,
+      filters: [...new Set(tableData.map(item => item.machine))].map(machine => ({
+        text: machine,
+        value: machine,
+      })),
+      onFilter: (value, record) => record.machine === value,
+    },
+    {
+      title: 'No of Failures',
+      dataIndex: 'failures',
+      key: 'failures',
+      sorter: (a, b) => a.failures - b.failures,
+      filters: [...new Set(tableData.map(item => item.failures))].map(failures => ({
+        text: failures.toString(),
+        value: failures,
+      })),
+      onFilter: (value, record) => record.failures === value,
+    },
+    {
+      title: 'MTTR (hours)',
+      dataIndex: 'mttr',
+      key: 'mttr',
+      sorter: (a, b) => a.mttr - b.mttr,
+      filterSearch: true,
+      filters: [...new Set(tableData.map(item => item.mttr))].map(mttr => ({
+        text: mttr.toFixed(2),
+        value: mttr,
+      })),
+      onFilter: (value, record) => record.mttr === value,
+      render: (text) => text.toFixed(2)
+    },
+    {
+      title: 'MTBF (hours)',
+      dataIndex: 'mtbf',
+      key: 'mtbf',
+      sorter: (a, b) => a.mtbf - b.mtbf,
+      filterSearch: true,
+      filters: [...new Set(tableData.map(item => item.mtbf))].map(mtbf => ({
+        text: mtbf.toFixed(2),
+        value: mtbf,
+      })),
+      onFilter: (value, record) => record.mtbf === value,
+      render: (text) => text.toFixed(2)
+    }
+  ];
+
+  const cardStyle = {
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+    borderRadius: '12px',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+    border: 'none',
+  };
+
+  const statisticStyle = {
+    '.ant-statistic-title': {
+      color: '#666',
+      fontSize: '16px',
+      marginBottom: '8px',
+    },
+    '.ant-statistic-content': {
+      color: '#1890ff',
+      fontSize: '24px',
+      fontWeight: '600',
+    },
+  };
+
+
+
+
+  
   return (
     <div className="p-4">
       {/* Summary Statistics */}
       <Row gutter={[16, 16]}>
-      <Col span={8}>
-        <div className="shadow-lg rounded-xl">
-          <Card title="Mean Time To Repair (MTTR)" >
-            <Statistic title="Shop Average MTTR" value={mttr} suffix="hours" />
-          </Card>
-        </div>
-      </Col>
-      <Col span={8}>
-        <div className="shadow-lg rounded-xl">
-          <Card title="Mean Time Between Failures (MTBF)">
-            <Statistic title="Shop Average MTBF" value={mtbf} suffix="hours" />
-          </Card>
-        </div>
-      </Col>
-      <Col span={8}>
-        <div className="shadow-lg rounded-xl">
-          <Card title="Total Failures">
-            <Statistic title="Total Failures" value={totalFailures} />
-          </Card>
-        </div>
-      </Col>
-    </Row>
+        <Col span={8}>
+          <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              style={cardStyle}
+              title={
+                <div className="flex items-center">
+                  <div className="w-2 h-8 bg-blue-500 rounded mr-3"></div>
+                  <span className="text-lg font-semibold text-gray-700">Mean Time To Repair (MTTR)</span>
+                </div>
+              }
+            >
+              <Statistic 
+                title="Shop Average MTTR" 
+                value={mttr} 
+                suffix="hours"
+                style={statisticStyle}
+              />
+            </Card>
+          </div>
+        </Col>
+        <Col span={8}>
+          <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              style={cardStyle}
+              title={
+                <div className="flex items-center">
+                  <div className="w-2 h-8 bg-green-500 rounded mr-3"></div>
+                  <span className="text-lg font-semibold text-gray-700">Mean Time Between Failures (MTBF)</span>
+                </div>
+              }
+            >
+              <Statistic 
+                title="Shop Average MTBF" 
+                value={mtbf} 
+                suffix="hours"
+                style={statisticStyle}
+              />
+            </Card>
+          </div>
+        </Col>
+        <Col span={8}>
+          <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              style={cardStyle}
+              title={
+                <div className="flex items-center">
+                  <div className="w-2 h-8 bg-red-500 rounded mr-3"></div>
+                  <span className="text-lg font-semibold text-gray-700">Total Failures</span>
+                </div>
+              }
+            >
+              <Statistic 
+                title="Total Failures" 
+                value={totalFailures}
+                style={statisticStyle}
+              />
+            </Card>
+          </div>
+        </Col>
+      </Row>
 
-      
       {/* MTBF-MTTR Line Chart */}
       <Row className="mt-4">
         <Col span={24}>
-          <div className="shadow-lg rounded-xl">
-            <Card>
+          <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
+            <Card style={cardStyle}>
               <ReactECharts 
                 option={lineChartOption} 
                 style={{ height: '400px' }}
@@ -222,68 +387,67 @@ const TicketAnalytics = () => {
       {/* Machine Performance Table */}
       <Row className="mt-4">
         <Col span={24}>
-          <div className="shadow-lg rounded-xl">
-            <Card title="Machine Performance Metrics">
+          <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              style={cardStyle}
+              title={
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <div className="w-2 h-8 bg-purple-500 rounded mr-3"></div>
+                    <span className="text-lg font-semibold text-gray-700">Machine Performance Metrics</span>
+                  </div>
+                  <Space>
+                    <Input
+                      placeholder="Search across all columns"
+                      prefix={<SearchOutlined />}
+                      value={searchText}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      style={{ 
+                        width: 250,
+                        borderRadius: '6px',
+                        border: '1px solid #d9d9d9',
+                      }}
+                    />
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={handleReset}
+                      title="Reset to default view"
+                    >
+                      Reset
+                    </Button>
+                  </Space>
+                </div>
+              }
+            >
               <Table
-                dataSource={tableData}
-                columns={[
-                  {
-                    title: 'Machine',
-                    dataIndex: 'machine',
-                    key: 'machine',
-                    sorter: (a, b) => a.machine.localeCompare(b.machine),
-                    filterSearch: true,
-                    filters: [...new Set(tableData.map(item => item.machine))].map(machine => ({
-                      text: machine,
-                      value: machine,
-                    })),
-                    onFilter: (value, record) => record.machine === value,
+                rowSelection={rowSelection}
+                dataSource={getFilteredData()}
+                columns={columns}
+                pagination={{
+                  ...pagination,
+                  showSizeChanger: true,
+                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                  pageSizeOptions: ['5', '10', '20', '50'],
+                  showQuickJumper: true,
+                  position: ['bottomCenter'],
+                  onChange: handleTableChange,
+                  onShowSizeChange: handleTableChange
+                }}
+                style={{
+                  '.ant-table-thead > tr > th': {
+                    background: '#f8f9fa',
+                    color: '#666',
+                    fontWeight: '600',
                   },
-                  {
-                    title: 'No of Failures',
-                    dataIndex: 'failures',
-                    key: 'failures',
-                    sorter: (a, b) => a.failures - b.failures,
-                    filters: [...new Set(tableData.map(item => item.failures))].map(failures => ({
-                      text: failures.toString(),
-                      value: failures,
-                    })),
-                    onFilter: (value, record) => record.failures === value,
+                  '.ant-table-tbody > tr:hover > td': {
+                    background: '#f0f7ff',
                   },
-                  {
-                    title: 'MTTR (hours)',
-                    dataIndex: 'mttr',
-                    key: 'mttr',
-                    sorter: (a, b) => a.mttr - b.mttr,
-                    filterSearch: true,
-                    filters: [...new Set(tableData.map(item => item.mttr))].map(mttr => ({
-                      text: mttr.toFixed(2),
-                      value: mttr,
-                    })),
-                    onFilter: (value, record) => record.mttr === value,
-                    render: (text) => text.toFixed(2)
-                  },
-                  {
-                    title: 'MTBF (hours)',
-                    dataIndex: 'mtbf',
-                    key: 'mtbf',
-                    sorter: (a, b) => a.mtbf - b.mtbf,
-                    filterSearch: true,
-                    filters: [...new Set(tableData.map(item => item.mtbf))].map(mtbf => ({
-                      text: mtbf.toFixed(2),
-                      value: mtbf,
-                    })),
-                    onFilter: (value, record) => record.mtbf === value,
-                    render: (text) => text.toFixed(2)
-                  }
-                ]}
-                pagination={false}
+                }}
               />
             </Card>
           </div>
         </Col>
       </Row>
-
     </div>
   );
 };

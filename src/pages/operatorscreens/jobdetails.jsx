@@ -193,7 +193,7 @@ const JobDetails = () => {
   // Function to load all available jobs
   const loadAvailableJobs = useCallback(async () => {
     try {
-      const response = await fetch('http://172.18.7.88:6997/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.93:8800/api/v1/planning/all_orders');
       
       if (!response.ok) {
         throw new Error('Failed to fetch available jobs');
@@ -211,7 +211,7 @@ const JobDetails = () => {
   const loadJobDetails = useCallback(async (partNumber) => {
     try {
       setIsLoadingJobData(true);
-      const response = await fetch(`http://172.18.7.88:6997/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.93:8800/api/v1/planning/search_order?part_number=${partNumber}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch job details');
@@ -273,7 +273,7 @@ const JobDetails = () => {
       }
       
       // Directly call the deactivation endpoint with simple payload
-      const response = await fetch('http://172.18.7.88:6997/api/v1/logs/machine-raw-live-deactive/', {
+      const response = await fetch('http://172.18.7.93:8800/api/v1/logs/machine-raw-live-deactive/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -347,7 +347,7 @@ const JobDetails = () => {
       }
       
       // Now activate the new job with simpler direct approach
-      const activateResponse = await fetch('http://172.18.7.88:6997/api/v1/logs/machine-raw-live/', {
+      const activateResponse = await fetch('http://172.18.7.93:8800/api/v1/logs/machine-raw-live/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -964,7 +964,7 @@ const JobDetails = () => {
       
       console.log('Submitting operator log payload:', payload);
       
-      const response = await fetch('http://172.18.7.88:6997/api/v1/logs/operator-log', {
+      const response = await fetch('http://172.18.7.93:8800/api/v1/logs/operator-log', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

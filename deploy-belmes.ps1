@@ -13,7 +13,7 @@
 # Configuration parameters
 param(
     [string]$RemoteUser = "smc",
-    [string]$RemoteHost = "172.18.7.88:6997",
+    [string]$RemoteHost = "172.18.7.93:8800",
     [string]$RemotePath = "/home/smc/belmes",
     [string]$AppBasePath = "/belmes/",
     [string]$BuildDir = "dist",
@@ -185,7 +185,7 @@ NC='\033[0m' # No Color
 APP_DIR=${BELMES_APP_DIR:-"/var/www/html/belmes"}
 NGINX_SITES_AVAILABLE=${NGINX_SITES_AVAILABLE:-"/etc/nginx/sites-available"}
 NGINX_SITES_ENABLED=${NGINX_SITES_ENABLED:-"/etc/nginx/sites-enabled"}
-SERVER_NAME=${SERVER_NAME:-"172.18.7.88:6997"}
+SERVER_NAME=${SERVER_NAME:-"172.18.7.93:8800"}
 APP_PATH=${APP_PATH:-"/belmes"}
 BACKUP_DIR=${BACKUP_DIR:-"/var/backups/belmes"}
 DIST_SOURCE=${DIST_SOURCE:-"./dist"}
@@ -395,7 +395,7 @@ server {
 
     # API proxy configuration
     location /api/v5/ {
-        proxy_pass http://172.18.7.91:7777/api/v5/;
+        proxy_pass http://172.18.7.93:8800/api/v5/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -430,7 +430,7 @@ server {
         error_log /var/log/nginx/api-error.log debug;
         
         # Use fixed port without URI rewriting
-        proxy_pass http://172.18.7.88:6997:8002;
+        proxy_pass http://172.18.7.93:8800:8002;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';

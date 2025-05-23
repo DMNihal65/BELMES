@@ -1,17 +1,26 @@
 import React, { useEffect, useState } from 'react'; // Import useEffect and useState
-import { Table, Button, Space, Modal, Input, message, DatePicker } from 'antd';
+import { Table, Button, Space, Modal, Input, message, DatePicker, Select } from 'antd';
 import useMachineMaintenanceStore from '../../../store/maintenance'; // Import the store
 import { Row, Col } from 'antd'; 
-import { SearchOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import moment from 'moment';
 
 const { RangePicker } = DatePicker;
+const { Option } = Select;
 
 const DowntimeTickets = () => {
   const [data, setData] = useState([]); // State to hold the fetched data
   const [searchText, setSearchText] = useState('');
+  const [selectedColumn, setSelectedColumn] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedDateColumn, setSelectedDateColumn] = useState('open_dt');
   const [filteredData, setFilteredData] = useState([]);
   const [dateRange, setDateRange] = useState(null);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 5,
+    total: 0,
+  });
   const fetchDowntimes = useMachineMaintenanceStore((state) => state.fetchDowntimes); // Fetch function from the store
   const acknowledgeDowntime = useMachineMaintenanceStore((state) => state.acknowledgeDowntime); // Acknowledge function
   const closeDowntime = useMachineMaintenanceStore((state) => state.closeDowntime); // Close function
@@ -21,57 +30,99 @@ const DowntimeTickets = () => {
 
   useEffect(() => {
     const getData = async () => {
-      const downtimes = await fetchDowntimes(); // Fetch downtimes
-      setData(downtimes); // Set the fetched data to state
-      applyFilters(downtimes, searchText, dateRange);
+      const downtimes = await fetchDowntimes();
+      setData(downtimes);
+      if (!searchText && !dateRange && selectedColumn === 'all' && selectedStatus === 'all') {
+        applyFilters(downtimes, '', null, 'all', 'all', selectedDateColumn);
+      } else {
+        applyFilters(downtimes, searchText, dateRange, selectedColumn, selectedStatus, selectedDateColumn);
+      }
     };
 
-    getData(); // Initial fetch
+    getData();
 
     const intervalId = setInterval(() => {
-      getData(); // Fetch downtimes every 2 seconds
+      getData();
     }, 5000);
 
-    return () => clearInterval(intervalId); // Cleanup on unmount
-  }, [fetchDowntimes]);
+    return () => clearInterval(intervalId);
+  }, [fetchDowntimes, searchText, dateRange, selectedColumn, selectedStatus, selectedDateColumn]);
 
   // Function to apply both search and date filters
-  const applyFilters = (dataToFilter, searchValue, dates) => {
+  const applyFilters = (dataToFilter, searchValue, dates, column, status, dateColumn) => {
     let filtered = [...dataToFilter];
 
     // Apply text search filter
     if (searchValue) {
       const searchVal = searchValue.toLowerCase();
       filtered = filtered.filter(item => {
-        return Object.keys(item).some(key => {
-          const itemValue = item[key];
+        if (column === 'all') {
+          return Object.keys(item).some(key => {
+            const itemValue = item[key];
+            if (itemValue === null || itemValue === undefined) return false;
+            return String(itemValue).toLowerCase().includes(searchVal);
+          });
+        } else {
+          const itemValue = item[column];
           if (itemValue === null || itemValue === undefined) return false;
           return String(itemValue).toLowerCase().includes(searchVal);
-        });
+        }
       });
     }
 
     // Apply date range filter
     if (dates && dates[0] && dates[1]) {
+      const startDate = moment(dates[0]).startOf('day');
+      const endDate = moment(dates[1]).endOf('day');
+      
       filtered = filtered.filter(item => {
-        const openDate = moment(item.open_dt);
-        return openDate.isBetween(dates[0], dates[1], 'day', '[]');
+        const dateValue = item[dateColumn];
+        if (!dateValue) return false;
+        const itemDate = moment(dateValue);
+        return itemDate.isBetween(startDate, endDate, 'day', '[]');
       });
     }
 
+    // Apply status filter
+    if (status !== 'all') {
+      filtered = filtered.filter(item => item.status === status);
+    }
+
     setFilteredData(filtered);
+    setPagination(prev => ({
+      ...prev,
+      total: filtered.length,
+    }));
   };
 
   // Handle search functionality
   const handleSearch = (value) => {
     setSearchText(value);
-    applyFilters(data, value, dateRange);
+    applyFilters(data, value, dateRange, selectedColumn, selectedStatus, selectedDateColumn);
+  };
+
+  // Handle column selection
+  const handleColumnChange = (value) => {
+    setSelectedColumn(value);
+    applyFilters(data, searchText, dateRange, value, selectedStatus, selectedDateColumn);
+  };
+
+  // Handle status selection
+  const handleStatusChange = (value) => {
+    setSelectedStatus(value);
+    applyFilters(data, searchText, dateRange, selectedColumn, value, selectedDateColumn);
+  };
+
+  // Handle date column selection
+  const handleDateColumnChange = (value) => {
+    setSelectedDateColumn(value);
+    applyFilters(data, searchText, dateRange, selectedColumn, selectedStatus, value);
   };
 
   // Handle date range change
   const handleDateRangeChange = (dates) => {
     setDateRange(dates);
-    applyFilters(data, searchText, dates);
+    applyFilters(data, searchText, dates, selectedColumn, selectedStatus, selectedDateColumn);
   };
 
   const handleAcknowledge = async (ticketId) => {
@@ -146,11 +197,11 @@ const DowntimeTickets = () => {
   };
 
   const columns = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-    },
+    // {
+    //   title: 'ID',
+    //   dataIndex: 'id',
+    //   key: 'id',
+    // },
     {
       title: 'Machine Name',
       dataIndex: 'machine_name',
@@ -171,29 +222,29 @@ const DowntimeTickets = () => {
       dataIndex: 'priority',
       key: 'priority',
     },
-    {
-      title: 'Reported By',
-      dataIndex: 'reported_by',
-      key: 'reported_by',
-      render: (value) => value || '-',
-    },
+    // {
+    //   title: 'Reported By',
+    //   dataIndex: 'reported_by',
+    //   key: 'reported_by',
+    //   render: (value) => value || '-',
+    // },
     {
       title: 'Open Date',
       dataIndex: 'open_dt',
       key: 'open_dt',
-      render: (date) => date ? new Date(date).toLocaleString() : '-',
+      render: (date) => date ? moment(date).format('DD/MM/YYYY') : '-',
     },
     {
       title: 'In Progress Date',
       dataIndex: 'inprogress_dt',
       key: 'inprogress_dt',
-      render: (date) => date ? new Date(date).toLocaleString() : '-',
+      render: (date) => date ? moment(date).format('DD/MM/YYYY') : '-',
     },
     {
       title: 'Closed Date',
       dataIndex: 'closed_dt',
       key: 'closed_dt',
-      render: (date) => date ? new Date(date).toLocaleString() : '-',
+      render: (date) => date ? moment(date).format('DD/MM/YYYY') : '-',
     },
     {
       title: 'Action Taken',
@@ -214,33 +265,108 @@ const DowntimeTickets = () => {
     },
   ];
 
+  // Handle pagination change
+  const handleTableChange = (newPagination) => {
+    setPagination(newPagination);
+  };
+
+  // Reset all filters
+  const handleReset = () => {
+    setSearchText('');
+    setDateRange(null);
+    setSelectedColumn('all');
+    setSelectedStatus('all');
+    setSelectedDateColumn('open_dt');
+    setPagination({
+      current: 1,
+      pageSize: 5,
+      total: data.length,
+    });
+    applyFilters(data, '', null, 'all', 'all', 'open_dt');
+  };
+
   return (
     <div className="p-4 shadow-lg rounded-xl">
       <Row className="mb-4" gutter={16}>
-        <Col span={8}>
+      <Col span={3}>
+          <Select
+            style={{ width: '100%' }}
+            value={selectedStatus}
+            onChange={handleStatusChange}
+            placeholder="Select Status"
+          >
+            <Option value="all">All Status</Option>
+            <Option value="open">Open</Option>
+            <Option value="in_progress">In Progress</Option>
+            <Option value="closed">Closed</Option>
+          </Select>
+        </Col>
+        <Col span={3}>
+          <Select
+            style={{ width: '100%' }}
+            value={selectedColumn}
+            onChange={handleColumnChange}
+            placeholder="Select Column"
+          >
+            <Option value="all">All Columns</Option>
+            <Option value="machine_name">Machine Name</Option>
+            <Option value="category">Category</Option>
+            <Option value="description">Description</Option>
+            <Option value="priority">Priority</Option>
+            <Option value="reported_by">Reported By</Option>
+          </Select>
+        </Col>
+        <Col span={6}>
           <Input
-            placeholder="Search in all columns..."
+            placeholder={`Search in ${selectedColumn === 'all' ? 'all columns' : selectedColumn}...`}
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={(e) => handleSearch(e.target.value)}
             allowClear
           />
         </Col>
-        <Col span={8}>
+        {/* <Col span={3}>
+          <Select
+            style={{ width: '100%' }}
+            value={selectedDateColumn}
+            onChange={handleDateColumnChange}
+            placeholder="Select Date Column"
+          >
+            <Option value="open_dt">Open Date</Option>
+            <Option value="inprogress_dt">In Progress Date</Option>
+            <Option value="closed_dt">Closed Date</Option>
+          </Select>
+        </Col>
+        <Col span={6}>
           <RangePicker
             onChange={handleDateRangeChange}
             placeholder={['Start Date', 'End Date']}
-            format="YYYY-MM-DD"
+            format="DD/MM/YYYY"
             allowClear
+            value={dateRange}
           />
+        </Col> */}
+        <Col span={3}>
+          <Button 
+            type="primary" 
+            icon={<ReloadOutlined />}
+            onClick={handleReset}
+          >
+            Reset Filters
+          </Button>
         </Col>
       </Row>
       
       <Table 
         columns={columns} 
-        dataSource={filteredData} // Use filtered data instead of data
+        dataSource={filteredData}
         rowKey="id"
-        pagination={{ pageSize: 5 }}
+        pagination={{
+          ...pagination,
+          showSizeChanger: true,
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          onChange: handleTableChange,
+        }}
         scroll={{ x: true }}
       />
       

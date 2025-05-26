@@ -219,23 +219,13 @@ const OrderDashboard = () => {
 
   // Add this new function to check completion status for completed orders
   const checkCompletedOrdersStatus = useCallback(async (orders) => {
-    console.log('Starting to check completion status for orders:', orders);
     setLoadingCompletion(true);
     try {
       const completedOrdersWithStatus = await Promise.all(
         orders.map(async (order) => {
           try {
-            console.log('Checking completion for order:', {
-              partNumber: order.part_number,
-              productionOrder: order.production_order
-            });
-
             if (!order.part_number || !order.production_order) {
-              console.warn('Missing required fields for order:', order);
-              return {
-                ...order,
-                completion_status: null
-              };
+              return { ...order, completion_status: null };
             }
 
             const completionStatus = await useOrderStore.getState().checkOrderCompletion(
@@ -243,24 +233,17 @@ const OrderDashboard = () => {
               order.production_order
             );
 
-            console.log('Received completion status:', completionStatus);
-
             return {
               ...order,
               completion_status: completionStatus
             };
           } catch (error) {
             console.error(`Error checking completion for order ${order.production_order}:`, error);
-            message.error(`Failed to check completion status for order ${order.production_order}`);
-            return {
-              ...order,
-              completion_status: null
-            };
+            return { ...order, completion_status: null };
           }
         })
       );
 
-      console.log('Updated completed orders with status:', completedOrdersWithStatus);
       setCompletedOrders(completedOrdersWithStatus);
     } catch (error) {
       console.error('Error checking completed orders:', error);
@@ -288,72 +271,92 @@ const OrderDashboard = () => {
       title: 'Production Order',
       dataIndex: 'production_order',
       key: 'production_order',
+      width: 150,
     },
     {
       title: 'Part Number',
       dataIndex: 'part_number',
       key: 'part_number',
+      width: 150,
     },
     {
       title: 'Project Name',
       dataIndex: 'project_name',
       key: 'project_name',
+      width: 200,
     },
     {
-      title: 'Completion Status',
-      key: 'completion_status',
+      title: 'Status',
+      key: 'status',
+      width: 150,
       render: (_, record) => {
         if (!record.completion_status) {
           return <Tag color="default">Unknown</Tag>;
         }
         return (
+          <Tag color={record.completion_status.is_order_completed ? 'success' : 'warning'}>
+            {record.completion_status.completion_date_status}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Progress',
+      key: 'progress',
+      width: 120,
+      render: (_, record) => {
+        if (!record.completion_status) return 'N/A';
+        return (
+          <div className="flex items-center">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
+              <div 
+                className="bg-blue-600 h-2.5 rounded-full" 
+                style={{ width: `${record.completion_status.completion_percentage}%` }}
+              ></div>
+            </div>
+            <span className="text-sm">{record.completion_status.completion_percentage}%</span>
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Operations',
+      key: 'operations',
+      width: 150,
+      render: (_, record) => {
+        if (!record.completion_status) return 'N/A';
+        return (
           <div>
-            <Tag color={record.completion_status.is_order_completed ? 'success' : 'warning'}>
-              {record.completion_status.is_order_completed ? 'Completed' : 'In Progress'}
-            </Tag>
-            <div className="text-xs text-gray-500 mt-1">
-              {record.completion_status.completion_percentage}% Complete
+            <div className="font-medium">
+              {record.completion_status.completed_operations}/{record.completion_status.total_eligible_operations}
+            </div>
+            <div className="text-xs text-gray-500">
+              Total: {record.completion_status.total_all_operations}
             </div>
           </div>
         );
       },
     },
     {
-      title: 'Completion Details',
-      key: 'completion_details',
+      title: 'Completion Date',
+      key: 'completion_date',
+      width: 150,
+      render: (_, record) => {
+        if (!record.completion_status?.overall_completion_date) return 'Not completed';
+        return new Date(record.completion_status.overall_completion_date).toLocaleDateString();
+      },
+    },
+    {
+      title: 'Message',
+      key: 'message',
+      width: 300,
       render: (_, record) => {
         if (!record.completion_status) return 'N/A';
         return (
           <div className="text-sm">
-            <div className="mb-2">
-              <span className="font-semibold">Status: </span>
-              <span className={record.completion_status.is_order_completed ? 'text-green-600' : 'text-yellow-600'}>
-                {record.completion_status.message}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-semibold">Operations: </span>
-                {record.completion_status.completed_operations}/{record.completion_status.total_eligible_operations}
-                <span className="text-gray-500 text-xs ml-1">
-                  (Total: {record.completion_status.total_all_operations})
-                </span>
-              </div>
-              <div>
-                <span className="font-semibold">Completion Date: </span>
-                {new Date(record.completion_status.overall_completion_date).toLocaleDateString()}
-              </div>
-              <div>
-                <span className="font-semibold">Completion Status: </span>
-                <span className={record.completion_status.completion_date_status === 'Fully Completed' ? 'text-green-600' : 'text-yellow-600'}>
-                  {record.completion_status.completion_date_status}
-                </span>
-              </div>
-              <div>
-                <span className="font-semibold">Progress: </span>
-                {record.completion_status.completion_percentage}%
-              </div>
-            </div>
+            <span className={record.completion_status.is_order_completed ? 'text-green-600' : 'text-yellow-600'}>
+              {record.completion_status.message}
+            </span>
           </div>
         );
       },

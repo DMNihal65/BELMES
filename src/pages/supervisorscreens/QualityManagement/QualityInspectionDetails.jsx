@@ -592,7 +592,7 @@ const QualityInspectionDetails = ({
         title={
           <div className="flex items-center gap-2">
             <FileSearchOutlined className="text-blue-500" />
-            <span>Measured Inspection Data</span>
+            <span>{isViewingFinalInspection ? 'Measured Final Inspection Data' : 'Measured Inspection Data'}</span>
           </div>
         }
         visible={isMeasuredDataModalVisible}
@@ -604,6 +604,8 @@ const QualityInspectionDetails = ({
         ]}
         width={1600}
         className="measured-data-modal"
+        style={{ zIndex: 1100 }}
+        maskStyle={{ zIndex: 1099 }}
       >
         {/* Header section */}
         <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
@@ -1342,6 +1344,20 @@ const QualityInspectionDetails = ({
 
   // Add handler for final inspection click
   const handleFinalInspectionClick = () => {
+    // Check if we have operation groups with op_no 999
+    const hasFinalInspection = inspectionDetails?.operation_groups?.some(
+      group => group.op_no === 999
+    );
+
+    if (!hasFinalInspection) {
+      Modal.info({
+        title: 'Final Inspection Not Available',
+        content: 'Final inspection has not been done yet.',
+        okText: 'OK'
+      });
+      return;
+    }
+
     setIsFinalInspectionModalVisible(true);
   };
 
@@ -1485,26 +1501,29 @@ const QualityInspectionDetails = ({
       // Show loading indicator
       message.loading({ content: 'Loading final inspection measurements...', key: 'finalMeasurementsLoading' });
       
-      // Use the same endpoint with op_no=999 for final inspection
-      const response = await qualityStore.fetchStageInspectionByOperation(
-        inspectionDetails.order_id,
-        999 // Final inspection operation number
-      );
-      
       // Get the IPID for final inspection
       const finalOpGroup = inspectionDetails.operation_groups?.find(
         group => group.op_no === 999
       );
       const ipid = finalOpGroup?.ipid;
+
+      if (!ipid) {
+        message.error('IPID not found for final inspection');
+        return;
+      }
+      
+      // Fetch measurements using the stage inspection endpoint
+      const response = await qualityStore.fetchStageInspectionByOperation(
+        inspectionDetails.order_id,
+        999 // Final inspection operation number
+      );
       
       // Check FTP approval status for final inspection
-      if (inspectionDetails.order_id && ipid) {
-        const ftpStatus = await qualityStore.checkFTPApprovalStatus(
-          inspectionDetails.order_id,
-          ipid
-        );
-        setFtpApprovalStatus(ftpStatus);
-      }
+      const ftpStatus = await qualityStore.checkFTPApprovalStatus(
+        inspectionDetails.order_id,
+        ipid
+      );
+      setFtpApprovalStatus(ftpStatus);
       
       if (response && response.length > 0) {
         // Transform the data to match the expected format
@@ -1530,7 +1549,10 @@ const QualityInspectionDetails = ({
       }
     } catch (error) {
       console.error('Error loading final inspection measurements:', error);
-      message.error({ content: 'Failed to load final inspection measurements', key: 'finalMeasurementsLoading' });
+      message.error({ 
+        content: error.response?.data?.message || 'Failed to load final inspection measurements', 
+        key: 'finalMeasurementsLoading' 
+      });
     }
   };
 
@@ -1921,6 +1943,27 @@ const QualityInspectionDetails = ({
     
     .animate-progress {
       animation: progress 2s infinite linear;
+    }
+
+    /* Modal z-index fixes */
+    .ant-modal-root {
+      z-index: 1000;
+    }
+
+    .measured-data-modal {
+      z-index: 1100 !important;
+    }
+
+    .measured-data-modal .ant-modal-wrap {
+      z-index: 1100 !important;
+    }
+
+    .measured-data-modal .ant-modal-mask {
+      z-index: 1099 !important;
+    }
+
+    .measured-data-modal .ant-modal {
+      z-index: 1100 !important;
     }
 
     .qms-loading-modal .ant-modal-content {

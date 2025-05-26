@@ -225,7 +225,7 @@ const Scheduling = () => {
     const workCenterMachines = scheduleData.work_centers.flatMap(wc => 
       wc.machines.map(machine => ({
         id: machine.id,  // Original machine ID
-        machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work center code and machine ID
+        machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work centre code and machine ID
         name: machine.name,
         work_center_code: wc.work_center_code,
         work_center_name: wc.work_center_name,

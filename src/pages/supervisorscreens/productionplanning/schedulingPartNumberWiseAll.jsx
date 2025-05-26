@@ -223,11 +223,11 @@ const Scheduling = () => {
     
     // Get all machines from work_centers in the order they appear in the API
     const workCenterMachines = scheduleData.work_centers
-      .filter(wc => wc.is_schedulable === true) // Only include work centers that are schedulable
+      .filter(wc => wc.is_schedulable === true) // Only include work centres that are schedulable
       .flatMap(wc => 
         wc.machines.map(machine => ({
           id: machine.id,  // Original machine ID
-          machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work center code and machine ID
+          machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work centre code and machine ID
           name: machine.name,
           work_center_code: wc.work_center_code,
           work_center_name: wc.work_center_name,

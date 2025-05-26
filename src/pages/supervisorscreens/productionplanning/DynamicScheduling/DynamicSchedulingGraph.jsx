@@ -126,7 +126,7 @@ const DynamicSchedulingGraph = () => {
   // Add new function to fetch part details
   const fetchPartDetails = async () => {
     try {
-      const response = await axios.get('http://172.18.7.88:9933/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.88:7979/api/v1/planning/all_orders');
       setPartDetails(response.data);
     } catch (err) {
       console.error('Error fetching part details:', err);
@@ -198,7 +198,7 @@ const DynamicSchedulingGraph = () => {
     const machineMapping = {};
     const machineNameToId = {};
     scheduleData.work_centers.forEach(wc => {
-      // Only process work centers that are schedulable
+      // Only process work centres that are schedulable
       if (wc.is_schedulable) {
         wc.machines.forEach(machine => {
           const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
@@ -210,7 +210,7 @@ const DynamicSchedulingGraph = () => {
 
     // Update the groups creation logic to handle multiple selected machines and production orders
     scheduleData.work_centers.forEach(wc => {
-      // Only add groups for schedulable work centers
+      // Only add groups for schedulable work centres
       if (wc.is_schedulable) {
         wc.machines.forEach(machine => {
           // Check if this machine has any operations for the selected parts and production orders
@@ -729,7 +729,7 @@ const DynamicSchedulingGraph = () => {
             maxTagTextLength={10}
           >
             {scheduleData?.work_centers
-              .filter(wc => wc.is_schedulable) // Only show schedulable work centers
+              .filter(wc => wc.is_schedulable) // Only show schedulable work centres
               .map(wc => 
                 wc.machines.map(machine => (
                   <Option key={machine.id} value={machine.id}>

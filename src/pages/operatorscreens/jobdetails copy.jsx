@@ -183,7 +183,7 @@ const JobDetails = () => {
   // Function to load all available jobs
   const loadAvailableJobs = useCallback(async () => {
     try {
-      const response = await fetch('http://172.18.7.88:6997/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.88:7979/api/v1/planning/all_orders');
       
       if (!response.ok) {
         throw new Error('Failed to fetch available jobs');
@@ -201,7 +201,7 @@ const JobDetails = () => {
   const loadJobDetails = useCallback(async (partNumber) => {
     try {
       setIsLoadingJobData(true);
-      const response = await fetch(`http://172.18.7.88:6997/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.88:7979/api/v1/planning/search_order?part_number=${partNumber}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch job details');
@@ -1459,7 +1459,7 @@ const JobDetails = () => {
                           <div>{selectedOperation.operation_number}</div>
                         </div>
                         <div>
-                          <div className="text-gray-500">Work Center</div>
+                          <div className="text-gray-500">work centre</div>
                           <div>{selectedOperation.work_center}</div>
                         </div>
                         <div>

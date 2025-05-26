@@ -145,7 +145,7 @@ const NotificationsNew = () => {
       
       // Handle both machine and material notifications
       if (notification.notificationType === 'material') {
-        const response = await fetch('http://172.18.7.88:6997/api/v1/newlogs/raw_material_status_logs/acknowledge', {
+        const response = await fetch('http://172.18.7.88:7979/api/v1/newlogs/raw_material_status_logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -168,7 +168,7 @@ const NotificationsNew = () => {
         setLastAcknowledgedId(notification.id);
         setLastAcknowledgedType('material');
       } else if (notification.notificationType === 'machine') {
-        const response = await fetch('http://172.18.7.88:6997/api/v1/newlogs/machine-status-logs/acknowledge', {
+        const response = await fetch('http://172.18.7.88:7979/api/v1/newlogs/machine-status-logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -999,7 +999,7 @@ const NotificationsNew = () => {
                   <Bell size={24} color="#fff" />
                 </div>
                 <div>
-                  <Title level={3} style={{ margin: 0 }}>Notifications Center New</Title>
+                  <Title level={3} style={{ margin: 0 }}>Notifications Center</Title>
                   <Text type="secondary">
                     Monitor and manage all system alerts in one place
                   </Text>
@@ -1264,12 +1264,12 @@ const NotificationsNew = () => {
               tab={
                 <span>
                   Instrument Calibrations
-                  {unreadInstrumentCalibrationCount > 0 && (
+                  {/* {unreadInstrumentCalibrationCount > 0 && (
                     <Badge 
                       count={unreadInstrumentCalibrationCount} 
                       style={{ marginLeft: '8px' }} 
                     />
-                  )}
+                  )} */}
                 </span>
               } 
               key="instrumentCalibration" 
@@ -1278,12 +1278,12 @@ const NotificationsNew = () => {
               tab={
                 <span>
                   Machine Calibrations
-                  {unreadMachineCalibrationCount > 0 && (
+                  {/* {unreadMachineCalibrationCount > 0 && (
                     <Badge 
                       count={unreadMachineCalibrationCount} 
                       style={{ marginLeft: '8px' }} 
                     />
-                  )}
+                  )} */}
                 </span>
               } 
               key="machineCalibration" 
@@ -1291,7 +1291,7 @@ const NotificationsNew = () => {
           </Tabs>
 
           {/* Alert for unacknowledged tab */}
-          {activeTabKey === 'machine' && totalUnacknowledgedCount > 0 && (
+          {/* {activeTabKey === 'machine' && totalUnacknowledgedCount > 0 && (
             <Alert
               message={`${totalUnacknowledgedCount} notifications require your attention`}
               type="warning"
@@ -1307,7 +1307,7 @@ const NotificationsNew = () => {
               }
               style={{ marginBottom: '16px', borderRadius: '4px' }}
             />
-          )}
+          )} */}
 
           {isLoading || tableLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>

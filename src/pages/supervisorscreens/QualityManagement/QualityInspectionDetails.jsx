@@ -70,6 +70,8 @@ const QualityInspectionDetails = ({
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [selectedMeasurement, setSelectedMeasurement] = useState(null);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
 
@@ -458,30 +460,50 @@ const QualityInspectionDetails = ({
 
   // Function to handle viewing measured data
   const handleViewMeasuredData = async () => {
-    if (!inspectionDetails?.order_id) return;
+    if (!inspectionDetails?.order_id || !selectedOperation) return;
 
     try {
       // Show loading indicator
       message.loading({ content: 'Loading measured data...', key: 'measuredDataLoading' });
       
-      // Fetch inspection data using the quality store
-      const response = await qualityStore.fetchInspectionByOrderId(inspectionDetails.order_id);
+      // Fetch inspection data using the new endpoint
+      const response = await qualityStore.fetchStageInspectionByOperation(
+        inspectionDetails.order_id,
+        selectedOperation
+      );
+      
+      // Get the IPID for the selected operation
+      const selectedOpGroup = inspectionDetails.operation_groups?.find(
+        group => group.op_no === selectedOperation
+      );
+      const ipid = selectedOpGroup?.ipid;
       
       // Check FTP approval status
-      const orderId = inspectionDetails.order_id;
-      const ipid = inspectionDetails.operation_groups?.[0]?.ipid;
-      if (orderId && ipid) {
-        const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+      if (inspectionDetails.order_id && ipid) {
+        const ftpStatus = await qualityStore.checkFTPApprovalStatus(
+          inspectionDetails.order_id,
+          ipid
+        );
         setFtpApprovalStatus(ftpStatus);
       }
       
-      // Check if we have valid data with the correct structure
-      if (response && response.inspection_data && response.inspection_data.length > 0) {
-        setMeasuredData(response);
+      if (response && response.length > 0) {
+        // Transform the data to match the expected format
+        const transformedData = {
+          inspection_data: [{
+            operation_number: selectedOperation,
+            inspections: response.map(item => ({
+              ...item,
+              is_done: item.is_done || false
+            }))
+          }]
+        };
+        
+        setMeasuredData(transformedData);
         setIsMeasuredDataModalVisible(true);
         message.success({ content: 'Data loaded successfully', key: 'measuredDataLoading', duration: 1 });
       } else {
-        message.warning({ content: 'No measurement data available', key: 'measuredDataLoading' });
+        message.warning({ content: 'No measurement data available for this operation', key: 'measuredDataLoading' });
       }
     } catch (error) {
       console.error('Error loading measured data:', error);
@@ -497,8 +519,6 @@ const QualityInspectionDetails = ({
     const flatData = [];
     
     measuredData.inspection_data.forEach(operationData => {
-      const operationNumber = operationData.operation_number;
-      
       if (operationData.inspections && operationData.inspections.length > 0) {
         operationData.inspections.forEach(inspection => {
           // Calculate upper and lower tolerance limits
@@ -516,8 +536,8 @@ const QualityInspectionDetails = ({
           
           flatData.push({
             ...inspection,
-            operation_number: operationNumber,
-            key: `${operationNumber}-${inspection.id}`,
+            operation_number: operationData.operation_number,
+            key: `${operationData.operation_number}-${inspection.id}`,
             upperLimit,
             lowerLimit,
             isWithinTolerance
@@ -561,6 +581,11 @@ const QualityInspectionDetails = ({
         setFilteredData(data);
       }
     }, [measuredData]);
+
+    // Check if we're viewing final inspection measurements
+    const isViewingFinalInspection = measuredData?.inspection_data?.some(
+      data => data.operation_number === 999
+    );
     
     return (
       <Modal
@@ -608,16 +633,42 @@ const QualityInspectionDetails = ({
           </Row>
         </div>
 
-        {/* Show approval status alert */}
-        {ftpApprovalStatus?.is_completed && (
+        {/* Show approval status alert for final inspection */}
+        {isViewingFinalInspection && ftpApprovalStatus?.is_completed && (
           <Alert
-            message="Inspection Approved"
-            description={`This inspection was approved on ${moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY HH:mm')}`}
+            message="Final Inspection Approved"
+            description={`This final inspection was approved on ${moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY HH:mm')}`}
             type="success"
             showIcon
             className="mb-4"
           />
         )}
+
+        {/* Add approve button for all operations */}
+        <div className="mb-4 flex justify-end">
+          <Button 
+            type={ftpApprovalStatus?.is_completed === true ? "primary" : "default"}
+            icon={<CheckCircleOutlined />}
+            onClick={isViewingFinalInspection ? handleFinalApproveAll : handleApproveAll}
+            loading={isViewingFinalInspection ? isFinalApprovingAll : isApprovingAll}
+            size="large"
+            className="approve-all-btn"
+            style={ftpApprovalStatus?.is_completed === true ? { 
+              backgroundColor: "#52c41a", 
+              borderColor: "#52c41a", 
+              color: "#fff",
+              cursor: 'not-allowed',
+              opacity: 0.8
+            } : {}}
+            disabled={ftpApprovalStatus?.is_completed === true}
+          >
+            {ftpApprovalStatus?.is_completed === true 
+              ? "Already Approved" 
+              : isViewingFinalInspection 
+                ? "Approve Final Inspection" 
+                : "Approve All Measurements"}
+          </Button>
+        </div>
 
         {/* Filter and search controls with updated functionality */}
         <div className="mb-4 flex flex-wrap gap-4 justify-between items-center">
@@ -1390,9 +1441,14 @@ const QualityInspectionDetails = ({
   const fetchFinalInspectionDrawing = async () => {
     try {
       setLoadingFinalDrawing(true);
-      const drawingId = inspectionDetails?.production_order; // Use production order from inspection details
-      const operationId = '999'; // Final Inspection operation
-      const data = await qualityStore.fetchBalloonedDrawing(drawingId, operationId);
+      const productionOrder = inspectionDetails?.production_order;
+      const operationId = '999'; // Operation ID for final inspection
+      
+      if (!productionOrder) {
+        throw new Error('Production order not found');
+      }
+      
+      const data = await qualityStore.fetchBalloonedDrawing(productionOrder, operationId);
       setFinalInspectionDrawing(data);
     } catch (error) {
       message.error('Failed to load final inspection drawing');
@@ -1426,28 +1482,204 @@ const QualityInspectionDetails = ({
         return;
       }
       
-      const response = await qualityStore.fetchDetailedInspection(inspectionDetails.order_id);
+      // Show loading indicator
+      message.loading({ content: 'Loading final inspection measurements...', key: 'finalMeasurementsLoading' });
       
-      // Check if we have data for Operation 999
-      const hasOperation999 = response?.inspection_data?.some(
-        data => data.operation_number === 999
+      // Use the same endpoint with op_no=999 for final inspection
+      const response = await qualityStore.fetchStageInspectionByOperation(
+        inspectionDetails.order_id,
+        999 // Final inspection operation number
       );
-
-      if (!hasOperation999) {
+      
+      // Get the IPID for final inspection
+      const finalOpGroup = inspectionDetails.operation_groups?.find(
+        group => group.op_no === 999
+      );
+      const ipid = finalOpGroup?.ipid;
+      
+      // Check FTP approval status for final inspection
+      if (inspectionDetails.order_id && ipid) {
+        const ftpStatus = await qualityStore.checkFTPApprovalStatus(
+          inspectionDetails.order_id,
+          ipid
+        );
+        setFtpApprovalStatus(ftpStatus);
+      }
+      
+      if (response && response.length > 0) {
+        // Transform the data to match the expected format
+        const transformedData = {
+          inspection_data: [{
+            operation_number: 999,
+            inspections: response.map(item => ({
+              ...item,
+              is_done: item.is_done || false
+            }))
+          }]
+        };
+        
+        setMeasuredData(transformedData);
+        setIsMeasuredDataModalVisible(true);
+        message.success({ content: 'Final inspection data loaded successfully', key: 'finalMeasurementsLoading', duration: 1 });
+      } else {
         Modal.warning({
           title: 'No Measurements Found',
           content: 'No measurements have been recorded for Final Inspection (Operation 999) yet.',
           okText: 'OK'
         });
-        return;
       }
-
-      setMeasuredData(response);
-      setIsMeasuredDataModalVisible(true);
     } catch (error) {
-      message.error('Failed to load final inspection measurements');
       console.error('Error loading final inspection measurements:', error);
+      message.error({ content: 'Failed to load final inspection measurements', key: 'finalMeasurementsLoading' });
     }
+  };
+
+  // Add function to handle measurement click
+  const handleMeasurementClick = (record) => {
+    setSelectedMeasurement(record);
+    setIsDetailModalVisible(true);
+  };
+
+  // Add function to render measurement details modal
+  const renderMeasurementDetailModal = () => {
+    if (!selectedMeasurement) return null;
+
+    return (
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <InfoCircleOutlined className="text-blue-500" />
+            <span>Measurement Details</span>
+          </div>
+        }
+        visible={isDetailModalVisible}
+        onCancel={() => setIsDetailModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsDetailModalVisible(false)}>
+            Close
+          </Button>
+        ]}
+        width={800}
+      >
+        <div className="space-y-4">
+          {/* Header Information */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <Row gutter={[16, 8]}>
+              <Col span={8}>
+                <Text type="secondary" className="text-xs">Zone</Text>
+                <div className="text-base font-medium">{selectedMeasurement.zone || '-'}</div>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary" className="text-xs">Dimension Type</Text>
+                <div className="text-base font-medium">{selectedMeasurement.dimension_type || '-'}</div>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary" className="text-xs">Instrument</Text>
+                <div className="text-base font-medium">{selectedMeasurement.measured_instrument || '-'}</div>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Measurements */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <Title level={5}>Measurements</Title>
+            <Row gutter={[16, 16]} className="mt-2">
+              <Col span={8}>
+                <Card size="small" title="Nominal Value">
+                  <Text strong>{selectedMeasurement.nominal_value || '-'}</Text>
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" title="Upper Tolerance">
+                  <Text type="success">+{selectedMeasurement.uppertol || '0'}</Text>
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" title="Lower Tolerance">
+                  <Text type="danger">{selectedMeasurement.lowertol || '0'}</Text>
+                </Card>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Actual Measurements */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <Title level={5}>Actual Measurements</Title>
+            <Row gutter={[16, 16]} className="mt-2">
+              <Col span={8}>
+                <Card size="small" title="Measurement #1">
+                  <Text>{selectedMeasurement.measured_1 || '-'}</Text>
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" title="Measurement #2">
+                  <Text>{selectedMeasurement.measured_2 || '-'}</Text>
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" title="Measurement #3">
+                  <Text>{selectedMeasurement.measured_3 || '-'}</Text>
+                </Card>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Mean and Status */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <Row gutter={[16, 16]}>
+              <Col span={12}>
+                <Card size="small" title="Mean Value">
+                  <div className="flex items-center gap-2">
+                    <Text strong className={selectedMeasurement.isWithinTolerance ? 'text-green-600' : 'text-red-600'}>
+                      {selectedMeasurement.measured_mean || '-'}
+                    </Text>
+                    {selectedMeasurement.isWithinTolerance ? 
+                      <CheckCircleOutlined className="text-green-500" /> : 
+                      <CloseCircleOutlined className="text-red-500" />
+                    }
+                  </div>
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card size="small" title="Status">
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      status={selectedMeasurement.isWithinTolerance ? 'success' : 'error'} 
+                      text={
+                        selectedMeasurement.isWithinTolerance ? 
+                          'Within Tolerance' : 
+                          'Out of Tolerance'
+                      } 
+                    />
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Additional Information */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <Row gutter={[16, 8]}>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs">Operator</Text>
+                <div className="text-base">
+                  {selectedMeasurement.operator?.username || '-'}
+                </div>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs">Date & Time</Text>
+                <div className="text-base">
+                  {selectedMeasurement.created_at ? 
+                    moment(selectedMeasurement.created_at).format('DD-MM-YYYY HH:mm') : 
+                    '-'
+                  }
+                </div>
+              </Col>
+            </Row>
+          </div>
+        </div>
+      </Modal>
+    );
   };
 
   // Update the renderFinalInspectionModal function
@@ -1490,183 +1722,189 @@ const QualityInspectionDetails = ({
         dataIndex: 'measured_instrument',
         key: 'measured_instrument',
         width: 150,
+      },
+      {
+        title: 'Action',
+        key: 'action',
+        width: 100,
+        render: (_, record) => (
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => handleMeasurementClick(record)}
+          >
+            View
+          </Button>
+        ),
       }
     ];
 
     return (
-      <Modal
-        title={
-          <div className="flex items-center gap-2">
-            <FileSearchOutlined className="text-blue-500" />
-            <span>Final Inspection Measurements</span>
-          </div>
-        }
-        visible={isFinalInspectionModalVisible}
-        onCancel={() => {
-          setIsFinalInspectionModalVisible(false);
-          setFinalInspectionDrawing(null);
-        }}
-        width={1600}
-        footer={[
-          <Button key="close" onClick={() => {
+      <>
+        <Modal
+          title={
+            <div className="flex items-center gap-2">
+              <FileSearchOutlined className="text-blue-500" />
+              <span>Final Inspection Measurements</span>
+            </div>
+          }
+          visible={isFinalInspectionModalVisible}
+          onCancel={() => {
             setIsFinalInspectionModalVisible(false);
             setFinalInspectionDrawing(null);
-          }}>
-            Close
-          </Button>
-        ]}
-      >
-        <div className="flex gap-6">
-          {/* Left side - Measurements */}
-          <div className="flex-1 min-w-[45%]">
-            {/* Header section */}
-            <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
-              <Row gutter={16} align="middle">
-                <Col span={24}>
-                  <Row gutter={[16, 8]}>
-                    <Col span={8}>
-                      <div className="flex flex-col">
-                        <Text type="secondary" className="text-xs">Order ID</Text>
-                        <Text strong className="text-base">{inspectionDetails?.order_id || '-'}</Text>
-                      </div>
-                    </Col>
-                    <Col span={8}>
-                      <div className="flex flex-col">
-                        <Text type="secondary" className="text-xs">Production Order</Text>
-                        <Text strong className="text-base">{inspectionDetails?.production_order || '-'}</Text>
-                      </div>
-                    </Col>
-                    <Col span={8}>
-                      <div className="flex flex-col">
-                        <Text type="secondary" className="text-xs">Part Number</Text>
-                        <Text strong className="text-base">{inspectionDetails?.part_number || '-'}</Text>
-                      </div>
-                    </Col>
-                  </Row>
-                </Col>
-              </Row>
-            </div>
+          }}
+          width={1600}
+          footer={[
+            <Button key="close" onClick={() => {
+              setIsFinalInspectionModalVisible(false);
+              setFinalInspectionDrawing(null);
+            }}>
+              Close
+            </Button>
+          ]}
+        >
+          {/* Rest of the existing modal content */}
+          <div className="flex gap-6">
+            {/* Left side - Measurements */}
+            <div className="flex-1 min-w-[45%]">
+              {/* Header section */}
+              <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
+                <Row gutter={16} align="middle">
+                  <Col span={24}>
+                    <Row gutter={[16, 8]}>
+                      <Col span={8}>
+                        <div className="flex flex-col">
+                          <Text type="secondary" className="text-xs">Order ID</Text>
+                          <Text strong className="text-base">{inspectionDetails?.order_id || '-'}</Text>
+                        </div>
+                      </Col>
+                      <Col span={8}>
+                        <div className="flex flex-col">
+                          <Text type="secondary" className="text-xs">Production Order</Text>
+                          <Text strong className="text-base">{inspectionDetails?.production_order || '-'}</Text>
+                        </div>
+                      </Col>
+                      <Col span={8}>
+                        <div className="flex flex-col">
+                          <Text type="secondary" className="text-xs">Part Number</Text>
+                          <Text strong className="text-base">{inspectionDetails?.part_number || '-'}</Text>
+                        </div>
+                      </Col>
+                    </Row>
+                  </Col>
+                </Row>
+              </div>
 
-            {/* Show approval status alert */}
-            {ftpApprovalStatus?.is_completed && (
-              <Alert
-                message="Final Inspection Approved"
-                description={`This final inspection was approved on ${moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY HH:mm')}`}
-                type="success"
-                showIcon
-                className="mb-4"
+              {/* Show approval status alert */}
+              {ftpApprovalStatus?.is_completed && (
+                <Alert
+                  message="Final Inspection Approved"
+                  description={`This final inspection was approved on ${moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY HH:mm')}`}
+                  type="success"
+                  showIcon
+                  className="mb-4"
+                />
+              )}
+
+              <div className="mb-4">
+                <Text strong>Operation: 999</Text>
+                <br />
+                <Text strong>IPID: {inspectionDetails?.operation_groups?.[0]?.ipid || 'No IPID'}</Text>
+              </div>
+              <Table
+                columns={columns}
+                dataSource={finalInspectionData}
+                pagination={false}
+                scroll={{ x: 800, y: 400 }}
+                size="small"
+                onRow={(record) => ({
+                  onClick: () => handleMeasurementClick(record),
+                  style: { cursor: 'pointer' }
+                })}
               />
-            )}
-
-            <div className="mb-4">
-              <Text strong>Operation: 999</Text>
-              <br />
-              <Text strong>IPID: {inspectionDetails?.operation_groups?.[0]?.ipid || 'No IPID'}</Text>
             </div>
-            <Table
-              columns={columns}
-              dataSource={finalInspectionData}
-              pagination={false}
-              scroll={{ x: 800, y: 400 }}
-              size="small"
-            />
-          </div>
 
-          {/* Right side - Drawing */}
-          <div className="flex-1 min-w-[55%]">
-            <div className="bg-white rounded-lg shadow-sm h-[calc(100vh-240px)] flex flex-col">
-              {/* Drawing Header */}
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <Typography.Title level={5} className="mb-0">
-                    Ballooned Drawing
-                  </Typography.Title>
-                  <Space>
-                    <Button
-                      type="primary"
-                      icon={<EyeOutlined />}
-                      onClick={handleViewFinalMeasurements}
-                    >
-                      View Measurements
-                    </Button>
-                    <Button 
-                      type={ftpApprovalStatus?.is_completed === true ? "primary" : "default"}
-                      icon={<CheckCircleOutlined />}
-                      onClick={handleFinalApproveAll}
-                      loading={isFinalApprovingAll}
-                      size="middle"
-                      className="approve-all-btn"
-                      style={ftpApprovalStatus?.is_completed === true ? { 
-                        backgroundColor: "#52c41a", 
-                        borderColor: "#52c41a", 
-                        color: "#fff",
-                        cursor: 'not-allowed',
-                        opacity: 0.8
-                      } : {}}
-                      disabled={ftpApprovalStatus?.is_completed === true}
-                    >
-                      {ftpApprovalStatus?.is_completed === true ? "Already Approved" : "Approve All Measurements"}
-                    </Button>
-                    {finalInspectionDrawing && (
+            {/* Right side - Drawing */}
+            <div className="flex-1 min-w-[55%]">
+              <div className="bg-white rounded-lg shadow-sm h-[calc(100vh-240px)] flex flex-col">
+                {/* Drawing Header */}
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <Typography.Title level={5} className="mb-0">
+                      Ballooned Drawing
+                    </Typography.Title>
+                    <Space>
                       <Button
-                        type="default"
-                        icon={<DownloadOutlined />}
-                        size="middle"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = finalInspectionDrawing.url;
-                          link.download = finalInspectionDrawing.fileName;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
+                        type="primary"
+                        icon={<EyeOutlined />}
+                        onClick={handleViewFinalMeasurements}
                       >
-                        Download Drawing
+                        View Measurements
                       </Button>
-                    )}
-                  </Space>
+                      {finalInspectionDrawing && (
+                        <Button
+                          type="default"
+                          icon={<DownloadOutlined />}
+                          size="middle"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = finalInspectionDrawing.url;
+                            link.download = finalInspectionDrawing.fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
+                          Download Drawing
+                        </Button>
+                      )}
+                    </Space>
+                  </div>
+                </div>
+
+                {/* Drawing Content */}
+                <div className="flex-1 p-4">
+                  {loadingFinalDrawing ? (
+                    <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                      <div className="text-center">
+                        <Spin size="large" />
+                        <div className="mt-4 text-gray-500">Loading drawing...</div>
+                      </div>
+                    </div>
+                  ) : finalInspectionDrawing ? (
+                    <div className="h-full rounded-lg overflow-hidden border border-gray-200">
+                      <iframe
+                        src={finalInspectionDrawing.url}
+                        type="application/pdf"
+                        className="w-full h-full"
+                        style={{
+                          backgroundColor: '#f8fafc',
+                          border: 'none'
+                        }}
+                        title="Ballooned Drawing View"
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description={
+                          <span className="text-gray-500">
+                            No drawing available
+                          </span>
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Drawing Content */}
-              <div className="flex-1 p-4">
-                {loadingFinalDrawing ? (
-                  <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
-                    <div className="text-center">
-                      <Spin size="large" />
-                      <div className="mt-4 text-gray-500">Loading drawing...</div>
-                    </div>
-                  </div>
-                ) : finalInspectionDrawing ? (
-                  <div className="h-full rounded-lg overflow-hidden border border-gray-200">
-                    <iframe
-                      src={finalInspectionDrawing.url}
-                      type="application/pdf"
-                      className="w-full h-full"
-                      style={{
-                        backgroundColor: '#f8fafc',
-                        border: 'none'
-                      }}
-                      title="Ballooned Drawing View"
-                    />
-                  </div>
-                ) : (
-                  <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg">
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description={
-                        <span className="text-gray-500">
-                          No drawing available
-                        </span>
-                      }
-                    />
-                  </div>
-                )}
-              </div>
             </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+
+        {/* Add the measurement detail modal */}
+        {renderMeasurementDetailModal()}
+      </>
     );
   };
 

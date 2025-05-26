@@ -107,11 +107,16 @@ const Login = () => {
           }
         }
     } catch (error) {
-      // Show more user-friendly error messages
+      // Show error messages for all types of errors
       if (error.message.includes('access')) {
         toast.error('Access Denied: ' + error.message);
+      } else if (error.message.includes('Invalid machine credentials')) {
+        toast.error('Invalid machine credentials. Please check your machine details.');
+        setCurrentStep(0); // Go back to machine credentials step
+      } else if (error.message.includes('Invalid operator credentials')) {
+        toast.error('Invalid operator credentials. Please check your username and password.');
       } else {
-        toast.error('Login failed: ' + error.message);
+        toast.error(error.message);
       }
     }
   };

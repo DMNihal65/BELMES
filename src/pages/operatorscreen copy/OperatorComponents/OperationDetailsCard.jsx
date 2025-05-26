@@ -391,7 +391,7 @@ const OperationDetailsCard = () => {
                   </div>
                   {operationToActivate.work_center && (
                     <div className="text-xs text-gray-500 mt-1">
-                      Work Center: {operationToActivate.work_center}
+                      work centre: {operationToActivate.work_center}
                     </div>
                   )}
                 </div>

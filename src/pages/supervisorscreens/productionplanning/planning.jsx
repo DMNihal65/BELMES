@@ -34,6 +34,7 @@ import * as QRCodeNode from 'qrcode';
 import { create } from 'zustand';
 import moment from 'moment';
 import useInventoryStore from '../../../store/inventory-store';
+import useOrderStore from '../../../store/order-store';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -153,9 +154,8 @@ const Planning = () => {
   const [addProgramForm] = Form.useForm();
   const [editProgramForm] = Form.useForm();
 
-
-
-
+  const [completionStatus, setCompletionStatus] = useState(null);
+  const planningStore = usePlanningStore();
 
   // Store hooks
   const { 
@@ -694,11 +694,24 @@ const loadInventoryItems = async () => {
     );
   };
 
+  const fetchCompletionStatus = async (partNumber, productionOrder) => {
+    try {
+      console.log('Fetching completion status for:', partNumber, productionOrder);
+      const status = await useOrderStore.getState().checkOrderCompletion(partNumber, productionOrder);
+      console.log('Completion status received:', status);
+      setCompletionStatus(status);
+    } catch (error) {
+      console.error('Error fetching completion status:', error);
+      message.error('Failed to fetch completion status');
+    }
+  };
+
   const handleJobSelect = async (partNumber) => {
     try {
+      console.log('Job selected:', partNumber);
       setLoading(true);
-      console.log('Selected part number:', partNumber);
-      setSelectedOrderNumber(partNumber);
+      setSelectedJob(null);
+      setCompletionStatus(null); // Reset completion status when selecting new job
       
       if (!partNumber) {
         setSelectedJob(null);
@@ -782,9 +795,18 @@ const loadInventoryItems = async () => {
         message.error('No job details found for the selected part number');
       }
       
+      if (selectedJob) {
+        console.log('Selected job:', selectedJob);
+        try {
+          await fetchCompletionStatus(partNumber, selectedJob.production_order);
+        } catch (error) {
+          console.error('Error fetching completion status:', error);
+          message.error('Failed to fetch completion status');
+        }
+      }
+      
     } catch (error) {
       console.error('Error in handleJobSelect:', error);
-      message.error('Failed to fetch job details');
     } finally {
       setLoading(false);
     }
@@ -2702,8 +2724,28 @@ const handleAddTool = async (values) => {
     }
   };
 
+  // Add this effect to fetch completion status when job is selected
+  useEffect(() => {
+    const fetchCompletionStatus = async () => {
+      if (selectedJob?.part_number && selectedJob?.production_order) {
+        setLoading(true);
+        try {
+          const status = await usePlanningStore.getState().checkOrderCompletion(
+            selectedJob.part_number,
+            selectedJob.production_order
+          );
+          setCompletionStatus(status);
+        } catch (error) {
+          console.error('Error fetching completion status:', error);
+          message.error('Failed to fetch completion status');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
 
-
+    fetchCompletionStatus();
+  }, [selectedJob]);
 
   
   return (
@@ -2819,11 +2861,11 @@ const handleAddTool = async (values) => {
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Total Operations</span>}>
                       {selectedJob.total_operations}
                     </Descriptions.Item>
-                    <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Start Date</span>}>
+                    {/* <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Start Date</span>}>
                       {selectedJob.project?.start_date 
                         ? new Date(selectedJob.project.start_date).toLocaleDateString()
                         : 'N/A'}
-                    </Descriptions.Item>
+                    </Descriptions.Item> */}
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Status</span>}>
                       <div className="flex items-center space-x-2">
                         {renderStatusButton(selectedJob.production_order)}
@@ -2833,6 +2875,25 @@ const handleAddTool = async (values) => {
                       label={<span style={{ fontWeight: 'bold', color: '#1890ff' }}>PDC</span>}
                     >
                       {renderPdcInfo(selectedJob.production_order)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Completion Status</span>}>
+                      {loading ? (
+                        <Spin size="small" />
+                      ) : completionStatus ? (
+                        <div style={{ 
+                          color: completionStatus.is_order_completed ? '#52c41a' : '#fa8c16',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          {completionStatus.is_order_completed 
+                            ? `Completed on ${new Date(completionStatus.overall_completion_date).toLocaleDateString()}`
+                            : 'Not Yet Completed'}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#999' }}>Loading status...</span>
+                      )}
                     </Descriptions.Item>
                   </Descriptions>
 
@@ -3226,6 +3287,7 @@ const handleAddTool = async (values) => {
 
 
 
+                
                 {/* Add Tool Modal */}
                <Modal
                   title="Add Tool"
@@ -3245,6 +3307,9 @@ const handleAddTool = async (values) => {
                     layout="vertical"
                     onFinish={handleAddTool}
                   >
+
+
+                    
                   <Form.Item
                     label="Select Tool"
                     rules={[{ required: true, message: 'Please select an inventory item' }]}
@@ -3268,7 +3333,7 @@ const handleAddTool = async (values) => {
                               .map(item => ({
                                 label: item.dynamic_data["Instrument code"] 
                                   ? `${item.dynamic_data["Instrument code"]}` 
-                                  : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
+                                  : `${item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "] ? (item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "]) : ''}${((item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "]) && item.dynamic_data["BEL Part Description"]) ? ' - ' : ''}${item.dynamic_data["BEL Part Description"] || ''}`,
                                 value: item.id,
                                 isLeaf: true,
                               }))
@@ -3318,6 +3383,10 @@ const handleAddTool = async (values) => {
                       }}
                     />
                   </Form.Item>
+
+
+
+                  
 
                     <Form.Item label="Selected Subcategory">
                       <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />

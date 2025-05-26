@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty, Tag } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
@@ -27,6 +27,8 @@ const OrderDashboard = () => {
   const [priorityOrders, setPriorityOrders] = useState([]);
   const [parent] = useAutoAnimate();
   const [timelineError, setTimelineError] = useState(null);
+  const [completedOrders, setCompletedOrders] = useState([]);
+  const [loadingCompletion, setLoadingCompletion] = useState(false);
   
   // Initialize orders and start polling when component mounts
   useEffect(() => {
@@ -215,6 +217,149 @@ const OrderDashboard = () => {
   // Filter orders for in-progress tab
   const inProgressOrders = orders.filter(order => order.status === 'in_progress');
 
+  // Add this new function to check completion status for completed orders
+  const checkCompletedOrdersStatus = useCallback(async (orders) => {
+    console.log('Starting to check completion status for orders:', orders);
+    setLoadingCompletion(true);
+    try {
+      const completedOrdersWithStatus = await Promise.all(
+        orders.map(async (order) => {
+          try {
+            console.log('Checking completion for order:', {
+              partNumber: order.part_number,
+              productionOrder: order.production_order
+            });
+
+            if (!order.part_number || !order.production_order) {
+              console.warn('Missing required fields for order:', order);
+              return {
+                ...order,
+                completion_status: null
+              };
+            }
+
+            const completionStatus = await useOrderStore.getState().checkOrderCompletion(
+              order.part_number,
+              order.production_order
+            );
+
+            console.log('Received completion status:', completionStatus);
+
+            return {
+              ...order,
+              completion_status: completionStatus
+            };
+          } catch (error) {
+            console.error(`Error checking completion for order ${order.production_order}:`, error);
+            message.error(`Failed to check completion status for order ${order.production_order}`);
+            return {
+              ...order,
+              completion_status: null
+            };
+          }
+        })
+      );
+
+      console.log('Updated completed orders with status:', completedOrdersWithStatus);
+      setCompletedOrders(completedOrdersWithStatus);
+    } catch (error) {
+      console.error('Error checking completed orders:', error);
+      message.error('Failed to check completion status for some orders');
+    } finally {
+      setLoadingCompletion(false);
+    }
+  }, []);
+
+  // Update useEffect to add logging
+  useEffect(() => {
+    if (orders && orders.length > 0) {
+      console.log('Orders updated, filtering completed orders');
+      const completedOrders = orders.filter(order => order.status === 'completed');
+      console.log('Found completed orders:', completedOrders);
+      if (completedOrders.length > 0) {
+        checkCompletedOrdersStatus(completedOrders);
+      }
+    }
+  }, [orders, checkCompletedOrdersStatus]);
+
+  // Add columns for completed orders table
+  const completedOrdersColumns = [
+    {
+      title: 'Production Order',
+      dataIndex: 'production_order',
+      key: 'production_order',
+    },
+    {
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+    },
+    {
+      title: 'Project Name',
+      dataIndex: 'project_name',
+      key: 'project_name',
+    },
+    {
+      title: 'Completion Status',
+      key: 'completion_status',
+      render: (_, record) => {
+        if (!record.completion_status) {
+          return <Tag color="default">Unknown</Tag>;
+        }
+        return (
+          <div>
+            <Tag color={record.completion_status.is_order_completed ? 'success' : 'warning'}>
+              {record.completion_status.is_order_completed ? 'Completed' : 'In Progress'}
+            </Tag>
+            <div className="text-xs text-gray-500 mt-1">
+              {record.completion_status.completion_percentage}% Complete
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Completion Details',
+      key: 'completion_details',
+      render: (_, record) => {
+        if (!record.completion_status) return 'N/A';
+        return (
+          <div className="text-sm">
+            <div className="mb-2">
+              <span className="font-semibold">Status: </span>
+              <span className={record.completion_status.is_order_completed ? 'text-green-600' : 'text-yellow-600'}>
+                {record.completion_status.message}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="font-semibold">Operations: </span>
+                {record.completion_status.completed_operations}/{record.completion_status.total_eligible_operations}
+                <span className="text-gray-500 text-xs ml-1">
+                  (Total: {record.completion_status.total_all_operations})
+                </span>
+              </div>
+              <div>
+                <span className="font-semibold">Completion Date: </span>
+                {new Date(record.completion_status.overall_completion_date).toLocaleDateString()}
+              </div>
+              <div>
+                <span className="font-semibold">Completion Status: </span>
+                <span className={record.completion_status.completion_date_status === 'Fully Completed' ? 'text-green-600' : 'text-yellow-600'}>
+                  {record.completion_status.completion_date_status}
+                </span>
+              </div>
+              <div>
+                <span className="font-semibold">Progress: </span>
+                {record.completion_status.completion_percentage}%
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
       {error && (
@@ -281,7 +426,19 @@ const OrderDashboard = () => {
                 </TabPane>
                 <TabPane tab="Completed" key="completed">
                   <div className="h-full overflow-auto">
-                    <OrderTable orders={orders.filter(order => order.status === 'completed')} onRefresh={handleRefresh} />
+                    {loadingCompletion ? (
+                      <div className="flex justify-center items-center py-8">
+                        <Spin size="large" />
+                      </div>
+                    ) : (
+                      <Table
+                        dataSource={completedOrders}
+                        columns={completedOrdersColumns}
+                        rowKey="production_order"
+                        pagination={{ pageSize: 10 }}
+                        scroll={{ x: 'max-content' }}
+                      />
+                    )}
                   </div>
                 </TabPane>
                 <TabPane tab="Priority" key="priority">

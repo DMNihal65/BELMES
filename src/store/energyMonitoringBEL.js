@@ -8,19 +8,19 @@ const API_TIMEOUT = 10000; // Increase timeout to 10 seconds
 const MAX_RETRIES = 1;
 
 // Use the correct WebSocket endpoint for machines data
-// const WS_MACHINES_ENDPOINT = 'ws://172.18.7.93:8808/api/v1/energymonitoring/ws/machines_data';
+// const WS_MACHINES_ENDPOINT = 'ws://172.18.7.88:7979/api/v1/energymonitoring/ws/machines_data';
 
 // Update the WebSocket endpoint for shiftwise energy data
-const WS_SHIFTWISE_ENERGY_ENDPOINT = 'http://172.18.7.93:8808/api/v1/energy-monitoring/shiftwise-energy-stream';
+const WS_SHIFTWISE_ENERGY_ENDPOINT = 'http://172.18.7.88:7979/api/v1/energy-monitoring/shiftwise-energy-stream';
 
 // Add the HTTP endpoint for historical data
-// const HISTORY_API_ENDPOINT = 'http://172.18.7.93:8808/api/v1/energymonitoring/shiftwise_energy_history_by_date';
+// const HISTORY_API_ENDPOINT = 'http://172.18.7.88:7979/api/v1/energymonitoring/shiftwise_energy_history_by_date';
 
 // Update the endpoint constant
-const MACHINE_STATUS_ENDPOINT = 'http://172.18.7.93:8808/api/v1/energy-monitoring/machine-status-stream';
+const MACHINE_STATUS_ENDPOINT = 'http://172.18.7.88:7979/api/v1/energy-monitoring/machine-status-stream';
 
 // Update the endpoint constant to use the specific epoch time
-const COMBINED_HISTORY_ENDPOINT = 'http://172.18.7.93:8808/api/v1/energy-monitoring/combined-history/1746586800';
+const COMBINED_HISTORY_ENDPOINT = 'http://172.18.7.88:7979/api/v1/energy-monitoring/combined-history/1746586800';
 
 const useEnergyMonitoringBelStore = create((set, get) => ({
   // Machine data
@@ -42,13 +42,9 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      // Close existing EventSource if any
-      const existingEventSource = get().eventSource;
-      if (existingEventSource) {
-        existingEventSource.close();
-      }
-
-      // Create new EventSource with error handling
+      console.log('Fetching machine names from:', MACHINE_STATUS_ENDPOINT);
+      
+      // Create EventSource for SSE
       const eventSource = new EventSource(MACHINE_STATUS_ENDPOINT);
       
       // Store the EventSource instance
@@ -56,90 +52,71 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
 
       // Handle connection open
       eventSource.onopen = () => {
-        console.log('SSE connection established');
+        console.log('Machine status SSE connection established');
         set({ isLoading: false });
       };
 
       // Handle incoming messages
       eventSource.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-          console.log('Received SSE data:', data);
+          console.log('Raw SSE data received:', event.data);
+          // Parse the SSE data format which includes "data: " prefix
+          const jsonStr = event.data.replace('data: ', '');
+          const data = JSON.parse(jsonStr);
+          console.log('Parsed machine data:', data);
           
           if (Array.isArray(data)) {
-            // Get current machine names from store
-            const currentMachines = get().machineNames;
+            // Sort machines by machine_id to maintain consistent order
+            const sortedData = [...data].sort((a, b) => a.machine_id - b.machine_id);
             
-            // If this is the first load (no current machines), set all machines
-            if (!currentMachines || currentMachines.length === 0) {
-              const formattedMachines = data.map(machine => ({
-                machine_id: machine.machine_id,
-                machine_data: {
-                  id: machine.machine_id,
-                  work_center: 'N/A',
-                  type: 'Default',
-                  make: machine.machine_name,
-                  model: 'Default'
-                },
-                status: machine.status,
-                total_power: machine.total_power,
-                energy_consumed: machine.energy_consumed,
-                timestamp: machine.timestamp
-              }));
-              
-              set({ machineNames: formattedMachines });
-            } else {
-              // For subsequent updates, only update changed machines
-              const updatedMachines = currentMachines.map(currentMachine => {
-                // Find if this machine has an update
-                const updatedMachine = data.find(m => m.machine_id === currentMachine.machine_id);
-                
-                if (updatedMachine && updatedMachine.status !== currentMachine.status) {
-                  // Only update if status has changed
-                  return {
-                    ...currentMachine,
-                    status: updatedMachine.status,
-                    total_power: updatedMachine.total_power,
-                    energy_consumed: updatedMachine.energy_consumed,
-                    timestamp: updatedMachine.timestamp
-                  };
-                }
-                
-                // Return unchanged machine
-                return currentMachine;
-              });
-              
-              set({ machineNames: updatedMachines });
-            }
+            const formattedMachines = sortedData.map(machine => ({
+              machine_id: machine.machine_id,
+              machine_name: machine.machine_name,
+              status: machine.status,
+              total_power: machine.total_power,
+              energy_consumed: machine.energy_consumed,
+              timestamp: machine.timestamp
+            }));
+            
+            console.log('Setting formatted machines:', formattedMachines);
+            set({ machineNames: formattedMachines, isLoading: false });
           }
         } catch (error) {
-          console.error('Error parsing SSE data:', error);
+          console.error('Error parsing machine data:', error);
         }
       };
 
       // Handle errors
       eventSource.onerror = (error) => {
-        console.error('SSE Error:', error);
+        console.error('Machine status SSE Error:', error);
         set({ error: 'Connection error', isLoading: false });
-        
-        // Fallback to mock data only if we don't have any data yet
-        if (!get().machineNames || get().machineNames.length === 0) {
-          const fallbackMachines = generateMockMachineList();
-          set({ machineNames: fallbackMachines });
-        }
       };
 
       return eventSource;
     } catch (error) {
-      console.error('Error setting up SSE:', error);
+      console.error('Error setting up machine status SSE:', error);
       set({ error: error.message, isLoading: false });
       
-      // Fallback to mock data only if we don't have any data yet
-      if (!get().machineNames || get().machineNames.length === 0) {
-        const fallbackMachines = generateMockMachineList();
-        set({ machineNames: fallbackMachines });
-      }
-      return null;
+      // Fallback to mock data
+      console.log('Using fallback mock data');
+      const fallbackMachines = [
+        { machine_id: 1, machine_name: "CNCT-SCH-110", status: 0 },
+        { machine_id: 2, machine_name: "CNCT-SCH-125", status: 0 },
+        { machine_id: 3, machine_name: "CNCT-SCH-180", status: 0 },
+        { machine_id: 4, machine_name: "CNCT-TUR26", status: 0 },
+        { machine_id: 5, machine_name: "CNCT-NU7B", status: 0 },
+        { machine_id: 6, machine_name: "CNCM-CTX Beta 1250TC4A", status: 0 },
+        { machine_id: 7, machine_name: "CNCM-DMU-60MB 5 Axis", status: 0 },
+        { machine_id: 8, machine_name: "CNCM-DMU-50", status: 0 },
+        { machine_id: 9, machine_name: "CNCM-DMU 60eVo Linear", status: 0 },
+        { machine_id: 10, machine_name: "CNCM-DMU-60", status: 0 },
+        { machine_id: 11, machine_name: "CNCM-VCP800W Duro", status: 0 },
+        { machine_id: 12, machine_name: "MMC1-U32J", status: 0 },
+        { machine_id: 13, machine_name: "MMC1-Robofil 240", status: 0 },
+        { machine_id: 14, machine_name: "CNCT-Pilatus 20T-L3", status: 0 }
+      ];
+      set({ machineNames: fallbackMachines });
+      return fallbackMachines;
     }
   },
   
@@ -156,7 +133,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
       
       // Create WebSocket connection
-      const wsUrl = `ws://172.18.7.93:8808/api/v1/energymonitoring/ws/live_data`;
+      const wsUrl = `ws://172.18.7.88:7979/api/v1/energymonitoring/ws/live_data`;
       console.log(`Connecting to WebSocket at ${wsUrl}`);
       
       const socket = new WebSocket(wsUrl);
@@ -362,7 +339,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       
       const apiParamName = apiParamMap[parameterName] || parameterName;
       
-      const baseUrl = `http://172.18.7.93:8808/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      const baseUrl = `http://172.18.7.88:7979/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
       
       console.log(`Fetching filtered history data from ${baseUrl}`);
       
@@ -576,7 +553,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       );
 
       // Use the specific endpoint with the epoch time
-      const response = await axios.get(`http://172.18.7.93:8808/api/v1/energy-monitoring/combined-history/${epochTimestamp}`, {
+      const response = await axios.get(`http://172.18.7.88:7979/api/v1/energy-monitoring/combined-history/${epochTimestamp}`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -664,7 +641,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
 
       // Create new EventSource for parameters using the original endpoint
-      const eventSource = new EventSource(`http://172.18.7.93:8808/api/v1/energy-monitoring/machine/${machineId}/parameters-stream`);
+      const eventSource = new EventSource(`http://172.18.7.88:7979/api/v1/energy-monitoring/machine/${machineId}/parameters-stream`);
       
       // Store the EventSource instance
       set({ parametersEventSource: eventSource });
@@ -716,7 +693,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     
     try {
       // Create new EventSource for parameter history
-      const eventSource = new EventSource(`http://172.18.7.93:8808/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history-stream`);
+      const eventSource = new EventSource(`http://172.18.7.88:7979/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history-stream`);
       
       // Handle connection open
       eventSource.onopen = () => {
@@ -780,7 +757,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       const startTimestamp = Math.floor(startTime.valueOf() / 1000);
       const endTimestamp = Math.floor(endTime.valueOf() / 1000);
       
-      const url = `http://172.18.7.93:8808/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history?start_time=${startTimestamp}&end_time=${endTimestamp}`;
+      const url = `http://172.18.7.88:7979/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history?start_time=${startTimestamp}&end_time=${endTimestamp}`;
       
       console.log('Fetching historical data from:', url);
       
@@ -1018,156 +995,72 @@ function generateMockMachineList() {
   return [
     { 
       machine_id: 1, 
-      machine_data: { 
-        id: 1, 
-        work_center: 15, 
-        type: "Default", 
-        make: "m1", 
-        model: "Default"
-      },
-      status: 0  // OFF (grey)
+      machine_name: "Machine-1",
+      status: 0
     },
     { 
       machine_id: 2, 
-      machine_data: { 
-        id: 2, 
-        work_center: 16, 
-        type: "Default", 
-        make: "m2", 
-        model: "Default" 
-      },
-      status: 1  // ON (yellow)
+      machine_name: "Machine-2",
+      status: 1
     },
     { 
       machine_id: 3, 
-      machine_data: { 
-        id: 3, 
-        work_center: 17, 
-        type: "Default", 
-        make: "m3", 
-        model: "Default" 
-      },
+      machine_name: "Machine-3",
       status: 2
     },
     { 
       machine_id: 4, 
-      machine_data: { 
-        id: 4, 
-        work_center: 18, 
-        type: "Default", 
-        make: "m4", 
-        model: "Default" 
-      },
+      machine_name: "SMPD-Default",
       status: 0
     },
     { 
       machine_id: 5, 
-      machine_data: { 
-        id: 5, 
-        work_center: 19, 
-        type: "Default", 
-        make: "m5", 
-        model: "Default"
-      },
+      machine_name: "QFAB-m3",
       status: 1
     },
     { 
       machine_id: 6, 
-      machine_data: { 
-        id: 6, 
-        work_center: 20, 
-        type: "Default", 
-        make: "m6", 
-        model: "Default" 
-      },
+      machine_name: "SMSS-Default",
       status: 2
     },
     { 
       machine_id: 7, 
-      machine_data: { 
-        id: 7, 
-        work_center: 21, 
-        type: "Default", 
-        make: "m7", 
-        model: "Default" 
-      },
+      machine_name: "SPH1-Default",
       status: 0
     },
     { 
       machine_id: 8, 
-      machine_data: { 
-        id: 8, 
-        work_center: 22, 
-        type: "Default", 
-        make: "m8", 
-        model: "Default" 
-      },
+      machine_name: "SMPP-Default",
       status: 1
     },
     { 
       machine_id: 9, 
-      machine_data: { 
-        id: 9, 
-        work_center: 23, 
-        type: "Default", 
-        make: "m9", 
-        model: "Default" 
-      },
+      machine_name: "Machine-9",
       status: 2
     },
     { 
       machine_id: 10, 
-      machine_data: { 
-        id: 10, 
-        work_center: 24, 
-        type: "Default", 
-        make: "m10", 
-        model: "Default" 
-      },
+      machine_name: "Machine-10",
       status: 0
     },
     { 
       machine_id: 11, 
-      machine_data: { 
-        id: 11, 
-        work_center: 25, 
-        type: "Default", 
-        make: "m11", 
-        model: "Default" 
-      },
+      machine_name: "Machine-11",
       status: 1
     },
     { 
       machine_id: 12, 
-      machine_data: { 
-        id: 12, 
-        work_center: 26, 
-        type: "Default", 
-        make: "m12", 
-        model: "Default" 
-      },
+      machine_name: "MMM3-Default",
       status: 2
     },
     { 
       machine_id: 13, 
-      machine_data: { 
-        id: 13, 
-        work_center: 27, 
-        type: "Default", 
-        make: "m13", 
-        model: "Default" 
-      },
+      machine_name: "NEWC-Default",
       status: 0
     },
     { 
       machine_id: 14, 
-      machine_data: { 
-        id: 14, 
-        work_center: 28, 
-        type: "Default", 
-        make: "m14", 
-        model: "Default" 
-      },
+      machine_name: "SMFD-Default",
       status: 1
     }
   ];

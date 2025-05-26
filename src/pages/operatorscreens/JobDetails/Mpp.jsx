@@ -68,7 +68,7 @@ const MPP = () => {
       width: 250,
     },
     {
-      title: 'Work Center',
+      title: 'work centre',
       dataIndex: 'workCenter',
       width: 120,
       render: (text) => text ? <Tag color="blue">{text}</Tag> : '-'

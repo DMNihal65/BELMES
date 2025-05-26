@@ -460,7 +460,7 @@ const JobSelectionPanel = ({ visible, onClose }) => {
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="font-medium">OP{operation.operation_number}: {operation.operation_description}</div>
-                    <div className="text-xs text-gray-500 mt-1">Work Center: {operation.work_center}</div>
+                    <div className="text-xs text-gray-500 mt-1">work centre: {operation.work_center}</div>
                   </div>
                   {selectedOperation?.id === operation.id && (
                     <Tag color="blue">Selected</Tag>

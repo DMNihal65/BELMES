@@ -596,74 +596,60 @@ function InspectionResult() {
           throw new Error('No order ID selected');
         }
         
-        console.log(`Fetching detailed measurements for inspection ID: ${inspectionId}, operation: ${selectedOperation}`);
+        console.log(`Fetching stage inspection for order ID: ${inspectionId}, operation: ${selectedOperation}`);
         
-        // Call the fetchDetailedInspection method from quality-store.js
-        const response = await qualityStore.fetchDetailedInspection(inspectionId);
-        console.log('Detailed measurements data received:', response);
-        
+        // Call the fetchStageInspectionByOperation method from quality-store.js
+        const response = await qualityStore.fetchStageInspectionByOperation(inspectionId, selectedOperation);
+        console.log('Stage inspection data received:', response);
+
         // Check FTP approval status
         const orderId = inspectionId;
-        const ipid = 'IPID-213301910108-10';
+        const ipid = response[0]?.op_id ? `IPID-${orderId}${selectedOperation}-${response[0].op_id}` : null;
         
-        console.log('Checking FTP status for orderId:', orderId, 'ipid:', ipid);
-        
-        try {
-          const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
-          console.log('FTP Status received:', ftpStatus);
-          setFtpApprovalStatus(ftpStatus);
+        if (ipid) {
+          console.log('Checking FTP status for orderId:', orderId, 'ipid:', ipid);
           
-          // If FTP is approved, update all measurements to show as done
-          if (ftpStatus?.is_completed === true && response?.inspection_data) {
-            console.log('FTP is completed, updating all measurements to done');
-            response.inspection_data = response.inspection_data.map(op => ({
-              ...op,
-              inspections: op.inspections.map(insp => ({
-                ...insp,
-                is_done: true
-              }))
-            }));
+          try {
+            const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+            console.log('FTP Status received:', ftpStatus);
+            setFtpApprovalStatus(ftpStatus);
+          } catch (error) {
+            console.error('Error checking FTP status:', error);
+            message.error('Failed to check FTP approval status');
           }
-        } catch (error) {
-          console.error('Error checking FTP status:', error);
-          message.error('Failed to check FTP approval status');
         }
         
-        if (response) {
-          // If we have a selected operation, filter the data to show only that operation
-          if (selectedOperation && response.inspection_data) {
-            const filteredOperationData = response.inspection_data.filter(data => 
-              data.operation_number === parseInt(selectedOperation, 10) || 
-              data.operation_number === selectedOperation
-            );
-            
-            if (filteredOperationData.length > 0) {
-              // Create a new object with filtered data for the selected operation only
-              const filteredResponse = {
-                ...response,
-                inspection_data: filteredOperationData
-              };
-              
-              console.log('Filtered data for operation', selectedOperation, ':', filteredResponse);
-              setDetailedMeasurements(filteredResponse);
-            } else {
-              // Keep all data if no matching operation is found
-              setDetailedMeasurements(response);
-              console.log('No data found for operation', selectedOperation, 'showing all data');
-            }
-          } else {
-            // No specific operation selected, show all data
-            setDetailedMeasurements(response);
-          }
-          
-          // Show the modal with the measurements
-          setIsDetailedMeasurementsVisible(true);
-        } else {
-          message.error('No measurement data found');
-        }
+        // Transform the response data to match the expected format
+        const transformedData = {
+          order_id: inspectionId,
+          production_order: inspectionData?.[0]?.production_order || '',
+          part_number: inspectionData?.[0]?.part_number || '',
+          inspection_data: [{
+            operation_number: selectedOperation,
+            inspections: response.map(item => ({
+              id: item.id,
+              zone: item.zone,
+              dimension_type: item.dimension_type,
+              nominal_value: item.nominal_value,
+              uppertol: item.uppertol,
+              lowertol: item.lowertol,
+              measured_1: item.measured_1,
+              measured_2: item.measured_2,
+              measured_3: item.measured_3,
+              measured_mean: item.measured_mean,
+              measured_instrument: item.measured_instrument,
+              operator: item.operator,
+              is_done: ftpApprovalStatus?.is_completed === true ? true : item.measured_mean !== 0 // Consider measurement done if FTP is completed or mean is not 0
+            }))
+          }]
+        };
+        
+        setDetailedMeasurements(transformedData);
+        setIsDetailedMeasurementsVisible(true);
+        
       } catch (error) {
-        console.error('Error fetching detailed measurements:', error);
-        message.error(`Failed to load detailed measurements: ${error.message}`);
+        console.error('Error fetching stage inspection data:', error);
+        message.error(`Failed to load measurements: ${error.message}`);
       } finally {
         setLoadingDetailedMeasurements(false);
       }

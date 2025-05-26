@@ -147,8 +147,8 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         const centers = await fetchWorkCenters();
         setWorkCenters(centers);
       } catch (error) {
-        console.error('Error fetching work centers:', error);
-        message.error('Failed to fetch work centers');
+        console.error('Error fetching work centres:', error);
+        message.error('Failed to fetch work centres');
       }
     };
 
@@ -325,7 +325,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
       const response = await fetch(
-        `http://172.18.7.88:6997/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
+        `http://172.18.7.88:7979/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
         {
           method: 'PUT',
           headers: {
@@ -851,7 +851,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
 
       // Construct the URL to fetch the document
-      let downloadUrl = `http://172.18.7.88:6997/api/v1/document-management/documents/${documentId}/download`;
+      let downloadUrl = `http://172.18.7.88:7979/api/v1/document-management/documents/${documentId}/download`;
       if (versionId) {
         downloadUrl += `?version_id=${versionId}`;
       }
@@ -937,7 +937,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
 
       // Construct the download URL
-      let downloadUrl = `http://172.18.7.88:6997/api/v1/document-management/documents/${documentId}/download`;
+      let downloadUrl = `http://172.18.7.88:7979/api/v1/document-management/documents/${documentId}/download`;
       if (versionId) {
         downloadUrl += `?version_id=${versionId}`;
       }
@@ -1032,7 +1032,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     );
   };
 
-  // Function to fetch machines when work center changes
+  // Function to fetch machines when work centre changes
   const handleWorkCenterChange = async (workCenterCode) => {
     try {
       const machinesList = await fetchMachines(workCenterCode);
@@ -1044,7 +1044,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     }
   };
 
-  // Update useEffect to fetch machines when work center changes
+  // Update useEffect to fetch machines when work centre changes
   useEffect(() => {
     const fetchMachinesForWorkCenter = async () => {
       if (editingKey) {
@@ -1068,12 +1068,12 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   useEffect(() => {
     const initializeMachines = async () => {
       if (operations && operations.length > 0) {
-        // Get all unique work centers
+        // Get all unique work centres
         const uniqueWorkCenters = [...new Set(operations.map(op => op.work_center))];
         
         let allMachines = [];
         
-        // Fetch machines for each work center
+        // Fetch machines for each work centre
         for (const workCenter of uniqueWorkCenters) {
           if (workCenter) {
             try {
@@ -1099,7 +1099,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
               
               setOperations(updatedOperations);
             } catch (error) {
-              console.error('Error fetching machines for work center:', workCenter, error);
+              console.error('Error fetching machines for work centre:', workCenter, error);
             }
           }
         }
@@ -1154,7 +1154,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
       const response = await fetch(
-        `http://172.18.7.88:6997/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
+        `http://172.18.7.88:7979/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
         {
           method: 'PUT',
           headers: {
@@ -1326,7 +1326,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
     },
     {
-      title: 'Work Center',
+      title: 'work centre',
       dataIndex: 'work_center',
       width: 150,
       editable: false,
@@ -1526,10 +1526,10 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
           <Form.Item
             name="work_center_code"
-            label="Work Center"
-            rules={[{ required: true, message: 'Please select work center' }]}
+            label="work centre"
+            rules={[{ required: true, message: 'Please select work centre' }]}
           >
-            <Select placeholder="Select work center">
+            <Select placeholder="Select work centre">
               {workCenters.map(wc => (
                 <Select.Option key={wc.id} value={wc.code}>
                   {wc.code}
@@ -1745,7 +1745,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
                   <div className="font-medium">{selectedOperationForMachine.operation_number}</div>
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Work Center</label>
+                  <label className="text-sm text-gray-600">work centre</label>
                   <div className="font-medium">{selectedOperationForMachine.work_center}</div>
                 </div>
               </div>

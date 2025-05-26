@@ -239,14 +239,14 @@ const CapacityPlanning = () => {
             ? (utilizedHours / availableHours * 100).toFixed(1) 
             : 0;
 
-          // Get work center name
+          // Get work centre name
           const workCenterName = machineData ? machineData.work_center_name : 'Unknown';
           
           return `
             <div class="apexcharts-tooltip-box" style="padding: 10px; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: none; min-width: 220px; border-radius: 8px;">
               <div style="margin-bottom: 10px; font-weight: 600; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">${machine}</div>
               <div style="margin-bottom: 8px; font-size: 13px; color: #1f2937; font-weight: 500;">
-                Work Center: <span style="color: #3b82f6">${workCenterName}</span>
+                work centre: <span style="color: #3b82f6">${workCenterName}</span>
               </div>
               
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -312,7 +312,7 @@ const CapacityPlanning = () => {
         } else {
           setMachineUtilizationData([]);
           updateChartWithUtilizationData([]);
-          message.info('No work center machines available for the selected date range');
+          message.info('No work centre machines available for the selected date range');
         }
       } else {
         setMachineUtilizationData([]);
@@ -419,14 +419,14 @@ const CapacityPlanning = () => {
               ? (utilizedHours / availableHours * 100).toFixed(1) 
               : 0;
 
-            // Get work center name directly from the data
+            // Get work centre name directly from the data
             const workCenterName = machineData.work_center_name;
             
             return `
               <div class="apexcharts-tooltip-box" style="padding: 10px; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: none; min-width: 220px; border-radius: 8px;">
                 <div style="margin-bottom: 10px; font-weight: 600; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px;">${machine}</div>
                 <div style="margin-bottom: 8px; font-size: 13px; color: #1f2937; font-weight: 500;">
-                  Work Center: <span style="color: #3b82f6">${workCenterName}</span>
+                  work centre: <span style="color: #3b82f6">${workCenterName}</span>
                 </div>
                 
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -498,14 +498,14 @@ const CapacityPlanning = () => {
     // Fetch data for default date range when component mounts
     fetchMachineData(dateRange[0], dateRange[1]);
     
-    // Fetch work centers 
+    // Fetch work centres 
     const fetchWorkCentersList = async () => {
       try {
         const { fetchWorkCenters } = usePlanningStore.getState();
         const centers = await fetchWorkCenters();
         setWorkCenters(centers || []);
       } catch (error) {
-        console.error('Error fetching work centers:', error);
+        console.error('Error fetching work centres:', error);
       }
     };
 
@@ -563,7 +563,7 @@ const CapacityPlanning = () => {
             <Title level={4} style={{ margin: 0, color: '#374151' }}>Machine Capacity Planning</Title>
             <Text type="secondary">Monitor and analyze machine utilization across the shop floor</Text>
             <div className="mt-2">
-              <Tag color="blue" icon={<AlertOutlined />}>Only work center machines are displayed</Tag>
+              <Tag color="blue" icon={<AlertOutlined />}>Only work centre machines are displayed</Tag>
             </div>
           </div>
         </div>

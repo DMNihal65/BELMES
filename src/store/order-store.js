@@ -3,12 +3,14 @@ import dayjs from 'dayjs';
 import { message } from 'antd';
 import React from 'react';
 import { LoadingOutlined } from '@ant-design/icons';
+import axios from 'axios';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.88:6997',
-  QUALITY_URL: 'http://172.18.7.88:6997',
-  PLANNING_URL: 'http://172.18.7.88:6997',
+  BASE_URL: 'http://172.18.7.88:7979',
+  QUALITY_URL: 'http://172.18.7.88:7979',
+  PLANNING_URL: 'http://172.18.7.88:7979',
+  SCHEDULING_URL: 'http://172.18.7.88:7979',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
     saveOrder: '/api/v1/planning/save-to-db',
@@ -23,6 +25,7 @@ const API_CONFIG = {
     uploadDocumentByType: '/api/v1/document-management/documents/upload-by-type',
     getDocumentsByPartNumber: (partNumber) => `/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
     updateProjectPriorities: '/api/v1/planning/projects/priority',
+    checkOrderCompletion: (partNumber, productionOrder) => `/api/v1/scheduling/check-order-completion-simple/${partNumber}/${productionOrder}`
   }
 };
 
@@ -145,7 +148,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.88:6997/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:7979/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -208,44 +211,8 @@ const useOrderStore = create((set, get) => ({
   updateOrder: async (updatedOrder) => {
     set({ isLoading: true, error: null });
     try {
-      // First update the order in the save-to-db endpoint
-      const saveToDbResponse = await fetch(
-        `${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.saveOrder}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({
-            data: {
-              "Project Name": updatedOrder.project.name,
-              "Sale Order": updatedOrder.sale_order,
-              "Part No": updatedOrder.part_number,
-              "Part Desc": updatedOrder.part_description,
-              "Required Qty": updatedOrder.required_quantity.toString(),
-              "Plant": updatedOrder.plant_id?.toString() || "1",
-              "WBS": updatedOrder.wbs_element,
-              "Rtg Seq No": "0",
-              "Sequence No": "0",
-              "Launched Qty": updatedOrder.launched_quantity?.toString() || "0",
-              "Prod Order No": updatedOrder.production_order,
-              "Operations": [],
-              "Document Verification": {},
-              "Raw Materials": []
-            }
-          })
-        }
-      );
-
-      if (!saveToDbResponse.ok) {
-        const errorData = await saveToDbResponse.json();
-        throw new Error(errorData.message || 'Failed to update order in save-to-db');
-      }
-
-      // Then update the order in the all_orders endpoint
-      const allOrdersResponse = await fetch(
-        `${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.allOrders}`,
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}/api/v1/planning/orders/${updatedOrder.id}`,
         {
           method: 'PUT',
           headers: {
@@ -253,22 +220,20 @@ const useOrderStore = create((set, get) => ({
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
           body: JSON.stringify({
-            id: updatedOrder.id,
             part_description: updatedOrder.part_description,
             required_quantity: updatedOrder.required_quantity,
             wbs_element: updatedOrder.wbs_element,
             sale_order: updatedOrder.sale_order,
             project: {
-              name: updatedOrder.project.name,
-              priority: updatedOrder.project.priority
+              name: updatedOrder.project.name
             }
           })
         }
       );
 
-      if (!allOrdersResponse.ok) {
-        const errorData = await allOrdersResponse.json();
-        throw new Error(errorData.message || 'Failed to update order in all_orders');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update order');
       }
 
       // Update the order in the local state
@@ -517,7 +482,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.88:6997/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.88:7979/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -900,7 +865,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.18.7.88:6997/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.18.7.88:7979/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -957,7 +922,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.88:6997/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.18.7.88:7979/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -1298,7 +1263,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.18.7.88:6997/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:7979/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1548,7 +1513,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.18.7.88:6997/api/v1/master-order/machines/${machineId}`,
+        `http://172.18.7.88:7979/api/v1/master-order/machines/${machineId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1602,6 +1567,37 @@ const useOrderStore = create((set, get) => ({
       });
       
       set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
+
+  checkOrderCompletion: async (partNumber, productionOrder) => {
+    try {
+      console.log('Checking order completion for:', { partNumber, productionOrder });
+      const url = `${API_CONFIG.SCHEDULING_URL}${API_CONFIG.endpoints.checkOrderCompletion(partNumber, productionOrder)}`;
+      console.log('Calling endpoint:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to check order completion: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Completion status response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error checking order completion:', error);
       throw error;
     }
   },

@@ -222,9 +222,9 @@ const StatusLegend = () => (
 
 // Status colors configuration with updated comments
 const STATUS_COLORS = {
-  0: "#94A3B8",      // Grey
-  1: "#eab308",      // Yellow for IDLE/ON status (1)
-  2: "#22c55e",      // Green for PRODUCTION status (2)
+  0: "#94A3B8",      // Grey - Machine is OFF
+  1: "#eab308",      // Yellow - Machine is IDLE/ON
+  2: "#22c55e",      // Green - Machine is in PRODUCTION
   default: "#94A3B8" // Grey for unknown status
 };
 
@@ -270,6 +270,8 @@ function MachineModel({
   onPointerOut,
   rotation 
 }) {
+  console.log('MachineModel data:', data);
+  
   const hoverScale = isHovered ? 1.1 : 1;
   const yOffset = isHovered ? 0.5 : 0;
   const statusColor = STATUS_COLORS[data.status] || STATUS_COLORS.default;
@@ -440,32 +442,32 @@ function MachineModel({
       </group>
 
       {/* Machine Label */}
-      <Html position={[0, 5, 0]} center>
+      <Html position={[0, 5.5, 0]} center>
         <div style={{
           transform: isHovered ? 'scale(1.1)' : 'scale(1)',
           transition: 'transform 0.3s ease'
         }}>
           <div style={{
-            background: 'rgba(255, 255, 255, 0.9)',
+            background: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(4px)',
-            padding: '8px 12px',
+            padding: '8px 16px',
             borderRadius: '8px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            minWidth: '120px',
-            textAlign: 'center'
+            minWidth: '190px',
+            textAlign: 'center',
+            border: '1px solid rgba(0,0,0,0.1)',
+            marginBottom: '10px'
           }}>
             <div style={{ 
-              fontWeight: 'bold', 
+              fontWeight: '600', 
               fontSize: '14px', 
-              color: '#1a202c' 
+              color: '#1a202c',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: '190px'
             }}>
-              {data.name}
-            </div>
-            <div style={{ 
-              fontSize: '12px', 
-              color: '#4a5568' 
-            }}>
-              {/* WC: {data.workCenter} */}
+              {data.machine_name || 'Unknown Machine'}
             </div>
           </div>
         </div>
@@ -583,27 +585,43 @@ const MachinesVisualization = () => {
   // Get machine data from the store
   const { fetchMachineNames, startMachineStatusPolling, cleanup, machineNames, isLoading, connectShiftwiseEnergyWebSocket, disconnectShiftwiseEnergyWebSocket, isLive } = useEnergyMonitoringBelStore();
   
-  // Set up SSE connection
+  // Set up data fetching
   useEffect(() => {
+    console.log('Initializing data fetching in Machines component');
+    
     const loadData = async () => {
-      // Fetch machine names if they haven't been loaded yet
-      if (!machineNames || machineNames.length === 0) {
-        await fetchMachineNames();
-      }
-      
-      // Connect to WebSocket if in live mode
-      if (isLive) {
-        connectShiftwiseEnergyWebSocket();
+      try {
+        // Always fetch machine names to ensure we have the latest data
+        console.log('Fetching machine names...');
+        const machines = await fetchMachineNames();
+        console.log('Fetched machines:', machines);
+        
+        // Connect to WebSocket if in live mode
+        if (isLive) {
+          console.log('Live mode enabled, connecting to WebSocket');
+          connectShiftwiseEnergyWebSocket();
+        }
+      } catch (error) {
+        console.error('Error in loadData:', error);
       }
     };
     
     loadData();
     
-    // Cleanup - disconnect WebSocket when component unmounts
+    // Set up polling for machine status updates
+    const pollInterval = setInterval(() => {
+      console.log('Polling for machine status updates...');
+      fetchMachineNames();
+    }, 30000); // Poll every 30 seconds
+    
+    // Cleanup
     return () => {
+      console.log('Cleaning up connections and intervals');
+      clearInterval(pollInterval);
       disconnectShiftwiseEnergyWebSocket();
+      cleanup();
     };
-  }, [connectShiftwiseEnergyWebSocket, disconnectShiftwiseEnergyWebSocket, fetchMachineNames, isLive, machineNames]);
+  }, [connectShiftwiseEnergyWebSocket, disconnectShiftwiseEnergyWebSocket, fetchMachineNames, isLive, cleanup]);
 
   // Reset renderError when data changes
   useEffect(() => {
@@ -615,7 +633,7 @@ const MachinesVisualization = () => {
   // Calculate positions in a hexagonal pattern with increased radius
   const getMachinePosition = (index, totalMachines) => {
     const angle = (index / totalMachines) * Math.PI * 2;
-    const radius = 20; // Increased radius for more spacing
+    const radius = 30; // Increased radius from 20 to 30 for more spacing
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     return [x, 0, z];
@@ -623,30 +641,29 @@ const MachinesVisualization = () => {
 
   // Process the machine data from API
   const processedMachines = React.useMemo(() => {
+    console.log('Raw machineNames from store:', machineNames);
+    
     if (!machineNames || machineNames.length === 0) {
+      console.log('No machine names, using fallback data');
       // Fallback data if API doesn't return anything
       return Array.from({ length: 14 }, (_, i) => ({
         id: i + 1,
-        name: `Machine ${i + 1}`,
-        status: i % 3, // alternate between 0, 1, 2
-        type: 'Default',
-        workCenter: i + 15
+        machine_name: `Machine ${i + 1}`,
+        status: i % 3
       }));
     }
 
-    return machineNames.map(machine => {
-      // Get the proper machine name - use make from machine_data as the machine name
-      const machineName = machine.machine_data?.make || `Machine ${machine.machine_id}`;
-      
-      return {
-        id: machine.machine_id,
-        name: machineName, // Use the make field as machine name
-        status: machine.status,
-        type: machine.machine_data?.type || 'Default',
-        // workCenter: machine.machine_data?.work_center || 'N/A',
-        model: machine.machine_data?.model || 'Default'
-      };
-    });
+    const processed = machineNames.map(machine => ({
+      id: machine.machine_id,
+      machine_name: machine.machine_name,
+      status: machine.status,
+      total_power: machine.total_power,
+      energy_consumed: machine.energy_consumed,
+      timestamp: machine.timestamp
+    }));
+    
+    console.log('Processed machines:', processed);
+    return processed;
   }, [machineNames]);
 
   const handleMachineClick = (machine) => {
@@ -662,7 +679,7 @@ const MachinesVisualization = () => {
     return (
       <MachineOverlay 
         machineId={selectedMachine.id}
-        machineName={selectedMachine.name}
+        machineName={selectedMachine.machine_name}
         onBack={() => setSelectedMachine(null)} 
       />
     );

@@ -68,21 +68,21 @@ function ProductionAnalytics() {
   const [loadingWorkCenters, setLoadingWorkCenters] = useState(false);
   const [availableMachines, setAvailableMachines] = useState([]);
 
-  // Fetch work centers - removed filtering by is_schedulable
+  // Fetch work centres - removed filtering by is_schedulable
   const fetchWorkCenters = async () => {
     setLoadingWorkCenters(true);
     try {
-      const response = await axios.get('http://172.18.7.88:6997/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await axios.get('http://172.18.7.88:7979/api/v1/master-order/workcenters/?skip=0&limit=100');
       const workCentersData = response.data;
       
       // No longer filtering by is_schedulable
       setWorkCenters(workCentersData);
       
-      // Extract all machine codes from work centers
+      // Extract all machine codes from work centres
       const machineNames = workCentersData.map(wc => wc.code);
       setAvailableMachines(machineNames);
     } catch (error) {
-      console.error('Error fetching work centers:', error);
+      console.error('Error fetching work centres:', error);
     } finally {
       setLoadingWorkCenters(false);
     }

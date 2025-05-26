@@ -102,7 +102,7 @@ const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => {
             // If no documents exist, we should check the MPP endpoint directly
             try {
               const mppResponse = await fetch(
-                `http://172.18.7.88:6997/api/v1/mpp/by-part/${selectedOperation.part_number}/${selectedOperation.operation_number}`,
+                `http://172.18.7.88:7979/api/v1/mpp/by-part/${selectedOperation.part_number}/${selectedOperation.operation_number}`,
                 {
                   method: 'GET',
                   headers: {
@@ -527,7 +527,7 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
       width: '30%',
     },
     {
-      title: 'Work Center',
+      title: 'work centre',
       dataIndex: 'work_center',
       key: 'work_center',
       width: '15%',
@@ -849,7 +849,7 @@ const OperationDetails = ({ jobData, jobOrderData }) => {
           }
           description={
             <div>
-              <p>Work Center: {activeOperation.work_center}</p>
+              <p>work centre: {activeOperation.work_center}</p>
               <p>Setup Time: {activeOperation.setup_time?.toFixed(2) || '0.00'} hrs</p>
               <p>Cycle Time: {activeOperation.ideal_cycle_time?.toFixed(2) || '0.00'} hrs</p>
             </div>

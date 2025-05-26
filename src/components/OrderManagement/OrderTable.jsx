@@ -56,8 +56,7 @@ const OrderTable = ({ orders, onRefresh }) => {
       required_quantity: record.required_quantity,
       wbs_element: record.wbs_element,
       sale_order: record.sale_order,
-      project: record.project?.name,
-      project_priority: record.project?.priority
+      project: record.project?.name
     });
     setIsEditModalVisible(true);
   };
@@ -73,8 +72,7 @@ const OrderTable = ({ orders, onRefresh }) => {
         sale_order: values.sale_order,
         project: {
           ...editingOrder.project,
-          name: values.project,
-          priority: values.project_priority
+          name: values.project
         }
       };
 
@@ -116,7 +114,25 @@ const OrderTable = ({ orders, onRefresh }) => {
       sorter: (a, b) => a.production_order.localeCompare(b.production_order),
     },
     {
-      title: 'Material Description',
+      title: 'Project',
+      key: 'project',
+      render: (_, record) => (
+        <div>
+          <div>{record.project?.name}</div>
+          <Tag color={getPriorityColor(record.project?.priority)}>
+            Priority: {record.project?.priority || 'N/A'}
+          </Tag>
+        </div>
+      ),
+      sorter: (a, b) => {
+        const priorityA = a.project?.priority || 999;
+        const priorityB = b.project?.priority || 999;
+        return priorityA - priorityB;
+      },
+      defaultSortOrder: 'ascend', // Sort by priority by default
+    },
+    {
+      title: ' Description',
       dataIndex: 'part_description',
       key: 'part_description',
       render: (text) => (
@@ -146,24 +162,7 @@ const OrderTable = ({ orders, onRefresh }) => {
       dataIndex: 'sale_order',
       key: 'sale_order',
     },
-    {
-      title: 'Project',
-      key: 'project',
-      render: (_, record) => (
-        <div>
-          <div>{record.project?.name}</div>
-          <Tag color={getPriorityColor(record.project?.priority)}>
-            Priority: {record.project?.priority || 'N/A'}
-          </Tag>
-        </div>
-      ),
-      sorter: (a, b) => {
-        const priorityA = a.project?.priority || 999;
-        const priorityB = b.project?.priority || 999;
-        return priorityA - priorityB;
-      },
-      defaultSortOrder: 'ascend', // Sort by priority by default
-    },
+    
     {
       title: 'Status',
       key: 'status',
@@ -305,8 +304,8 @@ const OrderTable = ({ orders, onRefresh }) => {
         >
           <Form.Item
             name="part_description"
-            label="Material Description"
-            rules={[{ required: true, message: 'Please enter material description' }]}
+            label="Part Description"
+            rules={[{ required: true, message: 'Please enter part description' }]}
           >
             <Input />
           </Form.Item>
@@ -341,19 +340,6 @@ const OrderTable = ({ orders, onRefresh }) => {
             rules={[{ required: true, message: 'Please enter project name' }]}
           >
             <Input />
-          </Form.Item>
-
-          <Form.Item
-            name="project_priority"
-            label="Project Priority"
-            rules={[{ required: true, message: 'Please select project priority' }]}
-          >
-            <Select>
-              <Select.Option value={1}>High (1)</Select.Option>
-              <Select.Option value={2}>Medium-High (2)</Select.Option>
-              <Select.Option value={3}>Medium (3)</Select.Option>
-              <Select.Option value={4}>Low (4)</Select.Option>
-            </Select>
           </Form.Item>
         </Form>
       </Modal>

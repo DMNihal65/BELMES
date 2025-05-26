@@ -89,7 +89,7 @@ function Sidebar() {
         {
           key: '/supervisor/configuration',
           icon: <Factory size={18} />,
-          label: 'Work Center',
+          label: 'work centre',
         },
       ]
     },
@@ -196,7 +196,7 @@ function Sidebar() {
         {
           key: '/supervisor/inventory_data_management/inventory_all_data',
           icon: <Warehouse size={18} />,
-          label: 'Inventery Master ',
+          label: 'Inventory Master ',
         },
         {
           key: '/supervisor/inventory_data_management/inventory_analytics',
@@ -277,7 +277,7 @@ function Sidebar() {
         {
           key: '/admin/configuration',
           icon: <Factory size={18} />,
-          label: 'Work Center',
+          label: 'work centre',
         },
       ]
     },
@@ -358,7 +358,7 @@ function Sidebar() {
         {
           key: '/admin/inventory_data_management/inventory_all_data',
           icon: <Warehouse size={18} />,
-          label: 'Inventery Master ',
+          label: 'Inventory Master ',
         },
         {
           key: '/admin/inventory_data_management/inventory_analytics',

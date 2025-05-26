@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { message } from 'antd';
 
 class QualityStore {
   getAuthHeaders() {
@@ -22,7 +21,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.93:8808/api/v1/planning/all_orders',
+        'http://172.18.7.88:7979/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -45,7 +44,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.93:8808/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.88:7979/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -80,7 +79,7 @@ class QualityStore {
       
       const config = {
         method: 'get',
-        url: `http://172.18.7.93:8808/api/v1/quality/master-boc/ipids/${orderId}`,
+        url: `http://172.18.7.88:7979/api/v1/quality/master-boc/ipids/${orderId}`,
         ...this.getAuthHeaders()
       };
 
@@ -129,7 +128,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://172.18.7.93:8808/api/v1/quality/run',
+        'http://172.18.7.88:7979/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;
@@ -143,129 +142,28 @@ class QualityStore {
     }
   }
 
-  async fetchBalloonedDrawing(drawingId, operationId, retryCount = 0) {
-    const MAX_RETRIES = 3;
-    const TIMEOUT = 60000; // Increase timeout to 60 seconds
-    
+  async fetchBalloonedDrawing(productionOrder, operationId) {
     try {
-      console.log('=== Drawing Fetch Debug ===');
-      console.log('Drawing ID:', drawingId);
-      console.log('Operation ID:', operationId);
-      console.log('Attempt:', retryCount + 1);
+      console.log(`Fetching ballooned drawing for Production Order: ${productionOrder}, Operation: ${operationId}`);
       
-      const requestUrl = `http://172.18.7.93:8808/api/v1/document-management/ballooned-drawing/download/${drawingId}/${operationId}`;
-      console.log('Request URL:', requestUrl);
-      
-      // Add cache key
-      const cacheKey = `drawing_${drawingId}_${operationId}`;
-      
-      // Check if we have a cached version
-      const cachedDrawing = sessionStorage.getItem(cacheKey);
-      if (cachedDrawing) {
-        console.log('Using cached drawing');
-        return JSON.parse(cachedDrawing);
-      }
-
-      console.log('Making API request...');
       const response = await axios.get(
-        requestUrl,
+        `http://172.18.7.88:7979/api/v1/document-management/ballooned-drawing/download/${productionOrder}/${operationId}`,
         {
           ...this.getAuthHeaders(),
-          responseType: 'blob',
-          timeout: TIMEOUT,
-          // Add retry configuration
-          retry: 3,
-          retryDelay: (retryCount) => {
-            return retryCount * 1000; // Progressive delay
-          },
-          onDownloadProgress: (progressEvent) => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            console.log(`Download progress: ${percentCompleted}%`);
-          }
+          responseType: 'blob' // Important: set responseType to blob for PDF data
         }
       );
       
-      console.log('Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        dataSize: response.data.size
-      });
-      
       // Create a blob URL from the response data
       const blob = new Blob([response.data], { type: 'application/pdf' });
-      const blobUrl = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
       
-      console.log('Blob created:', {
-        size: blob.size,
-        type: blob.type,
-        url: blobUrl
-      });
-      
-      const drawingData = {
-        url: blobUrl,
-        fileName: `drawing_${drawingId}_${operationId}.pdf`,
-        timestamp: new Date().getTime()
+      return {
+        url: url,
+        fileName: `drawing_${productionOrder}_${operationId}.pdf`
       };
-      
-      // Cache the drawing data
-      sessionStorage.setItem(cacheKey, JSON.stringify(drawingData));
-      
-      console.log('Drawing data cached successfully');
-      return drawingData;
-      
     } catch (error) {
-      console.error('=== Drawing Fetch Error ===');
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data
-      });
-      
-      // Handle timeout and retry logic
-      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        if (retryCount < MAX_RETRIES) {
-          console.log(`Retrying download (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
-          // Exponential backoff with jitter
-          const baseDelay = Math.pow(2, retryCount) * 1000;
-          const jitter = Math.random() * 1000;
-          const delay = baseDelay + jitter;
-          
-          console.log(`Waiting ${delay}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          
-          // Try with a different timeout for each retry
-          const newTimeout = TIMEOUT * (retryCount + 1);
-          console.log(`Retrying with increased timeout of ${newTimeout}ms`);
-          
-          return this.fetchBalloonedDrawing(drawingId, operationId, retryCount + 1);
-        }
-        throw new Error(`Drawing fetch timed out after ${MAX_RETRIES} attempts. Please try again later.`);
-      }
-      
-      // Handle other specific errors
-      if (error.response) {
-        switch (error.response.status) {
-          case 404:
-            throw new Error('Drawing not found');
-          case 403:
-            throw new Error('Access denied to drawing');
-          case 500:
-            throw new Error('Server error while fetching drawing');
-          case 504:
-            throw new Error('Server gateway timeout. Please try again.');
-          default:
-            throw new Error(`Failed to fetch drawing: ${error.response.status}`);
-        }
-      }
-      
-      // Handle network errors
-      if (error.message.includes('Network Error')) {
-        throw new Error('Network error. Please check your connection and try again.');
-      }
-      
+      console.error('Error fetching ballooned drawing:', error);
       throw error;
     }
   }
@@ -284,7 +182,7 @@ class QualityStore {
           
           const response = await axios({
             method: method,
-            url: `http://172.18.7.93:8808/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
+            url: `http://172.18.7.88:7979/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
             ...this.getAuthHeaders(),
             timeout: 5000
           });
@@ -327,7 +225,7 @@ class QualityStore {
       // Try to ping the server with a HEAD request
       await axios({
         method: 'head',
-        url: 'http://172.18.7.93:8808/api/v1/health', // Use a health endpoint if available
+        url: 'http://172.18.7.88:7979/api/v1/health', // Use a health endpoint if available
         timeout: 5000 // 5 second timeout
       });
       
@@ -338,7 +236,7 @@ class QualityStore {
       try {
         await axios({
           method: 'head',
-          url: 'http://172.18.7.93:8808/',
+          url: 'http://172.18.7.88:7979/',
           timeout: 5000
         });
         
@@ -370,7 +268,7 @@ class QualityStore {
       console.log(`Downloading report from path: ${filePath}`);
       
       // Log the request URL
-      const requestUrl = `http://172.18.7.93:8808/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`;
+      const requestUrl = `http://172.18.7.88:7979/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -429,7 +327,7 @@ class QualityStore {
       console.log(`Downloading report with document ID: ${documentId}, version: ${versionNumber}`);
       
       // Log the request URL and headers
-      const requestUrl = `http://172.18.7.93:8808/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`;
+      const requestUrl = `http://172.18.7.88:7979/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -482,7 +380,7 @@ class QualityStore {
       console.log(`Fetching detailed inspection data for ID: ${inspectionId}`);
       
       const response = await axios.get(
-        `http://172.18.7.93:8808/api/v1/quality/inspection/${inspectionId}/detailed`,
+        `http://172.18.7.88:7979/api/v1/quality/inspection/${inspectionId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -501,7 +399,7 @@ class QualityStore {
       console.log(`Downloading document ID: ${documentId}, version: ${versionId}`);
       
       // Log the request URL and headers
-      const requestUrl = `http://172.18.7.93:8808/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
+      const requestUrl = `http://172.18.7.88:7979/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -555,7 +453,7 @@ class QualityStore {
       
       // Use the correct URL format
       // Note: Check if the port number is correct (6688)
-      const requestUrl = `http://172.18.7.93:8808/api/v1/document-management/report/structure/document/${documentId}`;
+      const requestUrl = `http://172.18.7.88:7979/api/v1/document-management/report/structure/document/${documentId}`;
       console.log('Delete request URL:', requestUrl);
       
       // Try with increased timeout and better error handling
@@ -595,7 +493,7 @@ class QualityStore {
         console.log('Trying alternative URL format...');
         
         // Alternative URL format (some APIs use query parameters instead of path parameters)
-        const alternativeUrl = `http://172.18.7.93:8808/api/v1/document-management/report/structure/document?id=${documentId}`;
+        const alternativeUrl = `http://172.18.7.88:7979/api/v1/document-management/report/structure/document?id=${documentId}`;
         console.log('Alternative delete request URL:', alternativeUrl);
         
         const altResponse = await axios({
@@ -649,7 +547,7 @@ class QualityStore {
       console.log(`Deleting folder with ID: ${folderId}`);
       
       // Log the request URL
-      const requestUrl = `http://172.18.7.93:8808/api/v1/document-management/report/structure/folder/${folderId}`;
+      const requestUrl = `http://172.18.7.88:7979/api/v1/document-management/report/structure/folder/${folderId}`;
       console.log('Delete folder request URL:', requestUrl);
       
       const response = await axios.delete(
@@ -678,7 +576,7 @@ class QualityStore {
 
   async approveAllMeasurements(orderId, ipid) {
     try {
-      const url = `http://172.18.7.93:8808/api/v1/quality/ftp/${orderId}/${ipid}/update`;
+      const url = `http://172.18.7.88:7979/api/v1/quality/ftp/${orderId}/${ipid}/update`;
       // Send an empty object as the request body since the API doesn't expect any specific attributes
       const response = await axios.post(url, {}, this.getAuthHeaders());
       return response.data;
@@ -696,7 +594,7 @@ class QualityStore {
   async checkFTPApprovalStatus(orderId, ipid) {
     try {
       const response = await axios.get(
-        `http://172.18.7.93:8808/api/v1/quality/ftp/${orderId}/${ipid}`,
+        `http://172.18.7.88:7979/api/v1/quality/ftp/${orderId}/${ipid}`,
         this.getAuthHeaders()
       );
       return response.data;
@@ -711,7 +609,7 @@ class QualityStore {
       console.log(`Fetching documents for folder ID: ${folderId}, page: ${page}`);
       
       const response = await axios.get(
-        `http://172.18.7.93:8808/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${pageSize}`,
+        `http://172.18.7.88:7979/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${pageSize}`,
         this.getAuthHeaders()
       );
       
@@ -730,7 +628,7 @@ class QualityStore {
       console.log(`Fetching versions for document ID: ${documentId}`);
       
       const response = await axios.get(
-        `http://172.18.7.93:8808/api/v1/document-management/documents/${documentId}/versions`,
+        `http://172.18.7.88:7979/api/v1/document-management/documents/${documentId}/versions`,
         this.getAuthHeaders()
       );
       
@@ -749,7 +647,7 @@ class QualityStore {
       console.log(`Fetching folders for parent ID: ${parentId}`);
       
       const response = await axios.get(
-        `http://172.18.7.93:8808/api/v1/document-management/folders/?parent_id=${parentId}`,
+        `http://172.18.7.88:7979/api/v1/document-management/folders/?parent_id=${parentId}`,
         this.getAuthHeaders()
       );
       
@@ -790,7 +688,7 @@ class QualityStore {
       formData.append('version_number', versionNumber);
       
       const response = await axios.post(
-        `http://172.18.7.93:8808/api/v1/document-management/documents/${documentId}/versions`,
+        `http://172.18.7.88:7979/api/v1/document-management/documents/${documentId}/versions`,
         formData,
         {
           ...this.getAuthHeaders(),
@@ -818,7 +716,7 @@ class QualityStore {
       // Log the full request details
       const requestConfig = {
         method: 'delete',
-        url: `http://172.18.7.93:8808/api/v1/document-management/document-versions/${versionId}`,
+        url: `http://172.18.7.88:7979/api/v1/document-management/document-versions/${versionId}`,
         ...this.getAuthHeaders(),
         validateStatus: function (status) {
           return status >= 200 && status < 500; // Accept all status codes to handle them manually
@@ -884,25 +782,20 @@ class QualityStore {
     }
   }
 
-  async checkFinalInspectionStatus(orderId, ipid) {
+  async fetchStageInspectionByOperation(orderId, opNo, quantityNo = 1) {
     try {
+      console.log(`Fetching stage inspection for Order ID: ${orderId}, Operation: ${opNo}`);
+      
       const response = await axios.get(
-        `http://172.18.7.93:8808/api/v1/quality/ftp/${orderId}/${ipid}`,
+        `http://172.18.7.88:7979/api/v1/quality/stage-inspection/filter?order_id=${orderId}&quantity_no=${quantityNo}&op_no=${opNo}`,
         this.getAuthHeaders()
       );
+      
+      console.log('Stage inspection data received:', response.data);
       return response.data;
+      
     } catch (error) {
-      if (error.response?.status === 404) {
-        // Return a default status object when no FTP record is found
-        return {
-          order_id: orderId,
-          ipid: ipid,
-          is_completed: false,
-          created_at: null,
-          updated_at: null
-        };
-      }
-      console.error('Error checking final inspection status:', error);
+      console.error('Error fetching stage inspection:', error);
       this.handleAuthError(error);
       throw error;
     }

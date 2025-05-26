@@ -173,7 +173,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
     },
     {
-      title: 'Work Center',
+      title: 'work centre',
       dataIndex: 'work_center',
       width: 150,
       editable: true,

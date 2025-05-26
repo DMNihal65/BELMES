@@ -276,7 +276,7 @@ const AssignmentsTab = () => {
                   {getMachineName(machines.find(m => m.id === selectedMachine) || {})}
                 </Descriptions.Item>
                 {machines.find(m => m.id === selectedMachine)?.work_center?.code && (
-                  <Descriptions.Item label="Work Center Code">
+                  <Descriptions.Item label="work centre Code">
                     {machines.find(m => m.id === selectedMachine)?.work_center?.code}
                   </Descriptions.Item>
                 )}

@@ -1189,7 +1189,8 @@ const usePlanningStore = create((set) => ({
       const response = await fetch(downloadUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'accept': '*/*'
+          'accept': 'application/pdf',
+          'Content-Type': 'application/pdf'
         }
       });
       
@@ -1198,19 +1199,25 @@ const usePlanningStore = create((set) => ({
       }
       
       // Get filename from Content-Disposition header if available
-      let filename = 'document';
+      let filename = 'document.pdf'; // Default to .pdf extension
       const contentDisposition = response.headers.get('content-disposition');
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
         if (filenameMatch && filenameMatch[1]) {
           filename = filenameMatch[1].replace(/['"]/g, '');
+          // Ensure filename has .pdf extension
+          if (!filename.toLowerCase().endsWith('.pdf')) {
+            filename += '.pdf';
+          }
         }
       }
       
       console.log(`Downloading file: ${filename}`);
       
       const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
+      // Create a new blob with PDF type
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
       
       // Use a download link
       const a = document.createElement('a');

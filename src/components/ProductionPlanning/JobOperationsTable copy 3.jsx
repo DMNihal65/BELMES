@@ -861,8 +861,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       const response = await fetch(downloadUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'accept': 'application/pdf',
-          'Content-Type': 'application/pdf'
+          'accept': '*/*'
         }
       });
       
@@ -876,14 +875,12 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       
       // Create a blob URL to use with PDF viewer
       const blob = await response.blob();
-      // Create a new blob with PDF type
-      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
       
       // If it's not a PDF, just download it instead of trying to view
       if (!contentType || !contentType.includes('application/pdf')) {
         console.log('Non-PDF document detected, downloading instead of viewing');
         // Get filename from Content-Disposition header if available
-        let filename = documentName || 'document.pdf';
+        let filename = documentName || 'document';
         const contentDisposition = response.headers.get('content-disposition');
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
@@ -892,12 +889,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           }
         }
         
-        // Ensure filename has .pdf extension
-        if (!filename.toLowerCase().endsWith('.pdf')) {
-          filename += '.pdf';
-        }
-        
-        const url = URL.createObjectURL(pdfBlob);
+        const url = URL.createObjectURL(blob);
         
         // Create and trigger download link
         const a = document.createElement('a');
@@ -912,11 +904,12 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           URL.revokeObjectURL(url);
         }, 100);
         
+        message.info('Document downloaded as it is not a viewable format');
         setIsLoading(false);
         return;
       }
       
-      const url = URL.createObjectURL(pdfBlob);
+      const url = URL.createObjectURL(blob);
       setPdfUrl(url);
       setIsPdfModalVisible(true);
       setCurrentPage(1);
@@ -954,8 +947,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       const response = await fetch(downloadUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'accept': 'application/pdf',
-          'Content-Type': 'application/pdf'
+          'accept': '*/*'
         }
       });
       
@@ -964,7 +956,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
       
       // Get filename from Content-Disposition header if available
-      let filename = fileName || 'document.pdf';
+      let filename = fileName || 'document';
       const contentDisposition = response.headers.get('content-disposition');
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
@@ -973,19 +965,17 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         }
       }
       
-      // Ensure filename has .pdf extension
-      if (!filename.toLowerCase().endsWith('.pdf')) {
-        filename += '.pdf';
+      // Get the content type and set appropriate extension if needed
+      const contentType = response.headers.get('content-type');
+      
+      // Ensure filename has appropriate extension
+      if (contentType) {
+        // Don't modify file extension - use whatever the server provides
+        console.log(`Downloading file as: ${filename} (${contentType})`);
       }
       
-      // Get the content type
-      const contentType = response.headers.get('content-type');
-      console.log('Content-Type:', contentType);
-      
       const blob = await response.blob();
-      // Create a new blob with PDF type
-      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
-      const url = URL.createObjectURL(pdfBlob);
+      const url = URL.createObjectURL(blob);
       
       // Create and trigger download link
       const a = document.createElement('a');

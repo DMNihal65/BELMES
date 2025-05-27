@@ -267,7 +267,12 @@ const Productivity = ({ onBack }) => {
         formatter: function(value) {
           // Ensure value is a number and handle undefined/null
           const numValue = parseFloat(value) || 0;
-          return numValue + ' kWh';
+          // Format to 3 decimal places and handle large numbers
+          if (Math.abs(numValue) >= 1000) {
+            return numValue.toFixed(1) + ' kWh';
+          } else {
+            return numValue.toFixed(3) + ' kWh';
+          }
         },
         offsetCenter: [0, '-10%']
       },

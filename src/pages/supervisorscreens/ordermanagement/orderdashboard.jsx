@@ -214,24 +214,74 @@ const OrderDashboard = () => {
     );
   };
 
-  // Filter orders for in-progress tab
-  const inProgressOrders = orders.filter(order => order.status === 'in_progress');
+  // Update useEffect to directly test the API call
+  useEffect(() => {
+    const testCompletionCheck = async () => {
+      try {
+        console.log('Testing completion check with specific order...');
+        
+        // Test with the specific order you mentioned
+        const testOrder = {
+          part_number: '213301940178',
+          production_order: '10593133'
+        };
 
-  // Add this new function to check completion status for completed orders
+        console.log('Test order details:', testOrder);
+
+        // Get the store instance
+        const orderStore = useOrderStore.getState();
+        console.log('Order store instance:', !!orderStore);
+
+        // Call the completion check
+        const completionStatus = await orderStore.checkOrderCompletion(
+          testOrder.part_number,
+          testOrder.production_order
+        );
+
+        console.log('Received completion status:', completionStatus);
+
+        // Update the completed orders with the completed_orders array from the response
+        if (completionStatus.completed_orders && completionStatus.completed_orders.length > 0) {
+          setCompletedOrders(completionStatus.completed_orders);
+        } else {
+          setCompletedOrders([]);
+        }
+
+      } catch (error) {
+        console.error('Error in test completion check:', error);
+        message.error('Failed to check completion status: ' + error.message);
+      }
+    };
+
+    // Call the test function
+    testCompletionCheck();
+  }, []); // Empty dependency array to run only once on mount
+
+  // Update the checkCompletedOrdersStatus function
   const checkCompletedOrdersStatus = useCallback(async (orders) => {
     setLoadingCompletion(true);
     try {
+      console.log('Starting to check completion status for orders:', orders);
+      
       const completedOrdersWithStatus = await Promise.all(
         orders.map(async (order) => {
           try {
             if (!order.part_number || !order.production_order) {
+              console.log('Missing part_number or production_order for order:', order);
               return { ...order, completion_status: null };
             }
+
+            console.log('Checking completion for order:', {
+              part_number: order.part_number,
+              production_order: order.production_order
+            });
 
             const completionStatus = await useOrderStore.getState().checkOrderCompletion(
               order.part_number,
               order.production_order
             );
+
+            console.log('Received completion status:', completionStatus);
 
             return {
               ...order,
@@ -239,11 +289,13 @@ const OrderDashboard = () => {
             };
           } catch (error) {
             console.error(`Error checking completion for order ${order.production_order}:`, error);
+            message.error(`Failed to check completion for order ${order.production_order}`);
             return { ...order, completion_status: null };
           }
         })
       );
 
+      console.log('All orders processed with completion status:', completedOrdersWithStatus);
       setCompletedOrders(completedOrdersWithStatus);
     } catch (error) {
       console.error('Error checking completed orders:', error);
@@ -253,17 +305,8 @@ const OrderDashboard = () => {
     }
   }, []);
 
-  // Update useEffect to add logging
-  useEffect(() => {
-    if (orders && orders.length > 0) {
-      console.log('Orders updated, filtering completed orders');
-      const completedOrders = orders.filter(order => order.status === 'completed');
-      console.log('Found completed orders:', completedOrders);
-      if (completedOrders.length > 0) {
-        checkCompletedOrdersStatus(completedOrders);
-      }
-    }
-  }, [orders, checkCompletedOrdersStatus]);
+  // Filter orders for in-progress tab
+  const inProgressOrders = orders.filter(order => order.status === 'in_progress');
 
   // Add columns for completed orders table
   const completedOrdersColumns = [
@@ -287,79 +330,65 @@ const OrderDashboard = () => {
     },
     {
       title: 'Status',
-      key: 'status',
+      key: 'completion_date_status',
       width: 150,
-      render: (_, record) => {
-        if (!record.completion_status) {
-          return <Tag color="default">Unknown</Tag>;
-        }
-        return (
-          <Tag color={record.completion_status.is_order_completed ? 'success' : 'warning'}>
-            {record.completion_status.completion_date_status}
-          </Tag>
-        );
-      },
+      render: (_, record) => (
+        <Tag color={record.is_order_completed ? 'success' : 'warning'}>
+          {record.completion_date_status}
+        </Tag>
+      ),
     },
     {
       title: 'Progress',
-      key: 'progress',
+      key: 'completion_percentage',
       width: 120,
-      render: (_, record) => {
-        if (!record.completion_status) return 'N/A';
-        return (
-          <div className="flex items-center">
-            <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
-              <div 
-                className="bg-blue-600 h-2.5 rounded-full" 
-                style={{ width: `${record.completion_status.completion_percentage}%` }}
-              ></div>
-            </div>
-            <span className="text-sm">{record.completion_status.completion_percentage}%</span>
+      render: (_, record) => (
+        <div className="flex items-center">
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
+            <div 
+              className="bg-blue-600 h-2.5 rounded-full" 
+              style={{ width: `${record.completion_percentage}%` }}
+            ></div>
           </div>
-        );
-      },
+          <span className="text-sm">{record.completion_percentage}%</span>
+        </div>
+      ),
     },
-    {
-      title: 'Operations',
-      key: 'operations',
-      width: 150,
-      render: (_, record) => {
-        if (!record.completion_status) return 'N/A';
-        return (
-          <div>
-            <div className="font-medium">
-              {record.completion_status.completed_operations}/{record.completion_status.total_eligible_operations}
-            </div>
-            <div className="text-xs text-gray-500">
-              Total: {record.completion_status.total_all_operations}
-            </div>
-          </div>
-        );
-      },
-    },
+    // {
+    //   title: 'Operations',
+    //   key: 'operations',
+    //   width: 150,
+    //   render: (_, record) => (
+    //     <div>
+    //       <div className="font-medium">
+    //         {record.completed_operations}/{record.total_eligible_operations}
+    //       </div>
+    //       <div className="text-xs text-gray-500">
+    //         Total: {record.total_all_operations}
+    //       </div>
+    //     </div>
+    //   ),
+    // },
     {
       title: 'Completion Date',
-      key: 'completion_date',
+      key: 'overall_completion_date',
       width: 150,
       render: (_, record) => {
-        if (!record.completion_status?.overall_completion_date) return 'Not completed';
-        return new Date(record.completion_status.overall_completion_date).toLocaleDateString();
+        if (!record.overall_completion_date) return 'Not completed';
+        return new Date(record.overall_completion_date).toLocaleDateString();
       },
     },
     {
       title: 'Message',
       key: 'message',
       width: 300,
-      render: (_, record) => {
-        if (!record.completion_status) return 'N/A';
-        return (
-          <div className="text-sm">
-            <span className={record.completion_status.is_order_completed ? 'text-green-600' : 'text-yellow-600'}>
-              {record.completion_status.message}
-            </span>
-          </div>
-        );
-      },
+      render: (_, record) => (
+        <div className="text-sm">
+          <span className={record.is_order_completed ? 'text-green-600' : 'text-yellow-600'}>
+            {record.message}
+          </span>
+        </div>
+      ),
     },
   ];
 

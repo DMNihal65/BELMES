@@ -763,6 +763,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
                   percent={oeeData.average_availability || 0}
                   width={80}
                   strokeColor="#1890ff"
+                  format={percent => `${percent.toFixed(2)}%`}
                 />
                 <div className="text-xs mt-1">Availability</div>
               </div>
@@ -772,6 +773,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
                   percent={oeeData.average_performance || 0}
                   width={80}
                   strokeColor="#52c41a"
+                  format={percent => `${percent.toFixed(2)}%`}
                 />
                 <div className="text-xs mt-1">Performance</div>
               </div>
@@ -781,6 +783,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
                   percent={oeeData.average_quality || 0}
                   width={80}
                   strokeColor="#722ed1"
+                  format={percent => `${percent.toFixed(2)}%`}
                 />
                 <div className="text-xs mt-1">Quality</div>
               </div>

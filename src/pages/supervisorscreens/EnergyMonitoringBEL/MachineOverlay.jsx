@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Tabs, Button, Typography, Card, Row, Col, Statistic, Spin, Select, DatePicker, Switch } from 'antd';
 import { ArrowLeftOutlined, LineChartOutlined, BarChartOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
@@ -88,15 +88,31 @@ const ParameterCard = ({ title, value, unit, color }) => (
   </Card>
 );
 
-// Create a memoized chart component
-const MemoizedChart = React.memo(({ options, chartKey }) => (
-  <ReactECharts
-    key={chartKey}
-    option={options}
-    style={{ height: '100%', width: '100%' }}
-    opts={{ renderer: 'svg' }}
-  />
-));
+// Create a memoized chart component with ref
+const MemoizedChart = React.memo(({ options }) => {
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    if (chartRef.current) {
+      const chart = chartRef.current.getEchartsInstance();
+      chart.setOption(options, {
+        replaceMerge: ['series', 'xAxis', 'yAxis'],
+        animation: true,
+        animationDuration: 300
+      });
+    }
+  }, [options]);
+
+  return (
+    <ReactECharts
+      ref={chartRef}
+      option={options}
+      style={{ height: '100%', width: '100%' }}
+      opts={{ renderer: 'svg' }}
+      notMerge={false}
+    />
+  );
+});
 
 // Create a memoized timeline controls component
 const TimelineControls = React.memo(({ 
@@ -115,7 +131,7 @@ const TimelineControls = React.memo(({
     marginBottom: '4px',
     gap: '8px'
   }}>
-    <Title level={5} style={{ margin: 0, fontSize: '14px' }}>Production Timeline</Title>
+    <Title level={5} stylLive Energy Monitoringe={{ margin: 0, fontSize: '14px' }}>Productioncc Timeline</Title>
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
       <Select
         style={{ width: '180px' }}
@@ -165,7 +181,6 @@ const MachineOverlay = ({ machineId, machineName, onBack }) => {
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
   const [historyEventSource, setHistoryEventSource] = useState(null);
-  const [chartKey, setChartKey] = useState(0);
 
   // Connect to Parameters Stream when component mounts
   useEffect(() => {
@@ -184,48 +199,9 @@ const MachineOverlay = ({ machineId, machineName, onBack }) => {
     };
   }, [machineId, clearMachineData, connectToParametersStream, cleanupParametersStream]);
 
-  // Connect to parameter history stream when parameter changes or live mode is toggled
-  useEffect(() => {
-    let newHistoryStream = null;
-
-    if (isLive) {
-      console.log(`Connecting to parameter history stream for ${selectedParameter}`);
-      // Close existing history stream if any
-      if (historyEventSource) {
-        historyEventSource.close();
-      }
-      newHistoryStream = connectToParameterHistoryStream(machineId, selectedParameter);
-      setHistoryEventSource(newHistoryStream);
-    } else if (startTime && endTime) {
-      // When live mode is off and we have both start and end times, fetch historical data
-      console.log('Fetching historical data for date range');
-      fetchParameterHistory(machineId, selectedParameter, startTime, endTime)
-        .catch(error => {
-          console.error('Error fetching historical data:', error);
-        });
-    }
-
-    // Cleanup function
-    return () => {
-      if (newHistoryStream) {
-        newHistoryStream.close();
-      }
-    };
-  }, [machineId, selectedParameter, isLive, startTime, endTime]);
-
-  const handleBack = () => {
-    clearMachineData();
-    onBack();
-  };
-
-  const handleTabChange = (key) => {
-    setActiveTab(key);
-  };
-
   // Memoize handlers
   const handleParameterChange = useCallback((value) => {
     setSelectedParameter(value);
-    setChartKey(prev => prev + 1);
   }, []);
 
   const handleLiveToggle = useCallback((checked) => {
@@ -245,41 +221,52 @@ const MachineOverlay = ({ machineId, machineName, onBack }) => {
     if (dates && dates.length === 2) {
       setStartTime(dates[0]);
       setEndTime(dates[1]);
+      // Fetch historical data without triggering full page refresh
+      fetchParameterHistory(machineId, selectedParameter, dates[0], dates[1])
+        .catch(error => {
+          console.error('Error fetching historical data:', error);
+        });
     } else {
       setStartTime(null);
       setEndTime(null);
     }
-  }, []);
+  }, [machineId, selectedParameter, fetchParameterHistory]);
 
-  // Memoize chart options
+  // Modify the useEffect for parameter history to prevent unnecessary re-renders
+  useEffect(() => {
+    let newHistoryStream = null;
+
+    if (isLive) {
+      if (historyEventSource) {
+        historyEventSource.close();
+      }
+      newHistoryStream = connectToParameterHistoryStream(machineId, selectedParameter);
+      setHistoryEventSource(newHistoryStream);
+    }
+
+    return () => {
+      if (newHistoryStream) {
+        newHistoryStream.close();
+      }
+    };
+  }, [machineId, selectedParameter, isLive]);
+
+  // Separate useEffect for handling date range changes
+  useEffect(() => {
+    if (!isLive && startTime && endTime) {
+      fetchParameterHistory(machineId, selectedParameter, startTime, endTime)
+        .catch(error => {
+          console.error('Error fetching historical data:', error);
+        });
+    }
+  }, [isLive, startTime, endTime, machineId, selectedParameter, fetchParameterHistory]);
+
+  // Memoize chart options with optimized update logic
   const chartOptions = useMemo(() => {
     const selectedParam = PARAMETER_OPTIONS.find(p => p.value === selectedParameter);
     const unit = selectedParam ? selectedParam.label.match(/\((.*?)\)/)?.[1] || '' : '';
 
-    if (!isLive && (!parameterHistoryData || parameterHistoryData.length === 0)) {
-      return {
-        grid: {
-          top: 50,
-          right: 30,
-          bottom: 50,
-          left: 60,
-          containLabel: true
-        },
-        graphic: [{
-          type: 'text',
-          left: 'center',
-          top: 'middle',
-          style: {
-            text: 'No data available for the selected time range',
-            fontSize: 16,
-            fontWeight: 'bold',
-            fill: '#999'
-          }
-        }]
-      };
-    }
-
-    return {
+    const baseOptions = {
       grid: {
         top: 50,
         right: 30,
@@ -355,21 +342,17 @@ const MachineOverlay = ({ machineId, machineName, onBack }) => {
       series: [{
         name: selectedParam?.label || selectedParameter,
         type: 'line',
-        step: 'end',
+        step: 'middle',
         data: parameterHistoryData.map(d => d.value),
         smooth: false,
-        symbol: 'circle',
-        symbolSize: 8,
+        symbol: 'none',
+        sampling: 'average',
         itemStyle: {
-          color: '#1890ff',
-          borderWidth: 2,
-          borderColor: '#fff'
+          color: '#1890ff'
         },
         lineStyle: {
-          width: 4,
-          color: '#1890ff',
-          shadowColor: 'rgba(24, 144, 255, 0.3)',
-          shadowBlur: 10
+          width: 2,
+          color: '#1890ff'
         },
         areaStyle: {
           color: {
@@ -380,33 +363,82 @@ const MachineOverlay = ({ machineId, machineName, onBack }) => {
             y2: 1,
             colorStops: [{
               offset: 0,
-              color: 'rgba(24, 144, 255, 0.4)'
+              color: 'rgba(24, 144, 255, 0.2)'
             }, {
               offset: 1,
-              color: 'rgba(24, 144, 255, 0.1)'
+              color: 'rgba(24, 144, 255, 0.05)'
             }]
           }
         },
         emphasis: {
           focus: 'series',
           itemStyle: {
-            color: '#1890ff',
-            borderWidth: 3,
-            shadowBlur: 20,
-            shadowColor: 'rgba(24, 144, 255, 0.5)'
+            color: '#1890ff'
           },
           lineStyle: {
-            width: 5,
-            shadowBlur: 20,
-            shadowColor: 'rgba(24, 144, 255, 0.5)'
+            width: 3,
+            color: '#1890ff'
           }
         }
       }],
       animation: true,
       animationDuration: 300,
-      animationEasing: 'cubicInOut'
+      animationEasing: 'cubicInOut',
+      dataZoom: [
+        {
+          type: 'inside',
+          start: 0,
+          end: 100
+        },
+        {
+          type: 'slider',
+          start: 0,
+          end: 100,
+          height: 20,
+          bottom: 0,
+          borderColor: 'transparent',
+          backgroundColor: '#f0f2f5',
+          fillerColor: 'rgba(24, 144, 255, 0.1)',
+          handleStyle: {
+            color: '#1890ff',
+            borderColor: '#1890ff'
+          },
+          moveHandleStyle: {
+            color: '#1890ff',
+            borderColor: '#1890ff'
+          }
+        }
+      ]
     };
+
+    if (!isLive && (!parameterHistoryData || parameterHistoryData.length === 0)) {
+      return {
+        ...baseOptions,
+        graphic: [{
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: {
+            text: 'No data available for the selected time range',
+            fontSize: 16,
+            fontWeight: 'bold',
+            fill: '#999'
+          }
+        }]
+      };
+    }
+
+    return baseOptions;
   }, [selectedParameter, parameterHistoryData, isLive]);
+
+  const handleBack = () => {
+    clearMachineData();
+    onBack();
+  };
+
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+  };
 
   // Define items for the Tabs component
   const items = [
@@ -636,7 +668,6 @@ const MachineOverlay = ({ machineId, machineName, onBack }) => {
             <div style={{ height: '300px', width: '100%' }}>
               <MemoizedChart
                 options={chartOptions}
-                chartKey={chartKey}
               />
             </div>
           </Card>

@@ -192,7 +192,8 @@ function InspectionResult() {
             setIsOperationModalVisible(true);
           } catch (ftpError) {
             console.error('Error checking FTP status:', ftpError);
-            message.warning('Could not verify approval status');
+            // Remove the error message and silently set status to not completed
+            setFtpApprovalStatus({ is_completed: false });
             
             // Still show the data even if FTP check fails
             const formattedData = {
@@ -218,7 +219,6 @@ function InspectionResult() {
 
             setSelectedOperationData(formattedData.inspection_data[0]);
             setSelectedOperation('999');
-            setFtpApprovalStatus({ is_completed: false });
             setIsOperationModalVisible(true);
           }
         } else {
@@ -231,6 +231,26 @@ function InspectionResult() {
         setLoading(false);
       }
     } else {
+      // For operation 20, check FTP status
+      if (operation === '20') {
+        try {
+          setLoading(true);
+          const orderId = record.order_id;
+          const ipid = `IPID-${record.part_number}-${operation}`;
+          console.log('Checking FTP status for operation 20:', { orderId, ipid });
+          
+          const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+          console.log('FTP Status for operation 20:', ftpStatus);
+          
+          setFtpApprovalStatus(ftpStatus);
+        } catch (error) {
+          console.error('Error checking FTP status for operation 20:', error);
+          message.error('Failed to check FTP approval status');
+        } finally {
+          setLoading(false);
+        }
+      }
+      
       // Existing operation click logic
       const operationData = record.inspection_data.find(
         data => data.operation_number === operation
@@ -604,7 +624,7 @@ function InspectionResult() {
 
         // Check FTP approval status
         const orderId = inspectionId;
-        const ipid = response[0]?.op_id ? `IPID-${orderId}${selectedOperation}-${response[0].op_id}` : null;
+        const ipid = `IPID-${inspectionData?.[0]?.part_number}-${selectedOperation}`;
         
         if (ipid) {
           console.log('Checking FTP status for orderId:', orderId, 'ipid:', ipid);
@@ -615,7 +635,8 @@ function InspectionResult() {
             setFtpApprovalStatus(ftpStatus);
           } catch (error) {
             console.error('Error checking FTP status:', error);
-            message.error('Failed to check FTP approval status');
+            // Remove the error message popup
+            setFtpApprovalStatus({ is_completed: false });
           }
         }
         
@@ -639,7 +660,7 @@ function InspectionResult() {
               measured_mean: item.measured_mean,
               measured_instrument: item.measured_instrument,
               operator: item.operator,
-              is_done: ftpApprovalStatus?.is_completed === true ? true : item.measured_mean !== 0 // Consider measurement done if FTP is completed or mean is not 0
+              is_done: ftpApprovalStatus?.is_completed === true ? true : item.measured_mean !== 0
             }))
           }]
         };
@@ -819,24 +840,23 @@ function InspectionResult() {
         key: 'is_done',
         width: '8%',
         render: (isDone, record) => {
-          console.log('Rendering status for record:', record);
-          console.log('Current FTP status:', ftpApprovalStatus);
+          console.log('Record FTP Status:', record.ftp_status);
           
-          // If FTP is approved, always show as done
-          if (ftpApprovalStatus?.is_completed === true) {
-            console.log('FTP is completed, showing Done status');
+          // Check FTP status
+          if (record.ftp_status?.is_completed) {
             return (
               <Tag color="success" icon={<CheckCircleOutlined />}>
-                Done
+                Approved
               </Tag>
             );
           }
           
-          // Otherwise show based on individual measurement status
-          console.log('FTP not completed, showing individual status:', isDone);
-          return isDone ? 
-            <Tag color="success" icon={<CheckCircleOutlined />}>Done</Tag> : 
-            <Tag color="warning" icon={<ClockCircleOutlined />}>Pending</Tag>;
+          // If FTP is not completed or status is pending
+          return (
+            <Tag color="warning" icon={<ClockCircleOutlined />}>
+              Not Yet Approved
+            </Tag>
+          );
         }
       },
       {
@@ -969,7 +989,9 @@ function InspectionResult() {
           }
           open={isDetailedMeasurementsVisible}
           onCancel={() => setIsDetailedMeasurementsVisible(false)}
-          width={1400}
+          width={1800}
+          style={{ top: 20 }}
+          bodyStyle={{ padding: '24px', maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }}
           footer={[
             <Button 
               key="close" 
@@ -989,17 +1011,16 @@ function InspectionResult() {
             ) : measurements && measurements.length > 0 ? (
               <div>
                 <Alert
-                  message="Inspection Status"
-                  description={
+                  message={
                     <div className="flex items-center gap-2">
-                      <Text strong>FTP Approval Status:</Text>
-                      {ftpApprovalStatus?.is_completed ? (
+                      <Text strong>Operation Status:</Text>
+                      {ftpApprovalStatus?.is_completed === true ? (
                         <Tag color="success" icon={<CheckCircleOutlined />}>
                           Approved
                         </Tag>
                       ) : (
                         <Tag color="warning" icon={<ClockCircleOutlined />}>
-                          Pending Approval
+                          Not Yet Approved
                         </Tag>
                       )}
                       {ftpApprovalStatus?.updated_at && (
@@ -1009,7 +1030,7 @@ function InspectionResult() {
                       )}
                     </div>
                   }
-                  type={ftpApprovalStatus?.is_completed ? "success" : "warning"}
+                  type={ftpApprovalStatus?.is_completed === true ? "success" : "warning"}
                   showIcon
                   className="mb-4"
                 />
@@ -1022,9 +1043,17 @@ function InspectionResult() {
                   }))}
                   bordered
                   size="middle"
-                  scroll={{ y: 500, x: 1300 }}
-                  pagination={{ pageSize: 10, showSizeChanger: false }}
+                  scroll={{ x: 'max-content', y: 600 }}
+                  pagination={{ 
+                    pageSize: 10, 
+                    showSizeChanger: true,
+                    showTotal: (total) => `Total ${total} items`
+                  }}
                   className="detailed-measurements-table"
+                  style={{ 
+                    width: '100%',
+                    overflowX: 'auto'
+                  }}
                 />
               </div>
             ) : (
@@ -1034,7 +1063,7 @@ function InspectionResult() {
                     <p className="text-gray-500 mb-4">No measurements found for Operation {selectedOperation}</p>
                     {!ftpApprovalStatus?.is_completed && (
                       <Tag color="warning" icon={<ClockCircleOutlined />}>
-                        Pending Approval
+                        Not Yet Approved
                       </Tag>
                     )}
                   </div>
@@ -1884,6 +1913,37 @@ const styles = `
   
   .custom-modal .ant-modal-body {
     padding: 24px;
+  }
+
+  .detailed-measurements-table .ant-table-container {
+    overflow-x: auto;
+  }
+  
+  .detailed-measurements-table .ant-table-cell {
+    white-space: nowrap;
+    padding: 12px 16px;
+  }
+  
+  .detailed-measurements-table .ant-table-thead > tr > th {
+    background: #f0f5ff;
+    font-weight: 600;
+    text-align: center;
+    color: #1e3a8a;
+    padding: 12px 16px;
+  }
+  
+  .detailed-measurements-table .ant-table-tbody > tr > td {
+    padding: 12px 16px;
+    text-align: center;
+  }
+  
+  .detailed-measurements-table .ant-table-pagination {
+    margin: 16px 0;
+  }
+  
+  .detailed-measurements-table .ant-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
   }
 `;
 

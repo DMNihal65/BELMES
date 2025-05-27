@@ -7,9 +7,9 @@ import axios from 'axios';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.88:7799',
-  QUALITY_URL: 'http://172.18.7.88:7799',
-  PLANNING_URL: 'http://172.18.7.88:7799',
+  BASE_URL: 'http://172.18.7.88:4476',
+  QUALITY_URL: 'http://172.18.7.88:4476',
+  PLANNING_URL: 'http://172.18.7.88:4476',
   SCHEDULING_URL: 'http://172.18.7.88:4476',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
@@ -148,7 +148,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.88:7799/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:4476/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -482,7 +482,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.88:7799/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.88:4476/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -865,7 +865,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.18.7.88:7799/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.18.7.88:4476/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -922,7 +922,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.88:7799/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.18.7.88:4476/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -1263,7 +1263,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.18.7.88:7799/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:4476/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1513,7 +1513,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.18.7.88:7799/api/v1/master-order/machines/${machineId}`,
+        `http://172.18.7.88:4476/api/v1/master-order/machines/${machineId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1573,31 +1573,87 @@ const useOrderStore = create((set, get) => ({
 
   checkOrderCompletion: async (partNumber, productionOrder) => {
     try {
-      console.log('Checking order completion for:', { partNumber, productionOrder });
-      const url = `http://172.18.7.88:4476/api/v1/scheduling/check-order-completion-simple/${partNumber}/${productionOrder}`;
-      console.log('Calling endpoint:', url);
+      // Input validation
+      if (!partNumber || !productionOrder) {
+        console.error('Missing required parameters:', { partNumber, productionOrder });
+        throw new Error('Part number and production order are required');
+      }
 
+      console.log('Starting order completion check with parameters:', {
+        partNumber,
+        productionOrder,
+        timestamp: new Date().toISOString()
+      });
+
+      const url = `http://172.18.7.88:4476/api/v1/scheduling/check-order-completion-simple?part_number=${partNumber}&production_order=${productionOrder}`;
+      console.log('API Endpoint URL:', url);
+
+      const token = localStorage.getItem('token');
+      console.log('Auth token present:', !!token);
+
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      console.log('Making API request...');
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
         }
       });
 
-      console.log('Response status:', response.status);
+      console.log('API Response status:', response.status);
+      console.log('API Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Failed to check order completion: ${errorText}`);
+        let errorMessage;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.detail || 'Unknown error';
+          console.error('API Error Response:', errorData);
+        } catch (e) {
+          const errorText = await response.text();
+          errorMessage = errorText || `HTTP error ${response.status}`;
+          console.error('API Error Text:', errorText);
+        }
+        throw new Error(`API request failed: ${errorMessage}`);
       }
 
       const data = await response.json();
-      console.log('Completion status response:', data);
-      return data;
+      console.log('API Success Response:', data);
+
+      // Validate response data
+      if (!data || !data.completed_orders) {
+        throw new Error('Invalid response format: missing completed_orders array');
+      }
+
+      // Return the entire response object which includes completed_orders and summary
+      return {
+        message: data.message || 'No status message available',
+        summary: data.summary || { total_completed_orders: 0 },
+        completed_orders: data.completed_orders.map(order => ({
+          is_order_completed: order.is_order_completed || false,
+          message: order.message || 'No status message available',
+          part_number: order.part_number || '',
+          production_order: order.production_order || '',
+          project_name: order.project_name || 'Unknown Project',
+          completed_operations: order.completed_operations || 0,
+          total_eligible_operations: order.total_eligible_operations || 0,
+          total_all_operations: order.total_all_operations || 0,
+          completion_percentage: order.completion_percentage || 0,
+          overall_completion_date: order.overall_completion_date || null,
+          completion_date_status: order.completion_date_status || 'Unknown'
+        }))
+      };
+
     } catch (error) {
-      console.error('Error checking order completion:', error);
+      console.error('Error in checkOrderCompletion:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
       throw error;
     }
   },

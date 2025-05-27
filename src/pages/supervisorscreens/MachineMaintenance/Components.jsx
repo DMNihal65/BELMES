@@ -4,7 +4,7 @@ import { PlusOutlined, InboxOutlined, WarningOutlined, SearchOutlined } from '@a
 import axios from 'axios';
 import moment from 'moment';
 
-const BASE_URL = 'http://172.18.7.88:7799/api/v1/maintainance';
+const BASE_URL = 'http://172.18.7.88:4476/api/v1/maintainance';
 
 export default function RawMaterialsMaintenance() {
   const [form] = Form.useForm();

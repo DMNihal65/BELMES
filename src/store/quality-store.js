@@ -21,7 +21,7 @@ class QualityStore {
   async fetchAllOrders() {
     try {
       const response = await axios.get(
-        'http://172.18.7.88:7799/api/v1/planning/all_orders',
+        'http://172.18.7.88:4476/api/v1/planning/all_orders',
         this.getAuthHeaders()
       );
       return response.data.map(order => ({
@@ -44,7 +44,7 @@ class QualityStore {
     try {
       console.log('Fetching inspection for order ID:', orderId);
       const response = await axios.get(
-        `http://172.18.7.88:7799/api/v1/quality/inspection/${orderId}/detailed`,
+        `http://172.18.7.88:4476/api/v1/quality/inspection/${orderId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -79,7 +79,7 @@ class QualityStore {
       
       const config = {
         method: 'get',
-        url: `http://172.18.7.88:7799/api/v1/quality/master-boc/ipids/${orderId}`,
+        url: `http://172.18.7.88:4476/api/v1/quality/master-boc/ipids/${orderId}`,
         ...this.getAuthHeaders()
       };
 
@@ -128,7 +128,7 @@ class QualityStore {
   async launchQMSSoftware() {
     try {
       const response = await axios.get(
-        'http://172.18.7.88:7799/api/v1/quality/run',
+        'http://172.18.7.88:4476/api/v1/quality/run',
         this.getAuthHeaders()
       );
       return response.data;
@@ -147,7 +147,7 @@ class QualityStore {
       console.log(`Fetching ballooned drawing for Production Order: ${productionOrder}, Operation: ${operationId}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:7799/api/v1/document-management/ballooned-drawing/download/${productionOrder}/${operationId}`,
+        `http://172.18.7.88:4476/api/v1/document-management/ballooned-drawing/download/${productionOrder}/${operationId}`,
         {
           ...this.getAuthHeaders(),
           responseType: 'blob' // Important: set responseType to blob for PDF data
@@ -182,7 +182,7 @@ class QualityStore {
           
           const response = await axios({
             method: method,
-            url: `http://172.18.7.88:7799/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
+            url: `http://172.18.7.88:4476/api/v1/quality/stage-inspection/${inspectionId}/status?is_done=${isDone}`,
             ...this.getAuthHeaders(),
             timeout: 5000
           });
@@ -225,7 +225,7 @@ class QualityStore {
       // Try to ping the server with a HEAD request
       await axios({
         method: 'head',
-        url: 'http://172.18.7.88:7799/api/v1/health', // Use a health endpoint if available
+        url: 'http://172.18.7.88:4476/api/v1/health', // Use a health endpoint if available
         timeout: 5000 // 5 second timeout
       });
       
@@ -236,7 +236,7 @@ class QualityStore {
       try {
         await axios({
           method: 'head',
-          url: 'http://172.18.7.88:7799/',
+          url: 'http://172.18.7.88:4476/',
           timeout: 5000
         });
         
@@ -268,7 +268,7 @@ class QualityStore {
       console.log(`Downloading report from path: ${filePath}`);
       
       // Log the request URL
-      const requestUrl = `http://172.18.7.88:7799/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`;
+      const requestUrl = `http://172.18.7.88:4476/api/v1/document-management/download/?path=${encodeURIComponent(filePath)}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -327,7 +327,7 @@ class QualityStore {
       console.log(`Downloading report with document ID: ${documentId}, version: ${versionNumber}`);
       
       // Log the request URL and headers
-      const requestUrl = `http://172.18.7.88:7799/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`;
+      const requestUrl = `http://172.18.7.88:4476/api/v1/document-management/documents/download-version/${documentId}/${versionNumber}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -380,7 +380,7 @@ class QualityStore {
       console.log(`Fetching detailed inspection data for ID: ${inspectionId}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:7799/api/v1/quality/inspection/${inspectionId}/detailed`,
+        `http://172.18.7.88:4476/api/v1/quality/inspection/${inspectionId}/detailed`,
         this.getAuthHeaders()
       );
       
@@ -399,7 +399,7 @@ class QualityStore {
       console.log(`Downloading document ID: ${documentId}, version: ${versionId}`);
       
       // Log the request URL and headers
-      const requestUrl = `http://172.18.7.88:7799/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
+      const requestUrl = `http://172.18.7.88:4476/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
       
       // Ensure we explicitly request PDF format in headers
       const headers = { 
@@ -453,7 +453,7 @@ class QualityStore {
       
       // Use the correct URL format
       // Note: Check if the port number is correct (6688)
-      const requestUrl = `http://172.18.7.88:7799/api/v1/document-management/report/structure/document/${documentId}`;
+      const requestUrl = `http://172.18.7.88:4476/api/v1/document-management/report/structure/document/${documentId}`;
       console.log('Delete request URL:', requestUrl);
       
       // Try with increased timeout and better error handling
@@ -493,7 +493,7 @@ class QualityStore {
         console.log('Trying alternative URL format...');
         
         // Alternative URL format (some APIs use query parameters instead of path parameters)
-        const alternativeUrl = `http://172.18.7.88:7799/api/v1/document-management/report/structure/document?id=${documentId}`;
+        const alternativeUrl = `http://172.18.7.88:4476/api/v1/document-management/report/structure/document?id=${documentId}`;
         console.log('Alternative delete request URL:', alternativeUrl);
         
         const altResponse = await axios({
@@ -547,7 +547,7 @@ class QualityStore {
       console.log(`Deleting folder with ID: ${folderId}`);
       
       // Log the request URL
-      const requestUrl = `http://172.18.7.88:7799/api/v1/document-management/report/structure/folder/${folderId}`;
+      const requestUrl = `http://172.18.7.88:4476/api/v1/document-management/report/structure/folder/${folderId}`;
       console.log('Delete folder request URL:', requestUrl);
       
       const response = await axios.delete(
@@ -576,7 +576,7 @@ class QualityStore {
 
   async approveAllMeasurements(orderId, ipid) {
     try {
-      const url = `http://172.18.7.88:7799/api/v1/quality/ftp/${orderId}/${ipid}/update`;
+      const url = `http://172.18.7.88:4476/api/v1/quality/ftp/${orderId}/${ipid}/update`;
       // Send an empty object as the request body since the API doesn't expect any specific attributes
       const response = await axios.post(url, {}, this.getAuthHeaders());
       return response.data;
@@ -590,17 +590,47 @@ class QualityStore {
     }
   }
 
-  // Add new function to check FTP approval status
   async checkFTPApprovalStatus(orderId, ipid) {
     try {
+      console.log(`Checking FTP approval status for Order ID: ${orderId}, IPID: ${ipid}`);
+      
       const response = await axios.get(
-        `http://172.18.7.88:7799/api/v1/quality/ftp/${orderId}/${ipid}`,
+        `http://172.18.7.88:4476/api/v1/quality/ftp/${orderId}/${ipid}`,
         this.getAuthHeaders()
       );
-      return response.data;
+      
+      console.log('FTP approval status response:', response.data);
+      
+      // Ensure we have the expected response structure
+      if (response.data && typeof response.data.is_completed === 'boolean') {
+        return {
+          order_id: response.data.order_id,
+          ipid: response.data.ipid,
+          is_completed: response.data.is_completed,
+          status: response.data.is_completed ? 'approved' : 'pending',
+          created_at: response.data.created_at,
+          updated_at: response.data.updated_at
+        };
+      } else {
+        console.warn('Unexpected FTP status response format:', response.data);
+        return {
+          order_id: orderId,
+          ipid: ipid,
+          is_completed: false,
+          status: 'pending'
+        };
+      }
+      
     } catch (error) {
+      console.error('Error checking FTP approval status:', error);
       this.handleAuthError(error);
-      throw error;
+      // Return a default response in case of error
+      return {
+        order_id: orderId,
+        ipid: ipid,
+        is_completed: false,
+        status: 'pending'
+      };
     }
   }
 
@@ -609,7 +639,7 @@ class QualityStore {
       console.log(`Fetching documents for folder ID: ${folderId}, page: ${page}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:7799/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${pageSize}`,
+        `http://172.18.7.88:4476/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${pageSize}`,
         this.getAuthHeaders()
       );
       
@@ -628,7 +658,7 @@ class QualityStore {
       console.log(`Fetching versions for document ID: ${documentId}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:7799/api/v1/document-management/documents/${documentId}/versions`,
+        `http://172.18.7.88:4476/api/v1/document-management/documents/${documentId}/versions`,
         this.getAuthHeaders()
       );
       
@@ -647,7 +677,7 @@ class QualityStore {
       console.log(`Fetching folders for parent ID: ${parentId}`);
       
       const response = await axios.get(
-        `http://172.18.7.88:7799/api/v1/document-management/folders/?parent_id=${parentId}`,
+        `http://172.18.7.88:4476/api/v1/document-management/folders/?parent_id=${parentId}`,
         this.getAuthHeaders()
       );
       
@@ -688,7 +718,7 @@ class QualityStore {
       formData.append('version_number', versionNumber);
       
       const response = await axios.post(
-        `http://172.18.7.88:7799/api/v1/document-management/documents/${documentId}/versions`,
+        `http://172.18.7.88:4476/api/v1/document-management/documents/${documentId}/versions`,
         formData,
         {
           ...this.getAuthHeaders(),
@@ -716,7 +746,7 @@ class QualityStore {
       // Log the full request details
       const requestConfig = {
         method: 'delete',
-        url: `http://172.18.7.88:7799/api/v1/document-management/document-versions/${versionId}`,
+        url: `http://172.18.7.88:4476/api/v1/document-management/document-versions/${versionId}`,
         ...this.getAuthHeaders(),
         validateStatus: function (status) {
           return status >= 200 && status < 500; // Accept all status codes to handle them manually
@@ -786,12 +816,52 @@ class QualityStore {
     try {
       console.log(`Fetching stage inspection for Order ID: ${orderId}, Operation: ${opNo}`);
       
+      // First fetch inspection details to get the part number
+      const inspectionDetails = await this.fetchInspectionDetails(orderId);
+      const partNumber = inspectionDetails.part_number;
+      
+      console.log('Part Number:', partNumber);
+      
       const response = await axios.get(
-        `http://172.18.7.88:7799/api/v1/quality/stage-inspection/filter?order_id=${orderId}&quantity_no=${quantityNo}&op_no=${opNo}`,
+        `http://172.18.7.88:4476/api/v1/quality/stage-inspection/filter?order_id=${orderId}&quantity_no=${quantityNo}&op_no=${opNo}`,
         this.getAuthHeaders()
       );
       
       console.log('Stage inspection data received:', response.data);
+
+      // Get the IPID from the first inspection record if available
+      if (response.data && response.data.length > 0) {
+        const firstRecord = response.data[0];
+        // Use the correct IPID format: IPID-{part_number}-{op_no}
+        const ipid = firstRecord.ipid || `IPID-${partNumber}-${opNo}`;
+        
+        console.log('Constructed IPID:', ipid);
+        
+        // Check FTP status with the correct IPID
+        try {
+          const ftpStatus = await this.checkFTPApprovalStatus(orderId, ipid);
+          console.log('Raw FTP Status Response:', ftpStatus);
+          
+          // Ensure we're using the correct is_completed value
+          const isCompleted = ftpStatus.is_completed === true;
+          console.log('Is Completed:', isCompleted);
+          
+          // Add FTP status to each record with explicit is_completed value
+          response.data = response.data.map(record => ({
+            ...record,
+            ftp_status: {
+              ...ftpStatus,
+              is_completed: isCompleted
+            }
+          }));
+          
+          console.log('Updated response data with FTP status:', response.data);
+        } catch (ftpError) {
+          console.error('Error checking FTP status:', ftpError);
+          // Continue with the data even if FTP check fails
+        }
+      }
+      
       return response.data;
       
     } catch (error) {

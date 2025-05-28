@@ -8,19 +8,19 @@ const API_TIMEOUT = 10000; // Increase timeout to 10 seconds
 const MAX_RETRIES = 1;
 
 // Use the correct WebSocket endpoint for machines data
-// const WS_MACHINES_ENDPOINT = 'ws://172.18.7.88:4476/api/v1/energymonitoring/ws/machines_data';
+// const WS_MACHINES_ENDPOINT = 'ws://172.17.80.1:6655/api/v1/energymonitoring/ws/machines_data';
 
 // Update the WebSocket endpoint for shiftwise energy data
-const WS_SHIFTWISE_ENERGY_ENDPOINT = 'http://172.18.7.88:4476/api/v1/energy-monitoring/shiftwise-energy-stream';
+const WS_SHIFTWISE_ENERGY_ENDPOINT = 'http://172.17.80.1:6655/api/v1/energy-monitoring/shiftwise-energy-stream';
 
 // Add the HTTP endpoint for historical data
-// const HISTORY_API_ENDPOINT = 'http://172.18.7.88:4476/api/v1/energymonitoring/shiftwise_energy_history_by_date';
+// const HISTORY_API_ENDPOINT = 'http://172.17.80.1:6655/api/v1/energymonitoring/shiftwise_energy_history_by_date';
 
 // Update the endpoint constant
-const MACHINE_STATUS_ENDPOINT = 'http://172.18.7.88:4476/api/v1/energy-monitoring/machine-status-stream';
+const MACHINE_STATUS_ENDPOINT = 'http://172.17.80.1:6655/api/v1/energy-monitoring/machine-status-stream';
 
 // Update the endpoint constant to use the specific epoch time
-const COMBINED_HISTORY_ENDPOINT = 'http://172.18.7.88:4476/api/v1/energy-monitoring/combined-history/1746586800';
+const COMBINED_HISTORY_ENDPOINT = 'http://172.17.80.1:6655/api/v1/energy-monitoring/combined-history/1746586800';
 
 const useEnergyMonitoringBelStore = create((set, get) => ({
   // Machine data
@@ -156,7 +156,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
       
       // Create WebSocket connection
-      const wsUrl = `ws://172.18.7.88:4476/api/v1/energymonitoring/ws/live_data`;
+      const wsUrl = `ws://172.17.80.1:6655/api/v1/energymonitoring/ws/live_data`;
       console.log(`Connecting to WebSocket at ${wsUrl}`);
       
       const socket = new WebSocket(wsUrl);
@@ -362,7 +362,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       
       const apiParamName = apiParamMap[parameterName] || parameterName;
       
-      const baseUrl = `http://172.18.7.88:4476/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      const baseUrl = `http://172.17.80.1:6655/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
       
       console.log(`Fetching filtered history data from ${baseUrl}`);
       
@@ -576,7 +576,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       );
 
       // Use the specific endpoint with the epoch time
-      const response = await axios.get(`http://172.18.7.88:4476/api/v1/energy-monitoring/combined-history/${epochTimestamp}`, {
+      const response = await axios.get(`http://172.17.80.1:6655/api/v1/energy-monitoring/combined-history/${epochTimestamp}`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
@@ -664,7 +664,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
 
       // Create new EventSource for parameters using the original endpoint
-      const eventSource = new EventSource(`http://172.18.7.88:4476/api/v1/energy-monitoring/machine/${machineId}/parameters-stream`);
+      const eventSource = new EventSource(`http://172.17.80.1:6655/api/v1/energy-monitoring/machine/${machineId}/parameters-stream`);
       
       // Store the EventSource instance
       set({ parametersEventSource: eventSource });
@@ -716,7 +716,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
     
     try {
       // Create new EventSource for parameter history
-      const eventSource = new EventSource(`http://172.18.7.88:4476/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history-stream`);
+      const eventSource = new EventSource(`http://172.17.80.1:6655/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history-stream`);
       
       // Handle connection open
       eventSource.onopen = () => {
@@ -780,7 +780,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       const startTimestamp = Math.floor(startTime.valueOf() / 1000);
       const endTimestamp = Math.floor(endTime.valueOf() / 1000);
       
-      const url = `http://172.18.7.88:4476/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history?start_time=${startTimestamp}&end_time=${endTimestamp}`;
+      const url = `http://172.17.80.1:6655/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history?start_time=${startTimestamp}&end_time=${endTimestamp}`;
       
       console.log('Fetching historical data from:', url);
       

@@ -9,8 +9,8 @@ import useOperatorStore from '../../../store/operator-store';
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.18.7.88:4476";
-const MPP_API_BASE_URL = "http://172.18.7.88:4476";
+const API_BASE_URL = "http://172.17.80.1:6655";
+const MPP_API_BASE_URL = "http://172.17.80.1:6655";
 
 const DocumentsCard = () => {
   const { jobDocuments, selectedJob, isLoadingJobs } = useOperatorStore();

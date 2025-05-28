@@ -3036,27 +3036,17 @@ const handleAddTool = async (values) => {
                                 key: 'tool_name',
                                 className: 'bg-gray-50',
                               },
-                              // {
-                              //   title: 'Tool Number',
-                              //   dataIndex: 'tool_number',
-                              //   key: 'tool_number',
-                              //   className: 'bg-gray-50',
-                              // },
+                              {
+                                title: 'Tool Number',
+                                dataIndex: 'tool_number',
+                                key: 'tool_number',
+                                className: 'bg-gray-50',
+                              },
                               {
                                 title: 'BEL Part Number',
                                 dataIndex: 'bel_partnumber',
                                 key: 'bel_partnumber',
                                 className: 'bg-gray-50',
-                              },
-                              {
-                                title: 'Operation',
-                                dataIndex: 'operation_id',
-                                key: 'operation',
-                                className: 'bg-gray-50',
-                                render: (operationId) => {
-                                  const operation = selectedJob?.operations?.find(op => op.id === operationId);
-                                  return operation ? `${operation.operation_number} - ${operation.operation_description}` : 'N/A';
-                                }
                               },
                               {
                                 title: 'Description',
@@ -3071,7 +3061,6 @@ const handleAddTool = async (values) => {
                                 className: 'bg-gray-50',
                                 align: 'center',
                               },
-
                               {
                                 title: 'Action',
                                 key: 'action',
@@ -3341,34 +3330,13 @@ const handleAddTool = async (values) => {
                             isLeaf: false,
                             children: inventoryItems
                               .filter(item => item.subcategory_id === subcategory.id)
-                              .map(item => {
-                                const instrumentCode = item.dynamic_data["Instrument code"];
-                                const belPartNumber = item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "];
-                                const belPartDescription = item.dynamic_data["BEL Part Description"];
-
-                                let label = '';
-
-                                if (belPartNumber) {
-                                  label += belPartNumber;
-                                  if (belPartDescription) {
-                                    label += ` - ${belPartDescription}`;
-                                  }
-                                } else if (belPartDescription) {
-                                  label += belPartDescription;
-                                } else {
-                                  label += 'N/A';
-                                }
-
-                                if (instrumentCode) {
-                                  label += ` (Inst. Code: ${instrumentCode})`;
-                                }
-
-                                return {
-                                  label: label,
-                                  value: item.id,
-                                  isLeaf: true,
-                                };
-                              })
+                              .map(item => ({
+                                label: item.dynamic_data["Instrument code"] 
+                                  ? `${item.dynamic_data["Instrument code"]}` 
+                                  : `${item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "] ? (item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "]) : ''}${((item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "]) && item.dynamic_data["BEL Part Description"]) ? ' - ' : ''}${item.dynamic_data["BEL Part Description"] || ''}`,
+                                value: item.id,
+                                isLeaf: true,
+                              }))
                           }))
                       }))}
 
@@ -3378,26 +3346,39 @@ const handleAddTool = async (values) => {
                             option.label.toLowerCase().includes(inputValue.toLowerCase())
                           )
                       }}
+                      // displayRender={(labels) => labels[1] || ''} 
                       onChange={(value, selectedOptions) => {
                         if (Array.isArray(value) && value.length === 3) {
-                          const selectedSubcategory = selectedOptions[1];
+                          const selectedSubcategory = selectedOptions[1]; // The second option is the subcategory
                           const subcategoryName = selectedSubcategory ? selectedSubcategory.label : '';
-                          const selectedItem = selectedOptions[2];
-                          const selectedItemData = inventoryItems.find(item => item.id === value[2]);
 
                           // Set the form values
-                          addToolForm.setFieldsValue({
-                            tool_name: subcategoryName,
-                            inventory_item_id: value[2],
-                            bel_partnumber: selectedItemData?.dynamic_data["BEL Part Number"] || selectedItemData?.dynamic_data["BEL Part Number "] || 'N/A',
-                            description: selectedItemData?.dynamic_data["BEL Part Description"] || '',
-                            tool_number: selectedItemData?.dynamic_data["BEL Part Number"] || selectedItemData?.dynamic_data["BEL Part Number "] || 'N/A'
+                          form.setFieldsValue({
+                            tool_name: subcategoryName,  // Set the subcategory name as a string
+                            inventory_item_id: value[2],  // Set item ID if needed
                           });
 
-                          // Set the selected values
+                          // Set the selected subcategory name
                           setSelectedSubcategoryName(subcategoryName);
-                          setSelectedPartNumber(selectedItemData?.dynamic_data["BEL Part Number"] || selectedItemData?.dynamic_data["BEL Part Number "] || 'N/A');
-                          setSelectedPartDescription(selectedItemData?.dynamic_data["BEL Part Description"] || '');
+
+                          // Find the selected item to extract the part number and description
+                          const selectedItemData = inventoryItems.find(item => item.id === value[2]);
+
+                          if (selectedItemData) {
+                            setSelectedPartNumber(selectedItemData.dynamic_data["BEL Part Number "] || 'N/A');
+                            setSelectedPartDescription(selectedItemData.dynamic_data["BEL Part Description"] || 'N/A');
+                            
+                            // Optionally set description field as well (for backend)
+                            form.setFieldsValue({
+                              description: selectedItemData.dynamic_data["BEL Part Description"] || 'N/A',  // Description as string
+                            });
+                          } else {
+                            setSelectedPartNumber('');
+                            setSelectedPartDescription('');
+                            form.setFieldsValue({
+                              description: 'N/A',  // Fallback if no item is selected
+                            });
+                          }
                         }
                       }}
                     />
@@ -4350,23 +4331,3 @@ const handleAddTool = async (values) => {
 };
 
 export default Planning;
-
-//testingggg
-//tes2mhhh
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

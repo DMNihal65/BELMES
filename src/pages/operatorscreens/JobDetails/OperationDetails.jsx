@@ -102,7 +102,7 @@ const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => {
             // If no documents exist, we should check the MPP endpoint directly
             try {
               const mppResponse = await fetch(
-                `http://172.17.80.1:6655/api/v1/mpp/by-part/${selectedOperation.part_number}/${selectedOperation.operation_number}`,
+                `http://172.18.7.85:7879/api/v1/mpp/by-part/${selectedOperation.part_number}/${selectedOperation.operation_number}`,
                 {
                   method: 'GET',
                   headers: {

@@ -19,7 +19,7 @@ const AllUsersDataTable = ({reload }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://172.17.80.1:6655/api/v1/auth/api/v1/auth/users-get?skip=0&limit=100&active_only=true');
+      const response = await fetch('http://172.18.7.85:7879/api/v1/auth/api/v1/auth/users-get?skip=0&limit=100&active_only=true');
       const data = await response.json();
       setUsers(data);
     } catch (error) {

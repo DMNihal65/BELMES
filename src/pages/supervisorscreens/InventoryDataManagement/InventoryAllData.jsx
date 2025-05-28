@@ -825,25 +825,31 @@ const InventoryAllData = () => {
 
     // Apply search filter if searchText exists
     if (searchText) {
+      // Split search text by commas and trim whitespace
+      const searchTerms = searchText.split(',').map(term => term.trim().toLowerCase());
+      
       filteredData = filteredData.filter(item => {
-        // Search in standard fields
-        if (
-          item.item_code?.toString().toLowerCase().includes(searchText.toLowerCase()) ||
-          item.quantity?.toString().includes(searchText) ||
-          item.available_quantity?.toString().includes(searchText) ||
-          item.status?.toLowerCase().includes(searchText.toLowerCase())
-        ) {
-          return true;
-        }
+        // Check if ALL search terms are found in ANY column
+        return searchTerms.every(term => {
+          // Search in standard fields
+          if (
+            item.item_code?.toString().toLowerCase().includes(term) ||
+            item.quantity?.toString().includes(term) ||
+            item.available_quantity?.toString().includes(term) ||
+            item.status?.toLowerCase().includes(term)
+          ) {
+            return true;
+          }
 
-        // Search in dynamic fields
-        if (item.dynamic_data) {
-          return Object.values(item.dynamic_data).some(value => 
-            value?.toString().toLowerCase().includes(searchText.toLowerCase())
-          );
-        }
+          // Search in dynamic fields
+          if (item.dynamic_data) {
+            return Object.values(item.dynamic_data).some(value => 
+              value?.toString().toLowerCase().includes(term)
+            );
+          }
 
-        return false;
+          return false;
+        });
       });
     }
 

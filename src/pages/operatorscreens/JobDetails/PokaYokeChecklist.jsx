@@ -23,7 +23,7 @@ const { TextArea } = Input;
 const { Step } = Steps;
 const { Option } = Select;
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.17.80.1:6655';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.18.7.85:7879';
 
 const PokaYokeChecklist = ({ jobId, machineId, visible, onClose }) => {
   const { currentUser, currentMachine } = useAuthStore();

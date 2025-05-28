@@ -18,6 +18,8 @@ import {
   InputNumber,
   DatePicker
 } from 'antd';
+
+
 import { 
   PlusOutlined, 
   FolderOutlined,
@@ -275,7 +277,39 @@ const InventoryViewData = () => {
 
 
 
-  // Update the table title section
+  // Modify the getTableData function to handle exact combination matches
+  const getTableData = () => {
+    if (!selectedCategory || selectedCategory.type === 'category') {
+      return [];
+    }
+
+    // Split search terms by comma and trim whitespace
+    const searchTerms = searchTerm
+      .split(',')
+      .map(term => term.trim())
+      .filter(term => term.length > 0);
+
+    // Only show items for selected subcategory
+    return items.filter(item => {
+      if (item.subcategory_id !== selectedCategory.id) return false;
+
+      // If no search terms, show all items
+      if (searchTerms.length === 0) return true;
+
+      // Get all values from the item (including dynamic data)
+      const itemValues = [
+        item.item_code,
+        ...Object.values(item.dynamic_data || {})
+      ].map(val => String(val).toLowerCase());
+
+      // Check if ALL search terms are found in the item's values
+      return searchTerms.every(term => 
+        itemValues.some(val => val.includes(term.toLowerCase()))
+      );
+    });
+  };
+
+  // Update the renderTableTitle function
   const renderTableTitle = () => (
     <Space className="w-full justify-between">
       <Space>
@@ -286,11 +320,11 @@ const InventoryViewData = () => {
         </Text>
         <Space>
           <Input.Search
-            placeholder="Search items..."
+            placeholder="Enter values to match (e.g., ø4, WIDIA HANITA, 4)"
             allowClear
             onSearch={handleSearch}
             onChange={(e) => handleSearch(e.target.value)}
-            className="min-w-[200px] max-w-[300px] flex-1 xl:flex-none"
+            className="min-w-[300px] max-w-[500px] flex-1 xl:flex-none"
           />
           <Button 
             onClick={() => {
@@ -311,22 +345,6 @@ const InventoryViewData = () => {
   // Update the handleSearch function
   const handleSearch = (value) => {
     setSearchTerm(value);
-  };
-
-  // Modify the getTableData function to filter based on the search term
-  const getTableData = () => {
-    if (!selectedCategory || selectedCategory.type === 'category') {
-      return [];
-    }
-
-    // Only show items for selected subcategory
-    return items.filter(item => {
-      return item.subcategory_id === selectedCategory.id && 
-             (item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) || 
-              Object.values(item.dynamic_data).some(val => 
-                String(val).toLowerCase().includes(searchTerm.toLowerCase())
-              ));
-    });
   };
 
   const isEditing = (record) => record.id === editingKey;

@@ -98,7 +98,7 @@ const OEEDashboard = () => {
       }
       
       const response = await axios.get(
-        `http://172.18.7.85:7879/production_monitoring/overall-oee-analytics/?${params.toString()}`
+        `http://172.18.7.88:5654/production_monitoring/overall-oee-analytics/?${params.toString()}`
       );
       
       setOverallOEEData(response.data);
@@ -130,7 +130,7 @@ const OEEDashboard = () => {
       }
       
       const response = await axios.get(
-        `http://172.18.7.85:7879/production_monitoring/detailed-shift-summary/?${params.toString()}`
+        `http://172.18.7.88:5654/production_monitoring/detailed-shift-summary/?${params.toString()}`
       );
       
       // Transform data for table
@@ -173,7 +173,7 @@ const OEEDashboard = () => {
       
       // Fetch data for each machine
       const promises = machineIds.map(id => 
-        axios.get(`http://172.18.7.85:7879/production_monitoring/machine-oee-analysis/${id}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`)
+        axios.get(`http://172.18.7.88:5654/production_monitoring/machine-oee-analysis/${id}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`)
       );
       
       const results = await Promise.allSettled(promises);
@@ -204,7 +204,7 @@ const OEEDashboard = () => {
       const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
       
       const response = await axios.get(
-        `http://172.18.7.85:7879/production_monitoring/machine-oee-analysis/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        `http://172.18.7.88:5654/production_monitoring/machine-oee-analysis/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
       );
       
       if (response.data && response.data.oee_trends) {

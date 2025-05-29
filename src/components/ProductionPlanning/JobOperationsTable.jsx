@@ -325,7 +325,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
       const response = await fetch(
-        `http://172.18.7.85:7879/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
+        `http://172.18.7.88:5654/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
         {
           method: 'PUT',
           headers: {
@@ -851,7 +851,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
 
       // Construct the URL to fetch the document
-      let downloadUrl = `http://172.18.7.85:7879/api/v1/document-management/documents/${documentId}/download`;
+      let downloadUrl = `http://172.18.7.88:5654/api/v1/document-management/documents/${documentId}/download`;
       if (versionId) {
         downloadUrl += `?version_id=${versionId}`;
       }
@@ -861,7 +861,8 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       const response = await fetch(downloadUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'accept': '*/*'
+          'accept': 'application/pdf',
+          'Content-Type': 'application/pdf'
         }
       });
       
@@ -875,12 +876,14 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       
       // Create a blob URL to use with PDF viewer
       const blob = await response.blob();
+      // Create a new blob with PDF type
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
       
       // If it's not a PDF, just download it instead of trying to view
       if (!contentType || !contentType.includes('application/pdf')) {
         console.log('Non-PDF document detected, downloading instead of viewing');
         // Get filename from Content-Disposition header if available
-        let filename = documentName || 'document';
+        let filename = documentName || 'document.pdf';
         const contentDisposition = response.headers.get('content-disposition');
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
@@ -889,7 +892,12 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           }
         }
         
-        const url = URL.createObjectURL(blob);
+        // Ensure filename has .pdf extension
+        if (!filename.toLowerCase().endsWith('.pdf')) {
+          filename += '.pdf';
+        }
+        
+        const url = URL.createObjectURL(pdfBlob);
         
         // Create and trigger download link
         const a = document.createElement('a');
@@ -904,12 +912,11 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           URL.revokeObjectURL(url);
         }, 100);
         
-        message.info('Document downloaded as it is not a viewable format');
         setIsLoading(false);
         return;
       }
       
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(pdfBlob);
       setPdfUrl(url);
       setIsPdfModalVisible(true);
       setCurrentPage(1);
@@ -937,7 +944,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
 
       // Construct the download URL
-      let downloadUrl = `http://172.18.7.85:7879/api/v1/document-management/documents/${documentId}/download`;
+      let downloadUrl = `http://172.18.7.88:5654/api/v1/document-management/documents/${documentId}/download`;
       if (versionId) {
         downloadUrl += `?version_id=${versionId}`;
       }
@@ -947,7 +954,8 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       const response = await fetch(downloadUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'accept': '*/*'
+          'accept': 'application/pdf',
+          'Content-Type': 'application/pdf'
         }
       });
       
@@ -956,7 +964,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
       
       // Get filename from Content-Disposition header if available
-      let filename = fileName || 'document';
+      let filename = fileName || 'document.pdf';
       const contentDisposition = response.headers.get('content-disposition');
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
@@ -965,17 +973,19 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
         }
       }
       
-      // Get the content type and set appropriate extension if needed
-      const contentType = response.headers.get('content-type');
-      
-      // Ensure filename has appropriate extension
-      if (contentType) {
-        // Don't modify file extension - use whatever the server provides
-        console.log(`Downloading file as: ${filename} (${contentType})`);
+      // Ensure filename has .pdf extension
+      if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename += '.pdf';
       }
       
+      // Get the content type
+      const contentType = response.headers.get('content-type');
+      console.log('Content-Type:', contentType);
+      
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      // Create a new blob with PDF type
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+      const url = URL.createObjectURL(pdfBlob);
       
       // Create and trigger download link
       const a = document.createElement('a');
@@ -1154,7 +1164,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
       const response = await fetch(
-        `http://172.18.7.85:7879/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
+        `http://172.18.7.88:5654/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
         {
           method: 'PUT',
           headers: {

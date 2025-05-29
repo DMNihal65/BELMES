@@ -5,7 +5,7 @@ import { Wrench, Package } from 'lucide-react';
 
 
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.18.7.85:7879/api/v1';
+const API_BASE_URL = 'http://172.18.7.88:5654/api/v1';
 const API_ENDPOINTS = {
   // GET endpoints for notifications
   machineNotifications: `${API_BASE_URL}/newlogsmachine-status-logs`,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Tooltip , InputNumber, Spin, Space, Input, Card, Tag, Row, Col, Descriptions } from 'antd';
-import { ReloadOutlined, RollbackOutlined, SearchOutlined, ToolOutlined } from '@ant-design/icons';
+import { ReloadOutlined, RollbackOutlined, SearchOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
@@ -10,14 +10,15 @@ import useInventoryStore from '../../../store/inventory-store';
 
 const TransactionHistoryTable = () => {
   const [isReturnModalVisible, setIsReturnModalVisible] = useState(false);
+  const [isDynamicDataModalVisible, setIsDynamicDataModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [selectedDynamicData, setSelectedDynamicData] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [returnForm] = Form.useForm();
   const { user } = useAuthStore();
   const [inventoryItems, setInventoryItems] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [itemDetails, setItemDetails] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
@@ -33,15 +34,13 @@ const TransactionHistoryTable = () => {
     fetchTransactionHistory();
   }, [fetchTransactionHistory]);
 
-  const { fetchCategories, fetchItems, fetchAllSubcategories, fetchCategoryById,
-    fetchSubcategoryById,
-    fetchItemById} = useInventoryStore();
+  const { fetchCategories, fetchItems, fetchAllSubcategories } = useInventoryStore();
 
   useEffect(() => {
     const initializeData = async () => {
       setIsLoading(true);
       try {
-        const [categoriesData, itemsData, subcatsData, upcomingData] = await Promise.all([
+        const [categoriesData, itemsData, subcatsData] = await Promise.all([
           fetchCategories(),
           loadInventoryItems(),
           loadSubcategories(),
@@ -60,7 +59,6 @@ const TransactionHistoryTable = () => {
   const loadSubcategories = async () => {
     try {
       const subCats = await fetchAllSubcategories();
-      // console.log('Loaded subcategories:', subCats); // Debug log
       setSubcategories(subCats || []);
     } catch (error) {
       console.error('Error loading subcategories:', error);
@@ -72,46 +70,11 @@ const TransactionHistoryTable = () => {
   const loadInventoryItems = async () => {
     try {
       const items = await fetchItems();
-      // console.log('Loaded items:', items); // Debug log
       setInventoryItems(items || []);
     } catch (error) {
       console.error('Error loading inventory items:', error);
       toast.error('Failed to load inventory items');
       setInventoryItems([]);
-    }
-  };
-
-  useEffect(() => {
-    const fetchAllItemDetails = async () => {
-      const details = {};
-      for (const transaction of transactions) {
-        if (transaction.item_id) {
-          details[transaction.item_id] = await loadItemDetails(transaction.item_id);
-        }
-      }
-      setItemDetails(details);
-    };
-
-    if (transactions.length > 0) {
-      fetchAllItemDetails();
-    }
-  }, [transactions]);
-
-  const loadItemDetails = async (itemId) => {
-    try {
-      const itemDetails = await fetchItemById(itemId);
-      console.log('Fetched item details:', itemDetails); // Debug log
-      const subcategoryDetails = await fetchSubcategoryById(itemDetails.subcategory_id);
-      console.log('Fetched subcategory details:', subcategoryDetails); // Debug log
-      const categoryDetails = await fetchCategoryById(subcategoryDetails.category_id);
-      console.log('Fetched category details:', categoryDetails); // Debug log
-      return {
-        categoryName: categoryDetails.name,
-        subcategoryName: subcategoryDetails.name,
-      };
-    } catch (error) {
-      console.error('Error loading item details:', error);
-      return { categoryName: 'Unknown', subcategoryName: 'Unknown' };
     }
   };
 
@@ -192,35 +155,48 @@ const TransactionHistoryTable = () => {
     setPageSize(pagination.pageSize);
   };
 
+  const handleItemCodeClick = (record) => {
+    setSelectedDynamicData(record.dynamic_data);
+    setIsDynamicDataModalVisible(true);
+  };
+
   const columns = [
-    // {
-    //   title: 'Transaction ID',
-    //   dataIndex: 'id',
-    //   key: 'id',
-    //   width: 120,
-    //   sorter: (a, b) => a.id - b.id,
-    // },
     {
-      title: 'Item Details',
-      dataIndex: 'item_id',
-      key: 'item_details',
-      width: 300,
-      render: (itemId) => {
-        const details = itemDetails[itemId] || { categoryName: 'Loading...', subcategoryName: 'Loading...' };
-        return (
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Tag style={{ cursor: 'pointer', color: '#1890ff' }}>
-              <ToolOutlined /> {details.categoryName} - {details.subcategoryName}
-            </Tag>
-          </div>
-        );
-      },
+      title: 'Category',
+      dataIndex: 'category_name',
+      key: 'category_name',
+      width: 120,
+      align: 'center',
+    },
+    {
+      title: 'Subcategory',
+      dataIndex: 'subcategory_name',
+      key: 'subcategory_name',
+      width: 150,
+      align: 'center',
+    },
+    {
+      title: 'Item Code',
+      dataIndex: 'item_code',
+      key: 'item_code',
+      width: 150,
+      align: 'center',
+      render: (itemCode, record) => (
+        <Button 
+          type="link" 
+          onClick={() => handleItemCodeClick(record)}
+          icon={<InfoCircleOutlined />}
+        >
+          {itemCode}
+        </Button>
+      ),
     },
     {
       title: 'Type',
       dataIndex: 'type',
       key: 'type',
       width: 150,
+      align: 'center',
       render: (type) => (
         <Tag color={type === 'Issue' ? 'red' : 'green'} className="text-base px-3 py-1">
           {type}
@@ -232,18 +208,12 @@ const TransactionHistoryTable = () => {
       ],
       onFilter: (value, record) => record.type === value,
     },
-    // {
-    //   title: 'Item ID',
-    //   dataIndex: 'item_id',
-    //   key: 'item_id',
-    //   width: 150,
-    // },
-    
     {
       title: 'Quantity',
       dataIndex: 'quantity',
       key: 'quantity',
       width: 100,
+      align: 'center',
       render: (quantity) => (
         <span className="font-semibold">{quantity}</span>
       ),
@@ -256,6 +226,7 @@ const TransactionHistoryTable = () => {
           dataIndex: 'current_quantity',
           key: 'current_quantity',
           width: 100,
+          align: 'center',
           render: (value) => (
             <span className="font-semibold text-blue-600">{value}</span>
           ),
@@ -265,6 +236,7 @@ const TransactionHistoryTable = () => {
           dataIndex: 'available_quantity',
           key: 'available_quantity',
           width: 100,
+          align: 'center',
           render: (value) => (
             <span className="font-semibold text-green-600">{value}</span>
           ),
@@ -276,12 +248,14 @@ const TransactionHistoryTable = () => {
       dataIndex: 'performed_by_username',
       key: 'performed_by_username',
       width: 150,
+      align: 'center',
     },
     {
       title: 'Remarks',
       dataIndex: 'remarks',
       key: 'remarks',
       width: 200,
+      align: 'center',
       ellipsis: true,
     },
     {
@@ -289,6 +263,7 @@ const TransactionHistoryTable = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
+      align: 'center',
       render: formatDate,
       sorter: (a, b) => new Date(a.created_at) - new Date(b.created_at),
     },
@@ -297,6 +272,7 @@ const TransactionHistoryTable = () => {
       key: 'actions',
       fixed: 'right',
       width: 100,
+      align: 'center',
       render: (_, record) => (
         record.type === 'Issue' && (
           <Button
@@ -312,6 +288,8 @@ const TransactionHistoryTable = () => {
     },
   ];
 
+
+  
   return (
     <div className="p-4">
       <ToastContainer position="top-right" autoClose={5000} />
@@ -339,7 +317,6 @@ const TransactionHistoryTable = () => {
             >
               Reset
             </Button>
-           
           </Space>
         </div>
 
@@ -365,6 +342,31 @@ const TransactionHistoryTable = () => {
         </Spin>
       </Card>
 
+      {/* Dynamic Data Modal */}
+      <Modal
+        title="Item Details"
+        open={isDynamicDataModalVisible}
+        onCancel={() => setIsDynamicDataModalVisible(false)}
+        footer={null}
+        width={800}
+        centered
+      >
+        {selectedDynamicData && (
+          <Descriptions
+            bordered
+            column={2}
+            size="small"
+            className="mb-4"
+          >
+            {Object.entries(selectedDynamicData).map(([key, value]) => (
+              <Descriptions.Item key={key} label={key}>
+                {value}
+              </Descriptions.Item>
+            ))}
+          </Descriptions>
+        )}
+      </Modal>
+
       <Modal
         title={
           <div className="flex items-center gap-2">
@@ -389,9 +391,6 @@ const TransactionHistoryTable = () => {
               <Descriptions.Item label="Transaction ID">
                 {selectedTransaction.id}
               </Descriptions.Item>
-              {/* <Descriptions.Item label="Item Code">
-                {selectedTransaction.item_code}
-              </Descriptions.Item> */}
               <Descriptions.Item label="Issued Quantity">
                 {selectedTransaction.quantity}
               </Descriptions.Item>

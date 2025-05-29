@@ -214,73 +214,68 @@ const TransactionSummaryAnalytics = () => {
   const transactionHistoryColumns = [
     {
       title: 'Item Details',
-      dataIndex: ['item', 'id'],
+      dataIndex: 'item_code',
       key: 'item_details',
       width: 300,
-      render: (itemId) => {
-        const details = itemDetails[itemId];
+      render: (itemCode, record) => {
         return (
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            {details ? (
-              <Tag style={{ cursor: 'pointer', color: '#1890ff' }}>
-                <ToolOutlined /> {details.categoryName} - {details.subcategoryName}
-              </Tag>
-            ) : (
-              'Loading...'
-            )}
+            <Tag style={{ cursor: 'pointer', color: '#1890ff' }}>
+              <ToolOutlined /> {record.category_name} - {record.subcategory_name}
+            </Tag>
           </div>
         );
       },
     },
     {
       title: 'Type',
-      dataIndex: ['transaction', 'type'],
+      dataIndex: 'type',
       key: 'type',
       filters: [
         { text: 'Issue', value: 'Issue' },
         { text: 'Return', value: 'Return' },
       ],
-      onFilter: (value, record) => record.transaction.type === value,
+      onFilter: (value, record) => record.type === value,
       filterMultiple: false,
     },
     {
       title: 'Quantity',
-      dataIndex: ['transaction', 'quantity'],
+      dataIndex: 'quantity',
       key: 'quantity',
-      sorter: (a, b) => a.transaction.quantity - b.transaction.quantity,
-      ...getColumnSearchProps(['transaction', 'quantity'], 'Quantity'),
+      sorter: (a, b) => a.quantity - b.quantity,
+      ...getColumnSearchProps('quantity', 'Quantity'),
     },
     {
       title: 'Performed By',
-      dataIndex: ['transaction', 'performed_by', 'username'],
+      dataIndex: 'performed_by_username',
       key: 'username',
-      ...getColumnSearchProps(['transaction', 'performed_by', 'username'], 'User'),
+      ...getColumnSearchProps('performed_by_username', 'User'),
     },
     {
       title: 'Date',
-      dataIndex: ['transaction', 'created_at'],
+      dataIndex: 'created_at',
       key: 'created_at',
       render: (date) => new Date(date).toLocaleDateString(),
-      sorter: (a, b) => new Date(a.transaction.created_at) - new Date(b.transaction.created_at),
+      sorter: (a, b) => new Date(a.created_at) - new Date(b.created_at),
     },
   ];
 
-  const filteredData = transactionHistory.transactions.filter((item) => {
+  const filteredData = transactionHistory.transactions?.filter((item) => {
     if (!searchText) return true;
     
     const searchFields = [
-      item.transaction.id,
-      item.transaction.type,
-      item.transaction.quantity,
-      item.item.item_code,
-      item.transaction.performed_by.username,
-      new Date(item.transaction.created_at).toLocaleDateString(),
+      item.id,
+      item.type,
+      item.quantity,
+      item.item_code,
+      item.performed_by_username,
+      new Date(item.created_at).toLocaleDateString(),
     ];
 
     return searchFields.some(field => 
       field?.toString().toLowerCase().includes(searchText.toLowerCase())
     );
-  });
+  }) || [];
 
   const dailyTransactionData = transactionMetrics?.daily_transaction_counts
     ? Object.entries(transactionMetrics.daily_transaction_counts).map(([date, count]) => ({
@@ -579,25 +574,25 @@ const TransactionSummaryAnalytics = () => {
         <Table
           columns={transactionHistoryColumns}
           dataSource={filteredData}
-          rowKey={(record) => record.transaction.id}
+          rowKey={(record) => record.id}
           onChange={handleTableChange}
-          pagination={{
-            current: currentPage,
-            pageSize: pageSize,
-            total: transactionHistory.metadata?.total_count,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-            pageSizeOptions: ['5', '10', '20', '50'],
-            onChange: (page, size) => {
-              setCurrentPage(page);
-              setPageSize(size);
-            },
-            onShowSizeChange: (current, size) => {
-              setCurrentPage(1);
-              setPageSize(size);
-            }
-          }}
+          // pagination={{
+          //   current: currentPage,
+          //   pageSize: pageSize,
+          //   total: transactionHistory.metadata?.total_count,
+          //   showSizeChanger: true,
+          //   showQuickJumper: true,
+          //   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          //   pageSizeOptions: ['5', '10', '20', '50'],
+          //   onChange: (page, size) => {
+          //     setCurrentPage(page);
+          //     setPageSize(size);
+          //   },
+          //   onShowSizeChange: (current, size) => {
+          //     setCurrentPage(1);
+          //     setPageSize(size);
+          //   }
+          // }}
           scroll={{ x: true }}
         />
       </Card>

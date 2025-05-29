@@ -13,7 +13,7 @@ const API_BASE_URL = 'http://172.18.7.88:5654/api/v1';
 const API_ENDPOINTS = {
   // GET endpoints for notifications
   machineNotifications: `${API_BASE_URL}/maintainance/supervisor/machine-notifications/`,
-  materialNotifications: `${API_BASE_URL}/maintainance/supervisor/raw-material-notifications`,
+  materialNotifications: `${API_BASE_URL}/maintainance/supervisor/raw-material-notifications/`,
   machineUnacknowledged: `${API_BASE_URL}/notification/machine-notifications/unacknowledged`,
   materialUnacknowledged: `${API_BASE_URL}/notification/material-notifications/unacknowledged`,
   

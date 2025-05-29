@@ -7,7 +7,17 @@ import { read, utils } from 'xlsx';
 import dayjs from 'dayjs';
 import useAuthStore from './auth-store';
 
-const BASE_URL = 'http://172.18.7.88:5654/api/v1/api/inventory';
+
+
+
+
+
+
+
+
+
+
+const BASE_URL = 'http://172.18.7.88:5654/api/v1/inventory';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -29,7 +39,7 @@ const getUserId = () => {
 // Add these functions before the create function
 const addCalibration = async (calibrationData) => {
   try {
-    const response = await axios.post('http://172.18.7.88:5654/api/v1/api/inventory/calibrations/', {
+    const response = await axios.post('http://172.18.7.88:5654/api/v1/inventory/calibrations/', {
       ...calibrationData,
       created_by: getUserId()
     });
@@ -42,7 +52,7 @@ const addCalibration = async (calibrationData) => {
 
 const updateCalibration = async (id, calibrationData) => {
   try {
-    const response = await axios.put(`http://172.18.7.88:5654/api/v1/api/inventory/calibrations/${id}`, {
+    const response = await axios.put(`http://172.18.7.88:5654/api/v1/inventory/calibrations/${id}`, {
       ...calibrationData,
       created_by: getUserId()
     });
@@ -55,7 +65,7 @@ const updateCalibration = async (id, calibrationData) => {
 
 const getCalibrationByItemId = async (itemId) => {
   try {
-    const response = await axios.get(`http://172.18.7.88:5654/api/v1/api/inventory/calibrations/?inventory_item_id=${itemId}`);
+    const response = await axios.get(`http://172.18.7.88:5654/api/v1/inventory/calibrations/?inventory_item_id=${itemId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching calibration:', error);
@@ -279,7 +289,7 @@ const useInventoryStore = create((set, get) => ({
   fetchItems: async (subcategoryId) => {
     set({ loading: true });
     try {
-      let url = `${BASE_URL}/items`;
+      let url = `${BASE_URL}/items/`;
       if (subcategoryId) {
         url = `${url}?subcategory_id=${subcategoryId}`;
       }
@@ -320,7 +330,7 @@ const useInventoryStore = create((set, get) => ({
   addItem: async (itemData) => {
     set({ loading: true });
     try {
-      const response = await axios.post(`${BASE_URL}/items`, {
+      const response = await axios.post(`${BASE_URL}/items/`, {
         item_code: itemData.item_code,
         dynamic_data: itemData.dynamic_data,
         quantity: parseInt(itemData.quantity),
@@ -955,7 +965,7 @@ const useInventoryStore = create((set, get) => ({
         axios.get(`${BASE_URL}/analytics/requests-by-status`),
         axios.get(`${BASE_URL}/analytics/transaction-summary`),
         axios.get(`${BASE_URL}/analytics/transaction-metrics`),
-        axios.get(`${BASE_URL}/analytics/transaction-history?limit=100&offset=0`)
+        axios.get(`${BASE_URL}/analytics/transaction-history2?limit=10&offset=0`)
       ]);
 
       set({
@@ -974,7 +984,7 @@ const useInventoryStore = create((set, get) => ({
   // Add transaction history search function
   searchTransactionHistory: async (searchText, dateRange) => {
     try {
-      let url = `${BASE_URL}/analytics/transaction-history?limit=100&offset=0`;
+      let url = `${BASE_URL}/analytics/transaction-history2?limit=10&offset=0`;
       
       if (searchText) {
         url += `&search=${encodeURIComponent(searchText)}`;

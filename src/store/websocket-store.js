@@ -52,7 +52,7 @@ const useWebSocketStore = create((set, get) => ({
       }
     }
 
-    const ws = new WebSocket('ws://172.18.7.85:7879/production_monitoring/ws/live-status/');
+    const ws = new WebSocket('ws://172.18.7.85:4476/production_monitoring/ws/live-status/');
     
     ws.onmessage = (event) => {
       try {
@@ -278,7 +278,7 @@ const useWebSocketStore = create((set, get) => ({
 
       console.log(`Fetching machine operations for machine ID: ${machineId}`);
       const response = await fetch(
-        `http://172.18.7.85:7879/api/v1/operator/machines/${machineId}/operations`
+        `http://172.18.7.85:4476/api/v1/operator/machines/${machineId}/operations`
       );
 
       if (!response.ok) {
@@ -591,7 +591,7 @@ const useWebSocketStore = create((set, get) => ({
     };
 
     try {
-      const response = await fetch('http://172.18.7.85:7879/api/v1/maintainance/downtimes/', {
+      const response = await fetch('http://172.18.7.85:4476/api/v1/maintainance/downtimes/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -630,7 +630,7 @@ const useWebSocketStore = create((set, get) => ({
         return;
       }
       const response = await fetch(
-        `http://172.18.7.85:7879/api/v1/maintainance/operator/machine-update/${machineId}`,
+        `http://172.18.7.85:4476/api/v1/maintainance/operator/machine-update/${machineId}`,
         {
           method: 'POST',
           headers: {
@@ -690,20 +690,28 @@ const useWebSocketStore = create((set, get) => ({
     try {
       set({ maintenanceLoading: true });
       
+      // Add timeout to fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(
         `http://172.18.7.85:7879/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${useAuthStore.getState().token}`
           },
           body: JSON.stringify({
             description: payload.description,
             is_available: payload.componentStatus === 'available',
             created_by: payload.created_by
-          })
+          }),
+          signal: controller.signal
         }
       );
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -712,26 +720,41 @@ const useWebSocketStore = create((set, get) => ({
 
       const data = await response.json();
       
+      // Return success without any additional messages
       return {
         success: true,
         data: {
           id: data.id,
-          childPartNumber: data.child_part_number,
+          child_part_number: data.child_part_number,
           description: data.description,
           quantity: data.quantity,
-          unitName: data.unit_name,
-          statusName: data.status_name,
-          availableFrom: data.available_from,
+          unit_name: data.unit_name,
+          status_name: data.status_name,
+          available_from: data.available_from,
           orders: data.orders
-        },
-        message: 'Component status updated successfully'
+        }
       };
     } catch (error) {
       console.error('Error submitting component issue:', error);
+      
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          error: 'Request timed out. Please check your connection and try again.'
+        };
+      }
+      
+      if (error.message.includes('Failed to fetch')) {
+        return {
+          success: false,
+          error: 'Network error. Please check your connection and try again.'
+        };
+      }
+
       return {
         success: false,
-        error: error.message,
-        message: 'Failed to update component status'
+        error: error.message
       };
     } finally {
       set({ maintenanceLoading: false });
@@ -744,7 +767,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.85:7879/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.85:4476/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -780,7 +803,7 @@ const useWebSocketStore = create((set, get) => ({
       const token = useAuthStore.getState().token;
 
       const response = await fetch(
-        `http://172.18.7.85:7879/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
+        `http://172.18.7.85:4476/api/v1/document-management/documents/download-latest/${partNumber}/${docType}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -811,7 +834,7 @@ const useWebSocketStore = create((set, get) => ({
   fetchMppDetails: async (partNumber, operationNumber) => {
     try {
       const response = await fetch(
-        `http://172.18.7.85:7879/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
+        `http://172.18.7.85:4476/api/v1/mpp/by-part/${partNumber}/${operationNumber}`
       );
 
       if (!response.ok) {
@@ -850,7 +873,7 @@ const useWebSocketStore = create((set, get) => ({
       
       // First try to fetch documents from documents API
       const response = await fetch(
-        `http://172.18.7.85:7879/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.85:4476/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           method: 'GET',
           headers: {
@@ -886,7 +909,7 @@ const useWebSocketStore = create((set, get) => ({
         try {
           console.log(`Fetching MPP data directly for part ${partNumber}, operation ${operationNumber}`);
           const mppResponse = await fetch(
-            `http://172.18.7.85:7879/api/v1/mpp/by-part/${partNumber}/${operationNumber}`,
+            `http://172.18.7.85:4476/api/v1/mpp/by-part/${partNumber}/${operationNumber}`,
             {
               method: 'GET',
               headers: {
@@ -960,9 +983,9 @@ const useWebSocketStore = create((set, get) => ({
 
       // Fetch both operation and document data in parallel
       const [operationsResponse, documentsResponse] = await Promise.all([
-        fetch(`http://172.18.7.85:7879/api/v1/operator/machines/${machineId}/operations`),
+        fetch(`http://172.18.7.85:4476/api/v1/operator/machines/${machineId}/operations`),
         fetch(
-          `http://172.18.7.85:7879/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+          `http://172.18.7.85:4476/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -1043,7 +1066,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Downloading document with ID: ${documentId}`);
       
       // Make sure we're using the correct endpoint URL with token
-      const endpoint = `http://172.18.7.85:7879/api/v1/document-management/documents/${documentId}/download-latest`;
+      const endpoint = `http://172.18.7.85:4476/api/v1/document-management/documents/${documentId}/download-latest`;
       console.log(`Making request to: ${endpoint}`);
       
       // Instead of using window.open, use fetch with proper authentication headers
@@ -1121,7 +1144,7 @@ const useWebSocketStore = create((set, get) => ({
       console.log(`Opening document with ID: ${documentId} in new tab`);
       
       // Create the endpoint URL - same as in downloadDocumentById
-      const endpoint = `http://172.18.7.85:7879/api/v1/document-management/documents/${documentId}/download-latest`;
+      const endpoint = `http://172.18.7.85:4476/api/v1/document-management/documents/${documentId}/download-latest`;
       
       // Open in new tab and handle the request there
       const newWindow = window.open('', '_blank');
@@ -1271,6 +1294,38 @@ const useWebSocketStore = create((set, get) => ({
     } catch (error) {
       console.error('Error opening document URL:', error);
       return { success: false, error: error.message };
+    }
+  },
+
+  fetchAllOrders: async () => {
+    try {
+      const token = useAuthStore.getState().token;
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://172.18.7.85:7879/api/v1/planning/all_orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders');
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data
+      };
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   },
 }));

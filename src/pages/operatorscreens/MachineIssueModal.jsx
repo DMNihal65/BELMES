@@ -22,9 +22,11 @@ const MachineIssueModal = ({
   // States
   const [activeTab, setActiveTab] = useState('breakdown');
   const [breakdownCategory, setBreakdownCategory] = useState('availability');
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   // Get store values
-  const { submitMachineIssue, submitComponentIssue, submitBreakdownIssue, machineStatus, maintenanceLoading, jobData } = useWebSocketStore();
+  const { submitMachineIssue, submitComponentIssue, submitBreakdownIssue, machineStatus, maintenanceLoading, jobData, fetchAllOrders } = useWebSocketStore();
   
   // Get user ID from localStorage as fallback
   const getUserId = () => {
@@ -37,6 +39,31 @@ const MachineIssueModal = ({
     if (localUserId) return localUserId;
 
     return null;
+  };
+
+  // Fetch orders when modal opens
+  useEffect(() => {
+    if (visible && activeTab === 'component') {
+      fetchOrders();
+    }
+  }, [visible, activeTab]);
+
+  // Function to fetch orders
+  const fetchOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const result = await fetchAllOrders();
+      if (result.success) {
+        setOrders(result.data);
+      } else {
+        toast.error('Failed to fetch orders');
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast.error('Error fetching orders');
+    } finally {
+      setLoadingOrders(false);
+    }
   };
 
   // Reset forms when modal opens/closes
@@ -128,12 +155,11 @@ const MachineIssueModal = ({
         case 'machine':
           values = await machineForm.validateFields();
           let machineId;
-          // const machineId = machineStatus?.machine_id;
           const storedMachine = localStorage.getItem('currentMachine');
-        if (storedMachine) {
-          const machineData = JSON.parse(storedMachine);
-          machineId = machineData?.id;
-        }
+          if (storedMachine) {
+            const machineData = JSON.parse(storedMachine);
+            machineId = machineData?.id;
+          }
           
           if (!machineId) {
             toast.error('No machine ID available');
@@ -158,9 +184,8 @@ const MachineIssueModal = ({
 
         case 'component':
           values = await componentForm.validateFields();
-          const partNumber = getCurrentPartNumber();
-          if (!partNumber) {
-            toast.error('No part number available');
+          if (!values.partNumber) {
+            toast.error('Please select a part number');
             return;
           }
 
@@ -171,13 +196,15 @@ const MachineIssueModal = ({
             return;
           }
 
-          const componentResult = await submitComponentIssue(partNumber, {
+          const componentResult = await submitComponentIssue(values.partNumber, {
             description: values.description || '',
             componentStatus: values.componentStatus,
             created_by: componentUserId.toString()
           });
+
           if (componentResult?.success) {
             toast.success('Component issue submitted successfully');
+            componentForm.resetFields();
             onClose();
           } else {
             toast.error(componentResult?.error || 'Failed to submit component issue');
@@ -366,9 +393,25 @@ const MachineIssueModal = ({
                 </Select>
               </Form.Item>
               
-              <div className="mb-4 text-xs text-gray-500">
-                Using part number: {getCurrentPartNumber() || 'No part number available'}
-              </div>
+              <Form.Item
+                name="partNumber"
+                label="Part Number"
+                rules={[{ required: true, message: 'Please select a part number' }]}
+              >
+                <Select
+                  placeholder="Select part number"
+                  loading={loadingOrders}
+                  showSearch
+                  optionFilterProp="children"
+                  style={{ width: '100%' }}
+                >
+                  {orders.map((order) => (
+                    <Option key={order.part_number} value={order.part_number}>
+                      {`${order.part_number} - ${order.part_description}`}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
 
               <Form.Item
                 name="description"
@@ -408,43 +451,3 @@ const MachineIssueModal = ({
 };
 
 export default MachineIssueModal; 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

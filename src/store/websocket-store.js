@@ -695,7 +695,7 @@ const useWebSocketStore = create((set, get) => ({
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
       const response = await fetch(
-        `http://172.18.7.88:5654/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
+        `http://172.18.7.89:32000/api/v1/maintainance/operator/raw-material-update/${partNumber}`,
         {
           method: 'POST',
           headers: {
@@ -1304,7 +1304,7 @@ const useWebSocketStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.88:5654/api/v1/planning/all_orders', {
+      const response = await fetch('http://172.18.7.89:32000/api/v1/planning/all_orders', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'

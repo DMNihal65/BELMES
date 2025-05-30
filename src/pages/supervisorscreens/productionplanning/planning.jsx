@@ -115,6 +115,8 @@ const Planning = () => {
   const [isAddToolModalVisible, setIsAddToolModalVisible] = useState(false);
   const [isEditToolModalVisible, setIsEditToolModalVisible] = useState(false);
   const [isAddProgramModalVisible, setIsAddProgramModalVisible] = useState(false);
+  const [operations, setOperations] = useState([]);
+  const [loadingOperations, setLoadingOperations] = useState(false);
   const [isEditProgramModalVisible, setIsEditProgramModalVisible] = useState(false);
   const [isVersionUpdateModalVisible, setIsVersionUpdateModalVisible] = useState(false);
   const [selectedProgramForVersion, setSelectedProgramForVersion] = useState(null);
@@ -181,7 +183,8 @@ const Planning = () => {
     uploadCncProgram,
     updateProgramVersion,
     fetchProgramVersions,
-    fetchCncProgramDetails // Add this line
+    fetchCncProgramDetails,
+    fetchOperationsForTool // Add this line
   } = usePlanningStore();
 
     const [subcategories, setSubcategories] = useState([]);
@@ -1534,7 +1537,33 @@ const loadInventoryItems = async () => {
     </Button>
   );
 
-// Add this useEffect to fetch tools when the component mounts or when selectedJob changes
+  // Function to load operations for the selected production order
+  const loadOperations = async (productionOrder) => {
+    if (!productionOrder) return [];
+    
+    try {
+      setLoadingOperations(true);
+      const ops = await fetchOperationsForTool(productionOrder);
+      setOperations(ops);
+      return ops;
+    } catch (error) {
+      console.error('Error loading operations:', error);
+      message.error('Failed to load operations');
+      return [];
+    } finally {
+      setLoadingOperations(false);
+    }
+  };
+
+  // Load operations when modal opens
+  useEffect(() => {
+    if (isAddToolModalVisible && selectedJob?.production_order) {
+      console.log('Loading operations for production order:', selectedJob.production_order);
+      loadOperations(selectedJob.production_order);
+    }
+  }, [isAddToolModalVisible, selectedJob]);
+
+  // Add this useEffect to fetch tools when the component mounts or when selectedJob changes
   useEffect(() => {
   const fetchTools = async () => {
       if (selectedJob?.id) {
@@ -1555,10 +1584,15 @@ const loadInventoryItems = async () => {
 }, [selectedJob?.id, fetchToolsByOrderId]);
 
 // Update the handleAddTool function
-const handleAddTool = async (values) => {
-  try {
-    setLoading(true);
-    const toolData = {
+  const handleAddTool = async (values) => {
+    if (!values.operation_id) {
+      message.error('Please select an operation');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const toolData = {
       ...values,
       order_id: selectedJob.id,
       operation_id: values.operation_id,
@@ -3403,13 +3437,31 @@ const handleAddTool = async (values) => {
                     />
                   </Form.Item>
 
+                  <Form.Item
+                    name="operation_id"
+                    label="Operation"
+                    rules={[{ required: true, message: 'Please select an operation' }]}
+                  >
+                    <Select
+                      placeholder="Select Operation"
+                      loading={loadingOperations}
+                      showSearch
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        String(option.children).toLowerCase().includes(input.toLowerCase())
+                      }
+                    >
+                      {operations.map(op => (
+                        <Select.Option key={op.id} value={op.id}>
+                          {`${op.operation_number} - ${op.operation_description || 'No Description'}`}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
 
-
-                  
-
-                    <Form.Item label="Selected Subcategory">
-                      <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />
-                    </Form.Item>
+                  <Form.Item label="Selected Subcategory">
+                    <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />
+                  </Form.Item>
 
                     <Form.Item label="BEL Part Number">
                       <Input 
@@ -3434,7 +3486,7 @@ const handleAddTool = async (values) => {
                     >
                       <InputNumber min={1} style={{ width: '100%' }} />
                     </Form.Item>
-                    <Form.Item
+                    {/* <Form.Item
                       name="operation_id"
                       label="Operation"
                       rules={[{ required: true, message: 'Please select an operation' }]}
@@ -3446,7 +3498,7 @@ const handleAddTool = async (values) => {
                           </Select.Option>
                         ))}
                       </Select>
-                    </Form.Item>
+                    </Form.Item> */}
                   </Form>
                 </Modal>
 

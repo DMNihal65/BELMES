@@ -779,7 +779,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:5654/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.89:32000/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1459,7 +1459,7 @@ const Workcenter = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <Title level={4} className="!mb-1">work centre Machine Linking</Title>
+              <Title level={4} className="!mb-1">Work Centre Machine Linking</Title>
               <Text type="secondary">Link and configure work centres with their respective machines</Text>
             </div>
             <div className="flex gap-3">

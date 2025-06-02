@@ -2,6 +2,7 @@ import { Layout } from 'antd';
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import Footer from './Footer';
 import useStore from '../../store/useStore';
 
 const { Content } = Layout;
@@ -37,9 +38,11 @@ function MainLayout() {
           padding: '24px',
           minHeight: 280,
           background: '#f5f5f5',
+          paddingBottom: '80px'
         }}>
           <Outlet />
         </Content>
+        <Footer />
       </Layout>
     </Layout>
   );

@@ -240,12 +240,16 @@ const InventoryViewData = () => {
         });
       }
 
+      const availableQuantity = Number(values.available_quantity) || 0;
+      // Set status based on available quantity
+      const status = availableQuantity === 0 ? 'Inactive' : 'Active';
+
       const itemData = {
         item_code: String(values.item_code).trim(),
         dynamic_data: formattedDynamicData,
         quantity: Number(values.quantity) || 0,
-        available_quantity: Number(values.available_quantity) || 0,
-        status: values.status || 'Active',
+        available_quantity: availableQuantity,
+        status: status,
         subcategory_id: selectedSubcategory.id,
         created_by: 1
       };
@@ -275,7 +279,29 @@ const InventoryViewData = () => {
     }
   };
 
-
+  // Add a function to handle available quantity changes
+  const handleAvailableQuantityChange = async (value, record) => {
+    try {
+      const newStatus = value === 0 ? 'Inactive' : 'Active';
+      
+      // If we're editing an existing record
+      if (record?.id) {
+        await updateItem(record.id, {
+          ...record,
+          available_quantity: value,
+          status: newStatus
+        });
+        // Refresh the items list
+        await fetchItems(selectedCategory?.id);
+      } else {
+        // If we're in the form
+        form.setFieldsValue({ status: newStatus });
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Failed to update status');
+    }
+  };
 
   // Modify the getTableData function to handle exact combination matches
   const getTableData = () => {
@@ -521,7 +547,82 @@ const InventoryViewData = () => {
     }
 
     // Add action column
-    columns.push({
+    columns.push(
+      {
+        title: 'Total Quantity',
+        dataIndex: 'quantity',
+        key: 'quantity',
+        width: 100,
+        editable: true,
+        align: 'center',
+        sorter: (a, b) => a.quantity - b.quantity,
+        filters: [
+          { text: '0', value: '0' },
+          { text: '1-10', value: '1-10' },
+          { text: '11-50', value: '11-50' },
+          { text: '50+', value: '50+' },
+        ],
+        onFilter: (value, record) => {
+          if (value === '0') return record.quantity === 0;
+          if (value === '1-10') return record.quantity > 0 && record.quantity <= 10;
+          if (value === '11-50') return record.quantity > 10 && record.quantity <= 50;
+          if (value === '50+') return record.quantity > 50;
+          return true;
+        },
+      },
+      {
+        title: 'Status',
+        dataIndex: 'status',
+        key: 'status',
+        width: 100,
+        editable: false,
+        align: 'center',
+        filters: [
+          { text: 'Active', value: 'Active' },
+          { text: 'Inactive', value: 'Inactive' },
+        ],
+        onFilter: (value, record) => record.status === value,
+        render: (_, record) => {
+          const status = record.available_quantity === 0 ? 'Inactive' : 'Active';
+          return (
+            <Tag color={status === 'Active' ? 'green' : 'red'}>
+              {status}
+            </Tag>
+          );
+        },
+      },
+      {
+        title: 'Available Quantity',
+        dataIndex: 'available_quantity',
+        key: 'available_quantity',
+        width: 150,
+        editable: true,
+        align: 'center',
+        fixed: 'right',
+        sorter: (a, b) => a.available_quantity - b.available_quantity,
+        filters: [
+          { text: '0', value: '0' },
+          { text: '1-10', value: '1-10' },
+          { text: '11-50', value: '11-50' },
+          { text: '50+', value: '50+' },
+        ],
+        onFilter: (value, record) => {
+          if (value === '0') return record.available_quantity === 0;
+          if (value === '1-10') return record.available_quantity > 0 && record.available_quantity <= 10;
+          if (value === '11-50') return record.available_quantity > 10 && record.available_quantity <= 50;
+          if (value === '50+') return record.available_quantity > 50;
+          return true;
+        },
+        onCell: (record) => ({
+          record,
+          inputType: 'number',
+          dataIndex: 'available_quantity',
+          title: 'Available Quantity',
+          editing: isEditing(record),
+          onChange: (value) => handleAvailableQuantityChange(value, record),
+        }),
+      },
+      {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
@@ -532,6 +633,7 @@ const InventoryViewData = () => {
             type="primary"
             icon={<PlusOutlined />}
             size="small"
+            disabled={record.available_quantity === 0 || record.status === 'Inactive'}
             onClick={() => {
               setSelectedItem(record);
               setIsRequestModalVisible(true);
@@ -584,7 +686,7 @@ const InventoryViewData = () => {
           status: 'Active',
           quantity: 0,
           available_quantity: 0,
-          subcategory_id: selectedCategory.id  // Set initial subcategory_id
+          subcategory_id: selectedCategory.id
         }}
       >
         <Form.Item
@@ -597,7 +699,7 @@ const InventoryViewData = () => {
         <Form.Item
           name="subcategory_id"
           hidden
-          initialValue={selectedCategory.id}  // Set initial value here as well
+          initialValue={selectedCategory.id}
         >
           <Input />
         </Form.Item>
@@ -619,8 +721,8 @@ const InventoryViewData = () => {
             min={0} 
             style={{ width: '100%' }} 
             onChange={(value) => {
-              // Auto-update available quantity when quantity changes
               form.setFieldsValue({ available_quantity: value });
+              handleAvailableQuantityChange(value);
             }}
           />
         </Form.Item>
@@ -630,7 +732,11 @@ const InventoryViewData = () => {
           label="Available Quantity"
           rules={[{ required: true, message: 'Please enter available quantity' }]}
         >
-          <InputNumber min={0} style={{ width: '100%' }} />
+          <InputNumber 
+            min={0} 
+            style={{ width: '100%' }} 
+            onChange={(value) => handleAvailableQuantityChange(value)}
+          />
         </Form.Item>
 
         <Form.Item
@@ -638,7 +744,7 @@ const InventoryViewData = () => {
           label="Status"
           rules={[{ required: true, message: 'Please select status' }]}
         >
-          <Select>
+          <Select disabled>
             <Select.Option value="Active">Active</Select.Option>
             <Select.Option value="Inactive">Inactive</Select.Option>
           </Select>
@@ -984,3 +1090,34 @@ const InventoryViewData = () => {
 };
 
 export default InventoryViewData; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

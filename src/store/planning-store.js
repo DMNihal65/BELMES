@@ -4,6 +4,37 @@ import { Spin, Tooltip } from 'antd';
 import moment from 'moment';
 
 const usePlanningStore = create((set) => ({
+  // Function to fetch operations for tool management
+  fetchOperationsForTool: async (productionOrder) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`http://172.18.7.88:1717/api/v1/planning/search_order2?production_order=${productionOrder}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to fetch operations');
+      }
+
+      // Extract operations from the response
+      const operations = data.orders?.[0]?.operations || [];
+      console.log('Fetched operations:', operations); // Debug log
+      
+      // Transform operations for dropdown
+      const formattedOperations = operations.map(op => ({
+        ...op,
+        value: op.id, // Use operation id as the value
+        label: `${op.operation_number} - ${op.operation_description || 'No Description'}`,
+      }));
+
+      console.log('Formatted operations:', formattedOperations); // Debug log
+      set({ isLoading: false, error: null });
+      return formattedOperations;
+    } catch (error) {
+      console.error('Error fetching operations for tool:', error);
+      set({ error: error.message, isLoading: false });
+      return [];
+    }
+  },
   searchResults: [],
   allOrders: [],
   partNumbers: [],
@@ -257,18 +288,14 @@ const usePlanningStore = create((set) => ({
     try {
       console.log('Checking completion status for:', { partNumber, productionOrder });
       const response = await fetch(`http://172.18.7.88:1717/api/v1/scheduling/check-order-completion-simple/${partNumber}/${productionOrder}`, {
-        method: 'POST',
+        method: 'GET',
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Accept': 'application/json'
         },
-        mode: 'cors',
-        body: JSON.stringify({
-          part_number: partNumber,
-          production_order: productionOrder
-        })
+        mode: 'cors'
       });
 
+      // First check if the response is ok
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
@@ -2014,6 +2041,66 @@ const usePlanningStore = create((set) => ({
     }
   },
 
+  // Function to upload CNC program
+  uploadCncProgram: async (formData) => {
+    try {
+      set({ isLoading: true, error: null });
+      const response = await fetch('http://172.18.7.88:1717/api/v1/document-management/cnc-program/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload CNC program');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error uploading CNC program:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+
+  // Function to fetch CNC program details by part number
+  fetchCncProgramDetails: async (partNumber) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(`http://172.18.7.88:1717/api/v1/document-management/cnc-program/by-part/${partNumber}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // No programs found for this part
+          set({ isLoading: false });
+          return [];
+        }
+        
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch CNC program details');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error fetching CNC program details:', error);
+      set({ isLoading: false, error: error.message });
+      return [];
+    }
+  }
 }));
 
 export default usePlanningStore;

@@ -3,9 +3,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { message } from 'antd';
 
 // API endpoints
-const API_BASE_URL = "http://172.18.7.88:1717";
-const MPP_API_BASE_URL = "http://172.18.7.88:1717";
-const WS_URL = "ws://172.18.7.88:1717/production_monitoring/ws/live-status/";
+const API_BASE_URL = "http://172.18.7.88:4545";
+const MPP_API_BASE_URL = "http://172.18.7.88:4545";
+const WS_URL = "ws://172.18.7.88:4545/production_monitoring/ws/live-status/";
 
 // Helper function to get authentication token
 const getAuthToken = () => {
@@ -91,6 +91,8 @@ const useOperatorStore = create((set, get) => ({
   // Job details
   jobDetails: null,
   jobDocuments: null,
+  rawMaterials: null,
+  isLoadingRawMaterials: false,
   
   // Production data
   productionStats: null,
@@ -821,6 +823,40 @@ const useOperatorStore = create((set, get) => ({
       console.error('Error fetching production metrics:', error);
       message.error(`Failed to fetch metrics: ${error.message}`);
       return null;
+    }
+  },
+  
+  // Fetch raw materials for a production order
+  fetchRawMaterials: async (productionOrder) => {
+    try {
+      set({ isLoadingRawMaterials: true });
+      
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/planning/search_order2?production_order=${productionOrder}`,
+        {
+          headers: createAuthHeaders()
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch raw materials');
+      }
+      
+      const data = await response.json();
+      
+      if (data.orders && data.orders.length > 0) {
+        set({ rawMaterials: data.orders[0].raw_materials || [] });
+      } else {
+        set({ rawMaterials: [] });
+      }
+      
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error fetching raw materials:', error);
+      message.error(`Failed to load raw materials: ${error.message}`);
+      return { success: false, error: error.message };
+    } finally {
+      set({ isLoadingRawMaterials: false });
     }
   }
 }));

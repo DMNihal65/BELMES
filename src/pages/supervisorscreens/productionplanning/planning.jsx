@@ -690,7 +690,7 @@ const loadInventoryItems = async () => {
         type={status === 'active' ? 'primary' : 'default'}
         onClick={() => handleStatusChange(productionOrder, status)}
         loading={updatingStatus}
-        className={status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}
+        style={status === 'active' ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : {}}
       >
         {status === 'active' ? 'Active' : 'Inactive'}
       </Button>

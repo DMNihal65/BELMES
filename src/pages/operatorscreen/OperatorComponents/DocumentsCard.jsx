@@ -1,21 +1,28 @@
-import React, { useState } from 'react';
-import { Tabs, Card, List, Empty, Button, Tag, Tooltip, Spin, Alert, message } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Tabs, Card, List, Empty, Button, Tag, Tooltip, Spin, Alert, message, Table } from 'antd';
 import { 
   FileText, Download, Eye, FileArchive, 
-  FileImage, Database, AlertCircle, Info 
+  FileImage, Database, AlertCircle, Info,
+  Package
 } from 'lucide-react';
 import useOperatorStore from '../../../store/operator-store';
 
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.18.7.88:1717";
-const MPP_API_BASE_URL = "http://172.18.7.88:1717";
+const API_BASE_URL = "http://172.18.7.88:4545";
+const MPP_API_BASE_URL = "http://172.18.7.88:4545";
 
 const DocumentsCard = () => {
-  const { jobDocuments, selectedJob, isLoadingJobs } = useOperatorStore();
+  const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials } = useOperatorStore();
   const [activeTab, setActiveTab] = useState('all');
   const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    if (selectedJob?.production_order && activeTab === 'tools') {
+      fetchRawMaterials(selectedJob.production_order);
+    }
+  }, [selectedJob?.production_order, activeTab]);
 
   // Handle document preview with authentication
   const handlePreview = async (documentId) => {
@@ -200,6 +207,41 @@ const DocumentsCard = () => {
         return jobDocuments.all_documents || [];
     }
   };
+
+  const rawMaterialsColumns = [
+    {
+      title: 'Part Number',
+      dataIndex: 'child_part_number',
+      key: 'child_part_number',
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+    },
+    {
+      title: 'Quantity',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      render: (quantity, record) => `${quantity} ${record.unit?.name || ''}`,
+    },
+    {
+      title: 'Status',
+      dataIndex: ['status', 'name'],
+      key: 'status',
+      render: (status) => (
+        <Tag color={status === 'Available' ? 'green' : 'orange'}>
+          {status}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Available From',
+      dataIndex: 'available_from',
+      key: 'available_from',
+      render: (date) => new Date(date).toLocaleDateString(),
+    },
+  ];
 
   if (isLoadingJobs) {
     return (
@@ -488,6 +530,32 @@ const DocumentsCard = () => {
                   />
                 </List.Item>
               )}
+            />
+          )}
+        </TabPane>
+
+        <TabPane
+          tab={
+            <span className="flex items-center gap-2">
+              <Package size={16} />
+              Tools
+            </span>
+          }
+          key="tools"
+        >
+          {isLoadingRawMaterials ? (
+            <div className="p-8 flex items-center justify-center">
+              <Spin tip="Loading raw materials..." />
+            </div>
+          ) : !rawMaterials || rawMaterials.length === 0 ? (
+            <Empty description="No raw materials found" />
+          ) : (
+            <Table
+              dataSource={rawMaterials}
+              columns={rawMaterialsColumns}
+              rowKey="id"
+              pagination={false}
+              className="raw-materials-table"
             />
           )}
         </TabPane>

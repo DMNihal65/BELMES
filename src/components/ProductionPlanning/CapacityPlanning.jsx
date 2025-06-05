@@ -560,7 +560,7 @@ const CapacityPlanning = () => {
         <div className="flex flex-col md:flex-row md:items-center">
           <DashboardOutlined className="text-blue-500 text-2xl mb-2 md:mb-0 md:mr-3" />
           <div>
-            <Title level={4} style={{ margin: 0, color: '#374151' }}>Machine Capacity Planning</Title>
+            <Title level={4} style={{ margin: 0, color: '#00ADB5' }}>Machine Capacity Planning</Title>
             <Text type="secondary">Monitor and analyze machine utilization across the shop floor</Text>
             <div className="mt-2">
               <Tag color="blue" icon={<AlertOutlined />}>Only work centre machines are displayed</Tag>

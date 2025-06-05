@@ -1296,7 +1296,7 @@ const usePlanningStore = create((set) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const url = new URL('http://172.18.7.88:1717/api/v1/scheduling/part-production-pdc');
+      const url = new URL('http://172.18.7.88:1717/api/v1/scheduling/part-production-pdc11');
       if (partNumber) url.searchParams.append('part_number', partNumber);
       if (productionOrder) url.searchParams.append('production_order', productionOrder);
       
@@ -1526,9 +1526,12 @@ const usePlanningStore = create((set) => ({
         return { pdc: null, status: 'inactive', data_source: null };
       }
       
-      // If part is active, fetch the PDC data
+      // If part is active, fetch the PDC data using both part_number and production_order
+      const partNumber = activePart.part_number;
+      
+      // Use the new endpoint with both part_number and production_order
       const response = await fetch(
-        `http://172.18.7.88:1717/api/v1/scheduling/part-production-pdc?production_order=${productionOrder}`, 
+        `http://172.18.7.88:1717/api/v1/scheduling/part-production-pdc11?part_number=${partNumber}&production_order=${productionOrder}`, 
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1539,7 +1542,7 @@ const usePlanningStore = create((set) => ({
 
       if (response.status === 404) {
         // Part is active but no PDC data yet
-        console.log(`No PDC data found for production order: ${productionOrder}`);
+        console.log(`No PDC data found for part number: ${partNumber}, production order: ${productionOrder}`);
         return { pdc: null, status: 'active', data_source: null };
       }
 
@@ -1552,7 +1555,12 @@ const usePlanningStore = create((set) => ({
       
       // If we have PDC data, return it with active status
       if (data && Array.isArray(data) && data.length > 0) {
-        const pdcData = data[0];
+        // Find the matching record with both part_number and production_order
+        const pdcData = data.find(item => 
+          item.part_number === partNumber && 
+          item.production_order === productionOrder
+        ) || data[0];
+        
         return { 
           pdc: pdcData.pdc, 
           status: 'active', 

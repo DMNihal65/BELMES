@@ -116,14 +116,31 @@ const OrderTable = ({ orders, onRefresh }) => {
     {
       title: 'Project',
       key: 'project',
-      render: (_, record) => (
-        <div>
-          <div>{record.project?.name}</div>
-          <Tag color={getPriorityColor(record.project?.priority)}>
-            Priority: {record.project?.priority || 'N/A'}
-          </Tag>
-        </div>
-      ),
+      render: (_, record) => {
+        const priority = record.project?.priority;
+        const priorityLabel = priority ? `Priority ${priority}` : 'N/A';
+        
+        return (
+          <div>
+            <div className="font-medium">{record.project?.name}</div>
+            <span 
+              className="font-bold text-sm px-3 py-1 mt-1 inline-block"
+              style={{
+                borderRadius: '4px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                cursor: 'default',
+                backgroundColor: getPriorityBackgroundColor(priority),
+                color: getPriorityTextColor(priority),
+                border: '1px solid ' + getPriorityBorderColor(priority)
+              }}
+            >
+              {priorityLabel}
+            </span>
+          </div>
+        );
+      },
       sorter: (a, b) => {
         const priorityA = a.project?.priority || 999;
         const priorityB = b.project?.priority || 999;
@@ -224,19 +241,49 @@ const OrderTable = ({ orders, onRefresh }) => {
     },
   ];
 
-  // Helper function to determine priority tag color
-  const getPriorityColor = (priority) => {
+  // Helper functions for priority styling
+  const getPriorityBackgroundColor = (priority) => {
     switch (priority) {
       case 1:
-        return 'red';
+        return '#fff2f0';
       case 2:
-        return 'orange';
+        return '#fff7e6';
       case 3:
-        return 'yellow';
+        return '#fffbe6';
       case 4:
-        return 'blue';
+        return '#f0f5ff';
       default:
-        return 'default';
+        return '#f5f5f5';
+    }
+  };
+
+  const getPriorityTextColor = (priority) => {
+    switch (priority) {
+      case 1:
+        return '#cf1322';
+      case 2:
+        return '#d46b08';
+      case 3:
+        return '#d48806';
+      case 4:
+        return '#1d39c4';
+      default:
+        return '#595959';
+    }
+  };
+
+  const getPriorityBorderColor = (priority) => {
+    switch (priority) {
+      case 1:
+        return '#ffccc7';
+      case 2:
+        return '#ffe7ba';
+      case 3:
+        return '#fff1b8';
+      case 4:
+        return '#d6e4ff';
+      default:
+        return '#d9d9d9';
     }
   };
 
@@ -249,15 +296,52 @@ const OrderTable = ({ orders, onRefresh }) => {
     });
   }, [orders]);
 
+  // Add custom styles for the table
+  const tableStyle = {
+    '.ant-table-thead > tr > th': {
+      background: 'linear-gradient(to bottom, #EBF5FF, #DBEAFE)',
+      color: '#1D4ED8',
+      fontWeight: 'bold',
+      borderBottom: '2px solid #2563EB',
+      textTransform: 'uppercase',
+      fontSize: '0.9rem'
+    },
+    '.ant-table-tbody > tr > td': {
+      fontWeight: '500'
+    },
+    '.ant-table-tbody > tr:hover > td': {
+      backgroundColor: 'inherit !important'
+    }
+  };
+
   return (
     <>
       <Table
-        columns={columns}
+        columns={columns.map(col => ({
+          ...col,
+          className: 'font-medium'
+        }))}
+        components={{
+          header: {
+            cell: props => (
+              <th
+                {...props}
+                style={{
+                  background: 'linear-gradient(to bottom, #EBF5FF, #DBEAFE)',
+                  color: '#1D4ED8',
+                  fontWeight: 'bold',
+                  borderBottom: '2px solid #2563EB',
+                  textTransform: 'uppercase',
+                  fontSize: '0.9rem'
+                }}
+              />
+            )
+          }
+        }}
         dataSource={sortedOrders}
         rowKey="id"
         scroll={{ 
-          x: 1800, 
-          y: 'calc(100vh - 420px)'
+          x: 1800
         }}
         pagination={{
           pageSize: pageSize,
@@ -278,12 +362,13 @@ const OrderTable = ({ orders, onRefresh }) => {
         }}
         size="middle"
         bordered
+        className="custom-table"
         rowClassName={(record) => {
           const priority = record.project?.priority;
-          if (priority === 1) return 'bg-red-50';
-          if (priority === 2) return 'bg-orange-50';
-          if (priority === 3) return 'bg-yellow-50';
-          return '';
+          if (priority === 1) return 'bg-red-100 font-medium border-l-4 border-red-500';
+          if (priority === 2) return 'bg-orange-100 font-medium border-l-4 border-orange-500';
+          if (priority === 3) return 'bg-yellow-100 font-medium border-l-4 border-yellow-500';
+          return 'font-medium';
         }}
       />
 

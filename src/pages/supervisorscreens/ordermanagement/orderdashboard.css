@@ -1,0 +1,118 @@
+/* Custom styles for OrderDashboard */
+
+/* In Progress tab gradient and bold text */
+.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  background: linear-gradient(135deg, #4F46E5, #6366F1) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  font-weight: bold !important;
+}
+
+/* Table header styling with blue gradient */
+.custom-table .ant-table-thead > tr > th {
+  background: linear-gradient(to bottom, #EBF5FF, #DBEAFE) !important;
+  color: #1D4ED8 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #2563EB !important;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  padding: 12px 16px !important;
+}
+
+/* In Progress tab table header styling with green gradient */
+.in-progress-table .ant-table-thead > tr > th {
+  background: linear-gradient(to bottom, #ECFDF5, #D1FAE5) !important;
+  color: #059669 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #10B981 !important;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  padding: 12px 16px !important;
+}
+
+/* Table cell styling */
+.custom-table .ant-table-tbody > tr > td {
+  font-weight: 500;
+}
+
+/* In Progress table cell styling - bold text */
+.in-progress-table .ant-table-tbody > tr > td {
+  font-weight: 500;
+  color: #111827;
+}
+
+/* Completed tab table header styling with yellow gradient */
+.completed-table .ant-table-thead > tr > th {
+  background: linear-gradient(to bottom, #FEF9C3, #c2aa12) !important;
+  color: #854D0E !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #c7a355 !important;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  padding: 12px 16px !important;
+}
+
+/* Completed table cell styling - bold text */
+.completed-table .ant-table-tbody > tr > td {
+  font-weight: 500;
+  color: #111827;
+}
+
+/* Completely disable all table row hover effects */
+.custom-table .ant-table-tbody > tr:hover > td,
+.custom-table .ant-table-tbody > tr.ant-table-row:hover > td,
+.ant-table-tbody > tr.ant-table-row:hover > td,
+.ant-table-tbody > tr > td.ant-table-cell-row-hover,
+.ant-table-tbody > tr.ant-table-row-hover > td,
+.ant-table-tbody > tr > td.ant-table-column-sort.ant-table-cell-row-hover,
+.ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+.ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background-color: inherit !important;
+  background: inherit !important;
+}
+
+/* Pagination styling */
+.custom-table .ant-pagination {
+  margin-top: 16px;
+}
+
+/* Completely disable all tag hover effects */
+.ant-tag,
+.ant-tag:hover,
+.ant-tag-volcano,
+.ant-tag-volcano:hover,
+.ant-tag-orange,
+.ant-tag-orange:hover,
+.ant-tag-gold,
+.ant-tag-gold:hover,
+.ant-tag-geekblue,
+.ant-tag-geekblue:hover {
+  opacity: 1 !important;
+  cursor: default !important;
+  color: inherit !important;
+  border-color: inherit !important;
+  background-color: inherit !important;
+  transition: none !important;
+  pointer-events: none !important;
+}
+
+/* Table container styling */
+.order-table-container .custom-table {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Priority color styling */
+.priority-1 {
+  background-color: #FEE2E2 !important;
+}
+
+.priority-2 {
+  background-color: #FFEDD5 !important;
+}
+
+.priority-3 {
+  background-color: #FEF3C7 !important;
+}

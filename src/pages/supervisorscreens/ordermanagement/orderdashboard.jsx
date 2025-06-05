@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import './orderdashboard.css';
 import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty, Tag } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined, SearchOutlined, ReloadOutlined, AppstoreOutlined, PlayCircleOutlined, PauseCircleOutlined, DisconnectOutlined } from '@ant-design/icons';
+import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import OrderTable from '../../../components/OrderManagement/OrderTable';
@@ -209,7 +208,6 @@ const OrderDashboard = () => {
         columns={timelineColumns}
         rowKey="key"
         size="small"
-        className="in-progress-table"
         pagination={{ pageSize: 5 }}
         scroll={{ x: 'max-content' }}
       />
@@ -395,7 +393,7 @@ const OrderDashboard = () => {
   ];
 
   return (
-    <div className="h-screen bg-white flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
       {error && (
         <Alert
           message="Error"
@@ -407,60 +405,31 @@ const OrderDashboard = () => {
       )}
       
       <div className="flex-1 p-4 overflow-hidden flex flex-col">
-        {/* Header Section */}
-        <div className="mb-6">
-          <Row gutter={[16, 16]} align="middle">
-            <Col span={12}>
-              <div className="flex items-center">
-                <div className="bg-blue-600 h-10 w-10 rounded-md flex items-center justify-center mr-4 bg-indigo-600">
-                  <MenuOutlined style={{ color: 'white', fontSize: '18px' }} />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold m-0">ORDER MANAGEMENT</h1>
-                  {/* <p className="text-gray-500 text-sm m-0">Real-time machine monitoring system</p> */}
-                </div>
-              </div>
-            </Col>
-            <Col span={12} className="flex justify-end">
-              <Space>
-                <div className="relative">
-                 
-                 
-                </div>
-                
-                <Button 
-                  className="bg-indigo-600 hover:bg-indigo-700 border-indigo-600"
-                  type="primary" 
-                  icon={<PlusOutlined />} 
-                  onClick={() => setIsModalVisible(true)}
-                >
-                  New Order
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </div>
+        {/* Quick Stats Row */}
+        <Row gutter={[16, 16]} className="mb-6" ref={parent}></Row>
 
-       
         {/* Main Content Area - Full Width Order Management */}
         <Row className="flex-1">
           <Col span={24} className="h-full">
             <Card
-   Production Dashboard           title={
+              title={
                 <div className="flex justify-between items-center">
-                  <span className="text-base font-semibold ">Order Lists</span>
-                  {/* <Space>
+                  <span className="text-base font-semibold">Order Management</span>
+                  <Space>
+                    {/* <Button icon={<FilterOutlined />} size="small">Filter</Button> */}
                     <Button 
-                      icon={<ReloadOutlined />} 
-                      onClick={handleRefresh}
+                      type="primary" 
+                      icon={<PlusOutlined />} 
+                      size="small"
+                      onClick={() => setIsModalVisible(true)}
                     >
-                      Refresh
+                      New Order
                     </Button>
-                  </Space> */}
+                  </Space>
                 </div>
               }
-              bordered={true}
-              className="h-full shadow-sm"
+              bordered={false}
+              className="h-full"
               bodyStyle={{ 
                 padding: '12px', 
                 height: 'calc(100% - 56px)',
@@ -472,27 +441,9 @@ const OrderDashboard = () => {
                 defaultActiveKey="all" 
                 className="h-full flex flex-col"
                 style={{ flex: 1 }}
-                type="card"
-                tabBarStyle={{ marginBottom: '16px' }}
-                tabBarGutter={8}
               >
-                <TabPane 
-                  tab={
-                    <div className="flex items-center px-2">
-                      <div className="bg-blue-100 text-blue-700 h-6 w-6 rounded-full flex items-center justify-center mr-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                          <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
-                          <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
-                          <path d="M18 12c-1.1 0-2 .9-2 2s.9 2 2 2h2v-4h-2z" />
-                        </svg>
-                      </div>
-                      <span className="font-medium">All Orders</span>
-                    </div>
-                  } 
-                  key="all"
-                  className="custom-tab"
-                >
-                  <div className="h-[calc(100vh-420px)] overflow-auto bg-white rounded-md shadow-sm p-2">
+                <TabPane tab="All Orders" key="all">
+                  <div className="h-[calc(100vh-320px)] overflow-auto">
                     <OrderTable 
                       orders={localOrders} 
                       onRefresh={handleRefresh}
@@ -500,39 +451,13 @@ const OrderDashboard = () => {
                     />
                   </div>
                 </TabPane>
-                <TabPane 
-                  tab={
-                    <div className="flex items-center px-2">
-                      <div className="bg-green-100 text-green-700 h-6 w-6 rounded-full flex items-center justify-center mr-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                          <circle cx="12" cy="12" r="10" />
-                          <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" />
-                        </svg>
-                      </div>
-                      <span className="font-medium">In Progress</span>
-                    </div>
-                  } 
-                  key="in_progress"
-                >
-                  <div className="h-[calc(100vh-420px)] overflow-auto bg-white rounded-md shadow-sm p-2">
+                <TabPane tab="In Progress" key="in_progress">
+                  <div className="h-full overflow-auto">
                     {renderTimelineTable()}
                   </div>
                 </TabPane>
-                <TabPane 
-                  tab={
-                    <div className="flex items-center px-2">
-                      <div className="bg-yellow-100 text-yellow-700 h-6 w-6 rounded-full flex items-center justify-center mr-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                          <polyline points="22 4 12 14.01 9 11.01" />
-                        </svg>
-                      </div>
-                      <span className="font-medium">Completed</span>
-                    </div>
-                  } 
-                  key="completed"
-                >
-                  <div className="h-[calc(100vh-420px)] overflow-auto bg-white rounded-md shadow-sm p-2">
+                <TabPane tab="Completed" key="completed">
+                  <div className="h-full overflow-auto">
                     {loadingCompletion ? (
                       <div className="flex justify-center items-center py-8">
                         <Spin size="large" />
@@ -542,28 +467,14 @@ const OrderDashboard = () => {
                         dataSource={completedOrders}
                         columns={completedOrdersColumns}
                         rowKey="production_order"
-                        className="completed-table"
                         pagination={{ pageSize: 10 }}
                         scroll={{ x: 'max-content' }}
                       />
                     )}
                   </div>
                 </TabPane>
-                <TabPane 
-                  tab={
-                    <div className="flex items-center px-2">
-                      <div className="bg-gray-100 text-gray-700 h-6 w-6 rounded-full flex items-center justify-center mr-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-                          <line x1="4" y1="22" x2="4" y2="15" />
-                        </svg>
-                      </div>
-                      <span className="font-medium">Priority</span>
-                    </div>
-                  } 
-                  key="priority"
-                >
-                  <div className="h-[calc(100vh-420px)] overflow-auto bg-white rounded-md shadow-sm p-2">
+                <TabPane tab="Priority" key="priority">
+                  <div className="h-full overflow-auto">
                     <ReorderableTable 
                       orders={priorityOrders}
                       onOrdersUpdate={handlePriorityUpdate}

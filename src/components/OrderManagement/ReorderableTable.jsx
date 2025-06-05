@@ -114,14 +114,31 @@ const ReorderableTable = ({ orders = [] }) => {
       title: 'Project',
       key: 'project',
       width: 200,
-      render: (_, record) => (
-        <div>
-          {record.project?.name || record.project_name}
+      render: (_, record) => {
+        const priority = record.project?.priority || record.priority;
+        const priorityLabel = priority ? `Priority ${priority}` : 'N/A';
+        
+        return (
           <div>
-            <Tag color="blue">Priority: {record.project?.priority || record.priority || 'N/A'}</Tag>
+            <div className="font-medium">{record.project?.name || record.project_name}</div>
+            <span 
+              className="font-bold text-sm px-3 py-1 mt-1 inline-block"
+              style={{
+                borderRadius: '4px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                cursor: 'default',
+                backgroundColor: getPriorityBackgroundColor(priority),
+                color: getPriorityTextColor(priority),
+                border: '1px solid ' + getPriorityBorderColor(priority)
+              }}
+            >
+              {priorityLabel}
+            </span>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Status',
@@ -137,22 +154,31 @@ const ReorderableTable = ({ orders = [] }) => {
     }
   ];
 
-  // Helper function to determine tag color based on priority
-  const getTagColor = (priority) => {
+  const getPriorityBackgroundColor = (priority) => {
     switch (priority) {
-      case 1:
-        return 'red';
-      case 2:
-        return 'orange';
-      case 3:
-        return 'yellow';
-      case 4:
-        return 'blue';
-      case 5:
-        return 'cyan';
-      default:
-        return 'default';
+      case 1: return '#FEE2E2'; // Light red
+      case 2: return '#FFEDD5'; // Light orange
+      case 3: return '#FEF3C7'; // Light yellow
+      case 4: return '#DBEAFE'; // Light blue
+      case 5: return '#CCFBF1'; // Light teal
+      default: return '#F3F4F6'; // Light gray
     }
+  };
+
+  const getPriorityTextColor = (priority) => {
+    switch (priority) {
+      case 1: return '#991B1B'; // Dark red
+      case 2: return '#9A3412'; // Dark orange
+      case 3: return '#92400E'; // Dark yellow
+      case 4: return '#1E40AF'; // Dark blue
+      case 5: return '#065F46'; // Dark teal
+      default: return '#1F2937'; // Dark gray
+    }
+  };
+
+  const getPriorityBorderColor = (priority) => {
+    // Using text color for border for consistency and good contrast
+    return getPriorityTextColor(priority);
   };
 
   const onDragEnd = ({ active, over }) => {
@@ -232,6 +258,7 @@ const ReorderableTable = ({ orders = [] }) => {
             strategy={verticalListSortingStrategy}
           >
             <Table
+              className="priority-table"
               components={{
                 body: {
                   row: Row,

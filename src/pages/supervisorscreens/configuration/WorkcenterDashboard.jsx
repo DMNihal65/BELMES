@@ -17,7 +17,7 @@ import {
   Switch,
   Popconfirm
 } from 'antd';
-import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, ClusterOutlined } from '@ant-design/icons';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import dayjs from 'dayjs';
@@ -779,7 +779,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:1717/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:1818/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1442,7 +1442,7 @@ const Workcenter = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-blue-50 p-6">
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -1458,9 +1458,14 @@ const Workcenter = () => {
       <Card className="shadow-sm">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <div>
-              <Title level={4} className="!mb-1">work centre Machine Linking</Title>
-              <Text type="secondary">Link and configure work centres with their respective machines</Text>
+            <div className="flex items-center">
+              <div className="flex items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200 w-12 h-12 mr-4">
+                <ClusterOutlined className="text-white text-2xl" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold m-0 text-gray-800">WORKCENTER MANAGEMENT</h1>
+                <p className="text-sm text-indigo-600 m-0">Link and configure work centres with their respective machines</p>
+              </div>
             </div>
             <div className="flex gap-3">
               <Button 
@@ -1486,7 +1491,7 @@ const Workcenter = () => {
             items={[
               {
                 key: 'workcenter',
-                label: 'work centre',
+                label: <span className="font-semibold">Work centre</span>,
                 children: (
                   <div className="border rounded-lg bg-white">
                     <Form form={form} component={false}>
@@ -1552,7 +1557,7 @@ const Workcenter = () => {
               },
               {
                 key: 'configure',
-                label: 'Configure Workcentre',
+                label: <span className="font-semibold">Configure Workcentre</span>,
                 children: (
                   <div className="border rounded-lg bg-white">
                     <Table

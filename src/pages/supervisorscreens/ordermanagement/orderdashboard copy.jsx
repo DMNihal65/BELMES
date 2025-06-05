@@ -11,9 +11,6 @@ import Workcenter from '../../../components/OrderManagement/Workcenter';
 import Lottie from 'lottie-react';
 import powerAnimation from '../../../assets/power.json';
 import inprogressAnimation from '../../../assets/inprogress.json';
-import completedAnimation from '../../../assets/completed.json';
-import totalOrdersAnimation from '../../../assets/totalorders.json';
-import priorityAnimation from '../../../assets/pritoriy.json';
 
 const { TabPane } = Tabs;
 
@@ -423,60 +420,22 @@ const OrderDashboard = () => {
         <Row gutter={[16, 16]} className="mb-6  " ref={parent}>
           <Col xs={24} sm={12} md={6}>
             <Card 
-              className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
-              bodyStyle={{ padding: 0 }}
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-indigo-50 to-blue-100 hover:scale-[1.02] overflow-hidden"
+              bodyStyle={{ padding: '20px', position: 'relative' }}
             >
-              {/* Animated background elements */}
-              <div className="absolute inset-0 opacity-5">
-                <div className="absolute top-4 right-4 w-32 h-32 bg-indigo-200 rounded-full blur-2xl animate-pulse"></div>
-                <div className="absolute bottom-4 left-4 w-24 h-24 bg-blue-200 rounded-full blur-xl animate-pulse delay-1000"></div>
+              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                <MenuOutlined className="text-7xl text-indigo-600" />
               </div>
-              
-              {/* Main content container */}
-              <div className="relative p-6 flex items-center justify-between h-32">
-                
-                {/* Left side - Icon and Label */}
-                <div className="flex items-center gap-4 flex-1">
-                  {/* Animated icon container */}
-                  <div className="relative">
-                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-blue-200 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
-                      <Lottie
-                        animationData={totalOrdersAnimation}
-                        style={{ width: 52, height: 52 }}
-                        {...lottieOptions}
-                        loop={true}
-                      />
-                    </div>
-                    {/* Pulse ring effect */}
-                    <div className="absolute inset-0 bg-indigo-200 rounded-xl animate-ping opacity-20"></div>
-                  </div>
-                  
-                  {/* Label section */}
-                  <div className="flex flex-col justify-center">
-                    <h3 className="text-indigo-800 font-semibold text-xl leading-tight">
-                      Total Orders
-                    </h3>
-                    <p className="text-indigo-600 text-sm font-medium opacity-80">
-                      All Orders
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Right side - Big number display */}
-                <div className="flex flex-col items-end justify-center">
-                  <div className="text-right">
-                    <div className="text-5xl font-bold text-indigo-700 leading-none group-hover:text-indigo-800 transition-colors duration-300">
-                      {orders?.length || 0}
-                    </div>
-                    <div className="text-indigo-500 text-xs font-medium mt-1 uppercase tracking-wider">
-                      Total
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Bottom accent line */}
-              <div className="h-1 bg-gradient-to-r from-indigo-400 via-blue-400 to-purple-400 group-hover:h-1.5 transition-all duration-300"></div>
+              <Statistic 
+                title={
+                  <span className="text-indigo-800 font-medium text-base flex items-center gap-2">
+                    <MenuOutlined className="text-indigo-600" /> Total Orders
+                  </span>
+                } 
+                value={orders?.length || 0} 
+                valueStyle={{ color: '#4338ca', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-indigo-400 ml-1">Orders</span>}
+              />
             </Card>
           </Col>
           
@@ -535,7 +494,10 @@ const OrderDashboard = () => {
       </div>
       
       {/* Trend indicator */}
-      
+      <div className="flex items-center gap-1 mt-2 px-2 py-1 bg-emerald-100 rounded-full">
+        <ArrowUpOutlined className="text-xs text-emerald-600" />
+        <span className="text-xs text-emerald-700 font-medium">Active</span>
+      </div>
     </div>
   </div>
   
@@ -546,119 +508,43 @@ const OrderDashboard = () => {
           
           <Col xs={24} sm={12} md={6}>
             <Card 
-              className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
-              bodyStyle={{ padding: 0 }}
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-yellow-50 to-yellow-100 hover:scale-[1.02] overflow-hidden"
+              bodyStyle={{ padding: '20px', position: 'relative' }}
             >
-              {/* Animated background elements */}
-              <div className="absolute inset-0 opacity-5">
-                <div className="absolute top-4 right-4 w-32 h-32 bg-amber-200 rounded-full blur-2xl animate-pulse"></div>
-                <div className="absolute bottom-4 left-4 w-24 h-24 bg-yellow-200 rounded-full blur-xl animate-pulse delay-1000"></div>
+              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                <FilterOutlined className="text-7xl text-yellow-600" />
               </div>
-              
-              {/* Main content container */}
-              <div className="relative p-6 flex items-center justify-between h-32">
-                
-                {/* Left side - Icon and Label */}
-                <div className="flex items-center gap-4 flex-1">
-                  {/* Animated icon container */}
-                  <div className="relative">
-                    <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-yellow-100 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
-                      <Lottie
-                        animationData={priorityAnimation}
-                        style={{ width: 52, height: 52 }}
-                        {...lottieOptions}
-                        loop={true}
-                      />
-                    </div>
-                    {/* Pulse ring effect */}
-                    <div className="absolute inset-0 bg-amber-200 rounded-xl animate-ping opacity-20"></div>
-                  </div>
-                  
-                  {/* Label section */}
-                  <div className="flex flex-col justify-center">
-                    <h3 className="text-amber-800 font-semibold text-xl leading-tight">
-                      Priority
-                    </h3>
-                    <p className="text-amber-600 text-sm font-medium opacity-80">
-                      High Priority Orders
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Right side - Big number display */}
-                <div className="flex flex-col items-end justify-center">
-                  <div className="text-right">
-                    <div className="text-5xl font-bold text-amber-700 leading-none group-hover:text-amber-800 transition-colors duration-300">
-                      {priorityOrders?.length || 0}
-                    </div>
-                    <div className="text-amber-500 text-xs font-medium mt-1 uppercase tracking-wider">
-                      Total
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Bottom accent line */}
-              <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 group-hover:h-1.5 transition-all duration-300"></div>
+              <Statistic 
+                title={
+                  <span className="text-yellow-800 font-medium text-base flex items-center gap-2">
+                    <FilterOutlined className="text-yellow-600" /> Priority
+                  </span>
+                } 
+                value={priorityOrders?.length || 0} 
+                valueStyle={{ color: '#D97706', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-yellow-400 ml-1">Orders</span>}
+              />
             </Card>
           </Col>
           
           <Col xs={24} sm={12} md={6}>
             <Card 
-              className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100 hover:scale-[1.03] overflow-hidden group cursor-pointer"
-              bodyStyle={{ padding: 0 }}
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-gray-50 to-gray-100 hover:scale-[1.02] overflow-hidden"
+              bodyStyle={{ padding: '20px', position: 'relative' }}
             >
-              {/* Animated background elements */}
-              <div className="absolute inset-0 opacity-5">
-                <div className="absolute top-4 right-4 w-32 h-32 bg-gray-300 rounded-full blur-2xl animate-pulse"></div>
-                <div className="absolute bottom-4 left-4 w-24 h-24 bg-gray-400 rounded-full blur-xl animate-pulse delay-1000"></div>
+              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                <PlusOutlined className="text-7xl text-gray-600" />
               </div>
-              
-              {/* Main content container */}
-              <div className="relative p-6 flex items-center justify-between h-32">
-                
-                {/* Left side - Icon and Label */}
-                <div className="flex items-center gap-4 flex-1">
-                  {/* Animated icon container */}
-                  <div className="relative">
-                    <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
-                      <Lottie
-                        animationData={completedAnimation}
-                        style={{ width: 52, height: 52 }}
-                        {...lottieOptions}
-                        loop={true}
-                      />
-                    </div>
-                    {/* Pulse ring effect */}
-                    <div className="absolute inset-0 bg-gray-300 rounded-xl animate-ping opacity-20"></div>
-                  </div>
-                  
-                  {/* Label section */}
-                  <div className="flex flex-col justify-center">
-                    <h3 className="text-gray-800 font-semibold text-xl leading-tight">
-                      Completed
-                    </h3>
-                    <p className="text-gray-600 text-sm font-medium opacity-80">
-                      Processed Orders
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Right side - Big number display */}
-                <div className="flex flex-col items-end justify-center">
-                  <div className="text-right">
-                    <div className="text-5xl font-bold text-gray-700 leading-none group-hover:text-gray-800 transition-colors duration-300">
-                      {completedOrders?.length || 0}
-                    </div>
-                    <div className="text-gray-500 text-xs font-medium mt-1 uppercase tracking-wider">
-                      Total
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Bottom accent line */}
-              <div className="h-1 bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600 group-hover:h-1.5 transition-all duration-300"></div>
+              <Statistic 
+                title={
+                  <span className="text-gray-800 font-medium text-base flex items-center gap-2">
+                    <PlusOutlined className="text-gray-600" /> Completed
+                  </span>
+                } 
+                value={completedOrders?.length || 0} 
+                valueStyle={{ color: '#4B5563', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-gray-400 ml-1">Orders</span>}
+              />
             </Card>
           </Col>
         </Row>

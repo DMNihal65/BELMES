@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import { format } from 'date-fns';
-import { Table, Switch, Select, Card, Button, Form, Space, Row, Col, DatePicker, Tag, Input, Typography  } from 'antd';
-import { ToolOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Table, Switch, Select, Card, Button, Form, Space, Row, Col, DatePicker, Tag, Input, Typography } from 'antd';
+import { ToolOutlined, CheckCircleOutlined, CloseCircleOutlined, ClusterOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -314,10 +314,29 @@ export default function MachineMaintenance() {
   }
 
   return (
-    <div className="w-full ">
+    <div className="w-full">
       {/* Toast Container */}
       <ToastContainer />
-      <Title className="text-xl font-semibold text-gray-800" level={3} style={{ margin: 8}}>Assests Availability</Title>
+      
+      {/* Assets Availability Card */}
+      <Card 
+        className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-indigo-50 to-blue-100 hover:scale-[1.02] overflow-hidden mb-6"
+        bodyStyle={{ padding: '20px', position: 'relative' }}
+      >
+        <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+          <ClusterOutlined className="text-7xl text-indigo-600" />
+        </div>
+        <Title 
+          level={3} 
+          className="text-indigo-800 font-medium flex items-center gap-2 mb-0"
+        >
+          <div className="flex items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200 w-10 h-10 mr-2">
+            <ClusterOutlined className="text-white text-2xl" />
+          </div>
+          Assets Availability
+        </Title>
+      </Card>
+
       <div className="mb-6">
       <div className="bg-white p-4 rounded-xl shadow-md">
         <Row gutter={[16, 16]}>

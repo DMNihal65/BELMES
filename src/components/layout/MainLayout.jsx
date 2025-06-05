@@ -37,7 +37,7 @@ function MainLayout() {
         <Content style={{ 
           padding: '24px',
           minHeight: 280,
-          background: '#f5f5f5',
+          background: '#f0f9ff',
           paddingBottom: '80px'
         }}>
           <Outlet />

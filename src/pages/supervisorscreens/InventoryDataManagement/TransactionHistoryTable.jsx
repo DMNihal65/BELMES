@@ -21,6 +21,7 @@ const TransactionHistoryTable = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [filteredData, setFilteredData] = useState([]);
 
   const {
     transactions,
@@ -33,6 +34,10 @@ const TransactionHistoryTable = () => {
   useEffect(() => {
     fetchTransactionHistory();
   }, [fetchTransactionHistory]);
+
+  useEffect(() => {
+    setFilteredData(transactions);
+  }, [transactions]);
 
   const { fetchCategories, fetchItems, fetchAllSubcategories } = useInventoryStore();
 
@@ -129,26 +134,26 @@ const TransactionHistoryTable = () => {
 
   const handleSearch = (value) => {
     setSearchText(value.toLowerCase());
+    const filtered = transactions.filter(record => {
+      return (
+        record.id?.toString().toLowerCase().includes(value.toLowerCase()) ||
+        record.type?.toLowerCase().includes(value.toLowerCase()) ||
+        record.item_code?.toLowerCase().includes(value.toLowerCase()) ||
+        record.performed_by_username?.toLowerCase().includes(value.toLowerCase()) ||
+        record.remarks?.toLowerCase().includes(value.toLowerCase()) ||
+        record.quantity?.toString().toLowerCase().includes(value.toLowerCase()) ||
+        record.current_quantity?.toString().toLowerCase().includes(value.toLowerCase()) ||
+        record.available_quantity?.toString().toLowerCase().includes(value.toLowerCase()) ||
+        formatDate(record.created_at)?.toLowerCase().includes(value.toLowerCase())
+      );
+    });
+    setFilteredData(filtered);
   };
 
   const handleReset = () => {
     setSearchText('');
+    setFilteredData(transactions);
   };
-
-  const filteredData = transactions.filter(record => {
-    if (!searchText) return true;
-    return (
-      record.id?.toString().toLowerCase().includes(searchText) ||
-      record.type?.toLowerCase().includes(searchText) ||
-      record.item_code?.toLowerCase().includes(searchText) ||
-      record.performed_by_username?.toLowerCase().includes(searchText) ||
-      record.remarks?.toLowerCase().includes(searchText) ||
-      record.quantity?.toString().toLowerCase().includes(searchText) ||
-      record.current_quantity?.toString().toLowerCase().includes(searchText) ||
-      record.available_quantity?.toString().toLowerCase().includes(searchText) ||
-      formatDate(record.created_at)?.toLowerCase().includes(searchText)
-    );
-  });
 
   const handleTableChange = (pagination, filters, sorter) => {
     setCurrentPage(pagination.current);
@@ -167,6 +172,8 @@ const TransactionHistoryTable = () => {
       key: 'category_name',
       width: 120,
       align: 'center',
+      filters: [...new Set(transactions.map(item => ({ text: item.category_name, value: item.category_name })))],
+      onFilter: (value, record) => record.category_name === value,
     },
     {
       title: 'Subcategory',
@@ -174,6 +181,8 @@ const TransactionHistoryTable = () => {
       key: 'subcategory_name',
       width: 150,
       align: 'center',
+      filters: [...new Set(transactions.map(item => ({ text: item.subcategory_name, value: item.subcategory_name })))],
+      onFilter: (value, record) => record.subcategory_name === value,
     },
     {
       title: 'Item Code',
@@ -249,6 +258,8 @@ const TransactionHistoryTable = () => {
       key: 'performed_by_username',
       width: 150,
       align: 'center',
+      filters: [...new Set(transactions.map(item => ({ text: item.performed_by_username, value: item.performed_by_username })))],
+      onFilter: (value, record) => record.performed_by_username === value,
     },
     {
       title: 'Remarks',

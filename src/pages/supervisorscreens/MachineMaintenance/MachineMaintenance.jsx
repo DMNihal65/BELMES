@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import { format } from 'date-fns';
-import { Table, Switch, Select, Card, Button, Form, Space, Row, Col, DatePicker, Tag, Input, Typography } from 'antd';
-import { ToolOutlined, CheckCircleOutlined, CloseCircleOutlined, ClusterOutlined } from '@ant-design/icons';
+import { Table, Switch, Card, Button, Form, Space, Row, Col, DatePicker, Tag, Input, Dropdown, Menu, Typography, Statistic } from 'antd';
+import { ToolOutlined, CheckCircleOutlined, CloseCircleOutlined, SearchOutlined, FilterOutlined, AppstoreOutlined, ReloadOutlined, PoweroffOutlined, DashboardOutlined, DesktopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -122,9 +122,9 @@ export default function MachineMaintenance() {
   const columns = [
     // {
     //   title: 'Machine ID',
-    //   dataIndex: 'machine_id', // Add this line
-    //   key: 'machine_id', // Add this line
-    //   width: '15%', // Adjust width as needed
+    //   dataIndex: 'machine_id',
+    //   key: 'machine_id',
+    //   width: '15%',
     // },
     {
       title: 'Machine Name',
@@ -157,7 +157,7 @@ export default function MachineMaintenance() {
           format(new Date(record.available_from), 'dd/MM/yyyy HH:mm')
         );
       },
-      width: '20%',
+      width: '15%',
     },
     {
       title: 'To',
@@ -194,13 +194,13 @@ export default function MachineMaintenance() {
           ? format(new Date(record.available_to), 'dd/MM/yyyy HH:mm') 
           : '-';
       },
-      width: '20%',
+      width: '15%',
     },
     {
       title: 'Status',
       dataIndex: 'status_name',
       key: 'status_name',
-      width: '20%',
+      width: '10%',
       render: (_, record) => {
         const editable = isEditing(record);
         if (editable) {
@@ -267,7 +267,7 @@ export default function MachineMaintenance() {
     {
       title: 'Actions',
       key: 'actions',
-      width: '20%',
+      width: '10%',
       render: (_, record) => {
         const editable = isEditing(record);
         return editable ? (
@@ -277,10 +277,11 @@ export default function MachineMaintenance() {
               onClick={() => save(record)} 
               size="small"
               loading={loading}
+              className="bg-green-500 hover:bg-green-600 text-white"
             >
               Save
             </Button>
-            <Button onClick={cancel} size="small">
+            <Button onClick={cancel} size="small" className="bg-red-500 hover:bg-red-600 text-white">
               Cancel
             </Button>
           </Space>
@@ -290,6 +291,7 @@ export default function MachineMaintenance() {
             disabled={editingKey !== ''}
             onClick={() => edit(record)}
             size="small"
+            className="bg-blue-500 hover:bg-blue-600 text-white"
           >
             Edit
           </Button>
@@ -300,7 +302,7 @@ export default function MachineMaintenance() {
   ];
 
   const filteredData = machines.filter(machine => {
-    const matchesMachine = !filterMachine || machine.machine_make === filterMachine;
+    const matchesMachine = !filterMachine || machine.machine_make.toLowerCase().includes(filterMachine.toLowerCase());
     const matchesStatus = !filterStatus || machine.status_name === filterStatus;
     return matchesMachine && matchesStatus;
   });
@@ -314,192 +316,172 @@ export default function MachineMaintenance() {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full  bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-fixed">
       {/* Toast Container */}
-      <ToastContainer />
-      
-      {/* Assets Availability Card */}
-      <Card 
-        className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-indigo-50 to-blue-100 hover:scale-[1.02] overflow-hidden mb-6"
-        bodyStyle={{ padding: '20px', position: 'relative' }}
-      >
-        <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-          <ClusterOutlined className="text-7xl text-indigo-600" />
-        </div>
-        <Title 
-          level={3} 
-          className="text-indigo-800 font-medium flex items-center gap-2 mb-0"
-        >
-          <div className="flex items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200 w-10 h-10 mr-2">
-            <ClusterOutlined className="text-white text-2xl" />
+      <ToastContainer position="top-right" theme="colored" />
+      <div className="bg-white bg-opacity-80 backdrop-blur-sm p-6 rounded-xl shadow-md mb-6 border border-indigo-100">
+        <Row>
+        <Col xs={24}>
+          <div className="flex flex-wrap items-center justify-between">
+            {/* LEFT SIDE: Title & Icon */}
+            <div className="flex items-center mb-2 md:mb-0">
+              <div className="flex items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200 w-12 h-12 mr-4">
+                <DashboardOutlined className="text-white text-2xl" />
+              </div>
+              <div>
+                <Title level={3} className="text-2xl font-bold m-0 text-gray-800">ASSETS AVAILABILITY</Title>
+                <p className="text-sm text-indigo-600 m-0">Real-time machine status and maintenance overview</p>
+              </div>
+            </div>
+
+            {/* RIGHT SIDE: Filters */}
+            <Space size="middle" wrap>
+              <Form.Item label={<span className="font-medium text-gray-700">Machine Name</span>} className="mb-0">
+                <Dropdown
+                  overlay={
+                    <Menu onClick={(e) => setFilterMachine(e.key)} className="rounded-xl shadow-lg p-1">
+                      <Menu.Item key="" icon={<AppstoreOutlined style={{ color: '#4f46e5' }} />} className="rounded-lg">
+                        <span className="font-medium">All Machines</span>
+                      </Menu.Item>
+                      <Menu.Divider />
+                      {[...new Set(machines.map(machine => machine.machine_make))].map(machineMake => (
+                        <Menu.Item key={machineMake} className="rounded-lg">
+                          <span className="font-medium">{machineMake}</span>
+                        </Menu.Item>
+                      ))}
+                    </Menu>
+                  }
+                  trigger={['click']}
+                >
+                  <Button 
+                    icon={<SearchOutlined />} 
+                    className={`rounded-xl ${filterMachine !== '' ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : ''} hover:shadow-md transition-all duration-300`}
+                  >
+                    <span className="font-medium">{filterMachine === '' ? 'All Machines' : filterMachine}</span>
+                  </Button>
+                </Dropdown>
+              </Form.Item>
+
+              <Form.Item label={<span className="font-medium text-gray-700">Status</span>} className="mb-0">
+                <Dropdown
+                  overlay={
+                    <Menu onClick={(e) => setFilterStatus(e.key)} className="rounded-xl shadow-lg p-1">
+                      <Menu.Item key="" icon={<AppstoreOutlined style={{ color: '#4f46e5' }} />} className="rounded-lg">
+                        <span className="font-medium">All Statuses</span>
+                      </Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Item key="ON" icon={<CheckCircleOutlined style={{ color: '#10b981' }} />} className="rounded-lg">
+                        <span className="font-medium">ON</span>
+                      </Menu.Item>
+                      <Menu.Item key="OFF" icon={<PoweroffOutlined style={{ color: '#64748b' }} />} className="rounded-lg">
+                        <span className="font-medium">OFF</span>
+                      </Menu.Item>
+                    </Menu>
+                  }
+                  trigger={['click']}
+                >
+                  <Button 
+                    icon={<FilterOutlined />} 
+                    className={`rounded-xl ${filterStatus !== '' ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : ''} hover:shadow-md transition-all duration-300`}
+                  >
+                    <span className="font-medium">{filterStatus === '' ? 'All Statuses' : filterStatus}</span>
+                  </Button>
+                </Dropdown>
+              </Form.Item>
+
+              <Button
+                onClick={() => {
+                  setFilterMachine('');
+                  setFilterStatus('');
+                  fetchMachineStatuses();
+                }}
+                className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+                icon={<ReloadOutlined />}
+              >
+                Reset Filters
+              </Button>
+            </Space>
           </div>
-          Assets Availability
-        </Title>
-      </Card>
-
-      <div className="mb-6">
-      <div className="bg-white p-4 rounded-xl shadow-md">
-        <Row gutter={[16, 16]}>
-          <Col xs={24} md={12} lg={8}>
-            <Form.Item label={<span className="font-medium text-gray-700">Machine Name</span>} className="mb-0">
-              <Select
-                className="w-full"
-                value={filterMachine}
-                onChange={setFilterMachine}
-                placeholder="Select machine"
-                allowClear
+          
+          <Row gutter={[16, 16]} className="mb-3 mt-5">
+      
+            {/* Total Machines */}
+            <Col xs={24} sm={12} md={6} lg={4}>
+              <Card 
+                className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-indigo-50 to-blue-100 hover:scale-[1.02] overflow-hidden"
+                bodyStyle={{ padding: '20px', position: 'relative' }}
               >
-                <Select.Option value="">All Machines</Select.Option>
-                {machines.map((machine) => (
-                  <Select.Option key={machine.machine_make} value={machine.machine_make}>
-                    {machine.machine_make}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
+                <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                  <DesktopOutlined className="text-7xl text-indigo-600" />
+                </div>
+                <Statistic 
+                  title={<span className="text-indigo-800 font-medium text-base flex items-center gap-2">
+                    <DesktopOutlined className="text-indigo-600" /> Total Machines
+                  </span>} 
+                  value={totalMachines} 
+                  valueStyle={{ color: '#4338ca', fontWeight: 700, fontSize: '28px' }}
+                  suffix={<span className="text-xs text-indigo-400 ml-1">Machines</span>}
+                />
+              </Card>
+            </Col>
 
-          <Col xs={24} md={12} lg={8}>
-            <Form.Item label={<span className="font-medium text-gray-700">Status</span>} className="mb-0">
-              <Select
-                className="w-full"
-                value={filterStatus}
-                onChange={setFilterStatus}
-                placeholder="Select status"
-                allowClear
+            {/* Active Machines */}
+            <Col xs={24} sm={12} md={6} lg={4}>
+              <Card 
+                className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-green-50 to-emerald-100 hover:scale-[1.02] overflow-hidden"
+                bodyStyle={{ padding: '20px', position: 'relative' }}
               >
-                <Select.Option value="">All Status</Select.Option>
-                {statuses.map((status) => (
-                  <Select.Option key={status.id} value={status.name}>
-                    {status.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
+                <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                  <CheckCircleOutlined className="text-7xl text-green-600" />
+                </div>
+                <Statistic 
+                  title={<span className="text-green-800 font-medium text-base flex items-center gap-2">
+                    <CheckCircleOutlined className="text-green-600" /> Active Machines
+                  </span>} 
+                  value={machines.filter(m => m.status_name === 'ON').length}
+                  valueStyle={{ color: '#16a34a', fontWeight: 700, fontSize: '28px' }}
+                  suffix={<span className="text-xs text-green-400 ml-1">Machines</span>}
+                />
+              </Card>
+            </Col>
+
+            {/* Inactive Machines */}
+            <Col xs={24} sm={12} md={6} lg={4}>
+              <Card 
+                className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-red-50 to-rose-100 hover:scale-[1.02] overflow-hidden"
+                bodyStyle={{ padding: '20px', position: 'relative' }}
+              >
+                <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                  <CloseCircleOutlined className="text-7xl text-red-600" />
+                </div>
+                <Statistic 
+                  title={<span className="text-red-800 font-medium text-base flex items-center gap-2">
+                    <CloseCircleOutlined className="text-red-600" /> Inactive Machines
+                  </span>} 
+                  value={machines.filter(m => m.status_name === 'OFF').length}
+                  valueStyle={{ color: '#dc2626', fontWeight: 700, fontSize: '28px' }}
+                  suffix={<span className="text-xs text-red-400 ml-1">Machines</span>}
+                />
+              </Card>
+            </Col>
+          </Row>
+
+        </Col>
+
         </Row>
       </div>
 
-      </div>
+      
 
-      <Row gutter={[16, 16]} className="mb-6">
-  {/* Total Machines */}
-  <Col xs={24} sm={12} md={12} lg={8}>
-    <Card
-      hoverable
-      bodyStyle={{ padding: '16px' }}
-      style={{
-        background: 'rgba(24, 144, 255, 0.05)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(24, 144, 255, 0.2)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-      }}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{
-            background: 'linear-gradient(135deg, #1890ff 0%, #69c0ff 100%)',
-            boxShadow: '0 4px 8px rgba(24, 144, 255, 0.2)',
-          }}
-        >
-          <ToolOutlined style={{ fontSize: '20px', color: '#ffffff' }} />
-        </div>
-        <div className="flex-1">
-          <Text style={{ fontSize: '14px', color: '#8c8c8c', display: 'block', marginBottom: '4px' }}>
-            Total Machines
-          </Text>
-          <div className="flex items-end justify-between">
-            <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-              {totalMachines}
-            </Title>
-            <Text style={{ fontSize: '12px', color: '#1890ff' }}>Total</Text>
-          </div>
-        </div>
-      </div>
-    </Card>
-  </Col>
-
-  {/* Active Machines */}
-  <Col xs={24} sm={12} md={12} lg={8}>
-    <Card
-      hoverable
-      bodyStyle={{ padding: '16px' }}
-      style={{
-        background: 'rgba(82, 196, 26, 0.05)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(82, 196, 26, 0.2)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-      }}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{
-            background: 'linear-gradient(135deg, #52c41a 0%, #b7eb8f 100%)',
-            boxShadow: '0 4px 8px rgba(82, 196, 26, 0.2)',
-          }}
-        >
-          <CheckCircleOutlined style={{ fontSize: '20px', color: '#ffffff' }} />
-        </div>
-        <div className="flex-1">
-          <Text style={{ fontSize: '14px', color: '#8c8c8c', display: 'block', marginBottom: '4px' }}>
-            Active Machines
-          </Text>
-          <div className="flex items-end justify-between">
-            <Title level={3} style={{ margin: 0, color: '#52c41a' }}>
-              {machines.filter(m => m.status_name === 'ON').length}
-            </Title>
-            <Text style={{ fontSize: '12px', color: '#52c41a' }}>Running</Text>
-          </div>
-        </div>
-      </div>
-    </Card>
-  </Col>
-
-  {/* Inactive Machines */}
-  <Col xs={24} sm={12} md={12} lg={8}>
-    <Card
-      hoverable
-      bodyStyle={{ padding: '16px' }}
-      style={{
-        background: 'rgba(255, 77, 79, 0.05)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 77, 79, 0.2)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-      }}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{
-            background: 'linear-gradient(135deg, #ff4d4f 0%, #ffa39e 100%)',
-            boxShadow: '0 4px 8px rgba(255, 77, 79, 0.2)',
-          }}
-        >
-          <CloseCircleOutlined style={{ fontSize: '20px', color: '#ffffff' }} />
-        </div>
-        <div className="flex-1">
-          <Text style={{ fontSize: '14px', color: '#8c8c8c', display: 'block', marginBottom: '4px' }}>
-            Inactive Machines
-          </Text>
-          <div className="flex items-end justify-between">
-            <Title level={3} style={{ margin: 0, color: '#ff4d4f' }}>
-              {machines.filter(m => m.status_name === 'OFF').length}
-            </Title>
-            <Text style={{ fontSize: '12px', color: '#ff4d4f' }}>Down</Text>
-          </div>
-        </div>
-      </div>
-    </Card>
-  </Col>
-</Row>
-
-
-      <div className="bg-white p-4 md:p-6 rounded-2xl shadow-lg border border-gray-100">
+      <div className="bg-white p-4 md:p-6 rounded-2xl shadow-lg border border-indigo-600"
+        style={{
+          // background: 'linear-gradient(135deg, #ffffff 0%, #f7f7f7 100%)',
+          border: '1px solid #e0e0e0',
+          borderRadius: '16px',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+          padding: '24px',
+        }}
+      >
       <Form form={form} component={false}>
         <Table
           columns={columns}
@@ -509,17 +491,43 @@ export default function MachineMaintenance() {
           onChange={handleTableChange}
           pagination={{
             ...tableParams.pagination,
-            pageSize: 7,
+            // pageSize: 7,
             responsive: true,
-            position: ['bottomCenter']
+            position: ['bottomCenter'],
           }}
           size="middle"
           bordered
           scroll={{ x: 'max-content' }}
-          className="responsive-table"
+          className="responsive-table custom-machine-maintenance-table"
+          style={{
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+          }}
         />
       </Form>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+//testing
+
+
+
+
+
+
+
+
+
+
+
+// fghf

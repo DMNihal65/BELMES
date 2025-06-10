@@ -1154,7 +1154,7 @@ const Notifications = () => {
                   <Bell size={24} color="#fff" />
                 </div>
                 <div>
-                  <Title level={3} style={{ margin: 0 }}>Notifications Center</Title>
+                  <Title level={3} style={{ margin: 0 }}>Notifications Centre</Title>
                   <Text type="secondary">
                     Monitor and manage all system alerts in one place
                   </Text>

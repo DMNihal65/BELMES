@@ -282,9 +282,9 @@ const ProductionAlerts = ({ machineData, timeRange, dateRange }) => {
                 { value: 'low', label: 'Low' },
               ]}
             />
-            <Button type="primary">
+            {/* <Button type="primary">
               Acknowledge All
-            </Button>
+            </Button> */}
           </Space>
         }
       >

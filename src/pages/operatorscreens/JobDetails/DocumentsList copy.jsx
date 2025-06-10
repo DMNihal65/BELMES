@@ -168,7 +168,7 @@ const DocumentsList = ({ jobData, jobOrderData }) => {
       >
         {selectedDocument && (
           <iframe
-            src={`http://172.18.7.88:1919/api/v1/document-management/documents/view/${jobOrderData?.part_number || jobData?.part_number}/${selectedDocument.type}?token=${token}`}
+            src={`http://172.18.7.88:2929/api/v1/document-management/documents/view/${jobOrderData?.part_number || jobData?.part_number}/${selectedDocument.type}?token=${token}`}
             style={{ width: '100%', height: '80vh' }}
             title="Document Viewer"
           />

@@ -2099,9 +2099,9 @@ const InventoryAllData = () => {
                     dataSource={getTableData()}
                     scroll={{ x: 'max-content' }}
                     size="middle"
-                    rowSelection={{
-                      type: 'checkbox',
-                    }}
+                    // rowSelection={{
+                    //   type: 'checkbox',
+                    // }}
                     loading={isLoading}
                     title={renderTableTitle}
                     rowKey="id"

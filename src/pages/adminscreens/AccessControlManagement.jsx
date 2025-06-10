@@ -424,7 +424,7 @@ const AccessControlManagement = ({onSuccess }) => {
   ];
 
   return (
-    <div className="p-6">
+    <div className="p-2">
       <ToastContainer position="top-right" autoClose={3000} />
       <Card bordered={false}>
         <div className="flex justify-between items-center mb-4">

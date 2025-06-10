@@ -495,11 +495,11 @@ const RequestTable = () => {
                         <Input disabled value={formatDate(selectedRecord.actual_return_date)} />
                       </Form.Item>
                     </Col>
-                    <Col span={8}>
+                    {/* <Col span={8}>
                       <Form.Item label="Inventory Item ID" name="inventory_item_id">
                         <Input disabled />
                       </Form.Item>
-                    </Col>
+                    </Col> */}
                   </Row>
 
                   <Row gutter={16}>
@@ -561,7 +561,7 @@ const RequestTable = () => {
               <p>Are you sure you want to approve this request?</p>
               {approveRecord && (
                 <div>
-                  <p>Request ID: {approveRecord.id}</p>
+                  {/* <p>Request ID: {approveRecord.id}</p> */}
                   <p>Quantity: {approveRecord.quantity}</p>
                   <p>Purpose: {approveRecord.purpose}</p>
                 </div>

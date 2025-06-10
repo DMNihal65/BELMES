@@ -10,8 +10,8 @@ import useOperatorStore from '../../../store/operator-store';
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.18.7.88:4545";
-const MPP_API_BASE_URL = "http://172.18.7.88:4545";
+const API_BASE_URL = "http://172.18.7.88:2929";
+const MPP_API_BASE_URL = "http://172.18.7.88:2929";
 
 const DocumentsCard = () => {
   const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials } = useOperatorStore();
@@ -210,7 +210,7 @@ const DocumentsCard = () => {
 
   const rawMaterialsColumns = [
     {
-      title: 'Part Number',
+      title: 'Child Part Number',
       dataIndex: 'child_part_number',
       key: 'child_part_number',
     },
@@ -220,7 +220,7 @@ const DocumentsCard = () => {
       key: 'description',
     },
     {
-      title: 'Quantity',
+      title: 'Raw Material Quantity',
       dataIndex: 'quantity',
       key: 'quantity',
       render: (quantity, record) => `${quantity} ${record.unit?.name || ''}`,

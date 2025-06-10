@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Statistic, Modal, Alert, Table, Button, Input, Space } from 'antd';
-import { ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SearchOutlined, ClockCircleOutlined, WarningOutlined, ToolOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import useMachineMaintenanceStore from '../../../store/maintenance';
+import failureData from '../../../assets/failure.json'; // Adjust the import path as necessary
 
 const TicketAnalytics = () => {
   const [isModalVisible, setIsModalVisible] = useState(true);
@@ -282,93 +283,91 @@ const TicketAnalytics = () => {
   ];
 
   const cardStyle = {
-    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+    // background: 'linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%)',
     borderRadius: '12px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-    border: 'none',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+    // border: '1px solid #d9d9d9',
   };
 
   const statisticStyle = {
-    '.ant-statistic-title': {
-      color: '#666',
-      fontSize: '16px',
-      marginBottom: '8px',
-    },
-    '.ant-statistic-content': {
-      color: '#1890ff',
-      fontSize: '24px',
-      fontWeight: '600',
-    },
+    // We will apply these styles directly using Tailwind CSS classes in the JSX
+    // '.ant-statistic-title': {
+    //   color: '#8c8c8c',
+    //   fontSize: '16px',
+    //   marginBottom: '8px',
+    // },
+    // '.ant-statistic-content': {
+    //   color: '#1890ff',
+    //   fontSize: '28px',
+    //   fontWeight: '700',
+    // },
   };
 
-
-
-
-  
   return (
     <div className="p-4">
       {/* Summary Statistics */}
       <Row gutter={[16, 16]}>
-        <Col span={8}>
-          <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
-            <Card 
-              style={cardStyle}
-              title={
-                <div className="flex items-center">
-                  <div className="w-2 h-8 bg-blue-500 rounded mr-3"></div>
-                  <span className="text-lg font-semibold text-gray-700">Mean Time To Repair (MTTR)</span>
-                </div>
-              }
-            >
-              <Statistic 
-                title="Shop Average MTTR" 
-                value={mttr} 
-                suffix="hours"
-                style={statisticStyle}
-              />
-            </Card>
-          </div>
-        </Col>
-        <Col span={8}>
-          <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
-            <Card 
-              style={cardStyle}
-              title={
-                <div className="flex items-center">
-                  <div className="w-2 h-8 bg-green-500 rounded mr-3"></div>
-                  <span className="text-lg font-semibold text-gray-700">Mean Time Between Failures (MTBF)</span>
-                </div>
-              }
-            >
-              <Statistic 
-                title="Shop Average MTBF" 
-                value={mtbf} 
-                suffix="hours"
-                style={statisticStyle}
-              />
-            </Card>
-          </div>
-        </Col>
-        <Col span={8}>
-          <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
-            <Card 
-              style={cardStyle}
-              title={
-                <div className="flex items-center">
-                  <div className="w-2 h-8 bg-red-500 rounded mr-3"></div>
-                  <span className="text-lg font-semibold text-gray-700">Total Failures</span>
-                </div>
-              }
-            >
-              <Statistic 
-                title="Total Failures" 
-                value={totalFailures}
-                style={statisticStyle}
-              />
-            </Card>
-          </div>
-        </Col>
-      </Row>
+  <Col span={8}>
+    <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
+      <Card 
+        className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-blue-50 to-blue-100 hover:scale-[1.02] overflow-hidden"
+        bodyStyle={{ padding: '20px', position: 'relative' }}
+      >
+        <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+          <ToolOutlined className="text-7xl text-blue-600" />
+        </div>
+        <Statistic 
+          title={<span className="text-blue-800 font-medium text-base flex items-center gap-2">
+            <ToolOutlined className="text-blue-600" /> Mean Time To Repair (MTTR)
+          </span>} 
+          value={mttr} 
+          valueStyle={{ color: '#1e3a8a', fontWeight: 700, fontSize: '28px' }}
+          suffix={<span className="text-xs text-blue-400 ml-1">hours</span>}
+        />
+      </Card>
+    </div>
+  </Col>
+  <Col span={8}>
+    <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
+      <Card 
+        className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-teal-50 to-teal-100 hover:scale-[1.02] overflow-hidden"
+        bodyStyle={{ padding: '20px', position: 'relative' }}
+      >
+        <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+          <ClockCircleOutlined className="text-7xl text-teal-600" />
+        </div>
+        <Statistic 
+          title={<span className="text-teal-800 font-medium text-base flex items-center gap-2">
+            <ClockCircleOutlined className="text-teal-600" /> Mean Time Between Failures (MTBF)
+          </span>} 
+          value={mtbf} 
+          valueStyle={{ color: '#065f46', fontWeight: 700, fontSize: '28px' }}
+          suffix={<span className="text-xs text-teal-400 ml-1">hours</span>}
+        />
+      </Card>
+    </div>
+  </Col>
+  <Col span={8}>
+    <div className="shadow-lg rounded-xl hover:shadow-xl transition-shadow duration-300">
+      <Card 
+        className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-rose-50 to-rose-100 hover:scale-[1.02] overflow-hidden"
+        bodyStyle={{ padding: '20px', position: 'relative' }}
+      >
+        <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+          <img src={failureData.imagePath} alt="Failure Icon" className="text-7xl" />
+        </div>
+        <Statistic 
+          title={<span className="text-rose-800 font-medium text-base flex items-center gap-2">
+            <img src={failureData.imagePath} alt="Failure Icon" className="text-rose-600" /> Total Failures
+          </span>} 
+          value={totalFailures} 
+          valueStyle={{ color: '#b91c1c', fontWeight: 700, fontSize: '28px' }}
+          suffix={<span className="text-xs text-rose-400 ml-1">failures</span>}
+        />
+      </Card>
+    </div>
+  </Col>
+</Row>
 
       {/* MTBF-MTTR Line Chart */}
       <Row className="mt-4">
@@ -391,9 +390,9 @@ const TicketAnalytics = () => {
             <Card 
               style={cardStyle}
               title={
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-amber-100 rounded-t-xl">
                   <div className="flex items-center">
-                    <div className="w-2 h-8 bg-purple-500 rounded mr-3"></div>
+                    <div className="w-2 h-8 bg-amber-600 rounded mr-3"></div>
                     <span className="text-lg font-semibold text-gray-700">Machine Performance Metrics</span>
                   </div>
                   <Space>
@@ -420,7 +419,7 @@ const TicketAnalytics = () => {
               }
             >
               <Table
-                rowSelection={rowSelection}
+                // rowSelection={rowSelection}
                 dataSource={getFilteredData()}
                 columns={columns}
                 pagination={{
@@ -435,12 +434,12 @@ const TicketAnalytics = () => {
                 }}
                 style={{
                   '.ant-table-thead > tr > th': {
-                    background: '#f8f9fa',
-                    color: '#666',
+                    background: '#f0f2f5',
+                    color: '#595959',
                     fontWeight: '600',
                   },
                   '.ant-table-tbody > tr:hover > td': {
-                    background: '#f0f7ff',
+                    background: '#e6f7ff',
                   },
                 }}
               />

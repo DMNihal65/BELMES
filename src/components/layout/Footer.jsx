@@ -22,7 +22,8 @@ function Footer() {
       alignItems: 'center',
       fontWeight: 'bold'
     }}>
-      CMTI ©{new Date().getFullYear()} Created by CMTI
+      {/* CMTI ©{new Date().getFullYear()} Created by CMTI */}
+      &copy; 2025 CMTI. All rights reserved.
     </AntFooter>
   );
 }

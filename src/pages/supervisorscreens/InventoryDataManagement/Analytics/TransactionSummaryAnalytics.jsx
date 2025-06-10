@@ -112,13 +112,16 @@ const TransactionSummaryAnalytics = () => {
   }, [transactionHistory.transactions]);
 
   const mostActiveItemsData = transactionMetrics?.most_active_items?.map(item => {
-    console.log('Most Active Items:', transactionMetrics.most_active_items); // Log the entire array for debugging
     const itemId = item.item_id; // Use item.item_id instead of item.id
     const details = itemDetails[itemId]; // Fetch item details using the correct item ID
-    console.log(`Item ID: ${itemId}, Details:`, details); // Log details for debugging
+
+    // Combine category and subcategory for the y-axis label
+    const categorySubcategory = `${item.item_category} - ${item.item_subcategory}`;
+
     return {
-      ...item,
-      itemDetails: details ? `${details.categoryName} - ${details.subcategoryName}` : 'Loading', // Combine category and subcategory
+        ...item,
+        itemDetails: details ? `${details.categoryName} - ${details.subcategoryName}` : 'Loading', // Combine category and subcategory
+        categorySubcategory, // Add the combined category-subcategory for the y-axis
     };
   }) || [];
 
@@ -469,7 +472,7 @@ const TransactionSummaryAnalytics = () => {
                   />
                   <YAxis 
                     type="category"
-                    dataKey="itemDetails"
+                    dataKey="categorySubcategory"
                     tick={{
                       fill: '#1E293B',          // dark blue-grey color for text
                       fontSize: 12,             // smaller font size

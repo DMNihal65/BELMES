@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Tabs, Table, Card, Badge, Select, Button, Space, Tag, Tooltip } from 'antd';
-import { ReloadOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { ReloadOutlined, ClockCircleOutlined, DesktopOutlined, ApartmentOutlined, BuildOutlined } from '@ant-design/icons';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import { format, parseISO } from 'date-fns';
 
@@ -184,9 +184,10 @@ const Notifications = () => {
 
   return (
     <div className="p-2">
-      <Card className="mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-lg font-semibold">MAINTENANCE LOGS</div>
+      <Card
+        className="mb-6"
+        title={<span><BuildOutlined /> MAINTENANCE LOGS</span>}
+        extra={
           <Space>
             <Select
               value={notificationsLimit}
@@ -207,13 +208,13 @@ const Notifications = () => {
               Refresh
             </Button>
           </Space>
-        </div>
-
+        }
+      >
         <Tabs activeKey={activeTab} onChange={handleTabChange}>
           <TabPane 
             tab={
               <Badge count={totalMachineNotifications} offset={[10, 0]}>
-                <span>Machine Status</span>
+                <span><DesktopOutlined /> Machine Status</span>
               </Badge>
             } 
             key="machine"
@@ -240,12 +241,13 @@ const Notifications = () => {
               onChange={handleTableChange}
               size="middle"
               bordered
+              locale={{ emptyText: 'No Machine Notifications' }}
             />
           </TabPane>
           <TabPane 
             tab={
               <Badge count={totalComponentNotifications} offset={[10, 0]}>
-                <span>Component Status</span>
+                <span><ApartmentOutlined /> Component Status</span>
               </Badge>
             } 
             key="component"
@@ -272,6 +274,7 @@ const Notifications = () => {
               onChange={handleTableChange}
               size="middle"
               bordered
+              locale={{ emptyText: 'No Component Notifications' }}
             />
           </TabPane>
         </Tabs>
@@ -281,3 +284,15 @@ const Notifications = () => {
 };
 
 export default Notifications; 
+
+
+
+
+
+
+
+
+
+
+
+

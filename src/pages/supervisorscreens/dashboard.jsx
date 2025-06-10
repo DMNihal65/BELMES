@@ -42,12 +42,11 @@ const getStatusInfo = (status) => {
                 loop={true}
                 className="production-animation"
               />,
-        gradient: 'from-green-700 to-green-800',
-        bgGradient: 'from-green-300 to-green-200',
-        textColor: 'text-green-900',
+        bgColor: '#328a58',
+        textColor: 'text-white',
         shimmer: 'animate-pulse',
         glow: 'shadow-lg shadow-green-200',
-        iconBg: 'bg-green-700'
+        iconBg: '#328a58'
       };
     case 'ON':
       return {
@@ -61,12 +60,11 @@ const getStatusInfo = (status) => {
                 loop={true}
                 className="idle-animation"
               />,
-        gradient: 'from-amber-400 to-yellow-500',
-        bgGradient: 'from-amber-300 to-yellow-200',
-        textColor: 'text-amber-800',
+        bgColor: '#ebb625',
+        textColor: 'text-white',
         shimmer: '',
         glow: 'shadow-md shadow-amber-100',
-        iconBg: 'bg-amber-500'
+        iconBg: '#faa200'
       };
     
    
@@ -83,12 +81,11 @@ const getStatusInfo = (status) => {
         loop={true}
         className="off-animation"
       />,
-        gradient: 'from-slate-300 to-gray-400',
-        bgGradient: 'from-slate-300 to-gray-200',
-        textColor: 'text-slate-700',
+        bgColor: '#A9A9A9',
+        textColor: 'text-white',
         shimmer: '',
         glow: 'shadow-sm shadow-slate-100',
-        iconBg: 'bg-slate-400'
+        iconBg: '#a8032a'
       };
   }
 };
@@ -105,9 +102,7 @@ const ModernMachineCard = ({ machine, isSelected }) => {
   const statusInfo = getStatusInfo(machine.status);
   
   // Improved capitalization for all machine names and parts
-  const displayName = machine.name?.split('-').map(part => 
-    part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-  ).join(' ') || 'Unknown Machine';
+  const displayName = machine.name?.toUpperCase() || 'UNKNOWN MACHINE';
   
   // Capitalize part number and program name
   const partNumber = machine.partNumber ? 
@@ -123,42 +118,43 @@ const ModernMachineCard = ({ machine, isSelected }) => {
       className={`
         h-full rounded-xl overflow-hidden transition-all duration-300
         ${isSelected ? `shadow-xl ring-2 ring-${statusInfo.color}-500 ${statusInfo.shimmer}` : `${statusInfo.glow} hover:shadow-lg hover:scale-[1.02]`}
-        bg-gradient-to-br ${statusInfo.bgGradient}
         backdrop-blur-sm backdrop-filter
         border border-${statusInfo.color}-200
       `}
+      style={{ backgroundColor: statusInfo.bgColor }}
       bodyStyle={{ padding: '18px' }}
       bordered={true}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center">
-          <div className={`w-9 h-9 rounded-full bg-white flex items-center justify-center  shadow-md mr-2.5 ${machine.status === 'PRODUCTION' ? 'animate-pulse' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className={`w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-md mr-2.5 ${machine.status === 'PRODUCTION' ? 'animate-pulse' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {statusInfo.icon}
           </div>
           <span className={`text-base font-semibold ${statusInfo.textColor}`}>{displayName}</span>
         </div>
         <Tag 
-          className={`rounded-full px-3 py-0.5 border-${statusInfo.color}-400 text-${statusInfo.color}-700 bg-${statusInfo.color}-50 shadow-sm font-medium`}
+          className={`rounded-full px-3 py-0.5 border-white text-white bg-opacity-20 shadow-sm font-medium`}
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', borderColor: 'rgba(255, 255, 255, 0.3)' }}
         >
           {machine.status}
         </Tag>
       </div>
       
-      <Divider className={`my-2.5 border-${statusInfo.color}-200 opacity-60`} />
+      <Divider className={`my-2.5 border-white opacity-30`} />
       
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className={`p-2.5 rounded-lg bg-white bg-opacity-60 shadow-sm border border-${statusInfo.color}-100`}>
+        <div className={`p-2.5 rounded-lg bg-white bg-opacity-90 shadow-sm border border-white border-opacity-30`}>
           <div className="text-xs text-gray-500 mb-1">Part Number</div>
           <div className="text-sm font-medium truncate">{partNumber}</div>
         </div>
-        <div className={`p-2.5 rounded-lg bg-white bg-opacity-60 shadow-sm border border-${statusInfo.color}-100`}>
+        <div className={`p-2.5 rounded-lg bg-white bg-opacity-90 shadow-sm border border-white border-opacity-30`}>
           <div className="text-xs text-gray-500 mb-1">Program</div>
           <div className="text-sm font-medium truncate">{programName}</div>
         </div>
       </div>
       
       {completionPercentage > 0 && (
-        <div className={`p-3 rounded-lg bg-white bg-opacity-40 shadow-sm border border-${statusInfo.color}-100 mb-3`}>
+        <div className={`p-3 rounded-lg bg-white bg-opacity-90 shadow-sm border border-white border-opacity-30 mb-3`}>
           <div className="flex justify-between text-xs mb-2">
             <span className="font-medium">Production Progress</span>
             <span className="font-semibold">{machine.totalCount}/{machine.targetCount}</span>
@@ -181,7 +177,7 @@ const ModernMachineCard = ({ machine, isSelected }) => {
         </div>
       )}
       
-      <div className={`flex justify-end items-center mt-2 text-xs text-${statusInfo.color}-700  px-3  `}>
+      <div className={`flex justify-end items-center mt-2 text-xs text-white px-3`}>
         
       <div className="flex items-center">
           <ClockCircleOutlined className="mr-1.5" />
@@ -276,7 +272,7 @@ const SupervisorDashboard = () => {
   // Calculate overall statistics
   const totalMachines = machines.length;
   const productionMachines = machineStats['PRODUCTION'] || 0;
-  const idleMachines = (machineStats['ON'] || 0) + (machineStats['IDLE'] || 0);
+  const idleMachines = machineStats['IDLE'] || 0;
   const errorMachines = machineStats['ERROR'] || 0;
   const offMachines = machineStats['OFF'] || 0;
   const maintenanceMachines = machineStats['MAINTENANCE'] || 0;
@@ -292,7 +288,7 @@ const SupervisorDashboard = () => {
                 <DashboardOutlined className="text-white text-2xl" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold m-0 text-gray-800">SHOP-FLOOR VIEW</h1>
+                <h1 className="text-2xl font-bold m-0 text-gray-800">Production Dashboard</h1>
                 <p className="text-sm text-indigo-600 m-0">Real-time machine monitoring system</p>
               </div>
             </div>
@@ -321,7 +317,7 @@ const SupervisorDashboard = () => {
                       <span className="font-medium">Idle</span>
                     </Menu.Item>
                    
-                    <Menu.Item key="OFF" icon={<PoweroffOutlined style={{ color: '#64748b' }} />} className="rounded-lg">
+                    <Menu.Item key="OFF" icon={<PoweroffOutlined style={{ color: '#cc3929' }} />} className="rounded-lg">
                       <span className="font-medium">Offline</span>
                     </Menu.Item>
                   </Menu>
@@ -342,7 +338,8 @@ const SupervisorDashboard = () => {
         <Row gutter={[24, 24]} className="mt-6">
           <Col xs={24} sm={12} md={6} lg={4}>
             <Card 
-              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-indigo-50 to-blue-100 hover:scale-[1.02] overflow-hidden"
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
+              style={{ backgroundColor: '#f8fafc' }}
               bodyStyle={{ padding: '20px', position: 'relative' }}
             >
               <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
@@ -362,57 +359,60 @@ const SupervisorDashboard = () => {
           </Col>
           <Col xs={24} sm={12} md={6} lg={4}>
             <Card 
-              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-green-300 to-green-200 hover:scale-[1.02] overflow-hidden"
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
+              style={{ backgroundColor: '#0c8844' }}
               bodyStyle={{ padding: '20px', position: 'relative' }}
             >
               <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                <CheckCircleOutlined className="text-7xl text-emerald-600" />
+                <CheckCircleOutlined className="text-7xl text-white" />
               </div>
               <Statistic 
-                title={<span className="text-emerald-800 font-medium text-base flex items-center gap-2">
-                  <CheckCircleOutlined className="text-emerald-600" /> In Production
+                title={<span className="text-white font-medium text-base flex items-center gap-2">
+                  <CheckCircleOutlined className="text-white" /> In Production
                 </span>} 
                 value={productionMachines} 
-                valueStyle={{ color: '#047857', fontWeight: 700, fontSize: '28px' }}
-                suffix={<span className="text-xs text-emerald-400 ml-1">Machines</span>}
+                valueStyle={{ color: '#ffffff', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-white opacity-80 ml-1">Machines</span>}
               />
             
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6} lg={4}>
             <Card 
-              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-amber-50 to-yellow-100 hover:scale-[1.02] overflow-hidden"
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
+              style={{ backgroundColor: '#ebb625' }}
               bodyStyle={{ padding: '20px', position: 'relative' }}
             >
               <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                <ClockCircleOutlined className="text-7xl text-amber-600" />
+                <ClockCircleOutlined className="text-7xl text-white" />
               </div>
               <Statistic 
-                title={<span className="text-amber-800 font-medium text-base flex items-center gap-2">
-                  <ClockCircleOutlined className="text-amber-600" /> Idle
+                title={<span className="text-white font-medium text-base flex items-center gap-2">
+                  <ClockCircleOutlined className="text-white" /> Idle
                 </span>} 
                 value={idleMachines} 
-                valueStyle={{ color: '#b45309', fontWeight: 700, fontSize: '28px' }}
-                suffix={<span className="text-xs text-amber-400 ml-1">Machines</span>}
+                valueStyle={{ color: '#ffffff', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-white opacity-80 ml-1">Machines</span>}
               />
               
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6} lg={4}>
             <Card 
-              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-slate-50 to-gray-100 hover:scale-[1.02] overflow-hidden"
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
+              style={{ backgroundColor: '#A9A9A9' }}
               bodyStyle={{ padding: '20px', position: 'relative' }}
             >
               <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                <PoweroffOutlined className="text-7xl text-slate-600" />
+                <PoweroffOutlined className="text-7xl text-white" />
               </div>
               <Statistic 
-                title={<span className="text-slate-800 font-medium text-base flex items-center gap-2">
-                  <PoweroffOutlined className="text-slate-600" /> Offline
+                title={<span className="text-white font-medium text-base flex items-center gap-2">
+                  <PoweroffOutlined className="text-white" /> Offline
                 </span>} 
                 value={offMachines} 
-                valueStyle={{ color: '#475569', fontWeight: 700, fontSize: '28px' }}
-                suffix={<span className="text-xs text-slate-400 ml-1">Machines</span>}
+                valueStyle={{ color: '#ffffff', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-white opacity-80 ml-1">Machines</span>}
               />
              
             </Card>
@@ -493,7 +493,7 @@ const SupervisorDashboard = () => {
             </div>
             <div>
               <span className="text-lg font-bold">
-                {selectedMachine?.name?.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(' ') || 'Machine Details'}
+                {selectedMachine?.name?.toUpperCase() || 'MACHINE DETAILS'}
               </span>
               {selectedMachine && (
                 <div className="flex items-center mt-0.5">
@@ -623,11 +623,12 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
               </span>
             }
             className="shadow-md rounded-xl overflow-hidden border-0"
-            bodyStyle={{ padding: '16px', background: 'linear-gradient(to bottom right, #f5f3ff, #ede9fe)' }}
+            style={{ backgroundColor: '#f8fafc' }}
+            bodyStyle={{ padding: '16px' }}
             headStyle={{ borderBottom: '1px solid rgba(139, 92, 246, 0.2)', backgroundColor: '#f5f3ff' }}
           >
             <div className="grid grid-cols-3 gap-4 p-2">
-              <div className="text-center bg-white bg-opacity-70 p-3 rounded-xl shadow-sm">
+              <div className="text-center bg-white p-3 rounded-xl shadow-sm">
                 <Progress
                   type="dashboard"
                   percent={oeeData.average_availability || 0}
@@ -644,7 +645,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
                 />
                 <div className="text-sm mt-2 font-medium text-indigo-700">Availability</div>
               </div>
-              <div className="text-center bg-white bg-opacity-70 p-3 rounded-xl shadow-sm">
+              <div className="text-center bg-white p-3 rounded-xl shadow-sm">
                 <Progress
                   type="dashboard"
                   percent={oeeData.average_performance || 0}
@@ -661,7 +662,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
                 />
                 <div className="text-sm mt-2 font-medium text-emerald-700">Performance</div>
               </div>
-              <div className="text-center bg-white bg-opacity-70 p-3 rounded-xl shadow-sm">
+              <div className="text-center bg-white p-3 rounded-xl shadow-sm">
                 <Progress
                   type="dashboard"
                   percent={oeeData.average_quality || 0}
@@ -699,25 +700,25 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
             className="border-b border-sky-100"
           >
             <div className="grid grid-cols-2 gap-4 text-sm p-2">
-              <div className="p-3 bg-sky-50 rounded-lg shadow-sm">
+              <div className="p-3 bg-white rounded-lg shadow-sm border border-sky-200">
                 <div className="text-sky-500 mb-1 flex items-center">
                   <RocketOutlined className="mr-1.5" /> Program Number
                 </div>
                 <div className="font-semibold text-sky-900">{selectedMachine.currentProgram || 'N/A'}</div>
               </div>
-              <div className="p-3 bg-emerald-50 rounded-lg shadow-sm">
+              <div className="p-3 bg-white rounded-lg shadow-sm border border-emerald-200">
                 <div className="text-emerald-500 mb-1 flex items-center">
                   <BarcodeOutlined className="mr-1.5" /> Part Number
                 </div>
                 <div className="font-semibold text-emerald-900">{selectedMachine.partNumber || 'N/A'}</div>
               </div>
-              <div className="p-3 bg-amber-50 rounded-lg shadow-sm">
+              <div className="p-3 bg-white rounded-lg shadow-sm border border-amber-200">
                 <div className="text-amber-500 mb-1 flex items-center">
                   <AppstoreOutlined className="mr-1.5" /> Operation Number
                 </div>
                 <div className="font-semibold text-amber-900">{selectedMachine.operationNumber || 'N/A'}</div>
               </div>
-              <div className="p-3 bg-purple-50 rounded-lg shadow-sm">
+              <div className="p-3 bg-white rounded-lg shadow-sm border border-purple-200">
                 <div className="text-purple-500 mb-1 flex items-center">
                   <FileTextOutlined className="mr-1.5" /> Production Order
                 </div>

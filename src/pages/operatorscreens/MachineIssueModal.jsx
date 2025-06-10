@@ -15,18 +15,19 @@ const MachineIssueModal = ({
   onClose
 }) => {
   // Forms
-  const [breakdownForm] = Form.useForm();
+  const [oeeissueForm] = Form.useForm();
   const [machineForm] = Form.useForm();
   const [componentForm] = Form.useForm();
   
   // States
-  const [activeTab, setActiveTab] = useState('breakdown');
-  const [breakdownCategory, setBreakdownCategory] = useState('availability');
+  const [activeTab, setActiveTab] = useState('oeeissue');
+  const [oeeissueCategory, setoeeissueCategory] = useState('availability');
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [machineIssueCategory, setMachineIssueCategory] = useState('availability');
 
   // Get store values
-  const { submitMachineIssue, submitComponentIssue, submitBreakdownIssue, machineStatus, maintenanceLoading, jobData, fetchAllOrders } = useWebSocketStore();
+  const { submitMachineIssue, submitComponentIssue, submitoeeissueIssue, maintenanceLoading, jobData, fetchAllOrders, submitBreakdownIssue, submitOeeIssueReport } = useWebSocketStore();
   
   // Get user ID from localStorage as fallback
   const getUserId = () => {
@@ -69,11 +70,12 @@ const MachineIssueModal = ({
   // Reset forms when modal opens/closes
   useEffect(() => {
     if (visible) {
-      breakdownForm.resetFields();
+      oeeissueForm.resetFields();
       machineForm.resetFields();
       componentForm.resetFields();
-      setActiveTab('breakdown');
-      setBreakdownCategory('availability');
+      setActiveTab('oeeissue');
+      setoeeissueCategory('availability');
+      setMachineIssueCategory('availability');
 
       // Check if user is logged in when modal opens
       const userId = getUserId();
@@ -82,12 +84,12 @@ const MachineIssueModal = ({
         onClose();
       }
     }
-  }, [visible, breakdownForm, machineForm, componentForm]);
+  }, [visible, oeeissueForm, machineForm, componentForm]);
 
-  // Breakdown reasons based on category
-  const breakdownReasons = {
+  // oeeissue reasons based on category
+  const oeeissueReasons = {
     availability: [
-      'Machine Breakdown',
+      'Machine oeeissue',
       'Tool Change',
       'Setup/Adjustment',
       'Planned Maintenance',
@@ -107,6 +109,33 @@ const MachineIssueModal = ({
       'Process Deviation',
       'Operator Unavailable',
       'System Issues'
+    ]
+  };
+
+  // Machine issue reasons based on category (new)
+  const machineIssueReasons = {
+    availability: [
+      'Machine Breakdown',
+      'Electrical Issue',
+      'Mechanical Issue',
+      'Hydraulic Issue',
+      'Pneumatic Issue',
+      'Software Issue',
+      'Emergency Stop'
+    ],
+    quality: [
+      'Tooling Issue',
+      'Material Issue',
+      'Calibration Issue',
+      'Measurement Issue',
+      'Surface Finish Issue'
+    ],
+    performance: [
+      'Slow Cycle Time',
+      'Intermittent Stoppages',
+      'Excessive Vibration',
+      'Noise Issue',
+      'Heating Issue'
     ]
   };
 
@@ -139,33 +168,41 @@ const MachineIssueModal = ({
         return;
       }
 
+      let machineId;
+      const storedMachine = localStorage.getItem('currentMachine');
+      if (storedMachine) {
+        const machineData = JSON.parse(storedMachine);
+        machineId = machineData?.id;
+      }
+      
+      if (!machineId) {
+        toast.error('No machine ID available');
+        onClose();
+        return;
+      }
+
       let values;
       switch (type) {
-        case 'breakdown':
-          values = await breakdownForm.validateFields();
-          const breakdownResult = await submitBreakdownIssue(values);
-          if (breakdownResult?.success) {
-            toast.success('Breakdown issue submitted successfully');
+        case 'oeeissue':
+          values = await oeeissueForm.validateFields();
+          const oeeIssuePayload = {
+            category: values.oeeissueCategory.charAt(0).toUpperCase() + values.oeeissueCategory.slice(1), // Capitalize category
+            description: values.oeeissueReason.join(', '), // Join selected reasons
+            machine: machineId, // Changed from machine_id to machine
+            reported_by: parseInt(currentUserId) // Add reported_by
+          };
+
+          const oeeissueResult = await submitOeeIssueReport(oeeIssuePayload); // Use the new function
+          if (oeeissueResult?.success) {
+            toast.success('OEE Issue submitted successfully');
             onClose();
           } else {
-            toast.error(breakdownResult?.error || 'Failed to submit breakdown issue');
+            toast.error(oeeissueResult?.error || 'Failed to submit OEE Issue');
           }
           break;
 
         case 'machine':
           values = await machineForm.validateFields();
-          let machineId;
-          const storedMachine = localStorage.getItem('currentMachine');
-          if (storedMachine) {
-            const machineData = JSON.parse(storedMachine);
-            machineId = machineData?.id;
-          }
-          
-          if (!machineId) {
-            toast.error('No machine ID available');
-            return;
-          }
-
           const machinePayload = {
             machine_id: values.machineId,
             description: values.description || '',
@@ -174,11 +211,23 @@ const MachineIssueModal = ({
           };
 
           const result = await submitMachineIssue(machineId, machinePayload);
-          if (result?.success) {
-            toast.success('Machine issue submitted successfully');
+          
+          // Second API call for downtime issue
+          const downtimePayload = {
+            machine_id: machineId,
+            category: values.machineIssueCategory,
+            description: values.machineIssueReason.join(', ') || '',
+            priority: 0,
+            reported_by: parseInt(currentUserId)
+          };
+          
+          const downtimeResult = await submitBreakdownIssue(downtimePayload);
+
+          if (result?.success && downtimeResult?.success) {
+            toast.success('Machine and Downtime issues submitted successfully');
             onClose();
           } else {
-            toast.error(result?.error || 'Failed to submit machine issue');
+            toast.error(result?.error || downtimeResult?.error || 'Failed to submit machine issue');
           }
           break;
 
@@ -244,30 +293,30 @@ const MachineIssueModal = ({
           onChange={handleTabChange}
           className="issue-tabs"
         >
-          {/* Breakdown Tab */}
+          {/* oeeissue Tab */}
           <TabPane
             tab={
               <span className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
-                Breakdown Issue
+                OEE Issue
               </span>
             }
-            key="breakdown"
+            key="oeeissue"
           >
             <Form 
-              form={breakdownForm}
+              form={oeeissueForm}
               layout="vertical" 
               className="p-4"
             >
               <div className="space-y-4">
                 <Form.Item 
-                  name="breakdownCategory" 
+                  name="oeeissueCategory" 
                   label="Issue Category"
                   className="mb-6"
-                  initialValue={breakdownCategory}
+                  initialValue={oeeissueCategory}
                 >
                   <Radio.Group 
-                    onChange={(e) => setBreakdownCategory(e.target.value)}
+                    onChange={(e) => setoeeissueCategory(e.target.value)}
                     className="grid grid-cols-3 gap-4"
                   >
                     <Radio.Button value="availability" className="text-center">
@@ -283,7 +332,7 @@ const MachineIssueModal = ({
                 </Form.Item>
 
                 <Form.Item
-                  name="breakdownReason"
+                  name="oeeissueReason"
                   label="Issue Reason(description)"
                   rules={[{ required: true, message: 'Please select or enter a reason' }]}
                 >
@@ -292,7 +341,7 @@ const MachineIssueModal = ({
                     placeholder="Select a reason or enter custom"
                     className="w-full"
                   >
-                    {breakdownReasons[breakdownCategory]?.map(reason => (
+                    {oeeissueReasons[oeeissueCategory]?.map(reason => (
                       <Option key={reason} value={reason}>
                         {reason}
                       </Option>
@@ -303,23 +352,23 @@ const MachineIssueModal = ({
                 <Button 
                   type="primary" 
                   danger
-                  onClick={() => handleSubmit('breakdown')}
+                  onClick={() => handleSubmit('oeeissue')}
                   loading={maintenanceLoading}
                   block
                   size="large"
                 >
-                  Submit Breakdown Report
+                  Submit OEE Issue Report
                 </Button>
               </div>
             </Form>
           </TabPane>
 
-          {/* Machine Issue Tab */}
+          {/* Machine Breakdown Tab */}
           <TabPane
             tab={
               <span className="flex items-center gap-2">
                 <Wrench className="h-4 w-4" />
-                Machine Issue
+                Machine Breakdown
               </span>
             }
             key="machine"
@@ -341,17 +390,44 @@ const MachineIssueModal = ({
                 </Select>
               </Form.Item>
 
-              <Form.Item
-                name="description"
-                label="Description"
-                rules={[{ required: true, message: 'Please provide a description' }]}
+              <Form.Item 
+                name="machineIssueCategory" 
+                label="Issue Category"
+                className="mb-6"
+                initialValue={machineIssueCategory}
               >
-                <TextArea 
-                  rows={4} 
-                  placeholder="Describe the machine issue"
-                  maxLength={500}
-                  showCount
-                />
+                <Radio.Group 
+                  onChange={(e) => setMachineIssueCategory(e.target.value)}
+                  className="grid grid-cols-3 gap-4"
+                >
+                  <Radio.Button value="availability" className="text-center">
+                    Availability
+                  </Radio.Button>
+                  <Radio.Button value="quality" className="text-center">
+                    Quality
+                  </Radio.Button>
+                  <Radio.Button value="performance" className="text-center">
+                    Performance
+                  </Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+
+              <Form.Item
+                name="machineIssueReason"
+                label="Issue Reason (description)"
+                rules={[{ required: true, message: 'Please select or enter a reason' }]}
+              >
+                <Select
+                  mode="tags"
+                  placeholder="Select a reason or enter custom"
+                  className="w-full"
+                >
+                  {machineIssueReasons[machineIssueCategory]?.map(reason => (
+                    <Option key={reason} value={reason}>
+                      {reason}
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
 
               <Button 
@@ -360,6 +436,7 @@ const MachineIssueModal = ({
                 onClick={() => handleSubmit('machine')}
                 loading={maintenanceLoading}
                 block
+                size="large"
               >
                 Submit Machine Issue
               </Button>
@@ -451,3 +528,14 @@ const MachineIssueModal = ({
 };
 
 export default MachineIssueModal; 
+
+
+
+
+
+
+
+
+
+//testing
+//testingggg

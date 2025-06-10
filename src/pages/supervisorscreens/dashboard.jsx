@@ -272,7 +272,7 @@ const SupervisorDashboard = () => {
   // Calculate overall statistics
   const totalMachines = machines.length;
   const productionMachines = machineStats['PRODUCTION'] || 0;
-  const idleMachines = machineStats['IDLE'] || 0;
+  const idleMachines = machineStats['ON'] || 0;  // Changed from 'IDLE' to 'ON' to match the actual status in the data
   const errorMachines = machineStats['ERROR'] || 0;
   const offMachines = machineStats['OFF'] || 0;
   const maintenanceMachines = machineStats['MAINTENANCE'] || 0;

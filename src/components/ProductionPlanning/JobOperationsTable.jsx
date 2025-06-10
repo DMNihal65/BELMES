@@ -1,15 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Table, Button, Space, Tooltip, Form, Input, 
-  Popconfirm, Select, Tag, TimePicker, Modal, message,
-  Upload, InputNumber, Card, Tabs, Spin
+  Table, 
+  Button, 
+  Space, 
+  Tooltip, 
+  Form, 
+  Input, 
+  Popconfirm, 
+  Select, 
+  Tag, 
+  TimePicker, 
+  Modal, 
+  message, 
+  Upload, 
+  InputNumber, 
+  Card, 
+  Tabs, 
+  Spin 
 } from 'antd';
 import { 
-  EditOutlined, DeleteOutlined, FileTextOutlined, 
-  SaveOutlined, PlusOutlined, 
-  UploadOutlined,
-  InboxOutlined,
-  LinkOutlined
+  EditOutlined, 
+  DeleteOutlined, 
+  FileTextOutlined, 
+  SaveOutlined, 
+  PlusOutlined, 
+  UploadOutlined, 
+  InboxOutlined, 
+  LinkOutlined 
 } from '@ant-design/icons';
 import EditableCell from './EditableCell';
 import dayjs from 'dayjs';
@@ -40,7 +57,7 @@ const mockTools = [
   { id: 'T3', name: 'Tool 3' },
 ];
 
-const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperations, partNumber, productionOrder, orderNumber }) => {
+const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperations, partNumber, productionOrder, orderNumber, status = 'Inactive' }) => {
   const [form] = Form.useForm();
   const [operations, setOperations] = useState(initialOperations || []);
   const [editingKey, setEditingKey] = useState('');
@@ -279,9 +296,18 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     loadIpidStatusFromLocalStorage();
   }, [productionOrder, orderNumber]);
 
-  const isEditing = (record) => record.key === editingKey;
+  const isEditing = (record) => {
+    if (status === 'Active') {
+      return false; // Prevent editing if job is active
+    }
+    return record.key === editingKey;
+  };
 
   const edit = (record) => {
+    if (status === 'Active') {
+      message.warning('Cannot edit operation when job is Active');
+      return;
+    }
     form.setFieldsValue({
       operation_description: record.operation_description,
       setup_time: record.setup_time,
@@ -296,6 +322,10 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
   };
 
   const save = async (key) => {
+    if (status === 'Active') {
+      message.warning('Cannot save operation when job is Active');
+      return;
+    }
     try {
       const row = await form.validateFields();
       const record = operations.find(item => item.key === key);
@@ -1383,27 +1413,30 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       render: (_, record) => {
         const editable = isEditing(record);
         const hasIpid = ipidStatusMap[record.operation_number];
-        
+        const isActive = status === 'Active';
+
         return (
           <Space>
             {/* View MPP Details button */}
             <Tooltip title="View MPP Details">
               <Button 
                 type="link" 
-                icon={<FileTextOutlined />} 
+                icon={<FileTextOutlined />}
                 onClick={() => handleMppView(record)}
+                disabled={isActive}
               />
             </Tooltip>
 
             {/* IPID Upload button with loading state */}
-            {renderIpidButton(record)}
+            {!isActive && renderIpidButton(record)}
 
             {/* Machine Linking button */}
-            <Tooltip title="Change Machine">
+            <Tooltip title={isActive ? 'Cannot change machine when job is Active' : 'Change Machine'}>
               <Button
                 type="link"
                 icon={<LinkOutlined />}
                 onClick={() => handleMachineLinking(record)}
+                disabled={isActive}
               />
             </Tooltip>
 
@@ -1423,19 +1456,36 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
                 </Button>
               </Space>
             ) : (
-              <Tooltip title="Edit Operation">
+              <Tooltip title={isActive ? 'Cannot edit operation when job is Active' : 'Edit Operation'}>
                 <Button 
                   type="link" 
                   icon={<EditOutlined />}
                   onClick={() => edit(record)}
+                  disabled={isActive}
                 />
               </Tooltip>
             )}
           </Space>
         );
-      },
+      }
     },
   ];
+
+  // Updated header section with "Operation Sequences" and "Add Operation" button
+  const headerSection = (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Operation Sequences</h3>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={() => setIsAddModalVisible(true)}
+        disabled={status === 'Active'}
+        title={status === 'Active' ? 'Cannot add operations when job is Active' : 'Add new operation'}
+      >
+        Add Operation
+      </Button>
+    </div>
+  );
 
   const mergedColumns = columns.map(col => {
     if (!col.editable) {
@@ -1451,23 +1501,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }),
     };
   });
-
-
-  
-
-  // Updated header section with "Operation Sequences" and "Add Operation" button
-  const headerSection = (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 500 }}>Operation Sequences</h3>
-      <Button
-        type="primary"
-        icon={<PlusOutlined />}
-        onClick={() => setIsAddModalVisible(true)}
-      >
-        Add Operation
-      </Button>
-    </div>
-  );
 
   return (
     <Form form={form}>

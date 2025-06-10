@@ -1303,7 +1303,7 @@ const loadInventoryItems = async () => {
           </div>
           
           {/* Header Section */}
-          <div className="text-center space-y-2 border-b-4 border-blue-900 pb-4 mb-8 relative z-10">
+          <div className="text-center space-y-2 border-b-4 border-blue-900 pb-4 mb-4 relative z-10">
             <div className="flex items-center justify-between">
               <img src={belLogo} alt="BEL Logo" className="h-16" />
               <div className=" bg-blue-50 text-Black px-8 py-3 rounded-lg shadow-md">
@@ -1311,6 +1311,61 @@ const loadInventoryItems = async () => {
                 <h3 className="text-xl">JOB CARD</h3>
               </div>
               <div className="w-24"></div>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Total Jobs Card */}
+            <div className="bg-blue-600 text-white p-4 rounded-lg shadow-md">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm opacity-90">Total Jobs</p>
+                  <p className="text-2xl font-bold">24</p>
+                </div>
+                <div className="bg-blue-500 p-3 rounded-full">
+                  <ScheduleOutlined className="text-xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* In Progress Card */}
+            <div className="bg-yellow-500 text-white p-4 rounded-lg shadow-md">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm opacity-90">In Progress</p>
+                  <p className="text-2xl font-bold">18</p>
+                </div>
+                <div className="bg-yellow-400 p-3 rounded-full">
+                  <Hourglass className="text-xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Completed Card */}
+            <div className="bg-green-500 text-white p-4 rounded-lg shadow-md">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm opacity-90">Completed</p>
+                  <p className="text-2xl font-bold">6</p>
+                </div>
+                <div className="bg-green-400 p-3 rounded-full">
+                  <CheckCircle className="text-xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Pending PDC Card */}
+            <div className="bg-orange-500 text-white p-4 rounded-lg shadow-md">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm opacity-90">Pending PDC</p>
+                  <p className="text-2xl font-bold">3</p>
+                </div>
+                <div className="bg-orange-400 p-3 rounded-full">
+                  <CalendarCheck className="text-xl" />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1500,18 +1555,18 @@ const loadInventoryItems = async () => {
                   </tr>
                 </tbody>
               </table>
-            </div>
-          </div>
 
-          {/* Signature and Date Section */}
-          <div className="flex justify-between items-start mt-12 mb-8 relative z-10">
-            <div className="w-1/3">
-              <p className="font-bold mb-2  bg-blue-50">Signature with Seal</p>
-              <div className="border-b-4 border-blue-900 h-16"></div>
-            </div>
-            <div className="w-1/3 text-right">
-              <p className="font-bold mb-2  bg-blue-50">Date:</p>
-              <div className="border-b-4 border-blue-900 h-16"></div>
+              {/* Signature and Date Section */}
+              <div className="flex justify-between items-start mt-12 mb-8 relative z-10">
+                <div className="w-1/3">
+                  <p className="font-bold mb-2 bg-blue-50">Signature with Seal</p>
+                  <div className="border-b-4 border-blue-900 h-16"></div>
+                </div>
+                <div className="w-1/3 text-right">
+                  <p className="font-bold mb-2 bg-blue-50">Date:</p>
+                  <div className="border-b-4 border-blue-900 h-16"></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2788,7 +2843,7 @@ const loadInventoryItems = async () => {
       <Card className="shadow-sm">
       <Row justify="space-between" align="middle" wrap>
         <Col flex="1">
-          <Form.Item label="Select Job/Production Order" className="mb-0" style={{ width: '100%' }}>
+          <Form.Item label="Select Job/Production Order" className="mb-0" style={{ width: '100%', fontWeight: 600, fontSize: '26px' }}>
             <Select
               className="job-select"
               showSearch
@@ -2855,9 +2910,10 @@ const loadInventoryItems = async () => {
             >
               <TabPane 
                 tab={
-                  <span>
+                  <span style={{ fontWeight: 'bold' }}>
                     <FileTextOutlined />
                     Job Details
+
                   </span>
                 }
                 key="jobDetails"
@@ -2979,7 +3035,7 @@ const loadInventoryItems = async () => {
 
               <TabPane 
                 tab={
-                  <span>
+                  <span style={{ fontWeight: 'bold' }}>
                     <ToolOutlined />
                     Tools and Programs
                   </span>
@@ -3033,7 +3089,7 @@ const loadInventoryItems = async () => {
                   >
                     <TabPane 
                       tab={
-                        <span className="flex items-center">
+                        <span className="flex items-center" style={{ fontWeight: 'bold' }}>
                           <ToolOutlined className="mr-2" />
                           Tools List
                         </span>
@@ -3733,7 +3789,7 @@ const loadInventoryItems = async () => {
 
               <TabPane 
                 tab={
-                  <span>
+                  <span style={{ fontWeight: 'bold' }}>
                     <AppstoreOutlined />
                     Configuration Matrix
                   </span>
@@ -4277,7 +4333,7 @@ const loadInventoryItems = async () => {
 
       {/* Raw Material Modal */}
       <Modal
-        title="Job Number Tag"
+        title={<span style={{ fontWeight: 'bold' }}>Job Number Tag</span>}
         open={isRawMaterialModalVisible}
         onOk={handleDownloadRawMaterialJobCard}
         onCancel={() => setIsRawMaterialModalVisible(false)}

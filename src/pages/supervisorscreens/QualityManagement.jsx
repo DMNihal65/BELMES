@@ -5,6 +5,8 @@ import {
   Typography, Tag, Badge, Alert, DatePicker, TimePicker, message,
   Tree, Radio, Upload, Spin
 } from 'antd';
+import Lottie from 'lottie-react';
+import qualityAnimation from '../../assets/quality.json';
 import {
   FileTextOutlined, 
   CheckCircleOutlined, 
@@ -618,9 +620,19 @@ const QualityManagementDashboard = () => {
     <div className="space-y-6 p-6 bg-gray-50">
       {/* Header Section */}
       <div className="flex justify-between items-center mb-6">
-        <Typography.Title level={3} className="mb-0">
-          Quality Management Dashboard
-        </Typography.Title>
+        <div className="flex items-center">
+          <div className="w-10 h-10 mr-3">
+            <Lottie
+              animationData={qualityAnimation}
+              loop={true}
+              autoplay={true}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
+          <Typography.Title level={3} className="mb-0">
+            Quality Management Dashboard
+          </Typography.Title>
+        </div>
       </div>
 
       {/* Part Selection with improved UI */}

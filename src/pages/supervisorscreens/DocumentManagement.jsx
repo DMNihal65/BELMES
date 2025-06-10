@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Lottie from 'lottie-react';
+import documentsAnimation from '../../assets/documents.json';
 import {
   Card,
   Row,
@@ -2613,13 +2615,23 @@ const DocumentManagement = () => {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="bg-white rounded-lg shadow-sm mb-4 p-4">
         <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-800">
-              Document Management
-            </h1>
-            <p className="text-gray-500 text-sm">
-              Manage and organize your documents
-            </p>
+          <div className="flex items-center">
+            <div className="w-12 h-12 mr-3">
+              <Lottie
+                animationData={documentsAnimation}
+                loop={true}
+                autoplay={true}
+                style={{ width: '100%', height: '100%' }}
+              />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-800">
+                Document Management
+              </h1>
+              <p className="text-gray-500 text-sm">
+                Manage and organize your documents
+              </p>
+            </div>
           </div>
           {/* <div className="flex gap-2">Cannot delete the only version of a document
             <Button

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty, Tag } from 'antd';
+import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty, Tag, Input } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
@@ -31,6 +31,8 @@ const OrderDashboard = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [localOrders, setLocalOrders] = useState([]);
   const [priorityOrders, setPriorityOrders] = useState([]);
+  const [searchText, setSearchText] = useState('');
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [parent] = useAutoAnimate();
   const [timelineError, setTimelineError] = useState(null);
   const [completedOrders, setCompletedOrders] = useState([]);
@@ -222,7 +224,7 @@ const OrderDashboard = () => {
         columns={timelineColumns}
         rowKey="key"
         size="small"
-        pagination={{ pageSize: 5 }}
+        pagination={{ pageSize: 10 }}
         scroll={{ x: 'max-content' }}
       />
     );
@@ -319,8 +321,28 @@ const OrderDashboard = () => {
     }
   }, []);
 
-  // Filter orders for in-progress tab
-  const inProgressOrders = orders.filter(order => order.status === 'in_progress');
+  const handleSearch = (searchText) => {
+    setSearchText(searchText);
+    const filteredOrders = localOrders.filter((order) => {
+      const orderString = JSON.stringify(order).toLowerCase();
+      return orderString.includes(searchText.toLowerCase());
+    });
+    setFilteredOrders(filteredOrders);
+  };
+
+  // Reset search when tab changes
+  const handleTabChange = (activeKey) => {
+    if (activeKey !== 'all') {
+      setSearchText('');
+      setFilteredOrders([]);
+    }
+  };
+
+  // Calculate the actual counts for each card based on tab data
+  const totalOrdersCount = localOrders?.length || 0;
+  const inProgressOrdersCount = timelineData?.length || 0;
+  const completedOrdersCount = completedOrders?.length || 0;
+  const priorityOrdersCount = priorityOrders?.length || 0;
 
   // Add columns for completed orders table
   const completedOrdersColumns = [
@@ -368,21 +390,6 @@ const OrderDashboard = () => {
         </div>
       ),
     },
-    // {
-    //   title: 'Operations',
-    //   key: 'operations',
-    //   width: 150,
-    //   render: (_, record) => (
-    //     <div>
-    //       <div className="font-medium">
-    //         {record.completed_operations}/{record.total_eligible_operations}
-    //       </div>
-    //       <div className="text-xs text-gray-500">
-    //         Total: {record.total_all_operations}
-    //       </div>
-    //     </div>
-    //   ),
-    // },
     {
       title: 'Completion Date',
       key: 'overall_completion_date',
@@ -419,8 +426,9 @@ const OrderDashboard = () => {
       )}
       
       <div className="flex-1 p-4 overflow-hidden flex flex-col bg-sky-100 ">
-        {/* Quick Stats Row */}
+        {/* Quick Stats Row - Reordered: Total Orders, In Progress, Completed, Priority */}
         <Row gutter={[16, 16]} className="mb-6  " ref={parent}>
+          {/* Total Orders Card - 1st */}
           <Col xs={24} sm={12} md={6}>
             <Card 
               className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
@@ -466,7 +474,7 @@ const OrderDashboard = () => {
                 <div className="flex flex-col items-end justify-center">
                   <div className="text-right">
                     <div className="text-5xl font-bold text-indigo-700 leading-none group-hover:text-indigo-800 transition-colors duration-300">
-                      {orders?.length || 0}
+                      {totalOrdersCount}
                     </div>
                     <div className="text-indigo-500 text-xs font-medium mt-1 uppercase tracking-wider">
                       Total
@@ -480,79 +488,16 @@ const OrderDashboard = () => {
             </Card>
           </Col>
           
-          <Col xs={24} sm={12} md={6}>
-          <Card 
-  className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
-  bodyStyle={{ padding: 0 }}
->
-  {/* Animated background elements */}
-  <div className="absolute inset-0 opacity-5">
-    <div className="absolute top-4 right-4 w-32 h-32 bg-emerald-200 rounded-full blur-2xl animate-pulse"></div>
-    <div className="absolute bottom-4 left-4 w-24 h-24 bg-green-200 rounded-full blur-xl animate-pulse delay-1000"></div>
-  </div>
-  
- 
-  
-  {/* Main content container */}
-  <div className="relative p-6 flex items-center justify-between h-32">
-    
-    {/* Left side - Icon and Label */}
-    <div className="flex items-center gap-4 flex-1">
-      {/* Animated icon container */}
-      <div className="relative">
-        <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-green-200 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
-          <Lottie
-            animationData={inprogressAnimation}
-            style={{ width: 52, height: 52 }}
-            {...lottieOptions}
-            loop={true}
-          />
-        </div>
-        {/* Pulse ring effect */}
-        <div className="absolute inset-0 bg-emerald-200 rounded-xl animate-ping opacity-20"></div>
-      </div>
-      
-      {/* Label section */}
-      <div className="flex flex-col justify-center">
-        <h3 className="text-emerald-800 font-semibold text-xl leading-tight">
-          In Progress
-        </h3>
-        <p className="text-emerald-600 text-sm font-medium opacity-80">
-          Active Orders
-        </p>
-      </div>
-    </div>
-    
-    {/* Right side - Big number display */}
-    <div className="flex flex-col items-end justify-center">
-      <div className="text-right">
-        <div className="text-5xl font-bold text-emerald-700 leading-none group-hover:text-emerald-800 transition-colors duration-300">
-          {inProgressOrders?.length || 0}
-        </div>
-        <div className="text-emerald-500 text-xs font-medium mt-1 uppercase tracking-wider">
-          Total
-        </div>
-      </div>
-      
-      {/* Trend indicator */}
-      
-    </div>
-  </div>
-  
-  {/* Bottom accent line */}
-  <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 group-hover:h-1.5 transition-all duration-300"></div>
-</Card>
-          </Col>
-          
+          {/* In Progress Card - 2nd */}
           <Col xs={24} sm={12} md={6}>
             <Card 
-              className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
+              className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
               bodyStyle={{ padding: 0 }}
             >
               {/* Animated background elements */}
               <div className="absolute inset-0 opacity-5">
-                <div className="absolute top-4 right-4 w-32 h-32 bg-amber-200 rounded-full blur-2xl animate-pulse"></div>
-                <div className="absolute bottom-4 left-4 w-24 h-24 bg-yellow-200 rounded-full blur-xl animate-pulse delay-1000"></div>
+                <div className="absolute top-4 right-4 w-32 h-32 bg-emerald-200 rounded-full blur-2xl animate-pulse"></div>
+                <div className="absolute bottom-4 left-4 w-24 h-24 bg-green-200 rounded-full blur-xl animate-pulse delay-1000"></div>
               </div>
               
               {/* Main content container */}
@@ -562,25 +507,25 @@ const OrderDashboard = () => {
                 <div className="flex items-center gap-4 flex-1">
                   {/* Animated icon container */}
                   <div className="relative">
-                    <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-yellow-100 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
+                    <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-green-200 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
                       <Lottie
-                        animationData={priorityAnimation}
+                        animationData={inprogressAnimation}
                         style={{ width: 52, height: 52 }}
                         {...lottieOptions}
                         loop={true}
                       />
                     </div>
                     {/* Pulse ring effect */}
-                    <div className="absolute inset-0 bg-amber-200 rounded-xl animate-ping opacity-20"></div>
+                    <div className="absolute inset-0 bg-emerald-200 rounded-xl animate-ping opacity-20"></div>
                   </div>
                   
                   {/* Label section */}
                   <div className="flex flex-col justify-center">
-                    <h3 className="text-amber-800 font-semibold text-xl leading-tight">
-                      Priority
+                    <h3 className="text-emerald-800 font-semibold text-xl leading-tight">
+                      In Progress
                     </h3>
-                    <p className="text-amber-600 text-sm font-medium opacity-80">
-                      High Priority Orders
+                    <p className="text-emerald-600 text-sm font-medium opacity-80">
+                      Active Orders
                     </p>
                   </div>
                 </div>
@@ -588,10 +533,10 @@ const OrderDashboard = () => {
                 {/* Right side - Big number display */}
                 <div className="flex flex-col items-end justify-center">
                   <div className="text-right">
-                    <div className="text-5xl font-bold text-amber-700 leading-none group-hover:text-amber-800 transition-colors duration-300">
-                      {priorityOrders?.length || 0}
+                    <div className="text-5xl font-bold text-emerald-700 leading-none group-hover:text-emerald-800 transition-colors duration-300">
+                      {inProgressOrdersCount}
                     </div>
-                    <div className="text-amber-500 text-xs font-medium mt-1 uppercase tracking-wider">
+                    <div className="text-emerald-500 text-xs font-medium mt-1 uppercase tracking-wider">
                       Total
                     </div>
                   </div>
@@ -599,10 +544,11 @@ const OrderDashboard = () => {
               </div>
               
               {/* Bottom accent line */}
-              <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 group-hover:h-1.5 transition-all duration-300"></div>
+              <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 group-hover:h-1.5 transition-all duration-300"></div>
             </Card>
           </Col>
           
+          {/* Completed Card - 3rd */}
           <Col xs={24} sm={12} md={6}>
             <Card 
               className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100 hover:scale-[1.03] overflow-hidden group cursor-pointer"
@@ -648,7 +594,7 @@ const OrderDashboard = () => {
                 <div className="flex flex-col items-end justify-center">
                   <div className="text-right">
                     <div className="text-5xl font-bold text-gray-700 leading-none group-hover:text-gray-800 transition-colors duration-300">
-                      {completedOrders?.length || 0}
+                      {completedOrdersCount}
                     </div>
                     <div className="text-gray-500 text-xs font-medium mt-1 uppercase tracking-wider">
                       Total
@@ -661,6 +607,66 @@ const OrderDashboard = () => {
               <div className="h-1 bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600 group-hover:h-1.5 transition-all duration-300"></div>
             </Card>
           </Col>
+          
+          {/* Priority Card - 4th (Last) */}
+          <Col xs={24} sm={12} md={6}>
+            <Card 
+              className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
+              bodyStyle={{ padding: 0 }}
+            >
+              {/* Animated background elements */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-4 right-4 w-32 h-32 bg-amber-200 rounded-full blur-2xl animate-pulse"></div>
+                <div className="absolute bottom-4 left-4 w-24 h-24 bg-yellow-200 rounded-full blur-xl animate-pulse delay-1000"></div>
+              </div>
+              
+              {/* Main content container */}
+              <div className="relative p-6 flex items-center justify-between h-32">
+                
+                {/* Left side - Icon and Label */}
+                <div className="flex items-center gap-4 flex-1">
+                  {/* Animated icon container */}
+                  <div className="relative">
+                    <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-yellow-100 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
+                      <Lottie
+                        animationData={priorityAnimation}
+                        style={{ width: 52, height: 52 }}
+                        {...lottieOptions}
+                        loop={true}
+                      />
+                    </div>
+                    {/* Pulse ring effect */}
+                    <div className="absolute inset-0 bg-amber-200 rounded-xl animate-ping opacity-20"></div>
+                  </div>
+                  
+                  {/* Label section */}
+                  <div className="flex flex-col justify-center">
+                    <h3 className="text-amber-800 font-semibold text-xl leading-tight">
+                      Priority
+                    </h3>
+                    <p className="text-amber-600 text-sm font-medium opacity-80">
+                      High Priority Orders
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Right side - Big number display */}
+                <div className="flex flex-col items-end justify-center">
+                  <div className="text-right">
+                    <div className="text-5xl font-bold text-amber-700 leading-none group-hover:text-amber-800 transition-colors duration-300">
+                      {priorityOrdersCount}
+                    </div>
+                    <div className="text-amber-500 text-xs font-medium mt-1 uppercase tracking-wider">
+                      Total
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Bottom accent line */}
+              <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 group-hover:h-1.5 transition-all duration-300"></div>
+            </Card>
+          </Col>
         </Row>
 
         {/* Main Content Area - Full Width Order Management */}
@@ -671,7 +677,14 @@ const OrderDashboard = () => {
                 <div className="flex justify-between items-center ">
                   <span className="text-base font-semibold">Order Management</span>
                   <Space>
-                    {/* <Button icon={<FilterOutlined />} size="small">Filter</Button> */}
+                    <Input.Search
+                      placeholder="Search orders..."
+                      size="small"
+                      value={searchText}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      style={{ width: 200 }}
+                      allowClear
+                    />
                     <Button 
                       type="primary" 
                       icon={<PlusOutlined />} 
@@ -696,13 +709,14 @@ const OrderDashboard = () => {
                 defaultActiveKey="all" 
                 className="h-full flex flex-col"
                 style={{ flex: 1 }}
+                onChange={handleTabChange}
               >
                 <TabPane tab={<span className="font-semibold">All Orders</span>} key="all">
                   <div className="h-[calc(100vh-320px)] overflow-auto">
                     <OrderTable 
-                      orders={localOrders} 
+                      orders={searchText ? filteredOrders : localOrders} 
                       onRefresh={handleRefresh}
-                      key={JSON.stringify(localOrders)}
+                      key={JSON.stringify(searchText ? filteredOrders : localOrders)}
                     />
                   </div>
                 </TabPane>
@@ -753,4 +767,3 @@ const OrderDashboard = () => {
 };
 
 export default OrderDashboard;
-

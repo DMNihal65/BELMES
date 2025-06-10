@@ -19,8 +19,9 @@ import {
   ReloadOutlined, 
   CalendarOutlined, 
   AlertOutlined, 
-  DashboardOutlined
 } from '@ant-design/icons';
+import Lottie from 'lottie-react';
+import capacityPlanAnimation from "../../assets/capacityplan.json";
 import ReactApexChart from 'react-apexcharts';
 import dayjs from 'dayjs';
 import usePlanningStore from '../../store/planning-store';
@@ -556,11 +557,16 @@ const CapacityPlanning = () => {
 
   return (
     <div className="capacity-planning px-2 sm:px-4 md:px-6">
-      <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 md:p-6 rounded-xl shadow-sm">
+      <div className="mb-6 bg-white p-4 md:p-6 rounded-xl shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center">
-          <DashboardOutlined className="text-blue-500 text-2xl mb-2 md:mb-0 md:mr-3" />
+          <Lottie
+            animationData={capacityPlanAnimation}
+            autoplay={true}
+            loop={true}
+            style={{ width: 52, height: 52 }}
+          />
           <div>
-            <Title level={4} style={{ margin: 0, color: '#00ADB5' }}>Machine Capacity Planning</Title>
+            <Title level={4} style={{ margin: 0, color: 'black', fontWeight: 'bold' }}>Machine Capacity Planning</Title>
             <Text type="secondary">Monitor and analyze machine utilization across the shop floor</Text>
             <div className="mt-2">
               <Tag color="blue" icon={<AlertOutlined />}>Only work centre machines are displayed</Tag>
@@ -579,7 +585,7 @@ const CapacityPlanning = () => {
           <Col xs={24} lg={16}>
             <Space size="middle" align="center" wrap className="w-full justify-center md:justify-start">
               <div>
-                <label className="block text-sm text-gray-600 mb-1 font-medium">Select Date Range</label>
+                <label className="block text-sm text-gray-600 mb-1 font-bold">Select Date Range</label>
                 <RangePicker
                   value={dateRange}
                   onChange={handleDateRangeChange}

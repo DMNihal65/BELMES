@@ -8,6 +8,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useAccessControlStore } from '../../store/access-control-management';
 import MachinePasswordManagement from "../../pages/adminscreens/machineManagement/MachinePasswordManagement"; 
 import axios from 'axios';
+import Lottie from 'lottie-react';
+import accessControlAnimation from '../../assets/AccessControl.json';
 const { TabPane } = Tabs;
 
 const AccessControlManagement = ({onSuccess }) => {
@@ -428,7 +430,17 @@ const AccessControlManagement = ({onSuccess }) => {
       <ToastContainer position="top-right" autoClose={3000} />
       <Card bordered={false}>
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold">Access Control Management</h1>
+          <div className="flex items-center">
+            <div className="w-12 h-12 mr-3">
+              <Lottie
+                animationData={accessControlAnimation}
+                loop={true}
+                autoplay={true}
+                style={{ width: '100%', height: '100%' }}
+              />
+            </div>
+            <h1 className="text-xl font-semibold">Access Control Management</h1>
+          </div>
         </div>
 
         <Tabs activeKey={activeTab} onChange={handleTabChange}>

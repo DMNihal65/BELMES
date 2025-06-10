@@ -24,6 +24,8 @@ import {
   InputNumber,
   DatePicker
 } from 'antd';
+import Lottie from 'lottie-react';
+import inventoryAnimation from '../../../assets/inventory.json';
 import { 
   PlusOutlined, 
   EditOutlined, 
@@ -1916,7 +1918,17 @@ const InventoryAllData = () => {
       <ToastContainer position="top-right" autoClose={3000} />
       <div className="flex flex-col h-full">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-          <Title level={4} className="m-0">Inventory Master Data</Title>
+          <div className="flex items-center">
+            <div className="w-20 h-20 mr-2 drop-shadow-md">
+              <Lottie
+                animationData={inventoryAnimation}
+                loop={true}
+                autoplay={true}
+                style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
+              />
+            </div>
+            <Title level={4} className="m-0">Inventory Master Data</Title>
+          </div>
           <Space wrap className="self-start lg:self-auto">
             <Button 
               type="primary" 

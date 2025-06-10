@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import Lottie from 'lottie-react';
+import maintenanceAnimation from '../../../assets/maintence.json';
 import { Tabs, Table, Card, Badge, Select, Button, Space, Tag, Tooltip } from 'antd';
 import { ReloadOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import useMachineMaintenanceStore from '../../../store/maintenance';
@@ -186,7 +188,17 @@ const Notifications = () => {
     <div className="p-2">
       <Card className="mb-6">
         <div className="flex justify-between items-center mb-4">
-          <div className="text-lg font-semibold">MAINTENANCE LOGS</div>
+          <div className="flex items-center">
+            <div className="w-10 h-10 mr-2 drop-shadow-md">
+              <Lottie
+                animationData={maintenanceAnimation}
+                loop={true}
+                autoplay={true}
+                style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
+              />
+            </div>
+            <div className="text-lg font-semibold">MAINTENANCE LOGS</div>
+          </div>
           <Space>
             <Select
               value={notificationsLimit}

@@ -21,6 +21,8 @@ import {
 } from 'antd';
 import { Wrench, Package, Bell, CheckCircle, RefreshCw, Ruler, Filter } from 'lucide-react';
 import useNotificationStore from '../../store/notificationNew';
+import Lottie from 'lottie-react';
+import notificationAnimation from '../../assets/notification.json';
 import { ToolFilled, FilterOutlined, ToolOutlined, } from '@ant-design/icons';
 import useInventoryStore from '../../store/inventory-store';
 
@@ -53,6 +55,7 @@ const NotificationsNew = () => {
   const { getItemDetails } = useInventoryStore();
   const [lastAcknowledgedId, setLastAcknowledgedId] = useState(null);
   const [lastAcknowledgedType, setLastAcknowledgedType] = useState(null);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
 
   // Initialize store on component mount
   useEffect(() => {
@@ -145,7 +148,7 @@ const NotificationsNew = () => {
       
       // Handle both machine and material notifications
       if (notification.notificationType === 'material') {
-        const response = await fetch('http://172.18.7.88:1919/api/v1/newlogs/raw_material_status_logs/acknowledge', {
+        const response = await fetch('http://172.18.7.88:2929/api/v1/newlogs/raw_material_status_logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -168,7 +171,7 @@ const NotificationsNew = () => {
         setLastAcknowledgedId(notification.id);
         setLastAcknowledgedType('material');
       } else if (notification.notificationType === 'machine') {
-        const response = await fetch('http://172.18.7.88:1919/api/v1/newlogs/machine-status-logs/acknowledge', {
+        const response = await fetch('http://172.18.7.88:2929/api/v1/newlogs/machine-status-logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -984,25 +987,23 @@ const NotificationsNew = () => {
           boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
         }}>
           <Row justify="space-between" align="middle" gutter={[16, 16]}>
-            <Col xs={24} md={12}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ 
-                  background: '#1890ff',
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  boxShadow: '0 4px 8px rgba(24,144,255,0.2)'
-                }}>
-                  <Bell size={24} color="#fff" />
-                </div>
-                <div>
-                  <Title level={3} style={{ margin: 0 }}>Notifications Center</Title>
-                  <Text type="secondary">
-                    Monitor and manage all system alerts in one place
-                  </Text>
+          <Col xs={24} md={12}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="flex items-center">
+                  <div className="w-12 h-12 mr-3" style={{ background: 'transparent' }}>
+                    <Lottie
+                      animationData={notificationAnimation}
+                      loop={true}
+                      autoplay={true}
+                      style={{ width: '100%', height: '100%', background: 'transparent' }}
+                    />
+                  </div>
+                  <div>
+                    <Title level={3} style={{ margin: 0 }}>Notifications Centre</Title>
+                    <Text type="secondary">
+                      Monitor and manage all system alerts in one place
+                    </Text>
+                  </div>
                 </div>
               </div>
             </Col>
@@ -1015,7 +1016,7 @@ const NotificationsNew = () => {
                 >
                   Refresh
                 </Button>
-                {totalUnacknowledgedCount > 0 && (
+                {/* {totalUnacknowledgedCount > 0 && (
                   <Button 
                     type="primary" 
                     onClick={handleAcknowledgeAll}
@@ -1024,7 +1025,7 @@ const NotificationsNew = () => {
                   >
                     Acknowledge All ({totalUnacknowledgedCount})
                   </Button>
-                )}
+                )} */}
               </Space>
             </Col>
           </Row>
@@ -1320,13 +1321,15 @@ const NotificationsNew = () => {
             </div>
           ) : getFilteredNotifications().length > 0 ? (
             <Table 
-              dataSource={getFilteredNotifications()}
+              dataSource={getFilteredNotifications().slice((pagination.current - 1) * pagination.pageSize, pagination.current * pagination.pageSize)}
               columns={getColumns()}
               rowKey={(record) => record._uniqueId || `${record.notificationType}-${record.id || record.machine_id || record.part_number}-${record.updated_at || record.timestamp}`}
               pagination={{ 
-                pageSize: 10,
+                current: pagination.current,
+                pageSize: pagination.pageSize,
                 showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50'],
+                pageSizeOptions: ['5', '10', '20', '50'],
+                onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
                 showTotal: (total) => `Total ${total} notification${total !== 1 ? 's' : ''}`,
                 style: { marginTop: '16px' }
               }}

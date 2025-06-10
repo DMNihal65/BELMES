@@ -17,7 +17,9 @@ import {
   Switch,
   Popconfirm
 } from 'antd';
-import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, ClusterOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, CloseOutlined, EyeOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import Lottie from 'lottie-react';
+import workcenterAnimation from '../../../assets/workcenter (2).json';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import dayjs from 'dayjs';
@@ -31,6 +33,8 @@ const Workcenter = () => {
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
   const [editingKey, setEditingKey] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const [filteredData, setFilteredData] = useState([]);
   const [data, setData] = useState([]);
   const [configData, setConfigData] = useState([]);
   const [selectedWorkcenter, setSelectedWorkcenter] = useState(null);
@@ -779,7 +783,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:1818/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:1919/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1441,6 +1445,15 @@ const Workcenter = () => {
     },
   ];
 
+  const handleSearch = (searchText) => {
+    setSearchText(searchText);
+    const filteredData = data.filter((workcenter) => {
+      const workcenterString = JSON.stringify(workcenter).toLowerCase();
+      return workcenterString.includes(searchText.toLowerCase());
+    });
+    setFilteredData(filteredData);
+  };
+
   return (
     <div className="min-h-screen bg-blue-50 p-6">
       <ToastContainer
@@ -1459,15 +1472,28 @@ const Workcenter = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center">
-              <div className="flex items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200 w-12 h-12 mr-4">
-                <ClusterOutlined className="text-white text-2xl" />
+              <div className="flex items-center justify-center rounded-lg bg-indigo-100 shadow-lg shadow-indigo-200 w-14 h-14 mr-4 overflow-hidden">
+                <Lottie 
+                  animationData={workcenterAnimation}
+                  style={{ width: 60, height: 60, marginTop: 4 }}
+                  loop={true}
+                  autoplay={true}
+                />
               </div>
               <div>
                 <h1 className="text-2xl font-bold m-0 text-gray-800">WORKCENTER MANAGEMENT</h1>
-                <p className="text-sm text-indigo-600 m-0">Link and configure work centres with their respective machines</p>
+                <p className="text-sm text-indigo-00 m-0">Link and configure work centres with their respective machines</p>
               </div>
             </div>
             <div className="flex gap-3">
+              <Input.Search
+                placeholder="Search workcenters..."
+                size="middle"
+                value={searchText}
+                onChange={(e) => handleSearch(e.target.value)}
+                style={{ width: 250 }}
+                allowClear
+              />
               <Button 
                 type="primary"
                 icon={<PlusOutlined />}
@@ -1501,11 +1527,7 @@ const Workcenter = () => {
                             cell: EditableCell,
                           },
                         }}
-                        dataSource={data.map((item, index) => ({
-                          ...item,
-                          key: `${item.work_center_id}_${index}`,
-                          sequential_id: index + 1,
-                        }))}
+                        dataSource={searchText ? filteredData : data}
                         columns={mergedColumns}
                         rowClassName={(record) => 
                           `${isEditing(record) ? 'bg-blue-50' : 'hover:bg-gray-50'}`
@@ -1514,7 +1536,7 @@ const Workcenter = () => {
                         pagination={{
                           current: currentPage,
                           pageSize: 6,
-                          total: data.length,
+                          total: searchText ? filteredData.length : data.length,
                           showSizeChanger: false,
                           showQuickJumper: true,
                           position: ['bottomCenter'],

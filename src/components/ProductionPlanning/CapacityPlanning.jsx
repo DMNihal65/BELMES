@@ -563,7 +563,7 @@ const CapacityPlanning = () => {
             animationData={capacityPlanAnimation}
             autoplay={true}
             loop={true}
-            style={{ width: 52, height: 52 }}
+            style={{ width: 55, height: 50 }}
           />
           <div>
             <Title level={4} style={{ margin: 0, color: 'black', fontWeight: 'bold' }}>Machine Capacity Planning</Title>

@@ -783,7 +783,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:2929/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:2928/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1472,14 +1472,14 @@ const Workcenter = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center">
-              <div className="flex items-center justify-center rounded-lg bg-indigo-100 shadow-lg shadow-indigo-200 w-14 h-14 mr-4 overflow-hidden">
+              
                 <Lottie 
                   animationData={workcenterAnimation}
                   style={{ width: 60, height: 60, marginTop: 4 }}
                   loop={true}
                   autoplay={true}
                 />
-              </div>
+        
               <div>
                 <h1 className="text-2xl font-bold m-0 text-gray-800">WORKCENTER MANAGEMENT</h1>
                 <p className="text-sm text-indigo-00 m-0">Link and configure work centres with their respective machines</p>

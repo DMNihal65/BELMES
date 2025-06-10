@@ -131,7 +131,7 @@ const TimelineControls = React.memo(({
     marginBottom: '4px',
     gap: '8px'
   }}>
-    <Title level={5} stylLive Energy Monitoringe={{ margin: 0, fontSize: '14px' }}>Productioncc Timeline</Title>
+    <Title level={5} style={{ margin: 0, fontSize: '14px' }}>Production Timeline</Title>
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
       <Select
         style={{ width: '180px' }}

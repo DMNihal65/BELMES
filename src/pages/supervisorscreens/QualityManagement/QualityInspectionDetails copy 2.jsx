@@ -604,9 +604,8 @@ const QualityInspectionDetails = ({
         ]}
         width={1600}
         className="measured-data-modal"
-        style={{ zIndex: 1200 }}
-        mask={true}
-        maskClosable={false}
+        style={{ zIndex: 1100 }}
+        maskStyle={{ zIndex: 1099 }}
       >
         {/* Header section */}
         <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
@@ -1462,21 +1461,14 @@ const QualityInspectionDetails = ({
       const operationId = '999'; // Operation ID for final inspection
       
       if (!productionOrder) {
-        message.info('No production order found for final inspection');
-        return;
+        throw new Error('Production order not found');
       }
       
       const data = await qualityStore.fetchBalloonedDrawing(productionOrder, operationId);
-      if (data && data.url) {
-        setFinalInspectionDrawing(data);
-      } else {
-        message.info('No drawing is uploaded for final inspection');
-      }
+      setFinalInspectionDrawing(data);
     } catch (error) {
-      if (error.message !== 'Drawing not found') {
-        console.error('Error loading final inspection drawing:', error);
-      }
-      message.info('No drawing is uploaded for final inspection');
+      message.error('Failed to load final inspection drawing');
+      console.error('Error loading final inspection drawing:', error);
     } finally {
       setLoadingFinalDrawing(false);
     }
@@ -1824,6 +1816,17 @@ const QualityInspectionDetails = ({
                   </Col>
                 </Row>
               </div>
+
+              {/* Show approval status alert */}
+              {ftpApprovalStatus?.is_completed && (
+                <Alert
+                  message="Final Inspection Approved"
+                  description={`This final inspection was approved on ${moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY HH:mm')}`}
+                  type="success"
+                  showIcon
+                  className="mb-4"
+                />
+              )}
 
               <div className="mb-4">
                 <Text strong>Operation: 999</Text>

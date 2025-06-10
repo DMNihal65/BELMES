@@ -194,7 +194,7 @@ const Notifications = () => {
                 animationData={maintenanceAnimation}
                 loop={true}
                 autoplay={true}
-                style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
+                style={{ width: '56px', height: '56px', filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.5))' }}
               />
             </div>
             <div className="text-lg font-semibold">MAINTENANCE LOGS</div>

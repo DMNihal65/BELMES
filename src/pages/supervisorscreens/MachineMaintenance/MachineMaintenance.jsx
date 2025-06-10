@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import { format } from 'date-fns';
 import { Table, Switch, Card, Button, Form, Space, Row, Col, DatePicker, Tag, Input, Dropdown, Menu, Typography, Statistic } from 'antd';
-import { ToolOutlined, CheckCircleOutlined, CloseCircleOutlined, SearchOutlined, FilterOutlined, AppstoreOutlined, ReloadOutlined, PoweroffOutlined, DashboardOutlined, DesktopOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CloseCircleOutlined, SearchOutlined, FilterOutlined, AppstoreOutlined, ReloadOutlined, PoweroffOutlined, DesktopOutlined } from '@ant-design/icons';
+import Lottie from 'lottie-react';
+import shopAnimation from '../../../assets/assets.json';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -316,202 +318,196 @@ export default function MachineMaintenance() {
   }
 
   return (
-    <div className="w-full  bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-fixed">
-      {/* Toast Container */}
+    <div className="w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-fixed">
       <ToastContainer position="top-right" theme="colored" />
       <div className="bg-white bg-opacity-80 backdrop-blur-sm p-6 rounded-xl shadow-md mb-6 border border-indigo-100">
         <Row>
-        <Col xs={24}>
-          <div className="flex flex-wrap items-center justify-between">
-            {/* LEFT SIDE: Title & Icon */}
-            <div className="flex items-center mb-2 md:mb-0">
-              <div className="flex items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200 w-12 h-12 mr-4">
-                <DashboardOutlined className="text-white text-2xl" />
+          <Col xs={24}>
+            <div className="flex flex-wrap items-center justify-between">
+              {/* LEFT SIDE: Title & Icon */}
+              <div className="flex items-center mb-2 md:mb-0">
+                
+                  <Lottie 
+                    animationData={shopAnimation}
+                    style={{ width: 55, height: 55 }}
+                    loop={true}
+                    autoplay={true}
+                  />
+               
+                <div>
+                  <Title level={3} className="text-2xl font-bold m-0 text-gray-800">ASSETS AVAILABILITY</Title>
+                  <p className="text-sm text-indigo-600 m-0">Real-time machine status and maintenance overview</p>
+                </div>
               </div>
-              <div>
-                <Title level={3} className="text-2xl font-bold m-0 text-gray-800">ASSETS AVAILABILITY</Title>
-                <p className="text-sm text-indigo-600 m-0">Real-time machine status and maintenance overview</p>
-              </div>
-            </div>
-
-            {/* RIGHT SIDE: Filters */}
-            <Space size="middle" wrap>
-              <Form.Item label={<span className="font-medium text-gray-700">Machine Name</span>} className="mb-0">
-                <Dropdown
-                  overlay={
-                    <Menu onClick={(e) => setFilterMachine(e.key)} className="rounded-xl shadow-lg p-1">
-                      <Menu.Item key="" icon={<AppstoreOutlined style={{ color: '#4f46e5' }} />} className="rounded-lg">
-                        <span className="font-medium">All Machines</span>
-                      </Menu.Item>
-                      <Menu.Divider />
-                      {[...new Set(machines.map(machine => machine.machine_make))].map(machineMake => (
-                        <Menu.Item key={machineMake} className="rounded-lg">
-                          <span className="font-medium">{machineMake}</span>
+              {/* RIGHT SIDE: Filters */}
+              <Space size="middle" wrap>
+                <Form.Item label={<span className="font-medium text-gray-700">Machine Name</span>} className="mb-0">
+                  <Dropdown
+                    overlay={
+                      <Menu onClick={(e) => setFilterMachine(e.key)} className="rounded-xl shadow-lg p-1">
+                        <Menu.Item key="" icon={<AppstoreOutlined style={{ color: '#4f46e5' }} />} className="rounded-lg">
+                          <span className="font-medium">All Machines</span>
                         </Menu.Item>
-                      ))}
-                    </Menu>
-                  }
-                  trigger={['click']}
-                >
-                  <Button 
-                    icon={<SearchOutlined />} 
-                    className={`rounded-xl ${filterMachine !== '' ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : ''} hover:shadow-md transition-all duration-300`}
+                        <Menu.Divider />
+                        {[...new Set(machines.map(machine => machine.machine_make))].map(machineMake => (
+                          <Menu.Item key={machineMake} className="rounded-lg">
+                            <span className="font-medium">{machineMake}</span>
+                          </Menu.Item>
+                        ))}
+                      </Menu>
+                    }
+                    trigger={['click']}
                   >
-                    <span className="font-medium">{filterMachine === '' ? 'All Machines' : filterMachine}</span>
-                  </Button>
-                </Dropdown>
-              </Form.Item>
+                    <Button 
+                      icon={<SearchOutlined />} 
+                      className={`rounded-xl ${filterMachine !== '' ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : ''} hover:shadow-md transition-all duration-300`}
+                    >
+                      <span className="font-medium">{filterMachine === '' ? 'All Machines' : filterMachine}</span>
+                    </Button>
+                  </Dropdown>
+                </Form.Item>
 
-              <Form.Item label={<span className="font-medium text-gray-700">Status</span>} className="mb-0">
-                <Dropdown
-                  overlay={
-                    <Menu onClick={(e) => setFilterStatus(e.key)} className="rounded-xl shadow-lg p-1">
-                      <Menu.Item key="" icon={<AppstoreOutlined style={{ color: '#4f46e5' }} />} className="rounded-lg">
-                        <span className="font-medium">All Statuses</span>
-                      </Menu.Item>
-                      <Menu.Divider />
-                      <Menu.Item key="ON" icon={<CheckCircleOutlined style={{ color: '#10b981' }} />} className="rounded-lg">
-                        <span className="font-medium">ON</span>
-                      </Menu.Item>
-                      <Menu.Item key="OFF" icon={<PoweroffOutlined style={{ color: '#64748b' }} />} className="rounded-lg">
-                        <span className="font-medium">OFF</span>
-                      </Menu.Item>
-                    </Menu>
-                  }
-                  trigger={['click']}
-                >
-                  <Button 
-                    icon={<FilterOutlined />} 
-                    className={`rounded-xl ${filterStatus !== '' ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : ''} hover:shadow-md transition-all duration-300`}
+                <Form.Item label={<span className="font-medium text-gray-700">Status</span>} className="mb-0">
+                  <Dropdown
+                    overlay={
+                      <Menu onClick={(e) => setFilterStatus(e.key)} className="rounded-xl shadow-lg p-1">
+                        <Menu.Item key="" icon={<AppstoreOutlined style={{ color: '#4f46e5' }} />} className="rounded-lg">
+                          <span className="font-medium">All Statuses</span>
+                        </Menu.Item>
+                        <Menu.Divider />
+                        <Menu.Item key="ON" icon={<CheckCircleOutlined style={{ color: '#10b981' }} />} className="rounded-lg">
+                          <span className="font-medium">ON</span>
+                        </Menu.Item>
+                        <Menu.Item key="OFF" icon={<PoweroffOutlined style={{ color: '#64748b' }} />} className="rounded-lg">
+                          <span className="font-medium">OFF</span>
+                        </Menu.Item>
+                      </Menu>
+                    }
+                    trigger={['click']}
                   >
-                    <span className="font-medium">{filterStatus === '' ? 'All Statuses' : filterStatus}</span>
-                  </Button>
-                </Dropdown>
-              </Form.Item>
+                    <Button 
+                      icon={<FilterOutlined />} 
+                      className={`rounded-xl ${filterStatus !== '' ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : ''} hover:shadow-md transition-all duration-300`}
+                    >
+                      <span className="font-medium">{filterStatus === '' ? 'All Statuses' : filterStatus}</span>
+                    </Button>
+                  </Dropdown>
+                </Form.Item>
 
-              <Button
-                onClick={() => {
-                  setFilterMachine('');
-                  setFilterStatus('');
-                  fetchMachineStatuses();
-                }}
-                className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
-                icon={<ReloadOutlined />}
-              >
-                Reset Filters
-              </Button>
-            </Space>
-          </div>
-          
-          <Row gutter={[16, 16]} className="mb-3 mt-5">
-      
-            {/* Total Machines */}
-            <Col xs={24} sm={12} md={6} lg={4}>
-              <Card 
-                className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-indigo-50 to-blue-100 hover:scale-[1.02] overflow-hidden"
-                bodyStyle={{ padding: '20px', position: 'relative' }}
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                  <DesktopOutlined className="text-7xl text-indigo-600" />
-                </div>
-                <Statistic 
-                  title={<span className="text-indigo-800 font-medium text-base flex items-center gap-2">
-                    <DesktopOutlined className="text-indigo-600" /> Total Machines
-                  </span>} 
-                  value={totalMachines} 
-                  valueStyle={{ color: '#4338ca', fontWeight: 700, fontSize: '28px' }}
-                  suffix={<span className="text-xs text-indigo-400 ml-1">Machines</span>}
-                />
-              </Card>
-            </Col>
+                <Button
+                  onClick={() => {
+                    setFilterMachine('');
+                    setFilterStatus('');
+                    fetchMachineStatuses();
+                  }}
+                  className="rounded-xl shadow-sm hover:shadow-md transition-all duration-300"
+                  icon={<ReloadOutlined />}
+                >
+                  Reset Filters
+                </Button>
+              </Space>
+            </div>
+          </Col>
+        </Row>
 
-            {/* Active Machines */}
-            <Col xs={24} sm={12} md={6} lg={4}>
-              <Card 
-                className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-green-50 to-emerald-100 hover:scale-[1.02] overflow-hidden"
-                bodyStyle={{ padding: '20px', position: 'relative' }}
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                  <CheckCircleOutlined className="text-7xl text-green-600" />
-                </div>
-                <Statistic 
-                  title={<span className="text-green-800 font-medium text-base flex items-center gap-2">
-                    <CheckCircleOutlined className="text-green-600" /> Active Machines
-                  </span>} 
-                  value={machines.filter(m => m.status_name === 'ON').length}
-                  valueStyle={{ color: '#16a34a', fontWeight: 700, fontSize: '28px' }}
-                  suffix={<span className="text-xs text-green-400 ml-1">Machines</span>}
-                />
-              </Card>
-            </Col>
+        <Row gutter={[16, 16]} className="mb-3 mt-5">
+          {/* Total Machines */}
+          <Col xs={24} sm={12} md={6} lg={4}>
+            <Card 
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-indigo-50 to-blue-100 hover:scale-[1.02] overflow-hidden"
+              bodyStyle={{ padding: '20px', position: 'relative' }}
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                <DesktopOutlined className="text-7xl text-indigo-600" />
+              </div>
+              <Statistic 
+                title={<span className="text-indigo-600 font-medium text-base flex items-center gap-2">
+                  <DesktopOutlined className="text-indigo-700" /> Total Machines
+                </span>} 
+                value={totalMachines} 
+                valueStyle={{ color: '#4338ca', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-indigo-400 ml-1">Machines</span>}
+              />
+            </Card>
+          </Col>
 
-            {/* Inactive Machines */}
-            <Col xs={24} sm={12} md={6} lg={4}>
-              <Card 
-                className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-red-50 to-rose-100 hover:scale-[1.02] overflow-hidden"
-                bodyStyle={{ padding: '20px', position: 'relative' }}
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                  <CloseCircleOutlined className="text-7xl text-red-600" />
-                </div>
-                <Statistic 
-                  title={<span className="text-red-800 font-medium text-base flex items-center gap-2">
-                    <CloseCircleOutlined className="text-red-600" /> Inactive Machines
-                  </span>} 
-                  value={machines.filter(m => m.status_name === 'OFF').length}
-                  valueStyle={{ color: '#dc2626', fontWeight: 700, fontSize: '28px' }}
-                  suffix={<span className="text-xs text-red-400 ml-1">Machines</span>}
-                />
-              </Card>
-            </Col>
-          </Row>
+          {/* Active Machines */}
+          <Col xs={24} sm={12} md={6} lg={4}>
+            <Card 
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-green-50 to-emerald-100 hover:scale-[1.02] overflow-hidden"
+              bodyStyle={{ padding: '20px', position: 'relative' }}
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                <CheckCircleOutlined className="text-7xl text-green-600" />
+              </div>
+              <Statistic 
+                title={<span className="text-green-800 font-medium text-base flex items-center gap-2">
+                  <CheckCircleOutlined className="text-green-600" /> Active Machines
+                </span>} 
+                value={machines.filter(m => m.status_name === 'ON').length}
+                valueStyle={{ color: '#16a34a', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-green-400 ml-1">Machines</span>}
+              />
+            </Card>
+          </Col>
 
-        </Col>
-
+          {/* Inactive Machines */}
+          <Col xs={24} sm={12} md={6} lg={4}>
+            <Card 
+              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-red-50 to-rose-100 hover:scale-[1.02] overflow-hidden"
+              bodyStyle={{ padding: '20px', position: 'relative' }}
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
+                <CloseCircleOutlined className="text-7xl text-red-600" />
+              </div>
+              <Statistic 
+                title={<span className="text-red-800 font-medium text-base flex items-center gap-2">
+                  <CloseCircleOutlined className="text-red-600" /> Inactive Machines
+                </span>} 
+                value={machines.filter(m => m.status_name === 'OFF').length}
+                valueStyle={{ color: '#dc2626', fontWeight: 700, fontSize: '28px' }}
+                suffix={<span className="text-xs text-red-400 ml-1">Machines</span>}
+              />
+            </Card>
+          </Col>
         </Row>
       </div>
 
-      
-
       <div className="bg-white p-4 md:p-6 rounded-2xl shadow-lg border border-indigo-600"
         style={{
-          // background: 'linear-gradient(135deg, #ffffff 0%, #f7f7f7 100%)',
           border: '1px solid #e0e0e0',
           borderRadius: '16px',
           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
           padding: '24px',
         }}
       >
-      <Form form={form} component={false}>
-        <Table
-          columns={columns}
-          dataSource={filteredData}
-          loading={loading}
-          rowKey="machine_id"
-          onChange={handleTableChange}
-          pagination={{
-            ...tableParams.pagination,
-            // pageSize: 7,
-            responsive: true,
-            position: ['bottomCenter'],
-          }}
-          size="middle"
-          bordered
-          scroll={{ x: 'max-content' }}
-          className="responsive-table custom-machine-maintenance-table"
-          style={{
-            borderRadius: '12px',
-            overflow: 'hidden',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-          }}
-        />
-      </Form>
+        <Form form={form} component={false}>
+          <Table
+            columns={columns}
+            dataSource={filteredData}
+            loading={loading}
+            rowKey="machine_id"
+            onChange={handleTableChange}
+            pagination={{
+              ...tableParams.pagination,
+              responsive: true,
+              position: ['bottomCenter'],
+            }}
+            size="middle"
+            bordered
+            scroll={{ x: 'max-content' }}
+            className="responsive-table custom-machine-maintenance-table"
+            style={{
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+            }}
+          />
+        </Form>
       </div>
     </div>
   );
 }
-
-
 
 
 

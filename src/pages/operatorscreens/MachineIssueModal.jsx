@@ -368,7 +368,7 @@ const MachineIssueModal = ({
             tab={
               <span className="flex items-center gap-2">
                 <Wrench className="h-4 w-4" />
-                Machine Breakdown
+                Machine Breakdownd
               </span>
             }
             key="machine"
@@ -539,3 +539,4 @@ export default MachineIssueModal;
 
 //testing
 //testingggg
+

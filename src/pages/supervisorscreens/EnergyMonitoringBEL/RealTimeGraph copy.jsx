@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Typography, Spin } from 'antd';
-import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBel';
+import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBEL';
 
 const { Title, Text } = Typography;
 

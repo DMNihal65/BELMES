@@ -1,4 +1,4 @@
-import { Avatar, Button, Dropdown, Input, Layout, Space, Badge, List, Typography, Empty, Tabs, Tag, Spin } from 'antd';
+import { Avatar, Button, Dropdown, Input, Layout, Space, Badge, List, Typography, Empty, Tag, Spin } from 'antd';
 import { LogOut, Menu as MenuIcon, Search, User, Bell, Wrench, Package, Ruler } from 'lucide-react';
 import useAuthStore from '../../store/auth-store';
 import useStore from '../../store/useStore';
@@ -11,7 +11,6 @@ import { ToolFilled } from '@ant-design/icons';
 
 const { Header: AntHeader } = Layout;
 const { Text } = Typography;
-const { TabPane } = Tabs;
 
 function Header() {
   const { user, logout } = useAuthStore();
@@ -20,26 +19,59 @@ function Header() {
   const [activeTabKey, setActiveTabKey] = useState('all');
   const [acknowledging, setAcknowledging] = useState(false);
   const [processingNotificationId, setProcessingNotificationId] = useState(null);
+  const [markingAsRead, setMarkingAsRead] = useState(false);
   
   const { 
     notifications, 
     unreadCount, 
     isLoading,
     initialize,
-    disconnectWebSockets,
     fetchNotifications,
     markAllAsRead,
-    markAsRead
+    markNotificationAsRead
   } = useNotificationStore();
+
+  const handleMarkAsRead = async (notificationId, e) => {
+    if (e) e.stopPropagation(); // Prevent dropdown from closing if event exists
+    
+    setMarkingAsRead(true);
+    setProcessingNotificationId(notificationId);
+    
+    try {
+      await markNotificationAsRead(notificationId);
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      message.error('Failed to mark notification as read');
+    } finally {
+      setMarkingAsRead(false);
+      setProcessingNotificationId(null);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (acknowledging) return; // Prevent multiple clicks
+    
+    setAcknowledging(true);
+    try {
+      const success = await markAllAsRead();
+      if (success) {
+        // Refresh notifications to ensure UI is in sync with the server
+        await fetchNotifications();
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+      message.error('Failed to mark all notifications as read');
+    } finally {
+      setAcknowledging(false);
+    }
+  };
 
   // Initialize notifications when component mounts
   useEffect(() => {
     initialize();
     
-    // Cleanup when component unmounts
-    return () => {
-      disconnectWebSockets();
-    };
+    // No cleanup needed as we're using polling
+    return () => {};
   }, []);
 
   // Handle logout
@@ -64,46 +96,16 @@ function Header() {
     }
   };
   
-  // Handle mark all as read
-  const handleMarkAllAsRead = async () => {
-    setAcknowledging(true);
-    try {
-      await markAllAsRead();
-    } finally {
-      setAcknowledging(false);
-    }
-  };
-  
   // Handle manual refresh
   const handleRefresh = async () => {
     await fetchNotifications(true);
   };
 
-  // Filter notifications by type
-  const machineNotifications = notifications.filter(n => n.notificationType === 'machine');
-  const materialNotifications = notifications.filter(n => n.notificationType === 'material');
-  const instrumentCalibrationNotifications = notifications.filter(n => n.notificationType === 'instrumentCalibration');
-  const machineCalibrationNotifications = notifications.filter(n => n.notificationType === 'machineCalibration');
-  
-  // Get filtered notifications based on active tab
-  let filteredNotifications = activeTabKey === 'all' 
-    ? notifications 
-    : activeTabKey === 'machine' 
-      ? machineNotifications 
-      : activeTabKey === 'material'
-        ? materialNotifications
-        : activeTabKey === 'instrumentCalibration'
-          ? instrumentCalibrationNotifications
-          : machineCalibrationNotifications;
-  
   // For dropdown display, limit to top 5 most recent
-  const limitedNotifications = filteredNotifications.slice(0, 5);
+  const limitedNotifications = notifications.slice(0, 5);
   
-  // Count unread by type
-  const unreadMachineCount = machineNotifications.filter(n => !n.is_acknowledged).length;
-  const unreadMaterialCount = materialNotifications.filter(n => !n.is_acknowledged).length;
-  const unreadInstrumentCalibrationCount = instrumentCalibrationNotifications.filter(n => !n.is_acknowledged).length;
-  const unreadMachineCalibrationCount = machineCalibrationNotifications.filter(n => !n.is_acknowledged).length;
+  // Count unread
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
 
   // Profile menu items
   const profileMenuItems = [
@@ -151,8 +153,8 @@ function Header() {
       }}>
         <div>
           <Text strong>Notifications</Text>
-          {unreadCount > 0 && (
-            <Badge count={unreadCount} size="small" style={{ marginLeft: '8px' }} />
+          {unreadNotificationsCount > 0 && (
+            <Badge count={unreadNotificationsCount} size="small" style={{ marginLeft: '8px' }} />
           )}
         </div>
         
@@ -169,168 +171,123 @@ function Header() {
             />
           )}
           
-          {unreadCount > 0 && (
+          {unreadNotificationsCount > 0 && (
             <Button 
               type="link" 
               size="small"
               loading={acknowledging}
               onClick={handleMarkAllAsRead}
-              style={{ padding: '0' }}
+              disabled={acknowledging}
+              style={{ 
+                padding: '0',
+                color: acknowledging ? 'rgba(0, 0, 0, 0.25)' : '#1890ff'
+              }}
             >
-              Mark all as read
+              {acknowledging ? 'Marking all...' : 'Mark all as read'}
             </Button>
           )}
         </Space>
       </div>
       
-      {/* Tabs */}
-      <Tabs 
-        activeKey={activeTabKey} 
-        onChange={setActiveTabKey}
-        style={{ padding: '0 8px', marginTop: '4px' }}
-        size="small"
-      >
-        <TabPane tab="All" key="all" />
-        <TabPane tab={
-          <span>
-            Machine
-            {unreadMachineCount > 0 && (
-              <Badge count={unreadMachineCount} size="small" style={{ marginLeft: '4px' }} />
-            )}
-          </span>
-        } key="machine" />
-        <TabPane tab={
-          <span>
-            Material
-            {unreadMaterialCount > 0 && (
-              <Badge count={unreadMaterialCount} size="small" style={{ marginLeft: '4px' }} />
-            )}
-          </span>
-        } key="material" />
-        <TabPane tab={
-          <span>
-            Instrument
-            {unreadInstrumentCalibrationCount > 0 && (
-              <Badge count={unreadInstrumentCalibrationCount} size="small" style={{ marginLeft: '4px' }} />
-            )}
-          </span>
-        } key="instrumentCalibration" />
-        <TabPane tab={
-          <span>
-            Calibration
-            {unreadMachineCalibrationCount > 0 && (
-              <Badge count={unreadMachineCalibrationCount} size="small" style={{ marginLeft: '4px' }} />
-            )}
-          </span>
-        } key="machineCalibration" />
-      </Tabs>
-      
       {/* Notification List */}
-      <div style={{ 
-        overflowY: 'auto', 
-        maxHeight: '350px',
-        flex: 1
-      }}>
+      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
         {isLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
             <Spin />
           </div>
-        ) : filteredNotifications.length > 0 ? (
+        ) : notifications.length > 0 ? (
           <List
-            dataSource={limitedNotifications}
-            renderItem={(item) => (
+            dataSource={notifications.map(n => ({
+              ...n,
+              record_data: n.record_data || {}
+            }))}
+            renderItem={item => (
               <List.Item 
-                style={{ 
-                  padding: '8px 12px', 
+                key={item._uniqueId}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: item.read ? '#fff' : '#f9f9f9',
+                  borderBottom: '1px solid #f0f0f0',
                   cursor: 'pointer',
-                  borderLeft: !item.is_acknowledged ? '3px solid #1890ff' : '3px solid transparent',
-                  background: !item.is_acknowledged ? 'rgba(24, 144, 255, 0.05)' : 'transparent'
+                  ':hover': {
+                    backgroundColor: item.read ? '#f5f5f5' : '#f0f0f0',
+                  },
                 }}
-                onClick={() => handleAcknowledge(item)}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', width: '100%' }}>
-                  {/* Icon based on type */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+                  {/* Icon */}
                   <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center',
-                    width: '30px',
-                    height: '30px',
-                    background: getNotificationIconBackground(item.notificationType),
+                    width: '32px',
+                    height: '32px',
                     borderRadius: '50%',
+                    backgroundColor: getNotificationIconBackground(item.notificationType),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: '12px',
                     flexShrink: 0
                   }}>
-                    {item.notificationType === 'machine' && <Wrench size={14} color="#1890ff" />}
-                    {item.notificationType === 'material' && <Package size={14} color="#52c41a" />}
-                    {item.notificationType === 'instrumentCalibration' && <Ruler size={14} color="#722ed1" />}
-                    {item.notificationType === 'machineCalibration' && <ToolFilled size={14} color="#fa8c16" />}
+                    {getNotificationIcon(item.notificationType)}
                   </div>
                   
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* Title */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Text strong style={{ fontSize: '13px' }}>
-                        {getNotificationTitle(item)}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <Tag color={item.notificationType === 'machine' ? 'blue' : 'green'} style={{ margin: 0, fontSize: '11px' }}>
+                        {item.table_name || 'Notification'}
+                      </Tag>
+                      <Text type="secondary" style={{ fontSize: '11px' }}>
+                        {formatDate(item.updated_at || item.timestamp || item.created_at)}
                       </Text>
-                      {item.status_name && (
-                        <Tag color={getStatusColor(item.status_name, item.notificationType)} style={{ margin: 0 }}>
-                          {item.status_name || 'UNKNOWN'}
-                        </Tag>
-                      )}
-                      {item.notificationType === 'instrumentCalibration' && (
-                        <Tag color="purple" style={{ margin: 0 }}>
-                          {item.calibration_type || 'CALIBRATION'}
-                        </Tag>
-                      )}
-                      {item.notificationType === 'machineCalibration' && (
-                        <Tag color="orange" style={{ margin: 0 }}>
-                          CALIBRATION DUE
-                        </Tag>
-                      )}
                     </div>
                     
-                    {/* Description - truncated */}
-                    <Text type="secondary" style={{ 
-                      fontSize: '12px', 
+                    <Text strong style={{ 
                       display: 'block',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
+                      fontSize: '13px',
+                      marginBottom: '4px',
                       whiteSpace: 'nowrap',
-                      marginTop: '4px'
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
                     }}>
-                      {getNotificationDescription(item)}
+                      {getNotificationTitle(item)}
                     </Text>
                     
-                    {/* Footer */}
-                    <div style={{ 
-                      marginTop: '6px', 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
+                    <Text style={{ 
+                      fontSize: '12px', 
+                      color: '#666',
+                      marginBottom: '4px',
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word'
                     }}>
-                      <Text type="secondary" style={{ fontSize: '11px' }}>
-                        {formatDate(item.updated_at || item.timestamp)}
+                      {item.description || 'No description available'}
+                    </Text>
+                    
+                    {item.status_name && (
+                      <Text type="secondary" style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>
+                        Status: {item.status_name}
                       </Text>
-                      
-                      {!item.is_acknowledged && item.notificationType !== 'instrumentCalibration' && item.notificationType !== 'machineCalibration' && (
+                    )}
+                    
+                    {!item.read && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                         <Button 
-                          type="primary" 
-                          size="small" 
-                          onClick={(e) => handleAcknowledge(item, e)}
-                          loading={acknowledging && processingNotificationId === item._uniqueId}
+                          type="link" 
+                          size="small"
+                          onClick={(e) => handleMarkAsRead(item._uniqueId, e)}
+                          loading={markingAsRead && processingNotificationId === item._uniqueId}
+                          disabled={markingAsRead}
                           style={{ 
-                            height: '22px', 
-                            padding: '0 8px', 
-                            fontSize: '11px',
-                            borderRadius: '4px',
-                            background: getNotificationButtonColor(item.notificationType)
+                            padding: '0 8px',
+                            height: '24px',
+                            fontSize: '12px',
+                            lineHeight: '22px',
+                            color: '#1890ff'
                           }}
                         >
-                          Acknowledge
+                          {markingAsRead && processingNotificationId === item._uniqueId ? 'Marking...' : 'Mark as Read'}
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </List.Item>
@@ -346,7 +303,7 @@ function Header() {
       </div>
       
       {/* Footer */}
-      {filteredNotifications.length > 0 && (
+      {notifications.length > 0 && (
         <div style={{ 
           padding: '8px 12px', 
           borderTop: '1px solid #f0f0f0', 
@@ -368,19 +325,36 @@ function Header() {
     </div>
   );
 
+  // Helper function to get the notification icon
+  const getNotificationIcon = (type) => {
+    const iconProps = { size: 16, style: { color: '#fff' } };
+    
+    switch (type) {
+      case 'machine':
+        return <Wrench {...iconProps} />;
+      case 'material':
+        return <Package {...iconProps} />;
+      case 'instrumentCalibration':
+      case 'machineCalibration':
+        return <Ruler {...iconProps} />;
+      default:
+        return <Bell {...iconProps} />;
+    }
+  };
+
   // Helper function to get the notification icon background color
   const getNotificationIconBackground = (type) => {
     switch (type) {
       case 'machine':
-        return '#e6f7ff'; // Light blue
+        return '#1890ff'; // Blue
       case 'material':
-        return '#f6ffed'; // Light green
+        return '#52c41a'; // Green
       case 'instrumentCalibration':
-        return '#f9f0ff'; // Light purple
+        return '#722ed1'; // Purple
       case 'machineCalibration':
-        return '#fff7e6'; // Light orange
+        return '#fa8c16'; // Orange
       default:
-        return '#f0f0f0'; // Light gray
+        return '#8c8c8c'; // Gray
     }
   };
 
@@ -430,6 +404,8 @@ function Header() {
         return '#1890ff'; // Default blue
     }
   };
+
+
 
   // Helper function to get color based on status and type
   const getStatusColor = (status, type) => {
@@ -551,7 +527,7 @@ function Header() {
             placement="bottomRight" 
             trigger={['click']}
           >
-            <Badge count={unreadCount} size="small" style={{ fontSize: '10px' }}>
+            <Badge count={unreadNotificationsCount} size="small" style={{ fontSize: '10px' }}>
               <Button
                 type="text"
                 icon={<Bell size={20} />}

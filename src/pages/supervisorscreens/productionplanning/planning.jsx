@@ -3030,6 +3030,7 @@ const loadInventoryItems = async () => {
                   operations={selectedJob.operations}
                   partNumber={selectedJob.part_number}
                   orderNumber={selectedJob.production_order}
+                  status={getJobStatus(selectedJob.production_order) === 'active' ? 'Active' : 'Inactive'}
                 />
               </TabPane>
 

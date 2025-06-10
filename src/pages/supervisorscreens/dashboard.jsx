@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Progress, Badge, Tag, Empty, Alert, Button, Tooltip, Drawer, Typography, Space, Divider, Avatar, Input, Collapse, Dropdown, Menu } from 'antd';
 import { 
   ClockCircleOutlined, CheckCircleOutlined, ToolOutlined, 
-  DashboardOutlined, BarcodeOutlined, BarChartOutlined, 
+  BarcodeOutlined, BarChartOutlined, 
   SearchOutlined, FilterOutlined, DesktopOutlined,
   ExclamationCircleOutlined, SyncOutlined,
   FileTextOutlined, CodeSandboxOutlined, FullscreenOutlined,
@@ -15,6 +15,7 @@ import Lottie from 'lottie-react';
 import powerAnimation from '../../assets/power.json';
 import idleAnimation from '../../assets/idle.json';
 import offAnimation from '../../assets/off.json';
+import shopAnimation from '../../assets/shop.json';
 import useDashboardStore from '../../store/dashboard';
 
 // Function to get status information including color, badge status, and border class
@@ -284,11 +285,16 @@ const SupervisorDashboard = () => {
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} md={16}>
             <div className="flex items-center">
-              <div className="flex items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200 w-12 h-12 mr-4">
-                <DashboardOutlined className="text-white text-2xl" />
-              </div>
+            
+                <Lottie 
+                  animationData={shopAnimation}
+                  style={{ width: 55, height: 55 }}
+                  loop={true}
+                  autoplay={true}
+                />
+              
               <div>
-                <h1 className="text-2xl font-bold m-0 text-gray-800">Production Dashboard</h1>
+                <h1 className="text-2xl font-bold m-0 text-gray-800">Shopfloor-View</h1>
                 <p className="text-sm text-indigo-600 m-0">Real-time machine monitoring system</p>
               </div>
             </div>

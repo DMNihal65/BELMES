@@ -14,7 +14,6 @@ import {
   CheckCircle2, Image as ImageIcon, Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
-import useWebSocketStore from '../../../store/websocket-store';
 import useAuthStore from '../../../store/auth-store';
 import { memo } from 'react';
 import useOperatorMppStore from '../../../store/operatormpp-store';
@@ -102,7 +101,7 @@ const OperationDrawer = ({ selectedOperation, showDrawer, onClose }) => {
             // If no documents exist, we should check the MPP endpoint directly
             try {
               const mppResponse = await fetch(
-                `http://172.18.7.88:2929/api/v1/mpp/by-part/${selectedOperation.part_number}/${selectedOperation.operation_number}`,
+                `http://172.18.7.88:2928/api/v1/mpp/by-part/${selectedOperation.part_number}/${selectedOperation.operation_number}`,
                 {
                   method: 'GET',
                   headers: {

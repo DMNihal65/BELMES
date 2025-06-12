@@ -323,10 +323,34 @@ const OrderDashboard = () => {
 
   const handleSearch = (searchText) => {
     setSearchText(searchText);
+    
+    if (!searchText.trim()) {
+      setFilteredOrders([]);
+      return;
+    }
+
+    const searchLower = searchText.toLowerCase().trim();
+    const searchTerms = searchLower.split(/\s+/); // Split by any whitespace
+
     const filteredOrders = localOrders.filter((order) => {
-      const orderString = JSON.stringify(order).toLowerCase();
-      return orderString.includes(searchText.toLowerCase());
+      // Create a string with all searchable fields
+      const searchableFields = [
+        order.priority?.toString() || '', // Sl.No
+        order.part_number?.toString().toLowerCase() || '',
+        order.production_order?.toString().toLowerCase() || '',
+        order.project?.toString().toLowerCase() || '',
+        order.description?.toString().toLowerCase() || '',
+        order.quantity?.toString().toLowerCase() || '',
+        order.wbs_element?.toString().toLowerCase() || '',
+        order.sales_order?.toString().toLowerCase() || ''
+      ].join(' ');
+
+      // Check if all search terms are found in any of the fields
+      return searchTerms.every(term => 
+        searchableFields.includes(term)
+      );
     });
+
     setFilteredOrders(filteredOrders);
   };
 

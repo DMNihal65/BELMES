@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Progress, Badge, Tag, Empty, Alert, Button, Tooltip, Drawer, Typography, Space, Divider, Avatar, Input, Collapse, Dropdown, Menu } from 'antd';
 import { 
   ClockCircleOutlined, CheckCircleOutlined, ToolOutlined, 
-  BarcodeOutlined, BarChartOutlined, 
+  BarcodeOutlined, BarChartOutlined, DashboardOutlined,
   SearchOutlined, FilterOutlined, DesktopOutlined,
   ExclamationCircleOutlined, SyncOutlined,
   FileTextOutlined, CodeSandboxOutlined, FullscreenOutlined,

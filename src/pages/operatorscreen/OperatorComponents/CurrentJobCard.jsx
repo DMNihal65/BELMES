@@ -3,6 +3,15 @@ import { Card, Tag, Tooltip, Progress, Divider, Spin, Empty, Row, Col, Badge } f
 import { Package, Info, Clock, AlertOctagon, Layers, FileText, ArrowRight, CheckCircle2 } from 'lucide-react';
 import useOperatorStore from '../../../store/operator-store';
 
+// Helper function to safely render values that might be objects
+const safeRender = (value, fallback = 'N/A') => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') {
+    return value.name || value.code || value.id || JSON.stringify(value);
+  }
+  return value.toString();
+};
+
 const CurrentJobCard = () => {
   const {
     selectedJob,
@@ -107,18 +116,29 @@ const CurrentJobCard = () => {
           <Col span={14}>
             <div className="bg-sky-50 p-3 rounded-lg h-full border border-sky-100">
               <div className="text-xs text-sky-800 mb-1 font-medium">Part Number</div>
-              <div className="font-bold text-base text-sky-900">{job.part_number}</div>
+              <div className="font-bold text-base text-sky-900">
+                {safeRender(job.part_number, 'N/A')}
+              </div>
               <div className="mt-1 text-xs text-gray-500 truncate">
-                {job.part_description || job.material_description || 'No description'}
+                {safeRender(job.part_description || job.material_description, 'No description')}
               </div>
             </div>
           </Col>
           <Col span={10}>
             <div className="bg-sky-50 p-3 rounded-lg h-full border border-sky-100">
               <div className="text-xs text-sky-800 mb-1 font-medium">Order</div>
-              <div className="font-bold text-base text-sky-900">{job.production_order}</div>
+              <div className="font-bold text-base text-sky-900">
+                {safeRender(job.production_order, 'N/A')}
+              </div>
               <div className="mt-1 text-xs">
-                <Badge status="processing" text={job.priority ? `Priority ${job.priority}` : 'Standard'} />
+                <Badge 
+                  status="processing" 
+                  text={
+                    job.priority 
+                      ? `Priority ${safeRender(job.priority, 'Standard').replace('Priority Priority', 'Priority ')}`
+                      : 'Standard'
+                  } 
+                />
               </div>
             </div>
           </Col>
@@ -140,12 +160,19 @@ const CurrentJobCard = () => {
           {operation ? (
             <>
               <div className="font-bold text-base text-sky-900">
-                {operation.operation_description || operation.description}
+                {safeRender(operation.operation_description || operation.description, 'No description')}
               </div>
 
               {operation.work_center && (
                 <div className="mt-1 text-xs text-gray-500">
-                  <Badge status="default" text={`${operation.work_center}`} />
+                  <Badge 
+                    status="default" 
+                    text={
+                      typeof operation.work_center === 'object' 
+                        ? operation.work_center.name || operation.work_center.code || 'Work Center' 
+                        : operation.work_center.toString()
+                    } 
+                  />
                 </div>
               )}
               
@@ -171,12 +198,16 @@ const CurrentJobCard = () => {
               <div className="text-xs grid grid-cols-2 gap-1">
                 <div className="flex items-center gap-1">
                   <span className="text-gray-500">Sales Order:</span>
-                  <span className="font-medium text-sky-900">{job.sale_order || job.sales_order || 'N/A'}</span>
+                  <span className="font-medium text-sky-900">
+                    {safeRender(job.sale_order || job.sales_order, 'N/A')}
+                  </span>
                 </div>
                 
                 <div className="flex items-center gap-1">
                   <span className="text-gray-500">Project:</span>
-                  <span className="font-medium text-sky-900">{job.project || 'N/A'}</span>
+                  <span className="font-medium text-sky-900">
+                    {safeRender(job.project, 'N/A')}
+                  </span>
                 </div>
                 
                 

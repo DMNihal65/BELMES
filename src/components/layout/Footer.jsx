@@ -10,7 +10,7 @@ function Footer() {
     <AntFooter style={{ 
       textAlign: 'center',
       background: '#fff',
-      padding: '16px 50px',
+      padding: '10px 24px',
       borderTop: '1px solid #f0f0f0',
       position: 'fixed',
       bottom: 0,
@@ -20,9 +20,13 @@ function Footer() {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      fontWeight: 'bold'
+      fontSize: '12px',
+      color: '#000',
+      height: '40px'
     }}>
-      CMTI ©{new Date().getFullYear()} Created by CMTI
+      <div style={{ fontWeight: 'bold' }}>
+        © {new Date().getFullYear()} CMTI. All rights reserved.
+      </div>
     </AntFooter>
   );
 }

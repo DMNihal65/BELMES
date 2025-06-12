@@ -720,7 +720,7 @@ const MachinesVisualization = () => {
             fontWeight: 600
           }}
         >
-          FAB-C Machine Energy Monitoring
+          Shop-Floor Energy Monitoring
         </Title>
         
         <Button 

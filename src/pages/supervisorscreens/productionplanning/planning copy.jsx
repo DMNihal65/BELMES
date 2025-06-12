@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Upload, message,
-  Typography, Tag, Tooltip, Form, Drawer, Descriptions, Cascader,
-  Badge, Alert, Spin, Progress, Divider, Collapse, DatePicker, Pagination, InputNumber
+  Typography, Tag, Tooltip, Form, Drawer, Descriptions, Cascader ,
+  Badge, Alert, Spin, Progress, Divider, Collapse, DatePicker, Pagination, InputNumber, Grid // Added Grid
 } from 'antd';
 import {
   UploadOutlined, FileTextOutlined, EditOutlined,
@@ -11,8 +11,8 @@ import {
   CalendarOutlined, BarChartOutlined,
   ToolOutlined, DownloadOutlined, DeleteOutlined,
   ScheduleOutlined, ReloadOutlined, EyeOutlined,
-  AppstoreOutlined, CheckOutlined, RobotOutlined, CheckCircleOutlined,
-  ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined, CloseCircleOutlined,
+  AppstoreOutlined, CheckOutlined, RobotOutlined,
+  ExperimentOutlined, FileSearchOutlined, InfoCircleOutlined,
   HistoryOutlined
 } from '@ant-design/icons';
 import {
@@ -34,10 +34,17 @@ import * as QRCodeNode from 'qrcode';
 import { create } from 'zustand';
 import moment from 'moment';
 import useInventoryStore from '../../../store/inventory-store';
+import useOrderStore from '../../../store/order-store';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TabPane } = Tabs;
+
+const cellStyle = {
+  border: '1px solid #222',
+  padding: 8,
+  fontSize: 16,
+};
 
 // Create a separate component for PDC info
 const PdcInfo = ({ productionOrder }) => {
@@ -92,6 +99,7 @@ const PdcInfo = ({ productionOrder }) => {
 };
 
 const Planning = () => {
+  const screens = Grid.useBreakpoint(); // Added for responsiveness
   // Job and part selection states
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedPartNumber, setSelectedPartNumber] = useState(null);
@@ -107,6 +115,8 @@ const Planning = () => {
   const [isAddToolModalVisible, setIsAddToolModalVisible] = useState(false);
   const [isEditToolModalVisible, setIsEditToolModalVisible] = useState(false);
   const [isAddProgramModalVisible, setIsAddProgramModalVisible] = useState(false);
+  const [operations, setOperations] = useState([]);
+  const [loadingOperations, setLoadingOperations] = useState(false);
   const [isEditProgramModalVisible, setIsEditProgramModalVisible] = useState(false);
   const [isVersionUpdateModalVisible, setIsVersionUpdateModalVisible] = useState(false);
   const [selectedProgramForVersion, setSelectedProgramForVersion] = useState(null);
@@ -127,6 +137,8 @@ const Planning = () => {
   const [programDocuments, setProgramDocuments] = useState([]);
   const [programVersions, setProgramVersions] = useState([]); // Add state for versions
   const [isVersionHistoryModalVisible, setIsVersionHistoryModalVisible] = useState(false); // Add state for modal
+  const [isRawMaterialModalVisible, setIsRawMaterialModalVisible] = useState(false);
+  const [isGeneratingRawMaterialPdf, setIsGeneratingRawMaterialPdf] = useState(false);
 
   // UI control states
   const [activeTab, setActiveTab] = useState('jobDetails');
@@ -143,6 +155,10 @@ const Planning = () => {
   const [editToolForm] = Form.useForm();
   const [addProgramForm] = Form.useForm();
   const [editProgramForm] = Form.useForm();
+
+  const [completionStatus, setCompletionStatus] = useState(null);
+  const planningStore = usePlanningStore();
+
   // Store hooks
   const { 
     fetchAllOrders, 
@@ -165,15 +181,13 @@ const Planning = () => {
     fetchEngineeringDrawings,
     downloadDocument,
     uploadCncProgram,
-    fetchProgramDocuments,
     updateProgramVersion,
     fetchProgramVersions,
-    fetchCncProgramDetails // Add this line
+    fetchCncProgramDetails,
+    fetchOperationsForTool // Add this line
   } = usePlanningStore();
 
-
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [subcategories, setSubcategories] = useState([]);
+    const [subcategories, setSubcategories] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const { categories, fetchItems,  fetchCategories, fetchAllSubcategories } = useInventoryStore();
   const [selectedSubcategoryName, setSelectedSubcategoryName] = useState('');
@@ -230,7 +244,7 @@ const loadInventoryItems = async () => {
     const itemName = item ? `${subcategory?.name || 'N/A'} - ${item.item_code}` : itemId;
     message.info(`Showing calibration history for ${itemName}`);
   };
-  
+
   // Configuration for file upload component - customized for NC program files
   const uploadProps = {
     name: 'file',
@@ -264,19 +278,22 @@ const loadInventoryItems = async () => {
         message.error('Please upload a valid program file (.nc, .prt, .mpf, .cnc)');
       }
       
-      if (!isLessThan20MB) {
-        message.error('File must be smaller than 20MB!');
-      }
+      // if (!isLessThan20MB) {
+      //   message.error('File must be smaller than 20MB!');
+      // }
       
       return (isValidFileType && isLessThan20MB) || Upload.LIST_IGNORE;
     },
     showUploadList: true,
   };
 
-  // Update your existing uploadProps or add a new one for documents
+  // Add new state for tracking file-operation mappings
+  const [fileOperationMappings, setFileOperationMappings] = useState({});
+
+  // Update documentUploadProps
   const documentUploadProps = {
     name: 'file',
-    multiple: false,
+    multiple: true,
     customRequest: ({ onSuccess }) => {
       setTimeout(() => {
         onSuccess("ok", null);
@@ -309,14 +326,29 @@ const loadInventoryItems = async () => {
       return true;
     },
     onChange(info) {
-      const { status } = info.file;
+      const { status, uid } = info.file;
       if (status === 'done') {
         message.success(`${info.file.name} ready for upload.`);
+        // Initialize operation mapping for new file
+        setFileOperationMappings(prev => ({
+          ...prev,
+          [uid]: null
+        }));
+      } else if (status === 'removed') {
+        // Remove operation mapping when file is removed
+        setFileOperationMappings(prev => {
+          const newMappings = { ...prev };
+          delete newMappings[uid];
+          return newMappings;
+        });
       } else if (status === 'error') {
         message.error(`${info.file.name} file upload failed.`);
       }
     },
-    showUploadList: true,
+    showUploadList: {
+      showRemoveIcon: true,
+      showDownloadIcon: false
+    },
   };
 
   // Load saved selection from localStorage on component mount
@@ -580,6 +612,7 @@ const loadInventoryItems = async () => {
           setDrawingsLoading(true);
           const drawingsData = await fetchEngineeringDrawings(selectedJob.part_number);
           console.log('Fetched engineering drawings:', drawingsData);
+          console.log('Items from API:', drawingsData.items); // Log the items
           setEngineeringDrawings(drawingsData.items || []);
         } catch (error) {
           console.error('Error fetching engineering drawings:', error);
@@ -657,18 +690,31 @@ const loadInventoryItems = async () => {
         type={status === 'active' ? 'primary' : 'default'}
         onClick={() => handleStatusChange(productionOrder, status)}
         loading={updatingStatus}
-        className={status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}
+        style={status === 'active' ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : {}}
       >
         {status === 'active' ? 'Active' : 'Inactive'}
       </Button>
     );
   };
 
+  const fetchCompletionStatus = async (partNumber, productionOrder) => {
+    try {
+      console.log('Fetching completion status for:', partNumber, productionOrder);
+      const status = await useOrderStore.getState().checkOrderCompletion(partNumber, productionOrder);
+      console.log('Completion status received:', status);
+      setCompletionStatus(status);
+    } catch (error) {
+      console.error('Error fetching completion status:', error);
+      message.error('Failed to fetch completion status');
+    }
+  };
+
   const handleJobSelect = async (partNumber) => {
     try {
+      console.log('Job selected:', partNumber);
       setLoading(true);
-      console.log('Selected part number:', partNumber);
-      setSelectedOrderNumber(partNumber);
+      setSelectedJob(null);
+      setCompletionStatus(null); // Reset completion status when selecting new job
       
       if (!partNumber) {
         setSelectedJob(null);
@@ -752,9 +798,18 @@ const loadInventoryItems = async () => {
         message.error('No job details found for the selected part number');
       }
       
+      if (selectedJob) {
+        console.log('Selected job:', selectedJob);
+        try {
+          await fetchCompletionStatus(partNumber, selectedJob.production_order);
+        } catch (error) {
+          console.error('Error fetching completion status:', error);
+          message.error('Failed to fetch completion status');
+        }
+      }
+      
     } catch (error) {
       console.error('Error in handleJobSelect:', error);
-      message.error('Failed to fetch job details');
     } finally {
       setLoading(false);
     }
@@ -968,6 +1023,8 @@ const loadInventoryItems = async () => {
           doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
         }
       });
+
+
 
       // Generate and add QR codes
       try {
@@ -1246,7 +1303,7 @@ const loadInventoryItems = async () => {
           </div>
           
           {/* Header Section */}
-          <div className="text-center space-y-2 border-b-4 border-blue-900 pb-4 mb-8 relative z-10">
+          <div className="text-center space-y-2 border-b-4 border-blue-900 pb-4 mb-4 relative z-10">
             <div className="flex items-center justify-between">
               <img src={belLogo} alt="BEL Logo" className="h-16" />
               <div className=" bg-blue-50 text-Black px-8 py-3 rounded-lg shadow-md">
@@ -1254,6 +1311,61 @@ const loadInventoryItems = async () => {
                 <h3 className="text-xl">JOB CARD</h3>
               </div>
               <div className="w-24"></div>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Total Jobs Card */}
+            <div className="bg-blue-600 text-white p-4 rounded-lg shadow-md">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm opacity-90">Total Jobs</p>
+                  <p className="text-2xl font-bold">24</p>
+                </div>
+                <div className="bg-blue-500 p-3 rounded-full">
+                  <ScheduleOutlined className="text-xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* In Progress Card */}
+            <div className="bg-yellow-500 text-white p-4 rounded-lg shadow-md">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm opacity-90">In Progress</p>
+                  <p className="text-2xl font-bold">18</p>
+                </div>
+                <div className="bg-yellow-400 p-3 rounded-full">
+                  <Hourglass className="text-xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Completed Card */}
+            <div className="bg-green-500 text-white p-4 rounded-lg shadow-md">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm opacity-90">Completed</p>
+                  <p className="text-2xl font-bold">6</p>
+                </div>
+                <div className="bg-green-400 p-3 rounded-full">
+                  <CheckCircle className="text-xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Pending PDC Card */}
+            <div className="bg-orange-500 text-white p-4 rounded-lg shadow-md">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm opacity-90">Pending PDC</p>
+                  <p className="text-2xl font-bold">3</p>
+                </div>
+                <div className="bg-orange-400 p-3 rounded-full">
+                  <CalendarCheck className="text-xl" />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1443,18 +1555,18 @@ const loadInventoryItems = async () => {
                   </tr>
                 </tbody>
               </table>
-            </div>
-          </div>
 
-          {/* Signature and Date Section */}
-          <div className="flex justify-between items-start mt-12 mb-8 relative z-10">
-            <div className="w-1/3">
-              <p className="font-bold mb-2  bg-blue-50">Signature with Seal</p>
-              <div className="border-b-4 border-blue-900 h-16"></div>
-            </div>
-            <div className="w-1/3 text-right">
-              <p className="font-bold mb-2  bg-blue-50">Date:</p>
-              <div className="border-b-4 border-blue-900 h-16"></div>
+              {/* Signature and Date Section */}
+              <div className="flex justify-between items-start mt-12 mb-8 relative z-10">
+                <div className="w-1/3">
+                  <p className="font-bold mb-2 bg-blue-50">Signature with Seal</p>
+                  <div className="border-b-4 border-blue-900 h-16"></div>
+                </div>
+                <div className="w-1/3 text-right">
+                  <p className="font-bold mb-2 bg-blue-50">Date:</p>
+                  <div className="border-b-4 border-blue-900 h-16"></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1480,28 +1592,94 @@ const loadInventoryItems = async () => {
     </Button>
   );
 
+  // Function to load operations for the selected production order
+  const loadOperations = async (productionOrder) => {
+    if (!productionOrder) return [];
+    
+    try {
+      setLoadingOperations(true);
+      const ops = await fetchOperationsForTool(productionOrder);
+      setOperations(ops);
+      return ops;
+    } catch (error) {
+      console.error('Error loading operations:', error);
+      message.error('Failed to load operations');
+      return [];
+    } finally {
+      setLoadingOperations(false);
+    }
+  };
+
+  // Load operations when modal opens
+  useEffect(() => {
+    if (isAddToolModalVisible && selectedJob?.production_order) {
+      console.log('Loading operations for production order:', selectedJob.production_order);
+      loadOperations(selectedJob.production_order);
+    }
+  }, [isAddToolModalVisible, selectedJob]);
+
+  // Add this useEffect to fetch tools when the component mounts or when selectedJob changes
+  useEffect(() => {
+  const fetchTools = async () => {
+      if (selectedJob?.id) {
+        try {
+          setLoading(true);
+        const toolsData = await fetchToolsByOrderId(selectedJob.id);
+        setTools(toolsData);
+      } catch (error) {
+        console.error('Error fetching tools:', error);
+        message.error('Failed to fetch tools');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  fetchTools();
+}, [selectedJob?.id, fetchToolsByOrderId]);
+
+// Update the handleAddTool function
   const handleAddTool = async (values) => {
+    if (!values.operation_id) {
+      message.error('Please select an operation');
+      return;
+    }
+    
     try {
       setLoading(true);
       const toolData = {
-        ...values,
-        order_id: selectedJob.id,
-        operation_id: values.operation_id,
-        tool_name: values.tool_name, // Ensure this is a string
-      };
-      
-      const newTool = await addOrderTool(toolData);
-      setTools(prevTools => [...prevTools, newTool]);
-      message.success('Tool added successfully');
-      setIsAddToolModalVisible(false);
-      addToolForm.resetFields();
-    } catch (error) {
-      console.error('Error adding tool:', error);
-      message.error('Failed to add tool');
-    } finally {
-      setLoading(false);
-    }
-  };
+      ...values,
+      order_id: selectedJob.id,
+      operation_id: values.operation_id,
+      tool_name: selectedSubcategoryName,
+      bel_partnumber: selectedPartNumber,
+      description: selectedPartDescription,
+      tool_number: selectedPartNumber || 'N/A', // Add tool_number field using BEL part number
+      quantity: values.quantity
+    };
+    
+    // Call the API to add the tool
+    await addOrderTool(toolData);
+    
+    // After successful addition, fetch the updated tools list
+    const updatedTools = await fetchToolsByOrderId(selectedJob.id);
+    setTools(updatedTools);
+    
+    message.success('Tool added successfully');
+    setIsAddToolModalVisible(false);
+    addToolForm.resetFields();
+    
+    // Reset the selected values
+    setSelectedSubcategoryName('');
+    setSelectedPartNumber('');
+    setSelectedPartDescription('');
+  } catch (error) {
+    console.error('Error adding tool:', error);
+    message.error('Failed to add tool');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleUpdateTool = async (values) => {
     try {
@@ -1633,75 +1811,146 @@ const loadInventoryItems = async () => {
   // Handle viewing/downloading a drawing
   const handleViewDrawing = async (documentId) => {
     try {
-      await downloadDocument(documentId);
+      console.log('Attempting to download document ID:', documentId);
+      
+      if (!documentId) {
+        message.error('Invalid document ID');
+        return;
+      }
+      
+      // Try to download the document
+      const result = await downloadDocument(documentId);
+      console.log('Download result:', result);
+      message.success('Drawing downloaded successfully');
     } catch (error) {
-      console.error('Error viewing drawing:', error);
-      message.error('Failed to view drawing');
+      console.error('Error viewing/downloading drawing:', error);
+      message.error('Failed to download drawing: ' + (error.message || 'Unknown error'));
     }
   };
 
+  // Update handleAddDocument function
   const handleAddDocument = async (values) => {
     try {
       setLoading(true);
       
-      // Get the file from the Upload component
-      const file = values.file?.fileList[0]?.originFileObj;
-      if (!file) {
-        throw new Error('Please select a file to upload');
+      // Get all files from the Upload component
+      const files = values.file?.fileList || [];
+      if (files.length === 0) {
+        throw new Error('Please select files to upload');
       }
 
-      // Create FormData object
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('program_name', values.program_name);
-      formData.append('description', values.description || '');
-      formData.append('version_number', values.version || '1');
-      formData.append('part_number', selectedJob.part_number);
-      
-      // Get the operation number from the selected operation
-      const selectedOperation = selectedJob.operations.find(op => op.id === values.operation_id);
-      if (selectedOperation) {
-        formData.append('operation_number', selectedOperation.operation_number);
+      // Validate that all files have operations assigned
+      const unassignedFiles = files.filter(file => !fileOperationMappings[file.uid]);
+      if (unassignedFiles.length > 0) {
+        throw new Error('Please assign operations to all files');
       }
 
-      // Upload the CNC program
-      const response = await uploadCncProgram(formData);
-      console.log('Upload response:', response);
+      // Validate that all assigned operations exist in the available operations
+      const availableOperationIds = documentOperations.map(op => op.id.toString());
+      const invalidMappings = Object.entries(fileOperationMappings).filter(
+        ([fileUid, operationId]) => !availableOperationIds.includes(operationId.toString())
+      );
       
-      // Add the new document to the list
-      if (response && response.id) {
-        const newDocument = {
-          id: response.id,
-          name: response.name,
-          description: response.description,
-          type: 'CNC Program',
-          doc_type_id: response.doc_type_id,
-          part_number: response.part_number,
-          production_order_id: response.production_order_id,
-          created_at: response.created_at,
-          upload_date: response.created_at,
-          is_active: response.is_active,
-          latest_version: response.latest_version,
-          operation_number: response.latest_version?.metadata?.operation_number || '',
-          operation_id: selectedOperation ? selectedOperation.id : null
-        };
+      if (invalidMappings.length > 0) {
+        const invalidFiles = invalidMappings.map(([fileUid]) => 
+          files.find(f => f.uid === fileUid)?.name || 'Unknown file'
+        );
+        throw new Error(`Invalid operation assigned to: ${invalidFiles.join(', ')}. Please select valid operations.`);
+      }
+
+      // Upload each file with its assigned operation
+      const uploadPromises = files.map(fileInfo => {
+        const file = fileInfo.originFileObj;
+        const operationId = fileOperationMappings[fileInfo.uid];
         
-        setProgramDocuments(prevDocs => {
-          const updatedDocs = [...prevDocs, newDocument];
-          // Update localStorage
-          localStorage.setItem('programDocuments', JSON.stringify(updatedDocs));
-          return updatedDocs;
-        });
-      }
+        console.log('File:', file.name, 'Operation ID:', operationId);
+        console.log('Available operations:', documentOperations.map(op => ({id: op.id, number: op.operation_number})));
+        
+        // Use string comparison to ensure type compatibility
+        const selectedOperation = documentOperations.find(op => String(op.id) === String(operationId));
+        
+        if (!selectedOperation) {
+          console.error(`No matching operation found for ID ${operationId}`);
+          throw new Error(`Invalid operation for file ${file.name}. Operation ID ${operationId} not found.`);
+        }
+
+        // Create FormData object for each file
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Use file name without extension as program name
+        const programName = file.name.split('.')[0];
+        formData.append('program_name', programName);
+        formData.append('description', programName); // Use filename as description
+        formData.append('version_number', '1'); // Default version
+        formData.append('part_number', selectedJob.part_number);
+        formData.append('operation_number', selectedOperation.operation_number);
+        formData.append('operation_id', selectedOperation.id); // Add operation_id explicitly
+
+        // Return upload promise
+        return uploadCncProgram(formData);
+      });
+
+      // Wait for all uploads to complete
+      const responses = await Promise.all(uploadPromises);
       
-      message.success('CNC program uploaded successfully');
+      // Process all responses and add to program documents
+      const newDocuments = responses.map((response, index) => {
+        if (response && response.id) {
+          const fileInfo = files[index];
+          const operationId = fileOperationMappings[fileInfo.uid];
+          return {
+            id: response.id,
+            name: response.name,
+            description: response.description,
+            type: 'CNC Program',
+            doc_type_id: response.doc_type_id,
+            part_number: response.part_number,
+            production_order_id: response.production_order_id,
+            created_at: response.created_at,
+            upload_date: response.created_at,
+            is_active: response.is_active,
+            latest_version: response.latest_version,
+            operation_number: response.latest_version?.metadata?.operation_number || '',
+            operation_id: operationId
+          };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      setProgramDocuments(prevDocs => {
+        const updatedDocs = [...prevDocs, ...newDocuments];
+        localStorage.setItem('programDocuments', JSON.stringify(updatedDocs));
+        return updatedDocs;
+      });
+      
+      message.success(`${files.length} CNC program(s) uploaded successfully`);
       setIsAddDocumentModalVisible(false);
       addDocumentForm.resetFields();
+      setFileOperationMappings({}); // Reset mappings
     } catch (error) {
-      console.error('Error uploading CNC program:', error);
-      message.error(`Failed to upload CNC program: ${error.message}`);
+      console.error('Error uploading CNC programs:', error);
+      message.error(`Failed to upload CNC programs: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Add new function to handle operation selection for a file
+  const handleOperationSelect = (fileUid, operationId) => {
+    console.log(`Assigning operation ID ${operationId} to file ${fileUid}`);
+    
+    // Find the operation details for better feedback
+    const operation = documentOperations.find(op => String(op.id) === String(operationId));
+    
+    setFileOperationMappings(prev => ({
+      ...prev,
+      [fileUid]: operationId
+    }));
+    
+    // Show feedback message
+    if (operation) {
+      message.success(`Assigned Operation ${operation.operation_number} to file`);
     }
   };
 
@@ -1720,15 +1969,72 @@ const loadInventoryItems = async () => {
   // Add effect to fetch program documents when job changes or tab changes
   useEffect(() => {
     const fetchProgramDocs = async () => {
-      if (selectedJob?.id && activeTab === 'toolsAndPrograms') {
+      if (selectedJob?.part_number && activeTab === 'toolsAndPrograms') {
         try {
           setLoading(true);
-          const documentsData = await fetchProgramDocuments(selectedJob.id);
-          console.log('Fetched program documents:', documentsData);
-          setProgramDocuments(documentsData || []);
+          
+          // Use the fetchCncProgramDetails endpoint to get program documents
+          const programDetails = await fetchCncProgramDetails(selectedJob.part_number);
+          console.log('Fetched program documents using CNC endpoint:', programDetails);
+          
+          // Process the data to extract operation numbers as needed
+          let mappedDocuments = [];
+          
+          if (programDetails && Array.isArray(programDetails)) {
+            // Map the data to include operation numbers if available
+            mappedDocuments = programDetails.map(doc => {
+              // Try to extract operation number from metadata or latest_version
+              let operationNumber = null;
+              
+              if (doc.metadata && doc.metadata.operation_number) {
+                operationNumber = doc.metadata.operation_number;
+              } else if (doc.latest_version && doc.latest_version.metadata && doc.latest_version.metadata.operation_number) {
+                operationNumber = doc.latest_version.metadata.operation_number;
+              } else {
+                // Try to extract from file name (common format: OP10, Operation 10, etc.)
+                const name = doc.name || '';
+                const fileNameMatch = name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+                if (fileNameMatch) {
+                  operationNumber = fileNameMatch[1] || fileNameMatch[2];
+                }
+              }
+              
+              return {
+                ...doc,
+                operation_number: operationNumber
+              };
+            });
+          } else if (programDetails && programDetails.items && Array.isArray(programDetails.items)) {
+            // Handle case where API returns {items: [...]} structure
+            mappedDocuments = programDetails.items.map(doc => {
+              // Try to extract operation number from metadata or latest_version
+              let operationNumber = null;
+              
+              if (doc.metadata && doc.metadata.operation_number) {
+                operationNumber = doc.metadata.operation_number;
+              } else if (doc.latest_version && doc.latest_version.metadata && doc.latest_version.metadata.operation_number) {
+                operationNumber = doc.latest_version.metadata.operation_number;
+              } else {
+                // Try to extract from file name (common format: OP10, Operation 10, etc.)
+                const name = doc.name || '';
+                const fileNameMatch = name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+                if (fileNameMatch) {
+                  operationNumber = fileNameMatch[1] || fileNameMatch[2];
+                }
+              }
+              
+              return {
+                ...doc,
+                operation_number: operationNumber
+              };
+            });
+          }
+          
+          console.log('Processed CNC program documents:', mappedDocuments);
+          setProgramDocuments(mappedDocuments);
           
           // Store in localStorage for persistence
-          localStorage.setItem('programDocuments', JSON.stringify(documentsData || []));
+          localStorage.setItem('programDocuments', JSON.stringify(mappedDocuments));
         } catch (error) {
           console.error('Error fetching program documents:', error);
           
@@ -1742,6 +2048,8 @@ const loadInventoryItems = async () => {
               console.error('Error parsing saved documents:', parseError);
               setProgramDocuments([]);
             }
+          } else {
+            setProgramDocuments([]);
           }
         } finally {
           setLoading(false);
@@ -1750,7 +2058,7 @@ const loadInventoryItems = async () => {
     };
 
     fetchProgramDocs();
-  }, [selectedJob?.id, activeTab, fetchProgramDocuments]);
+  }, [selectedJob?.part_number, activeTab, fetchCncProgramDetails]);
 
   // Add the documentsColumns definition before the return statement
   // Define the columns for the Program Documents table
@@ -1773,11 +2081,35 @@ const loadInventoryItems = async () => {
       key: 'operation_number',
       className: 'bg-gray-50',
       render: (operationNumber, record) => {
-        if (!operationNumber) return 'N/A';
-        const operation = selectedJob?.operations?.find(op => op.operation_number === operationNumber);
-        return operation 
-          ? `${operation.operation_number} - ${operation.operation_description}`
-          : `${operationNumber}`;
+        // Log the record to help debugging
+        console.log('Rendering operation for document in table:', record);
+        
+        // Handle different possible data structures from API
+        let opNum = operationNumber || 
+          record.metadata?.operation_number || 
+          record.latest_version?.metadata?.operation_number;
+        
+        // If no operation number found in metadata, try to extract from name
+        if (!opNum && record.name) {
+          const fileNameMatch = record.name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+          if (fileNameMatch) {
+            opNum = fileNameMatch[1] || fileNameMatch[2];
+          }
+        }
+        
+        if (!opNum) return 'N/A';
+        
+        // Try to find matching operation in the job data
+        const operation = selectedJob?.operations?.find(op => 
+          op.operation_number.toString() === opNum.toString()
+        );
+        
+        if (operation) {
+          return `${operation.operation_number} - ${operation.operation_description}`;
+        } else {
+          // If no match found, at least show the operation number
+          return `Operation ${opNum}`;
+        }
       }
     },
     { 
@@ -1801,13 +2133,13 @@ const loadInventoryItems = async () => {
       align: 'center',
       render: (_, record) => (
         <Space>
-          <Tooltip title="Download Document">
+          {/* <Tooltip title="Download Document">
             <Button 
               type="link" 
               icon={<DownloadOutlined />}
               onClick={() => handleDownloadDocument(record)}
             />
-          </Tooltip>
+          </Tooltip> */}
           <Tooltip title="View Version History">
             <Button
               type="link"
@@ -1902,10 +2234,96 @@ const loadInventoryItems = async () => {
       setVersionFile(null);
       setVersionNumber('');
       
-      // Refresh the program documents list
-      if (selectedJob?.id) {
-        const updatedDocs = await fetchProgramDocuments(selectedJob.id);
-        setProgramDocuments(updatedDocs || []);
+      // Refresh the program documents list based on active tab
+      if (activeTab === 'toolsAndPrograms' && selectedJob?.part_number) {
+        try {
+          // Fetch latest documents using the CNC endpoint
+          const programDetails = await fetchCncProgramDetails(selectedJob.part_number);
+          
+          // Process the data to extract operation numbers
+          let mappedDocuments = [];
+          
+          if (programDetails && Array.isArray(programDetails)) {
+            mappedDocuments = programDetails.map(doc => {
+              let operationNumber = null;
+              
+              if (doc.metadata && doc.metadata.operation_number) {
+                operationNumber = doc.metadata.operation_number;
+              } else if (doc.latest_version && doc.latest_version.metadata && doc.latest_version.metadata.operation_number) {
+                operationNumber = doc.latest_version.metadata.operation_number;
+              } else {
+                const name = doc.name || '';
+                const fileNameMatch = name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+                if (fileNameMatch) {
+                  operationNumber = fileNameMatch[1] || fileNameMatch[2];
+                }
+              }
+              
+              return {
+                ...doc,
+                operation_number: operationNumber
+              };
+            });
+          } else if (programDetails && programDetails.items && Array.isArray(programDetails.items)) {
+            mappedDocuments = programDetails.items.map(doc => {
+              let operationNumber = null;
+              
+              if (doc.metadata && doc.metadata.operation_number) {
+                operationNumber = doc.metadata.operation_number;
+              } else if (doc.latest_version && doc.latest_version.metadata && doc.latest_version.metadata.operation_number) {
+                operationNumber = doc.latest_version.metadata.operation_number;
+              } else {
+                const name = doc.name || '';
+                const fileNameMatch = name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+                if (fileNameMatch) {
+                  operationNumber = fileNameMatch[1] || fileNameMatch[2];
+                }
+              }
+              
+              return {
+                ...doc,
+                operation_number: operationNumber
+              };
+            });
+          }
+          
+          setProgramDocuments(mappedDocuments);
+        } catch (error) {
+          console.error('Error refreshing program documents:', error);
+        }
+      } else if (activeTab === 'configMatrix' && selectedJob?.part_number) {
+        try {
+          // Also refresh config matrix documents
+          const programDetails = await fetchCncProgramDetails(selectedJob.part_number);
+          let mappedDocuments = [];
+          
+          if (programDetails && Array.isArray(programDetails)) {
+            mappedDocuments = programDetails.map(doc => {
+              let operationNumber = null;
+              
+              if (doc.metadata && doc.metadata.operation_number) {
+                operationNumber = doc.metadata.operation_number;
+              } else if (doc.latest_version && doc.latest_version.metadata && doc.latest_version.metadata.operation_number) {
+                operationNumber = doc.latest_version.metadata.operation_number;
+              } else {
+                const name = doc.name || '';
+                const fileNameMatch = name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+                if (fileNameMatch) {
+                  operationNumber = fileNameMatch[1] || fileNameMatch[2];
+                }
+              }
+              
+              return {
+                ...doc,
+                operation_number: operationNumber
+              };
+            });
+          }
+          
+          setProgramDocuments(mappedDocuments);
+        } catch (error) {
+          console.error('Error refreshing program documents for config matrix:', error);
+        }
       }
     } catch (error) {
       message.error(error.message || 'Failed to update program version');
@@ -1960,7 +2378,8 @@ const loadInventoryItems = async () => {
   const handleDownloadVersion = async (version) => {
     try {
       if (version?.id) {
-        await downloadDocument(version.document_id);
+        // Use the file_name from the version record for the download
+        await downloadDocument(version.document_id, version.file_name);
       } else {
         message.error('Version information is missing');
       }
@@ -1984,7 +2403,8 @@ const loadInventoryItems = async () => {
   const handleDownloadDocument = async (record) => {
     try {
       if (record.latest_version?.id) {
-        await downloadDocument(record.latest_version.id);
+        // Pass the document name when downloading
+        await downloadDocument(record.latest_version.id, record.name);
       } else {
         message.error('No version available for download');
       }
@@ -1997,15 +2417,82 @@ const loadInventoryItems = async () => {
   // Add effect to fetch program details when a part number is selected
   useEffect(() => {
     const fetchProgramDetails = async () => {
-      if (selectedJob?.part_number && activeTab === 'toolsAndPrograms') {
+      console.log('Running fetchProgramDetails for tab:', activeTab, 'part number:', selectedJob?.part_number);
+      
+      if (selectedJob?.part_number && (activeTab === 'toolsAndPrograms' || activeTab === 'configMatrix')) {
         try {
           setLoading(true);
           const programDetails = await fetchCncProgramDetails(selectedJob.part_number);
           console.log('Fetched CNC program details:', programDetails);
-          // Store the program details if needed in additional state
+          
+          // Update program documents state when we're on the configMatrix tab
+          if (activeTab === 'configMatrix') {
+            // Check if there's valid program data
+            if (programDetails && Array.isArray(programDetails)) {
+              // Map the data to include operation numbers if available
+              const mappedDocuments = programDetails.map(doc => {
+                // Try to extract operation number from metadata or latest_version
+                let operationNumber = null;
+                
+                if (doc.metadata && doc.metadata.operation_number) {
+                  operationNumber = doc.metadata.operation_number;
+                } else if (doc.latest_version && doc.latest_version.metadata && doc.latest_version.metadata.operation_number) {
+                  operationNumber = doc.latest_version.metadata.operation_number;
+                } else {
+                  // Try to extract from file name (common format: OP10, Operation 10, etc.)
+                  const name = doc.name || '';
+                  const fileNameMatch = name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+                  if (fileNameMatch) {
+                    operationNumber = fileNameMatch[1] || fileNameMatch[2];
+                  }
+                }
+                
+                return {
+                  ...doc,
+                  operation_number: operationNumber
+                };
+              });
+              
+              console.log('Mapped CNC program documents with operation numbers:', mappedDocuments);
+              setProgramDocuments(mappedDocuments);
+            } else if (programDetails && programDetails.items && Array.isArray(programDetails.items)) {
+              // Handle case where API returns {items: [...]} structure
+              const mappedDocuments = programDetails.items.map(doc => {
+                // Try to extract operation number from metadata or latest_version
+                let operationNumber = null;
+                
+                if (doc.metadata && doc.metadata.operation_number) {
+                  operationNumber = doc.metadata.operation_number;
+                } else if (doc.latest_version && doc.latest_version.metadata && doc.latest_version.metadata.operation_number) {
+                  operationNumber = doc.latest_version.metadata.operation_number;
+                } else {
+                  // Try to extract from file name (common format: OP10, Operation 10, etc.)
+                  const name = doc.name || '';
+                  const fileNameMatch = name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+                  if (fileNameMatch) {
+                    operationNumber = fileNameMatch[1] || fileNameMatch[2];
+                  }
+                }
+                
+                return {
+                  ...doc,
+                  operation_number: operationNumber
+                };
+              });
+              
+              console.log('Mapped CNC program documents with operation numbers:', mappedDocuments);
+              setProgramDocuments(mappedDocuments);
+            } else {
+              console.log('No program documents found for this part number');
+              setProgramDocuments([]);
+            }
+          }
         } catch (error) {
           console.error('Error fetching CNC program details:', error);
           // Don't show error to user as this might be optional data
+          if (activeTab === 'configMatrix') {
+            setProgramDocuments([]);
+          }
         } finally {
           setLoading(false);
         }
@@ -2015,50 +2502,395 @@ const loadInventoryItems = async () => {
     fetchProgramDetails();
   }, [selectedJob?.part_number, activeTab, fetchCncProgramDetails]);
 
+  // Add state variable for operations dropdown in the modal
+  const [documentOperations, setDocumentOperations] = useState([]);
+
+  // Add useEffect to fetch operations when the modal opens
+  useEffect(() => {
+    const fetchOperationsForModal = async () => {
+      if (isAddDocumentModalVisible && selectedJob) {
+        try {
+          setLoading(true);
+          
+          // Always fetch fresh operations from the API to ensure we have the latest data
+          console.log('Fetching operations from API for production order:', selectedJob.production_order);
+          const orderData = await searchOrders(selectedJob.production_order);
+          
+          if (orderData && orderData.orders && orderData.orders.length > 0) {
+            const operations = orderData.orders[0].operations || [];
+            console.log('Operations fetched from API:', operations);
+            setDocumentOperations(operations);
+            
+            // Update the selected job's operations if needed
+            if (operations.length > 0 && (!selectedJob.operations || selectedJob.operations.length === 0)) {
+              setSelectedJob(prevJob => ({
+                ...prevJob,
+                operations: operations
+              }));
+            }
+          } else {
+            console.warn('No operations found for production order:', selectedJob.production_order);
+            setDocumentOperations([]);
+          }
+        } catch (error) {
+          console.error('Error fetching operations for document upload:', error);
+          message.error('Failed to fetch operations');
+          setDocumentOperations([]);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchOperationsForModal();
+  }, [isAddDocumentModalVisible, selectedJob, searchOrders]);
+
+  // Update the modal to reset operations when closing
+  const handleCloseAddDocumentModal = () => {
+    setIsAddDocumentModalVisible(false);
+    addDocumentForm.resetFields();
+    setFileOperationMappings({});
+    setDocumentOperations([]);
+  };
+
+  const handleShowRawMaterialModal = () => {
+    if (!selectedJob) {
+      message.error('No job selected');
+      return;
+    }
+    setIsRawMaterialModalVisible(true);
+  };
+
+  const handleDownloadRawMaterialJobCard = async () => {
+    if (!selectedJob) {
+      message.error("No job selected for Job Number Tag.");
+      return;
+    }
+    setIsGeneratingRawMaterialPdf(true);
+
+    try {
+      const doc = new jsPDF();
+
+      // Add BEL logo if available
+      if (typeof belLogo !== 'undefined') {
+        const img = new Image();
+        img.src = belLogo;
+        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+        try {
+          doc.addImage(img, 'PNG', 10, 5, 30, 15);
+        } catch (e) { console.error("Error adding BEL logo to PDF", e); }
+      }
+
+    // Add company header with better styling
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    // doc.text('FABRICATION COMPONENTS', 105, 15, { align: 'center' });
+    // doc.setFontSize(16);
+    // doc.text('Job Number Tag', 105, 22, { align: 'center' });
+
+      // Prepare table data
+      const material = selectedJob.raw_materials?.[0] || {};
+
+            // Generate QR codes as Data URLs (already done in your code)
+            const qrString = [
+             selectedJob.part_number || '',
+             selectedJob.part_description || '',
+             selectedJob.production_order || '',
+             material.child_part_number || '',
+           ].join(' ; ');
+
+	      // const qrString = [
+        //       'Part Number: ' + (selectedJob.part_number || ''),
+        //       'Part Description: ' + (selectedJob.part_description || ''),
+        //       'Production Order: ' + (selectedJob.production_order || ''),
+        //       'Child Part Number: ' + (material.child_part_number || ''),
+        //     ].join(' ; ');
+      
+      const qrDataUrl = await QRCodeNode.toDataURL(qrString, { errorCorrectionLevel: 'M', margin: 1, width: 60 });
+      
+            
+      const tableBody = [
+        [
+          {
+            content: 'FAB/C - Job Number Tag',
+            colSpan: 2, // Span across two columns
+            styles: {
+              fontStyle: 'bold',
+              halign: 'center', // Center-align the content
+              fillColor: [240, 240, 240], // Optional background color
+              textColor: [0, 0, 0],
+              fontSize: 12,
+              minCellHeight: 15
+            }
+          },
+        ],
+        [
+          {
+            content: 'Part Number',
+            styles: { fontStyle: 'bold', cellWidth: 40 }
+          },
+          {
+            content: selectedJob.part_number || 'N/A',
+            styles: { cellWidth: 80 }
+          }
+        ],
+        [
+          {
+            content: 'Part Description',
+            styles: { fontStyle: 'bold', cellWidth: 40 }
+          },
+          {
+            content: selectedJob.part_description || 'N/A',
+            styles: { cellWidth: 80 }
+          }
+        ],
+        [
+          {
+            content: 'Production Order',
+            styles: { fontStyle: 'bold', cellWidth: 40 }
+          },
+          {
+            content: selectedJob.production_order || 'N/A',
+              styles: { cellWidth: 80 }
+          }
+        ],
+        [
+          {
+            content: 'Child Part Number',
+            styles: { fontStyle: 'bold', cellWidth: 40 }
+          },
+          {
+            content: material.child_part_number || 'N/A',
+            styles: { cellWidth: 80 }
+          }
+        ],      
+        [
+          {
+            content: 'Qty',
+            styles: { fontStyle: 'bold', cellWidth: 40 }
+          },
+          {
+            content: selectedJob.launched_quantity || 'N/A',
+            styles: { cellWidth: 80 }
+          }
+        ],
+        [
+          { content: 'QR Code', styles: { fontStyle: 'bold', cellWidth: 40, minCellHeight: 60 } },
+          { content: '', styles: { cellWidth: 80, minCellHeight: 60 } } // Increase minCellHeight for QR row
+        ]
+        
+      ];
+
+
+
+      
+
+      
+      let qrCellPos = null;
+      
+      // Draw the table (with light borders and centered text)
+      autoTable(doc, {
+        startY: 35,
+        head: [],
+        body: tableBody,
+        theme: 'grid',
+        styles: {
+          fontSize: 10,
+          cellPadding: 4,
+          lineColor: [200, 200, 200], // light gray
+          lineWidth: 0.5,
+          font: 'helvetica',
+          textColor: [0, 0, 0],
+          halign: 'center', // center align all cells
+          valign: 'middle'
+        },
+        columnStyles: {
+          0: { cellWidth: 60, fontStyle: 'bold', halign: 'center' },
+          1: { cellWidth: 110, halign: 'center' }
+        },
+        tableWidth: 'wrap',
+        margin: { horizontal: (doc.internal.pageSize.getWidth() - 170) / 2 }, // Center the table manually
+        didDrawCell: function (data) {
+          // Save the position of the QR Code cell
+          if (
+            data.row.index === tableBody.length - 1 && // last row
+            data.column.index === 1
+          ) {
+            qrCellPos = {
+              x: data.cell.x,
+              y: data.cell.y,
+              width: data.cell.width,
+              height: data.cell.height
+            };
+          }
+        }
+      });
+      // Get the Y position after the table
+      const finalY = doc.lastAutoTable.finalY || 35 + tableBody.length * 10;
+
+      // After autoTable:
+      let tableStartX = 15;
+      let tableWidth = 170;
+      let tableStartY = 35;
+      let tableHeight = tableBody.length * 10; // fallback
+      if (doc.lastAutoTable && doc.lastAutoTable.table) {
+        tableStartX = doc.lastAutoTable.table.x;
+        tableWidth = doc.lastAutoTable.table.width;
+        tableStartY = doc.lastAutoTable.table.y;
+        tableHeight = doc.lastAutoTable.table.height;
+      }
+
+      // Set up QR code grid dimensions
+      const qrGridWidth = 60; // or 80 for bigger QR codes
+      const qrGridHeight = 60; // or 80
+      // const qrSize = 30; // or 40
+      const qrMargin = 20; // margin between table and QR grid
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let qrStartX, qrStartY;
+      if (tableStartX + tableWidth + qrMargin + qrGridWidth < pageWidth - 10) {
+        // Enough space to the right
+        qrStartX = tableStartX + tableWidth + qrMargin;
+        qrStartY = tableStartY;
+      } else {
+        // Not enough space, place below the table
+        qrStartX = tableStartX;
+        qrStartY = tableStartY + tableHeight + qrMargin;
+      }
+
+      // const qrDataUrls = [qrDataUrl, qrDataUrl, qrDataUrl, qrDataUrl];
+
+      // // Top row
+      // doc.addImage(qrDataUrls[0], 'PNG', qrStartX, qrStartY, qrSize, qrSize);
+      // doc.addImage(qrDataUrls[1], 'PNG', qrStartX + qrSize, qrStartY, qrSize, qrSize);
+      // // Bottom row
+      // doc.addImage(qrDataUrls[2], 'PNG', qrStartX, qrStartY + qrSize, qrSize, qrSize);
+      // doc.addImage(qrDataUrls[3], 'PNG', qrStartX + qrSize, qrStartY + qrSize, qrSize, qrSize);
+
+      // After autoTable, draw the 2x2 QR codes inside the QR Code cell
+      // if (qrCellPos) {
+      //   // Decrease QR code size for 2x2 grid
+      //   const qrSize = qrCellPos.width / 3 - 2; // Smaller QR codes
+      //   const margin = 2;
+      //   const qrDataUrls = [qrDataUrl, qrDataUrl, qrDataUrl, qrDataUrl]; // Use your actual QR data URLs here
+
+      //   // Calculate total grid size (2 QR codes + margin between them)
+      //   const gridSize = 2 * qrSize + 2 * margin;
+      //   // Calculate starting x and y to center the grid in the cell
+      //   const startX = qrCellPos.x + (qrCellPos.width - gridSize) / 2;
+      //   const startY = qrCellPos.y + (qrCellPos.height - gridSize) / 2;
+
+      //   // Top-left
+      //   doc.addImage(qrDataUrls[0], 'PNG', startX, startY, qrSize, qrSize);
+      //   // Top-right
+      //   doc.addImage(qrDataUrls[1], 'PNG', startX + qrSize + margin, startY, qrSize, qrSize);
+      //   // Bottom-left
+      //   doc.addImage(qrDataUrls[2], 'PNG', startX, startY + qrSize + margin, qrSize, qrSize);
+      //   // Bottom-right
+      //   doc.addImage(qrDataUrls[3], 'PNG', startX + qrSize + margin, startY + qrSize + margin, qrSize, qrSize);
+      // }
+      if (qrCellPos) {
+        // Set QR code size to fit nicely in the cell with a bit more margin
+        const qrSize = Math.min(qrCellPos.width, qrCellPos.height) - 18; // Increased margin for smaller QR
+        const startX = qrCellPos.x + (qrCellPos.width - qrSize) / 2;
+        const startY = qrCellPos.y + (qrCellPos.height - qrSize) / 2;
+      
+        doc.addImage(qrDataUrl, 'PNG', startX, startY, qrSize, qrSize);
+      }
+
+      // Save the PDF
+      const fileName = `RawMaterial_JobCard_${selectedJob.production_order || 'unknown'}.pdf`;
+      doc.save(fileName);
+      message.success('Job Number Tag PDF downloaded successfully.');
+      setIsRawMaterialModalVisible(false);
+
+    } catch (error) {
+      console.error("Error generating Raw Material PDF:", error);
+      message.error(`Failed to generate Raw Material PDF: ${error.message}`);
+    } finally {
+      setIsGeneratingRawMaterialPdf(false);
+    }
+  };
+
+  // Add this effect to fetch completion status when job is selected
+  useEffect(() => {
+    const fetchCompletionStatus = async () => {
+      if (selectedJob?.part_number && selectedJob?.production_order) {
+        setLoading(true);
+        try {
+          const status = await usePlanningStore.getState().checkOrderCompletion(
+            selectedJob.part_number,
+            selectedJob.production_order
+          );
+          setCompletionStatus(status);
+        } catch (error) {
+          console.error('Error fetching completion status:', error);
+          message.error('Failed to fetch completion status');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchCompletionStatus();
+  }, [selectedJob]);
+
+  
   return (
     <div className="space-y-6 p-6">
       {/* Job Selection Section with improved layout */}
       <Card className="shadow-sm">
-        <Row gutter={24} align="middle">
-          <Col span={selectedJob ? 20 : 24}>
-            <Space size="large" className="w-full">
-              <Form.Item label="Select Job/Production Order" className="mb-0" style={{ flex: 1 }}>
-                <Space className="w-full">
-                  <Select
-                    className="job-select"
-                    showSearch
-                    style={{ width: 300 }}
-                    placeholder="Select Production Order"
-                    optionFilterProp="label"
-                    value={selectedOrderNumber}
-                    onChange={handleJobSelect}
-                    filterOption={(input, option) =>
-                      option.label.toLowerCase().includes(input.toLowerCase())
-                    }
-                  >
-                    {partNumbers.map(order => (
-                      <Option 
-                        key={order.id} 
-                        value={order.value}
-                        label={order.label}
-                      >
-                        {order.label}
-                      </Option>
-                    ))}
-                  </Select>
-                </Space>
-              </Form.Item>
+      <Row justify="space-between" align="middle" wrap>
+        <Col flex="1">
+          <Form.Item label="Select Job/Production Order" className="mb-0" style={{ width: '100%', fontWeight: 600, fontSize: '26px' }}>
+            <Select
+              className="job-select"
+              showSearch
+              style={{ width: '100%', maxWidth: 300 }}
+              placeholder="Select Production Order"
+              optionFilterProp="label"
+              value={selectedOrderNumber}
+              onChange={handleJobSelect}
+              filterOption={(input, option) =>
+                option.label.toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {partNumbers.map(order => (
+                <Option 
+                  key={order.id} 
+                  value={order.value}
+                  label={order.label}
+                >
+                  {order.label}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Col>
+
+        {selectedJob && (
+          <Col>
+            <Space>
+              <Button
+                type="primary"
+                icon={<FileTextOutlined />}
+                onClick={handleShowRawMaterialModal}
+              >
+                Job Number Tag
+              </Button>
+              <Button
+                type="default"
+                icon={<DownloadOutlined />}
+                onClick={handleShowPreview}
+              >
+                Download Job Card
+              </Button>
             </Space>
           </Col>
-          {selectedJob && (
-            <Col span={4} className="text-right">
-              <Space>
-                {renderDownloadButton()}
-              </Space>
-            </Col>
-          )}
-        </Row>
-      </Card>
+        )}
+      </Row>
+    </Card>
 
       {/* All other content conditionally rendered only when a job is selected */}
       {selectedJob && (
@@ -2067,13 +2899,21 @@ const loadInventoryItems = async () => {
           <Card className="shadow-sm">
             <Tabs 
               activeKey={activeTab} 
-              onChange={setActiveTab}
+              onChange={(tab) => {
+                console.log('Tab changed to:', tab);
+                // Clear program documents if changing away from configMatrix
+                if (tab !== 'configMatrix') {
+                  setProgramDocuments([]);
+                }
+                setActiveTab(tab);
+              }}
             >
               <TabPane 
                 tab={
-                  <span>
+                  <span style={{ fontWeight: 'bold' }}>
                     <FileTextOutlined />
                     Job Details
+
                   </span>
                 }
                 key="jobDetails"
@@ -2111,11 +2951,11 @@ const loadInventoryItems = async () => {
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Total Operations</span>}>
                       {selectedJob.total_operations}
                     </Descriptions.Item>
-                    <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Start Date</span>}>
+                    {/* <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Start Date</span>}>
                       {selectedJob.project?.start_date 
                         ? new Date(selectedJob.project.start_date).toLocaleDateString()
                         : 'N/A'}
-                    </Descriptions.Item>
+                    </Descriptions.Item> */}
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Status</span>}>
                       <div className="flex items-center space-x-2">
                         {renderStatusButton(selectedJob.production_order)}
@@ -2125,6 +2965,25 @@ const loadInventoryItems = async () => {
                       label={<span style={{ fontWeight: 'bold', color: '#1890ff' }}>PDC</span>}
                     >
                       {renderPdcInfo(selectedJob.production_order)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Completion Status</span>}>
+                      {loading ? (
+                        <Spin size="small" />
+                      ) : completionStatus ? (
+                        <div style={{ 
+                          color: completionStatus.is_order_completed ? '#52c41a' : '#fa8c16',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          {completionStatus.is_order_completed 
+                            ? `Completed on ${new Date(completionStatus.overall_completion_date).toLocaleDateString()}`
+                            : 'Not Yet Completed'}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#999' }}>Loading status...</span>
+                      )}
                     </Descriptions.Item>
                   </Descriptions>
 
@@ -2171,12 +3030,13 @@ const loadInventoryItems = async () => {
                   operations={selectedJob.operations}
                   partNumber={selectedJob.part_number}
                   orderNumber={selectedJob.production_order}
+                  status={getJobStatus(selectedJob.production_order) === 'active' ? 'Active' : 'Inactive'}
                 />
               </TabPane>
 
               <TabPane 
                 tab={
-                  <span>
+                  <span style={{ fontWeight: 'bold' }}>
                     <ToolOutlined />
                     Tools and Programs
                   </span>
@@ -2230,7 +3090,7 @@ const loadInventoryItems = async () => {
                   >
                     <TabPane 
                       tab={
-                        <span className="flex items-center">
+                        <span className="flex items-center" style={{ fontWeight: 'bold' }}>
                           <ToolOutlined className="mr-2" />
                           Tools List
                         </span>
@@ -2267,17 +3127,27 @@ const loadInventoryItems = async () => {
                                 key: 'tool_name',
                                 className: 'bg-gray-50',
                               },
-                              {
-                                title: 'Tool Number',
-                                dataIndex: 'tool_number',
-                                key: 'tool_number',
-                                className: 'bg-gray-50',
-                              },
+                              // {
+                              //   title: 'Tool Number',
+                              //   dataIndex: 'tool_number',
+                              //   key: 'tool_number',
+                              //   className: 'bg-gray-50',
+                              // },
                               {
                                 title: 'BEL Part Number',
                                 dataIndex: 'bel_partnumber',
                                 key: 'bel_partnumber',
                                 className: 'bg-gray-50',
+                              },
+                              {
+                                title: 'Operation',
+                                dataIndex: 'operation_id',
+                                key: 'operation',
+                                className: 'bg-gray-50',
+                                render: (operationId) => {
+                                  const operation = selectedJob?.operations?.find(op => op.id === operationId);
+                                  return operation ? `${operation.operation_number} - ${operation.operation_description}` : 'N/A';
+                                }
                               },
                               {
                                 title: 'Description',
@@ -2292,6 +3162,7 @@ const loadInventoryItems = async () => {
                                 className: 'bg-gray-50',
                                 align: 'center',
                               },
+
                               {
                                 title: 'Action',
                                 key: 'action',
@@ -2487,9 +3358,9 @@ const loadInventoryItems = async () => {
                             Add Document
                           </Button>
                         </div>
-                        {loading ? (
+                        {loading && activeTab === 'toolsAndPrograms' ? (
                           <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
-                            <Spin size="large" />
+                            <Spin size="large" tip="Loading program documents..." />
                           </div>
                         ) : programDocuments.length > 0 ? (
                           <Table
@@ -2514,7 +3385,12 @@ const loadInventoryItems = async () => {
                   </Tabs>
                 </Card>
 
-               {/* Add Tool Modal */}
+
+
+
+
+                
+                {/* Add Tool Modal */}
                <Modal
                   title="Add Tool"
                   visible={isAddToolModalVisible}
@@ -2522,39 +3398,22 @@ const loadInventoryItems = async () => {
                   onCancel={() => {
                     setIsAddToolModalVisible(false);
                     addToolForm.resetFields();
+                    setSelectedSubcategoryName('');
+                    setSelectedPartNumber('');
+                    setSelectedPartDescription('');
                   }}
                   confirmLoading={loading}
                 >
                  <Form
                     form={addToolForm}
                     layout="vertical"
-                    onFinish={async (values) => {
-                      try {
-                        // Prepare the tool data to be sent to the store
-                        const toolData = {
-                          tool_name: selectedSubcategoryName, // This should now be a string
-                          tool_number: values.tool_number || 'N/A', // Assuming you want to add this field
-                          bel_partnumber: selectedPartNumber,
-                          description: selectedPartDescription,
-                          quantity: values.quantity,
-                          order_id: selectedJob.id, // Assuming selectedJob.id is the order ID
-                          operation_id: values.operation_id,
-                        };
-
-                        // Call the addOrderTool function from the planning store
-                        const newTool = await usePlanningStore.getState().addOrderTool(toolData);
-                        console.log('New tool added:', newTool);
-                        message.success('Tool added successfully');
-                        setIsAddToolModalVisible(false);
-                        addToolForm.resetFields();
-                      } catch (error) {
-                        console.error('Error adding tool:', error);
-                        message.error('Failed to add tool');
-                      }
-                    }}
+                    onFinish={handleAddTool}
                   >
+
+
+                    
                   <Form.Item
-                    label="Selecet Tool"
+                    label="Select Tool"
                     rules={[{ required: true, message: 'Please select an inventory item' }]}
                   >
                     <Cascader
@@ -2573,13 +3432,34 @@ const loadInventoryItems = async () => {
                             isLeaf: false,
                             children: inventoryItems
                               .filter(item => item.subcategory_id === subcategory.id)
-                              .map(item => ({
-                                label: item.dynamic_data["Instrument code"] 
-                                  ? `${item.dynamic_data["Instrument code"]}` 
-                                  : `${item.dynamic_data["BEL Part Number "] ? item.dynamic_data["BEL Part Number "] : 'N/A'}${item.dynamic_data["BEL Part Description"] ? ` - ${item.dynamic_data["BEL Part Description"]}` : ''}`,
-                                value: item.id,
-                                isLeaf: true,
-                              }))
+                              .map(item => {
+                                const instrumentCode = item.dynamic_data["Instrument code"];
+                                const belPartNumber = item.dynamic_data["BEL Part Number"] || item.dynamic_data["BEL Part Number "];
+                                const belPartDescription = item.dynamic_data["BEL Part Description"];
+
+                                let label = '';
+
+                                if (belPartNumber) {
+                                  label += belPartNumber;
+                                  if (belPartDescription) {
+                                    label += ` - ${belPartDescription}`;
+                                  }
+                                } else if (belPartDescription) {
+                                  label += belPartDescription;
+                                } else {
+                                  label += 'N/A';
+                                }
+
+                                if (instrumentCode) {
+                                  label += ` (Inst. Code: ${instrumentCode})`;
+                                }
+
+                                return {
+                                  label: label,
+                                  value: item.id,
+                                  isLeaf: true,
+                                };
+                              })
                           }))
                       }))}
 
@@ -2589,47 +3469,56 @@ const loadInventoryItems = async () => {
                             option.label.toLowerCase().includes(inputValue.toLowerCase())
                           )
                       }}
-                      // displayRender={(labels) => labels[1] || ''} 
                       onChange={(value, selectedOptions) => {
                         if (Array.isArray(value) && value.length === 3) {
-                          const selectedSubcategory = selectedOptions[1]; // The second option is the subcategory
+                          const selectedSubcategory = selectedOptions[1];
                           const subcategoryName = selectedSubcategory ? selectedSubcategory.label : '';
-
-                          // Set the form values
-                          form.setFieldsValue({
-                            tool_name: subcategoryName,  // Set the subcategory name as a string
-                            inventory_item_id: value[2],  // Set item ID if needed
-                          });
-
-                          // Set the selected subcategory name
-                          setSelectedSubcategoryName(subcategoryName);
-
-                          // Find the selected item to extract the part number and description
+                          const selectedItem = selectedOptions[2];
                           const selectedItemData = inventoryItems.find(item => item.id === value[2]);
 
-                          if (selectedItemData) {
-                            setSelectedPartNumber(selectedItemData.dynamic_data["BEL Part Number "] || 'N/A');
-                            setSelectedPartDescription(selectedItemData.dynamic_data["BEL Part Description"] || 'N/A');
-                            
-                            // Optionally set description field as well (for backend)
-                            form.setFieldsValue({
-                              description: selectedItemData.dynamic_data["BEL Part Description"] || 'N/A',  // Description as string
-                            });
-                          } else {
-                            setSelectedPartNumber('');
-                            setSelectedPartDescription('');
-                            form.setFieldsValue({
-                              description: 'N/A',  // Fallback if no item is selected
-                            });
-                          }
+                          // Set the form values
+                          addToolForm.setFieldsValue({
+                            tool_name: subcategoryName,
+                            inventory_item_id: value[2],
+                            bel_partnumber: selectedItemData?.dynamic_data["BEL Part Number"] || selectedItemData?.dynamic_data["BEL Part Number "] || 'N/A',
+                            description: selectedItemData?.dynamic_data["BEL Part Description"] || '',
+                            tool_number: selectedItemData?.dynamic_data["BEL Part Number"] || selectedItemData?.dynamic_data["BEL Part Number "] || 'N/A'
+                          });
+
+                          // Set the selected values
+                          setSelectedSubcategoryName(subcategoryName);
+                          setSelectedPartNumber(selectedItemData?.dynamic_data["BEL Part Number"] || selectedItemData?.dynamic_data["BEL Part Number "] || 'N/A');
+                          setSelectedPartDescription(selectedItemData?.dynamic_data["BEL Part Description"] || '');
                         }
                       }}
                     />
                   </Form.Item>
 
-                    <Form.Item label="Selected Subcategory">
-                      <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />
-                    </Form.Item>
+                  <Form.Item
+                    name="operation_id"
+                    label="Operation"
+                    rules={[{ required: true, message: 'Please select an operation' }]}
+                  >
+                    <Select
+                      placeholder="Select Operation"
+                      loading={loadingOperations}
+                      showSearch
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        String(option.children).toLowerCase().includes(input.toLowerCase())
+                      }
+                    >
+                      {operations.map(op => (
+                        <Select.Option key={op.id} value={op.id}>
+                          {`${op.operation_number} - ${op.operation_description || 'No Description'}`}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+
+                  <Form.Item label="Selected Subcategory">
+                    <Input value={selectedSubcategoryName} readOnly className="bg-gray-100" />
+                  </Form.Item>
 
                     <Form.Item label="BEL Part Number">
                       <Input 
@@ -2654,7 +3543,7 @@ const loadInventoryItems = async () => {
                     >
                       <InputNumber min={1} style={{ width: '100%' }} />
                     </Form.Item>
-                    <Form.Item
+                    {/* <Form.Item
                       name="operation_id"
                       label="Operation"
                       rules={[{ required: true, message: 'Please select an operation' }]}
@@ -2666,7 +3555,7 @@ const loadInventoryItems = async () => {
                           </Select.Option>
                         ))}
                       </Select>
-                    </Form.Item>
+                    </Form.Item> */}
                   </Form>
                 </Modal>
 
@@ -2901,7 +3790,7 @@ const loadInventoryItems = async () => {
 
               <TabPane 
                 tab={
-                  <span>
+                  <span style={{ fontWeight: 'bold' }}>
                     <AppstoreOutlined />
                     Configuration Matrix
                   </span>
@@ -2953,147 +3842,167 @@ const loadInventoryItems = async () => {
 
                         {/* Program Details Section with improved styling */}
                         <div className="bg-gray-50 p-4 rounded-lg shadow-sm mb-4">
-                          <div className="flex items-center mb-4">
-                            <FileTextOutlined className="text-blue-500 text-xl mr-2" />
-                            <Text strong className="text-lg">Program Configuration Matrix</Text>
-                          </div>
-                          
-                          <div className="flex flex-col md:flex-row gap-6">
-                            {/* Left column with program details - with scrollable container */}
-                            <div className="w-full md:w-1/2 md:max-h-[600px] md:overflow-y-auto pr-2">
-                              {/* CNC Program Details */}
+                          <div className="flex flex-col gap-6">
+                            {/* Program Documents Section - Full Width */}
+                            <div className="w-full">
                               <Card 
                                 title={
                                   <div className="flex items-center">
-                                    <ToolOutlined className="text-blue-500 mr-2" />
-                                    <span>CNC Program Details</span>
-                                  </div>
-                                }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
-                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                                bodyStyle={{ padding: '12px' }}
-                              >
-                                <Table
-                                  size="small"
-                                  bordered
-                                  pagination={{ pageSize: 5, size: 'small' }}
-                                  columns={[
-                                    {
-                                      title: 'Program Name',
-                                      dataIndex: 'program_name',
-                                      key: 'program_name',
-                                      width: '50%',
-                                      ellipsis: true
-                                    },
-                                    {
-                                      title: 'Program Number',
-                                      dataIndex: 'program_number',
-                                      key: 'program_number',
-                                      width: '25%',
-                                      align: 'center'
-                                    },
-                                    {
-                                      title: 'Version',
-                                      dataIndex: 'version',
-                                      key: 'version',
-                                      width: '25%',
-                                      align: 'center'
-                                    }
-                                  ]}
-                                  dataSource={programs.map(program => ({
-                                    key: program.id,
-                                    program_name: program.program_name || program.description,
-                                    program_number: program.program_number || program.programNo,
-                                    version: program.version || 'v1'
-                                  }))}
-                                />
-                              </Card>
-
-                              {/* CMM Program Details */}
-                              <Card 
-                                title={
-                                  <div className="flex items-center">
-                                    <RobotOutlined className="text-blue-500 mr-2" />
-                                    <span>CMM Program Details</span>
-                                  </div>
-                                }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
-                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                                bodyStyle={{ padding: '12px' }}
-                              >
-                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
-                                  <RobotOutlined className="text-blue-400 text-4xl mb-2" />
-                                  <Text strong className="text-base mb-1">Coming Soon</Text>
-                                  <Text type="secondary" className="text-center text-xs">
-                                    CMM Program Management
-                                  </Text>
-                                </div>
-                              </Card>
-
-                              {/* VMS Program Details */}
-                              <Card 
-                                title={
-                                  <div className="flex items-center">
-                                    <ExperimentOutlined className="text-blue-500 mr-2" />
-                                    <span>VMS Program Details</span>
-                                  </div>
-                                }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300 mb-6"
-                                headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
-                                bodyStyle={{ padding: '12px' }}
-                              >
-                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
-                                  <ExperimentOutlined className="text-blue-400 text-4xl mb-2" />
-                                  <Text strong className="text-base mb-1">Coming Soon</Text>
-                                  <Text type="secondary" className="text-center text-xs">
-                                    Vision Measurement System
-                                  </Text>
-                                </div>
-                              </Card>
-
-                              {/* Manual/Visual Inspection Plan Details */}
-                              <Card 
-                                title={
-                                  <div className="flex items-center">
-                                    <FileSearchOutlined className="text-blue-500 mr-2" />
-                                    <span>Manual/Visual Inspection</span>
+                                    <FileTextOutlined className="text-blue-500 mr-2" />
+                                    <span>Program Documents</span>
                                   </div>
                                 }
                                 className="shadow-md hover:shadow-lg transition-shadow duration-300"
                                 headStyle={{ background: '#f0f5ff', borderBottom: '2px solid #1890ff' }}
                                 bodyStyle={{ padding: '12px' }}
+                                loading={loading && activeTab === 'configMatrix'}
                               >
-                                <div className="flex flex-col items-center justify-center h-[150px] bg-gray-50 rounded-lg">
-                                  <FileSearchOutlined className="text-blue-400 text-4xl mb-2" />
-                                  <Text strong className="text-base mb-1">Coming Soon</Text>
-                                  <Text type="secondary" className="text-center text-xs">
-                                    Inspection Plan Management
-                                  </Text>
-                                </div>
+                                {programDocuments && programDocuments.length > 0 ? (
+                                  <Table
+                                    size="small"
+                                    bordered
+                                    pagination={{ pageSize: 5, size: 'small' }}
+                                    columns={[
+                                      {
+                                        title: 'Name',
+                                        dataIndex: 'name',
+                                        key: 'name',
+                                        width: '25%',
+                                        ellipsis: true
+                                      },
+                                      {
+                                        title: 'Description',
+                                        dataIndex: 'description',
+                                        key: 'description',
+                                        width: '25%',
+                                        ellipsis: true
+                                      },
+                                      {
+                                        title: 'Operation',
+                                        dataIndex: 'operation_number',
+                                        key: 'operation_number',
+                                        width: '20%',
+                                        render: (operationNumber, record) => {
+                                          // Log the record to help debugging
+                                          console.log('Rendering operation for document:', record);
+                                          
+                                          // Handle different possible data structures from API
+                                          let opNum = operationNumber || 
+                                            record.metadata?.operation_number || 
+                                            record.latest_version?.metadata?.operation_number;
+                                          
+                                          // If no operation number found in metadata, try to extract from name
+                                          if (!opNum && record.name) {
+                                            const fileNameMatch = record.name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+                                            if (fileNameMatch) {
+                                              opNum = fileNameMatch[1] || fileNameMatch[2];
+                                            }
+                                          }
+                                          
+                                          if (!opNum) return 'N/A';
+                                          
+                                          // Try to find matching operation in the job data
+                                          const operation = selectedJob?.operations?.find(op => 
+                                            op.operation_number.toString() === opNum.toString()
+                                          );
+                                          
+                                          if (operation) {
+                                            return `${operation.operation_number} - ${operation.operation_description}`;
+                                          } else {
+                                            // If no match found, at least show the operation number
+                                            return `Operation ${opNum}`;
+                                          }
+                                        }
+                                      },
+                                      {
+                                        title: 'Version',
+                                        dataIndex: ['latest_version', 'version_number'],
+                                        key: 'version',
+                                        width: '10%',
+                                        align: 'center',
+                                        render: (version) => version || 'N/A'
+                                      },
+                                      {
+                                        title: 'Upload Date',
+                                        dataIndex: 'created_at',
+                                        key: 'created_at',
+                                        width: '10%',
+                                        render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
+                                      },
+                                      {
+                                        title: 'Actions',
+                                        key: 'actions',
+                                        width: '10%',
+                                        align: 'center',
+                                        render: (_, record) => (
+                                          <Space>
+                                            {/* <Button
+                                              type="link"
+                                              icon={<DownloadOutlined />}
+                                              onClick={() => handleDownloadDocument(record)}
+                                            />
+                                            <Button
+                                              type="link"
+                                              icon={<EyeOutlined />}
+                                              onClick={() => handleViewDrawing(record.id)}
+                                            /> */}
+                                            <Button
+                                              type="link"
+                                              icon={<HistoryOutlined />}
+                                              onClick={() => handleViewVersionHistory(record)}
+                                            />
+                                          </Space>
+                                        )
+                                      }
+                                    ]}
+                                    dataSource={programDocuments}
+                                  />
+                                ) : !loading && (
+                                  <div className="flex flex-col items-center justify-center h-[200px] bg-gray-50 rounded-lg">
+                                    <FileTextOutlined className="text-blue-400 text-5xl mb-4" />
+                                    <Text strong className="text-lg mb-2">No Program Documents Available</Text>
+                                    <Text type="secondary" className="text-center">
+                                      No CNC program documents found for this part
+                                    </Text>
+                                  </div>
+                                )}
                               </Card>
                             </div>
-                            
-                            {/* Right column with Engineering Drawings - with fixed height and scrolling */}
-                            <div className="w-full md:w-1/2 md:h-[600px]">
+
+                            {/* Engineering Drawings Section - Full Width */}
+                            <div className="w-full">
                               <Card 
                                 title={
-                                  <div className="flex items-center">
-                                    <FileTextOutlined className="text-green-500 mr-2" />
-                                    <span>Engineering Drawings</span>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center">
+                                      <FileTextOutlined className="text-green-500 mr-2" />
+                                      <span>Engineering Drawings</span>
+                                    </div>
+                                    {/* Add a refresh button to manually fetch drawings */}
+                                    <Button 
+                                      type="text" 
+                                      icon={<ReloadOutlined />} 
+                                      onClick={() => {
+                                        if (selectedJob?.part_number) {
+                                          setDrawingsLoading(true);
+                                          fetchEngineeringDrawings(selectedJob.part_number)
+                                            .then(data => {
+                                              console.log('Manually fetched drawings:', data);
+                                              setEngineeringDrawings(data.items || []);
+                                            })
+                                            .catch(err => console.error('Manual fetch error:', err))
+                                            .finally(() => setDrawingsLoading(false));
+                                        }
+                                      }}
+                                    />
                                   </div>
                                 }
-                                className="shadow-md hover:shadow-lg transition-shadow duration-300 h-full"
+                                className="shadow-md hover:shadow-lg transition-shadow duration-300"
                                 headStyle={{ background: '#f0fff0', borderBottom: '2px solid #52c41a' }}
-                                bodyStyle={{ 
-                                  padding: '12px', 
-                                  height: 'calc(100% - 56px)', 
-                                  overflow: 'hidden',
-                                  display: 'flex',
-                                  flexDirection: 'column'
-                                }}
+                                bodyStyle={{ padding: '12px' }}
                                 loading={drawingsLoading}
                               >
-                                {engineeringDrawings.length > 0 ? (
+                                {engineeringDrawings && engineeringDrawings.length > 0 ? (
                                   <Table
                                     size="small"
                                     bordered
@@ -3103,13 +4012,12 @@ const loadInventoryItems = async () => {
                                       position: ['bottomCenter'],
                                       showTotal: (total) => `Total ${total} drawings` 
                                     }}
-                                    scroll={{ y: 500 }}
                                     columns={[
                                       {
-                                        title: 'Name',
+                                        title: 'Drawing Name',
                                         dataIndex: 'name',
                                         key: 'name',
-                                        width: '50%',
+                                        width: '60%',
                                         ellipsis: true,
                                         render: (text) => (
                                           <Tooltip title={text}>
@@ -3119,22 +4027,16 @@ const loadInventoryItems = async () => {
                                       },
                                       {
                                         title: 'Version',
-                                        dataIndex: 'version',
+                                        dataIndex: ['latest_version', 'version_number'],
                                         key: 'version',
-                                        width: '15%',
-                                        align: 'center'
-                                      },
-                                      {
-                                        title: 'Date',
-                                        dataIndex: 'created_at',
-                                        key: 'created_at',
                                         width: '20%',
-                                        render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
+                                        align: 'center',
+                                        render: (version) => version || 'v1'
                                       },
                                       {
                                         title: 'Action',
                                         key: 'action',
-                                        width: '15%',
+                                        width: '20%',
                                         align: 'center',
                                         render: (_, record) => (
                                           <Button 
@@ -3145,21 +4047,19 @@ const loadInventoryItems = async () => {
                                         )
                                       }
                                     ]}
-                                    dataSource={engineeringDrawings.map(drawing => ({
-                                      key: drawing.id,
-                                      id: drawing.id,
-                                      name: drawing.name,
-                                      version: drawing.latest_version?.version_number || 'v1',
-                                      created_at: drawing.latest_version?.created_at || drawing.created_at
-                                    }))}
+                                    dataSource={engineeringDrawings}
                                   />
                                 ) : (
-                                  <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg">
+                                  <div className="flex flex-col items-center justify-center h-[200px] bg-gray-50 rounded-lg">
                                     <FileTextOutlined className="text-green-400 text-5xl mb-4" />
                                     <Text strong className="text-lg mb-2">No Drawings Available</Text>
-                                    <Text type="secondary" className="text-center">
+                                    <Text type="secondary" className="text-center mb-4">
                                       No engineering drawings found for this part
                                     </Text>
+                                    {/* Add debug info */}
+                                    <div className="text-xs text-gray-500 mt-2">
+                                      Part Number: {selectedJob?.part_number || 'None selected'}
+                                    </div>
                                   </div>
                                 )}
                               </Card>
@@ -3233,15 +4133,9 @@ const loadInventoryItems = async () => {
       <Modal
         title="Add CNC Program Document"
         open={isAddDocumentModalVisible}
-        onCancel={() => {
-          setIsAddDocumentModalVisible(false);
-          addDocumentForm.resetFields();
-        }}
+        onCancel={handleCloseAddDocumentModal}
         footer={[
-          <Button key="cancel" onClick={() => {
-            setIsAddDocumentModalVisible(false);
-            addDocumentForm.resetFields();
-          }}>
+          <Button key="cancel" onClick={handleCloseAddDocumentModal}>
             Cancel
           </Button>,
           <Button
@@ -3264,52 +4158,86 @@ const loadInventoryItems = async () => {
       >
         <Form form={addDocumentForm} layout="vertical">
           <Form.Item
-            name="operation_id"
-            label="Operation"
-            rules={[{ required: true, message: 'Please select an operation' }]}
-          >
-            <Select placeholder="Select operation">
-              {selectedJob?.operations?.map((operation) => (
-                <Option key={operation.id} value={operation.id}>
-                  {operation.operation_number} - {operation.operation_description}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="program_name"
-            label="Program Name"
-            rules={[{ required: true, message: 'Please enter program name' }]}
-          >
-            <Input placeholder="Enter program name" />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="Description"
-          >
-            <Input.TextArea placeholder="Enter program description" />
-          </Form.Item>
-          <Form.Item
-            name="version"
-            label="Version"
-            initialValue="1"
-          >
-            <Input placeholder="Enter version (e.g., 1)" />
-          </Form.Item>
-          <Form.Item
             name="file"
-            label="Upload CNC Program File"
-            rules={[{ required: true, message: 'Please select a file to upload' }]}
+            label="Upload CNC Program Files"
+            rules={[{ required: true, message: 'Please select at least one file to upload' }]}
           >
-            <Upload {...documentUploadProps} maxCount={1}>
-              <Button icon={<UploadOutlined />}>Click to Upload</Button>
-              <div className="mt-2 text-xs text-gray-500">
+            <Upload.Dragger
+              {...documentUploadProps}
+              style={{ padding: '20px' }}
+              multiple={true}
+              maxCount={10}
+            >
+              <p className="ant-upload-drag-icon">
+                <UploadOutlined className="text-3xl text-blue-500" />
+              </p>
+              <p className="ant-upload-text font-medium">
+                Click or drag CNC program files to this area to upload
+              </p>
+              <p className="ant-upload-hint text-gray-500 text-sm">
                 Support for CNC program files (.nc, .txt, .cnc, etc.)
-              </div>
-            </Upload>
+                <br />
+                You can upload multiple files at once
+              </p>
+            </Upload.Dragger>
           </Form.Item>
+
+          {/* File Operation Mappings */}
+          {addDocumentForm.getFieldValue('file')?.fileList?.length > 0 && (
+            <div className="mt-4">
+              <Alert
+                message="Operation Assignment Required"
+                description="Please assign an operation to each file before uploading."
+                type="info"
+                showIcon
+                className="mb-4"
+              />
+              <Text strong>Assign Operations to Files</Text>
+              <div className="mt-2 space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded p-2">
+                {addDocumentForm.getFieldValue('file').fileList.map(file => (
+                  <div key={file.uid} className="flex items-center space-x-4 p-2 bg-gray-50 rounded">
+                    <div className="flex-1">
+                      <Text>{file.name}</Text>
+                    </div>
+                    <Form.Item
+                      className="mb-0 flex-1"
+                      validateStatus={!fileOperationMappings[file.uid] ? 'error' : 'success'}
+                      help={!fileOperationMappings[file.uid] ? 'Please select an operation' : ''}
+                    >
+                      <Select
+                        placeholder="Select operation"
+                        value={fileOperationMappings[file.uid]}
+                        onChange={(value) => handleOperationSelect(file.uid, value)}
+                        style={{ width: '100%' }}
+                        status={!fileOperationMappings[file.uid] ? 'error' : ''}
+                        showSearch
+                        optionFilterProp="children"
+                        filterOption={(input, option) =>
+                          option.children.toLowerCase().includes(input.toLowerCase())
+                        }
+                        loading={loading}
+                      >
+                        {documentOperations.map((operation) => (
+                          <Option key={operation.id} value={operation.id}>
+                            {operation.operation_number} - {operation.operation_description}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Form>
       </Modal>
+
+
+
+
+
+
+      
 
       {/* Version Update Modal */}
       <Modal
@@ -3403,8 +4331,149 @@ const loadInventoryItems = async () => {
           className="mt-4"
         />
       </Modal>
+
+      {/* Raw Material Modal */}
+      <Modal
+        title={<span style={{ fontWeight: 'bold' }}>Job Number Tag</span>}
+        open={isRawMaterialModalVisible}
+        onOk={handleDownloadRawMaterialJobCard}
+        onCancel={() => setIsRawMaterialModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setIsRawMaterialModalVisible(false)}>
+            Cancel
+          </Button>,
+          <Button
+            key="download"
+            type="primary"
+            onClick={handleDownloadRawMaterialJobCard}
+            loading={isGeneratingRawMaterialPdf}
+          >
+            {isGeneratingRawMaterialPdf ? 'Generating PDF...' : 'Download PDF'}
+          </Button>
+        ]}
+      >
+        <div className="max-h-[70vh] overflow-y-auto">
+          {isGeneratingRawMaterialPdf ? (
+            <div className="flex items-center justify-center py-12">
+              <Spin size="large" tip="Generating PDF..." />
+            </div>
+          ) : (
+            <div className="p-4">
+              {/* Add your Job Number Tag content here */}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Job Number Tag Preview Modal */}
+      <Modal
+        title="Job Number Tag Preview"
+        open={isRawMaterialModalVisible}
+        onCancel={() => {
+          setIsRawMaterialModalVisible(false);
+        }}
+        width={800}
+        footer={[
+          <Button key="cancelRM" onClick={() => setIsRawMaterialModalVisible(false)}>
+            Cancel
+          </Button>,
+          <Button
+            key="downloadRM"
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={handleDownloadRawMaterialJobCard}
+            loading={isGeneratingRawMaterialPdf}
+          >
+            {isGeneratingRawMaterialPdf ? 'Generating PDF...' : 'Download PDF'}
+          </Button>
+        ]}
+      >
+        {selectedJob ? (
+          () => {
+            const material = selectedJob.raw_materials?.[0] || {};
+            return (
+              <div className="max-h-[70vh] overflow-y-auto p-1 pr-4 bg-gray-50">
+                <div className="bg-white shadow-lg rounded-lg p-6 space-y-6">
+                  {/* Details Table */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Raw Material Details</h3>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <tr className="border-b hover:bg-gray-50">
+                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Part Number</td>
+                          <td className="p-3 text-gray-800">{selectedJob.part_number || 'N/A'}</td>
+                        </tr>
+                        <tr className="border-b hover:bg-gray-50">
+                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Part Description</td>
+                          <td className="p-3 text-gray-800">{selectedJob.part_description || 'N/A'}</td>
+                        </tr>
+                        <tr className="border-b hover:bg-gray-50">
+                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Production Order</td>
+                          <td className="p-3 text-gray-800">{selectedJob.production_order || 'N/A'}</td>
+                        </tr>
+                        <tr className="border-b hover:bg-gray-50">
+                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Launched Quantity</td>
+                          <td className="p-3 text-gray-800">{selectedJob.launched_quantity || 'N/A'}</td>
+                        </tr>
+                        <tr className="hover:bg-gray-50">
+                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Child Part Number</td>
+                          <td className="p-3 text-gray-800">{material.child_part_number || 'N/A'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* QR Codes Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">QR Codes</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6 justify-items-center">
+                      {[
+                        { label: 'Part Number', value: selectedJob.part_number },
+                        { label: 'Production Order', value: selectedJob.production_order },
+                        { label: 'Part Description', value: selectedJob.part_description },
+                        { label: 'Child Part Number', value: material.child_part_number },
+                      ].map((qrItem, index) => (
+                        <div key={index} className="flex flex-col items-center p-3 border border-gray-200 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-shadow w-full">
+                          <QRCodeSVG
+                            value={qrItem.value || ''}
+                            size={100} // Adjusted size for better fit
+                            level="M" // M for medium, common for general use
+                            includeMargin={true}
+                            className="mb-2 rounded"
+                          />
+                          <span className="text-xs text-center text-gray-600 font-medium">{qrItem.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+        )() : (
+          <Alert message="No job selected or job data is unavailable." type="warning" showIcon />
+        )}
+      </Modal>
     </div>
   );
 };
 
 export default Planning;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -783,7 +783,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:2928/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:1919/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1447,10 +1447,38 @@ const Workcenter = () => {
 
   const handleSearch = (searchText) => {
     setSearchText(searchText);
+    
+    if (!searchText.trim()) {
+      setFilteredData([]);
+      return;
+    }
+
+    const searchLower = searchText.toLowerCase().trim();
+    const searchTerms = searchLower.split(/\s+/); // Split by any whitespace
+
     const filteredData = data.filter((workcenter) => {
-      const workcenterString = JSON.stringify(workcenter).toLowerCase();
-      return workcenterString.includes(searchText.toLowerCase());
+      // Create a string with all searchable fields
+      const searchableFields = [
+        workcenter.work_center_id?.toString().toLowerCase() || '',
+        workcenter.work_center?.code?.toString().toLowerCase() || '',
+        workcenter.type?.toString().toLowerCase() || '',
+        workcenter.make?.toString().toLowerCase() || '',
+        workcenter.model?.toString().toLowerCase() || '',
+        workcenter.year_of_installation?.toString().toLowerCase() || '',
+        workcenter.cnc_controller?.toString().toLowerCase() || '',
+        workcenter.cnc_controller_series?.toString().toLowerCase() || '',
+        workcenter.remarks?.toString().toLowerCase() || '',
+        workcenter.calibration_date ? dayjs(workcenter.calibration_date).format('YYYY-MM-DD') : '',
+        workcenter.calibration_due_date ? dayjs(workcenter.calibration_due_date).format('YYYY-MM-DD') : '',
+        workcenter.last_maintenance_date ? dayjs(workcenter.last_maintenance_date).format('YYYY-MM-DD') : ''
+      ].join(' ');
+
+      // Check if all search terms are found in any of the fields
+      return searchTerms.every(term => 
+        searchableFields.includes(term)
+      );
     });
+
     setFilteredData(filteredData);
   };
 
@@ -1535,7 +1563,7 @@ const Workcenter = () => {
                         loading={isLoading}
                         pagination={{
                           current: currentPage,
-                          pageSize: 6,
+                          pageSize: 10,
                           total: searchText ? filteredData.length : data.length,
                           showSizeChanger: false,
                           showQuickJumper: true,

@@ -19,9 +19,11 @@ import {
   DatePicker,
   message
 } from 'antd';
-import { Wrench, Package, Bell, CheckCircle, RefreshCw, Ruler, Filter } from 'lucide-react';
+import { Wrench, Package, CheckCircle, RefreshCw, Ruler, Filter } from 'lucide-react';
 import useNotificationStore from '../../store/notificationNew';
-import { ToolFilled, FilterOutlined, ToolOutlined, } from '@ant-design/icons';
+import { ToolFilled, FilterOutlined, ToolOutlined } from '@ant-design/icons';
+import Lottie from 'lottie-react';
+import notificationAnimation from '../../assets/notification.json';
 import useInventoryStore from '../../store/inventory-store';
 
 const { Title, Text } = Typography;
@@ -145,7 +147,7 @@ const NotificationsNew = () => {
       
       // Handle both machine and material notifications
       if (notification.notificationType === 'material') {
-        const response = await fetch('http://172.18.7.88:2928/api/v1/newlogs/raw_material_status_logs/acknowledge', {
+        const response = await fetch('http://172.18.7.88:2929/api/v1/newlogs/raw_material_status_logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -168,7 +170,7 @@ const NotificationsNew = () => {
         setLastAcknowledgedId(notification.id);
         setLastAcknowledgedType('material');
       } else if (notification.notificationType === 'machine') {
-        const response = await fetch('http://172.18.7.88:2928/api/v1/newlogs/machine-status-logs/acknowledge', {
+        const response = await fetch('http://172.18.7.88:2929/api/v1/newlogs/machine-status-logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -996,7 +998,12 @@ const NotificationsNew = () => {
                   alignItems: 'center',
                   boxShadow: '0 4px 8px rgba(24,144,255,0.2)'
                 }}>
-                  <Bell size={24} color="#fff" />
+                  <Lottie 
+                    animationData={notificationAnimation}
+                    style={{ width: 55, height: 55 }}
+                    loop={true}
+                    autoplay={true}
+                  />
                 </div>
                 <div>
                   <Title level={3} style={{ margin: 0 }}>Notifications Centre</Title>

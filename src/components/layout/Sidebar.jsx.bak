@@ -28,13 +28,20 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
 import belLogo from '../../assets/cmti.png';
+// Background images
 import notificationBg from '../../assets/notification.jpeg';
-import orderBg from '../../assets/order.png';
 import inventoryBg from '../../assets/inventory.jpeg';
 import planningBg from '../../assets/planning.jpeg';
 import productionBg from '../../assets/production.png';
 import qualityBg from '../../assets/Quality.jpeg';
 import helpBg from '../../assets/help.jpeg';
+import dashboardBg from '../../assets/Dashboardnew.jpeg';
+
+// Fallback for missing images
+const maintenanceBg = dashboardBg;
+const energyMonitoringBg = notificationBg;
+const documentsBg = planningBg;
+const orderBg = planningBg;
 import useAuthStore from '../../store/auth-store';
 import useNotificationStore from '../../store/notification';
 
@@ -117,32 +124,45 @@ function Sidebar() {
   const supervisorMenuItems = [
     {
       key: '/supervisor/dashboard',
-      label: 'Dashboard',
+      label: (
+        <div className="dashboard-header">
+          DASHBOARD
+        </div>
+      ),
       className: 'dashboard-menu-item',
     },
     {
-      key: 'order-management',
-      icon: <ClipboardList size={20} />,
+      key: '/supervisor/order-management',
       label: 'ORDER MANAGEMENT',
       className: 'order-management-item',
-      children: [
-        {
-          key: '/supervisor/order-management/order-lists',
-          label: 'Order Lists',
-          icon: <List size={18} />
-        },
-        {
-          key: '/supervisor/order-management/workcenter',
-          label: 'Workcenter',
-          icon: <Factory size={18} />
-        }
-      ]
+      style: {
+        backgroundImage: `url(${orderBg})`,
+        backgroundPosition: 'center center',
+        backgroundSize: 'cover',
+        height: '100px',
+        margin: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        borderRadius: '8px',
+        borderLeft: '4px solid #1890ff',
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+        textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)'
+      }
     },
 
     {
       key: 'production-planning',
-      icon: <Calendar size={18} />,
-      label: 'Process Engineering Cell',
+      label: (
+        <div className="process-engineering-header">
+          PROCESS ENGINEERING CELL
+        </div>
+      ),
+      popupClassName: 'process-engineering-submenu',
+      className: 'process-engineering-item',
+      popupOffset: [0, 0],
       children: [
 
          {
@@ -170,8 +190,14 @@ function Sidebar() {
     },
     {
       key: '/supervisor/production-monitoring',
-      icon: <Activity size={20} />,
-      label: 'Production Monitoring',
+      label: (
+        <div className="production-monitoring-header">
+          PRODUCTION MONITORING
+        </div>
+      ),
+      popupClassName: 'production-monitoring-submenu',
+      className: 'production-monitoring-item',
+      popupOffset: [0, 0],
       children: [
         {
           key: '/supervisor/production-monitoring/dashboard',
@@ -211,20 +237,12 @@ function Sidebar() {
     // },
     {
       key: '/supervisor/quality-management',
-      label: 'QUALITY MANAGEMENT',
-      className: 'quality-menu-item',
-      style: {
-        textAlign: 'center',
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        fontSize: '14px',
-        padding: '0 8px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        width: '100%'
-      }
+      label: (
+        <div className="quality-management-header">
+          QUALITY MANAGEMENT
+        </div>
+      ),
+      className: 'quality-management-item',
     },
     // {
     //   key: 'inventory_master',
@@ -243,8 +261,14 @@ function Sidebar() {
     // },
     {
       key: '/supervisor/inventory_data_management',
-      icon: <Archive size={20} />,
-      label: 'Inventory Management',
+      label: (
+        <div className="inventory-management-header">
+          INVENTORY MANAGEMENT
+        </div>
+      ),
+      popupClassName: 'inventory-management-submenu',
+      className: 'inventory-management-item',
+      popupOffset: [0, 0],
       children: [
         // {
         //   key: '/supervisor/inventory_data_management/data_management',
@@ -264,7 +288,11 @@ function Sidebar() {
     },
     {
       key: '/supervisor/maintenance',
-      label: 'MAINTENANCE',
+      label: (
+        <div className="maintenance-header">
+          MAINTENANCE
+        </div>
+      ),
       className: 'maintenance-menu-item',
     },
     // {
@@ -274,8 +302,12 @@ function Sidebar() {
     // },
     {
       key: '/supervisor/energy-monitoring-bel',
-      label: 'ENERGY MONITORING BEL',
-      className: 'energy-menu-item',
+      label: (
+        <div className="energy-monitoring-header">
+          ENERGY MONITORING BEL
+        </div>
+      ),
+      className: 'energy-monitoring-item',
     },
     // {
     //   key: '/supervisor/machine_availability',
@@ -285,20 +317,12 @@ function Sidebar() {
     // },
     {
       key: '/supervisor/documents',
-      label: 'DOCUMENT MANAGEMENT',
+      label: (
+        <div className="documents-header">
+          DOCUMENT MANAGEMENT
+        </div>
+      ),
       className: 'documents-menu-item',
-      style: {
-        textAlign: 'center',
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        fontSize: '14px',
-        padding: '0 8px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        width: '100%'
-      }
     },
     // {
     //   key: '/supervisor/notifications',
@@ -484,20 +508,12 @@ function Sidebar() {
     // },
     {
       key: '/admin/documents',
-      label: 'DOCUMENT MANAGEMENT',
+      label: (
+        <div className="documents-header">
+          DOCUMENT MANAGEMENT
+        </div>
+      ),
       className: 'documents-menu-item',
-      style: {
-        textAlign: 'center',
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        fontSize: '14px',
-        padding: '0 8px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        width: '100%'
-      }
     },
     // {
     //   key: '/admin/notifications',
@@ -602,25 +618,36 @@ function Sidebar() {
           background-image: url('/images/access-control-bg.jpg');
           background-position: center 30%;
         }
-        .process-engineering-header {
-          background-image: url(${planningBg});
-          background-position: center center;
-          background-size: cover;
-          height: 100px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-          border-radius: 8px;
-          border-left: 4px solid #1890ff;
-          font-weight: bold;
-          text-transform: uppercase;
-          text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
-          text-align: center;
+        /* Menu Item Headers */
+        .dashboard-header,
+        .process-engineering-header,
+        .production-monitoring-header,
+        .quality-management-header,
+        .inventory-management-header,
+        .maintenance-header,
+        .energy-monitoring-header,
+        .documents-header {
           width: 100%;
+          text-align: center;
+          font-size: 14px;
+          line-height: 1.4;
           padding: 0 8px;
-          box-sizing: border-box;
+          color: #ffffff;
+          text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
           cursor: pointer;
+          box-sizing: border-box;
+          
+          /* Hover effect */
+          &:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            transition: all 0.2s ease-in-out;
+          }
+          
+          /* Active state */
+          &:active {
+            transform: translateY(0);
+          }
         }
         
         .process-engineering-item > .ant-menu-submenu-title {
@@ -632,11 +659,18 @@ function Sidebar() {
           width: calc(100% - 16px) !important;
         }
         
-        .process-engineering-submenu {
+        /* Submenu Styles */
+        .process-engineering-submenu,
+        .production-monitoring-submenu,
+        .inventory-management-submenu {
           margin-left: 16px !important;
           position: fixed !important;
           left: 80px !important; /* Width of collapsed sidebar */
           z-index: 1000;
+          background: #fff;
+          border-radius: 0 8px 8px 0;
+          box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.15);
+          min-width: 200px;
           background: #fff;
           border-radius: 4px;
           box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
@@ -789,6 +823,117 @@ function Sidebar() {
           line-height: 1.4;
           padding: 0 8px;
           color: #ffffff;
+        }
+        
+        /* Supervisor Menu Items */
+        .dashboard-menu-item,
+        .process-engineering-item,
+        .production-monitoring-item,
+        .quality-management-item,
+        .inventory-management-item,
+        .maintenance-menu-item,
+        .energy-monitoring-item,
+        .documents-menu-item {
+          background-position: center center;
+          background-size: cover;
+          height: 100px !important;
+          margin: 8px !important;
+          display: flex !important;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          border-radius: 8px;
+          border-left: 4px solid #1890ff;
+          font-weight: bold;
+          text-transform: uppercase;
+          text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+          text-align: center;
+          width: calc(100% - 16px) !important;
+          padding: 0 8px;
+          box-sizing: border-box;
+        }
+        
+        .dashboard-menu-item {
+          background-image: url(${planningBg});
+        }
+        
+        .process-engineering-item {
+          background-image: url(${processEngineeringBg});
+        }
+        
+        .production-monitoring-item {
+          background-image: url(${productionBg});
+        }
+        
+        .quality-management-item {
+          background-image: url(${qualityBg});
+        }
+        
+        .inventory-management-item {
+          background-image: url(${inventoryManagementBg});
+        }
+        
+        .maintenance-menu-item {
+          background-image: url(${maintenanceBg});
+        }
+        
+        .energy-monitoring-item {
+          background-image: url(${energyMonitoringBg});
+        }
+        
+        .documents-menu-item {
+          background-image: url(${documentsBg});
+        }
+        
+        /* Header styles */
+        .dashboard-header,
+        .process-engineering-header,
+        .production-monitoring-header,
+        .quality-management-header,
+        .inventory-management-header,
+        .maintenance-header,
+        .energy-monitoring-header,
+        .documents-header {
+          width: 100%;
+          text-align: center;
+          font-size: 14px;
+          line-height: 1.4;
+          padding: 0 8px;
+          color: #ffffff;
+          text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+        }
+        
+        /* Supervisor Menu Items */
+        .dashboard-menu-item {
+          background-image: url(${planningBg});
+        }
+        
+        .process-engineering-item {
+          background-image: url(${processEngineeringBg});
+        }
+        
+        .production-monitoring-item {
+          background-image: url(${productionMonitoringBg});
+        }
+        
+        .quality-management-item {
+          background-image: url(${qualityManagementBg});
+        }
+        
+        .inventory-management-item {
+          background-image: url(${inventoryManagementBg});
+        }
+        
+        .maintenance-menu-item {
+          background-image: url(${maintenanceBg});
+        }
+        
+        .energy-monitoring-item {
+          background-image: url(${energyMonitoringBg});
+        }
+        
+        .documents-menu-item {
+          background-image: url(${documentsBg});
         }
         
         .help-support-item {

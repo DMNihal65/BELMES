@@ -168,7 +168,7 @@ const App = () => {
         </Routes>
       </BrowserRouter>
 
-      <style jsx global>{`
+      <style jsx="true" global="true">{`
         * {
           font-family: 'CustomFont', system-ui, sans-serif;
         }

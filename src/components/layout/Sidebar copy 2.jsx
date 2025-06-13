@@ -33,8 +33,6 @@ import orderBg from '../../assets/order.png';
 import inventoryBg from '../../assets/inventory.jpeg';
 import planningBg from '../../assets/planning.jpeg';
 import productionBg from '../../assets/production.png';
-import qualityBg from '../../assets/Quality.jpeg';
-import helpBg from '../../assets/help.jpeg';
 import useAuthStore from '../../store/auth-store';
 import useNotificationStore from '../../store/notification';
 
@@ -71,7 +69,7 @@ function Sidebar() {
   const operatorMenuItems = [
     {
       key: '/operator/dashboard',
-      // icon: <ClipboardList size={20} />,
+      icon: <ClipboardList size={20} />,
       label: 'Dashboard',
       className: 'dashboard-menu-item',
     },
@@ -87,30 +85,18 @@ function Sidebar() {
     // },
     {
       key: '/operator/inspection',
-      label: (
-        <div className="inspection-results-header">
-          INSPECTION RESULTS
-        </div>
-      ),
-      className: 'inspection-results-item',
+      icon: <CheckSquare size={20} />,
+      label: 'Inspection Results',
     },
     {
       key: '/operator/inventory',
-      label: (
-        <div className="inventory-data-header">
-          INVENTORY DATA
-        </div>
-      ),
-      className: 'inventory-data-item',
+      icon: <Archive size={20} />,
+      label: 'Inventory Data',
     },
     {
       key: '/operator/help',
-      label: (
-        <div className="help-support-header">
-          HELP & SUPPORT
-        </div>
-      ),
-      className: 'help-support-item',
+      icon: <HelpCircle size={20} />,
+      label: 'Help and Support',
     },
   ];
 
@@ -121,22 +107,25 @@ function Sidebar() {
       className: 'dashboard-menu-item',
     },
     {
-      key: 'order-management',
-      icon: <ClipboardList size={20} />,
+      key: '/supervisor/order-management',
       label: 'ORDER MANAGEMENT',
       className: 'order-management-item',
-      children: [
-        {
-          key: '/supervisor/order-management/order-lists',
-          label: 'Order Lists',
-          icon: <List size={18} />
-        },
-        {
-          key: '/supervisor/order-management/workcenter',
-          label: 'Workcenter',
-          icon: <Factory size={18} />
-        }
-      ]
+      style: {
+        backgroundImage: `url(${orderBg})`,
+        backgroundPosition: 'center center',
+        backgroundSize: 'cover',
+        height: '100px',
+        margin: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        borderRadius: '8px',
+        borderLeft: '4px solid #1890ff',
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+        textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)'
+      }
     },
 
     {
@@ -355,7 +344,6 @@ function Sidebar() {
       ),
       popupClassName: 'process-engineering-submenu',
       className: 'process-engineering-item',
-      popupOffset: [0, 0],
       children: [
         {
           key: '/admin/machine_availability',
@@ -435,7 +423,6 @@ function Sidebar() {
       ),
       popupClassName: 'inventory-submenu',
       className: 'inventory-menu-item',
-      popupOffset: [0, 0],
       children: [
         {
           key: '/admin/inventory_data_management/inventory_all_data',
@@ -634,19 +621,12 @@ function Sidebar() {
         
         .process-engineering-submenu {
           margin-left: 16px !important;
-          position: fixed !important;
-          left: 80px !important; /* Width of collapsed sidebar */
+          position: relative;
           z-index: 1000;
           background: #fff;
           border-radius: 4px;
           box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
           min-width: 200px;
-        }
-        
-        /* Adjust submenu position when sidebar is collapsed */
-        .ant-layout-sider-collapsed .process-engineering-submenu {
-          left: 80px !important;
-          margin-left: 0 !important;
         }
         
         .process-engineering-submenu .ant-menu-item {
@@ -698,19 +678,12 @@ function Sidebar() {
         
         .inventory-submenu {
           margin-left: 16px !important;
-          position: fixed !important;
-          left: 80px !important; /* Width of collapsed sidebar */
+          position: relative;
           z-index: 1000;
           background: #fff;
           border-radius: 4px;
           box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
           min-width: 200px;
-        }
-        
-        /* Adjust submenu position when sidebar is collapsed */
-        .ant-layout-sider-collapsed .inventory-submenu {
-          left: 80px !important;
-          margin-left: 0 !important;
         }
         
         .inventory-submenu .ant-menu-item {
@@ -729,96 +702,6 @@ function Sidebar() {
         
         .inventory-submenu .ant-menu-item .anticon {
           margin-right: 8px;
-        }
-        
-        .inspection-results-item {
-          background-image: url(${qualityBg});
-          background-position: center center;
-          background-size: cover;
-          height: 100px !important;
-          margin: 8px !important;
-          display: flex !important;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-          border-radius: 8px;
-          border-left: 4px solid #1890ff;
-          font-weight: bold;
-          text-transform: uppercase;
-          text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
-          text-align: center;
-          width: calc(100% - 16px) !important;
-          padding: 0 8px;
-          box-sizing: border-box;
-        }
-        
-        .inspection-results-header {
-          width: 100%;
-          text-align: center;
-          font-size: 14px;
-          line-height: 1.4;
-          padding: 0 8px;
-          color: #ffffff; /* Ensure text is white */
-        }
-        
-        .inventory-data-item {
-          background-image: url(${inventoryBg});
-          background-position: center center;
-          background-size: cover;
-          height: 100px !important;
-          margin: 8px !important;
-          display: flex !important;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-          border-radius: 8px;
-          border-left: 4px solid #1890ff;
-          font-weight: bold;
-          text-transform: uppercase;
-          text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
-          text-align: center;
-          width: calc(100% - 16px) !important;
-          padding: 0 8px;
-          box-sizing: border-box;
-        }
-        
-        .inventory-data-header {
-          width: 100%;
-          text-align: center;
-          font-size: 14px;
-          line-height: 1.4;
-          padding: 0 8px;
-          color: #ffffff;
-        }
-        
-        .help-support-item {
-          background-image: url(${helpBg});
-          background-position: center center;
-          background-size: cover;
-          height: 100px !important;
-          margin: 8px !important;
-          display: flex !important;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-          border-radius: 8px;
-          border-left: 4px solid #1890ff;
-          font-weight: bold;
-          text-transform: uppercase;
-          text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
-          text-align: center;
-          width: calc(100% - 16px) !important;
-          padding: 0 8px;
-          box-sizing: border-box;
-        }
-        
-        .help-support-header {
-          width: 100%;
-          text-align: center;
-          font-size: 14px;
-          line-height: 1.4;
-          padding: 0 8px;
-          color: #ffffff;
         }
         
         .production-monitoring-header {
@@ -853,19 +736,12 @@ function Sidebar() {
         
         .production-monitoring-submenu {
           margin-left: 16px !important;
-          position: fixed !important;
-          left: 80px !important; /* Width of collapsed sidebar */
+          position: relative;
           z-index: 1000;
           background: #fff;
           border-radius: 4px;
           box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
           min-width: 200px;
-        }
-        
-        /* Adjust submenu position when sidebar is collapsed */
-        .ant-layout-sider-collapsed .production-monitoring-submenu {
-          left: 80px !important;
-          margin-left: 0 !important;
         }
         
         .production-monitoring-submenu .ant-menu-item {

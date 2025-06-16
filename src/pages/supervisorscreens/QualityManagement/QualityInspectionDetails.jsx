@@ -507,7 +507,7 @@ const QualityInspectionDetails = ({
       }
     } catch (error) {
       console.error('Error loading measured data:', error);
-      message.error({ content: 'Failed to load measured data', key: 'measuredDataLoading' });
+      message.info({ content: 'No measured data is available for this operation', key: 'measuredDataLoading' });
     }
   };
 

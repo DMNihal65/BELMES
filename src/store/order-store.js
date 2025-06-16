@@ -963,6 +963,19 @@ const useOrderStore = create((set, get) => ({
   createManualOrder: async (data) => {
     set({ isLoading: true, error: null });
     try {
+      console.log('Creating order with data:', {
+        production_order: data.production_order,
+        sale_order: data.sale_order,
+        wbs_element: data.wbs_element,
+        part_number: data.part_number,
+        part_description: data.part_description,
+        total_operations: data.total_operations,
+        required_quantity: data.required_quantity,
+        launched_quantity: data.launched_quantity,
+        plant_id: data.plant_id,
+        project_name: data.project_name
+      });
+      
       // First create the order
       const orderResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.endpoints.createOrder}`, {
         method: 'POST',
@@ -984,12 +997,20 @@ const useOrderStore = create((set, get) => ({
         })
       });
 
+      // First check if the response is ok
       if (!orderResponse.ok) {
         const errorData = await orderResponse.json();
+        console.error('Order creation failed:', {
+          status: orderResponse.status,
+          statusText: orderResponse.statusText,
+          error: errorData
+        });
         throw new Error(errorData.message || 'Failed to create order');
       }
 
+      // If response is ok, parse the response once
       const orderResult = await orderResponse.json();
+      console.log('Order creation successful:', orderResult);
       const fileUploadErrors = [];
 
       // Upload MPP document if provided

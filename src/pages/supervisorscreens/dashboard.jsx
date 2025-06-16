@@ -1,219 +1,580 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Progress, Badge, Tag, Empty, Alert, Button, Tooltip, Drawer, Typography, Space, Divider, Avatar, Input, Collapse, Dropdown, Menu } from 'antd';
+import React, { useState, Suspense, useEffect, lazy } from 'react';
+import { Card, Row, Col, Statistic, Tabs, Progress, Badge, Collapse, Tag, Empty, Alert, Button, Tooltip, Radio, Spin } from 'antd';
 import { 
-  ClockCircleOutlined, CheckCircleOutlined, ToolOutlined, 
-  BarcodeOutlined, BarChartOutlined, DashboardOutlined,
-  SearchOutlined, FilterOutlined, DesktopOutlined,
-  ExclamationCircleOutlined, SyncOutlined,
-  FileTextOutlined, CodeSandboxOutlined, FullscreenOutlined,
-  SettingOutlined, LineChartOutlined, PieChartOutlined,
-  CaretDownOutlined, AppstoreOutlined, TableOutlined,
-  ThunderboltOutlined, FireOutlined, RocketOutlined,
-  PoweroffOutlined
+  ArrowUpOutlined, ArrowDownOutlined, ClockCircleOutlined, 
+  CheckCircleOutlined, ToolOutlined, DashboardOutlined, 
+  CodeSandboxOutlined, BarcodeOutlined, BarChartOutlined, 
+  MonitorOutlined, FileTextOutlined, ProjectOutlined, 
+  FullscreenOutlined, CompassOutlined, DesktopOutlined,
+  AppstoreOutlined, BorderHorizontalOutlined,
+  WarningOutlined, ReloadOutlined
 } from '@ant-design/icons';
-import Lottie from 'lottie-react';
-import powerAnimation from '../../assets/power.json';
-import idleAnimation from '../../assets/idle.json';
-import offAnimation from '../../assets/off.json';
-import shopAnimation from '../../assets/shop.json';
 import useDashboardStore from '../../store/dashboard';
+import BrowserCompatCheck from '../../components/3d/BrowserCompatCheck';
 
-// Function to get status information including color, badge status, and border class
-const getStatusInfo = (status) => {
-  // Common Lottie animation options for better appearance
-  const lottieOptions = {
-    rendererSettings: {
-      preserveAspectRatio: 'xMidYMid slice'
-    },
-    loop: true,
-    autoplay: true
-  };
+// Import machine images
+import dmu60Image from '../../assets/CNCM-DMU-60.png';
+import dmu50Image from '../../assets/CNCM-DMU-50new.png';
+import dmu60MBImage from '../../assets/CNCM-DMU-60MB 5 AXIS.png';
+import vmc800Image from '../../assets/VMC_800.png';
+import robofilImage from '../../assets/MMC1-ROBOFIL 240.png';
+import dmu60EvoImage from '../../assets/dmu-60-evo-linear-product-picture.png';
 
-  switch(status) {
-    case 'PRODUCTION':
-      return {
-        color: 'green',
-        badgeStatus: 'success',
-        borderClass: 'border-green-700',
-        // Using Lottie with fallback to icon
-        icon: <Lottie 
-                animationData={powerAnimation} 
-                style={{ width: 24, height: 24 }} 
-                {...lottieOptions}
-                loop={true}
-                className="production-animation"
-              />,
-        bgColor: '#328a58',
-        textColor: 'text-white',
-        shimmer: 'animate-pulse',
-        glow: 'shadow-lg shadow-green-200',
-        iconBg: '#328a58'
-      };
-    case 'ON':
-      return {
-        color: 'amber',
-        badgeStatus: 'warning',
-        borderClass: 'border-amber-500',
-        icon: <Lottie 
-                animationData={idleAnimation} 
-                style={{ width: 54, height: 54 }} 
-                {...lottieOptions}
-                loop={true}
-                className="idle-animation"
-              />,
-        bgColor: '#ebb625',
-        textColor: 'text-white',
-        shimmer: '',
-        glow: 'shadow-md shadow-amber-100',
-        iconBg: '#faa200'
-      };
-    
-   
-    case 'OFF':
-    default:
-      return {
-        color: 'slate',
-        badgeStatus: 'default',
-        borderClass: 'border-slate-400',
-        icon: <Lottie 
-        animationData={offAnimation} 
-        style={{ width: 34, height: 34 }} 
-        {...lottieOptions}
-        loop={true}
-        className="off-animation"
-      />,
-        bgColor: '#A9A9A9',
-        textColor: 'text-white',
-        shimmer: '',
-        glow: 'shadow-sm shadow-slate-100',
-        iconBg: '#a8032a'
-      };
-  }
+// Preload fonts to ensure they are available for 3D rendering
+const preloadLocalFonts = () => {
+  // Create a style element to preload fonts
+  const style = document.createElement('style');
+  style.textContent = `
+    @font-face {
+      font-family: 'Inter';
+      src: url('/fonts/Rubik-VariableFont_wght.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Inter-Italic';
+      src: url('/fonts/Rubik-Italic-VariableFont_wght.ttf') format('truetype');
+      font-weight: normal;
+      font-style: italic;
+      font-display: swap;
+    }
+  `;
+  document.head.appendChild(style);
+  
+  // Preload font files
+  const fontFiles = [
+    '/fonts/Rubik-VariableFont_wght.ttf',
+    '/fonts/Rubik-Italic-VariableFont_wght.ttf'
+  ];
+  
+  fontFiles.forEach(fontUrl => {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.href = fontUrl;
+    link.as = 'font';
+    link.type = 'font/ttf';
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  });
 };
 
-// Enhanced machine card component with rich UI and modern aesthetics
-const ModernMachineCard = ({ machine, isSelected }) => {
-  // Calculate completion percentage
-  const completionPercentage = 
-    machine.targetCount > 0 
-      ? Math.round((machine.totalCount / machine.targetCount) * 100) 
-      : 0;
-      
-  // Get status color and icon
-  const statusInfo = getStatusInfo(machine.status);
+// Preload HDR environment maps for offline use
+const preloadEnvironmentMaps = () => {
+  const hdrFiles = [
+    '/machine_shop_02_4k.hdr',
+    '/warehouse.hdr'
+  ];
   
-  // Improved capitalization for all machine names and parts
-  const displayName = machine.name?.toUpperCase() || 'UNKNOWN MACHINE';
+  hdrFiles.forEach(hdrUrl => {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.href = hdrUrl;
+    link.as = 'image';
+    document.head.appendChild(link);
+  });
+};
+
+// Call preload functions
+preloadLocalFonts();
+preloadEnvironmentMaps();
+
+// Add custom CSS for enhanced animations
+const customStyles = `
+  .scale-102 {
+    transform: scale(1.02);
+  }
   
-  // Capitalize part number and program name
-  const partNumber = machine.partNumber ? 
-    machine.partNumber.toUpperCase() : 'N/A';
-  const programName = machine.currentProgram ? 
-    machine.currentProgram.toUpperCase() : 'N/A';
-  const machineType = machine.type ? 
-    machine.type.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : 
-    'General';
+  .hover\\:scale-102:hover {
+    transform: scale(1.02);
+  }
   
+  .hover\\:rotate-1:hover {
+    transform: rotate(1deg);
+  }
+  
+  .animate-ping {
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  
+  @keyframes ping {
+    75%, 100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+  
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: .5;
+    }
+  }
+  
+  .backdrop-blur-sm {
+    backdrop-filter: blur(4px);
+  }
+  
+  .drop-shadow-lg {
+    filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.04)) drop-shadow(0 4px 3px rgb(0 0 0 / 0.1));
+  }
+  
+  .drop-shadow-sm {
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.05)) drop-shadow(0 1px 1px rgb(0 0 0 / 0.1));
+  }
+`;
+
+// Inject custom styles
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = customStyles;
+  document.head.appendChild(styleElement);
+}
+
+// Import 3D components with error handling using lazy loading
+const FactoryScene = lazy(() => 
+  import('../../components/3d/FactoryScene')
+    .catch(err => {
+      console.error("Error loading 3D scene:", err);
+      // Return a module with a default component that shows an error
+      return { 
+        default: ({ machines, onMachineSelect }) => (
+          <div className="h-full flex flex-col items-center justify-center bg-gray-100 p-4">
+            <div className="bg-yellow-50 border border-yellow-400 text-yellow-700 p-4 rounded-md mb-4 max-w-lg text-center">
+              <h3 className="font-bold text-lg mb-2"><WarningOutlined /> 3D View Not Available</h3>
+              <p>Failed to load 3D factory visualization. Using simplified view instead.</p>
+              <Button 
+                type="primary" 
+                icon={<ReloadOutlined />} 
+                className="mt-3"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </div>
+            <SimpleMachineList machines={machines} onMachineSelect={onMachineSelect} />
+          </div>
+        )
+      };
+    })
+);
+
+// Simplified machine list component as fallback when 3D view fails
+const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
+  // Group machines by type for better organization
+  const machinesByType = {
+    turning: machines.filter(m => m.type === 'turning'),
+    milling: machines.filter(m => m.type === 'milling'),
+    edm: machines.filter(m => m.type === 'edm')
+  };
+
+  // Status count for statistics
+  const statusCounts = machines.reduce((counts, machine) => {
+    counts[machine.status] = (counts[machine.status] || 0) + 1;
+    return counts;
+  }, {});
+
+  // Calculate overall statistics
+  const totalMachines = machines.length;
+  const activeMachines = statusCounts['PRODUCTION'] || 0;
+  const idleMachines = statusCounts['IDLE'] || 0;
+  const errorMachines = statusCounts['ERROR'] || 0;
+
   return (
-    <Card
-      className={`
-        h-full rounded-xl overflow-hidden transition-all duration-300
-        ${isSelected ? `shadow-xl ring-2 ring-${statusInfo.color}-500 ${statusInfo.shimmer}` : `${statusInfo.glow} hover:shadow-lg hover:scale-[1.02]`}
-        backdrop-blur-sm backdrop-filter
-        border border-${statusInfo.color}-200
-      `}
-      style={{ backgroundColor: statusInfo.bgColor }}
-      bodyStyle={{ padding: '18px' }}
-      bordered={true}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center">
-          <div className={`w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-md mr-2.5 ${machine.status === 'PRODUCTION' ? 'animate-pulse' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {statusInfo.icon}
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-green-50">
+      {/* Enhanced Stats Panel - Top */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-4 mb-4 border border-gray-200/50">
+        <div className="grid grid-cols-4 gap-4">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-blue-100 text-sm font-medium">Total Machines</div>
+                <div className="text-3xl font-bold">{totalMachines}</div>
+              </div>
+              <DesktopOutlined className="text-2xl opacity-80" />
+            </div>
           </div>
-          <span className={`text-base font-semibold ${statusInfo.textColor}`}>{displayName}</span>
-        </div>
-        <Tag 
-          className={`rounded-full px-3 py-0.5 border-white text-white bg-opacity-20 shadow-sm font-medium`}
-          style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', borderColor: 'rgba(255, 255, 255, 0.3)' }}
-        >
-          {machine.status}
-        </Tag>
-      </div>
-      
-      <Divider className={`my-2.5 border-white opacity-30`} />
-      
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className={`p-2.5 rounded-lg bg-white bg-opacity-90 shadow-sm border border-white border-opacity-30`}>
-          <div className="text-xs text-gray-500 mb-1">Part Number</div>
-          <div className="text-sm font-medium truncate">{partNumber}</div>
-        </div>
-        <div className={`p-2.5 rounded-lg bg-white bg-opacity-90 shadow-sm border border-white border-opacity-30`}>
-          <div className="text-xs text-gray-500 mb-1">Program</div>
-          <div className="text-sm font-medium truncate">{programName}</div>
-        </div>
-      </div>
-      
-      {completionPercentage > 0 && (
-        <div className={`p-3 rounded-lg bg-white bg-opacity-90 shadow-sm border border-white border-opacity-30 mb-3`}>
-          <div className="flex justify-between text-xs mb-2">
-            <span className="font-medium">Production Progress</span>
-            <span className="font-semibold">{machine.totalCount}/{machine.targetCount}</span>
+          
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-green-100 text-sm font-medium">In Production</div>
+                <div className="text-3xl font-bold">{activeMachines}</div>
+              </div>
+              <CheckCircleOutlined className="text-2xl opacity-80" />
+            </div>
           </div>
-          <Progress 
-            percent={completionPercentage} 
-            size="small" 
-            status={machine.status === 'PRODUCTION' ? 'active' : machine.status === 'ERROR' ? 'exception' : 'normal'}
-            strokeColor={{
-              '0%': `var(--ant-${statusInfo.color}-4)`,
-              '100%': `var(--ant-${statusInfo.color}-6)`,
-            }}
-            trailColor={`var(--ant-${statusInfo.color}-1)`}
-            strokeWidth={8}
-            className="custom-progress"
-          />
-          <div className="text-xs text-right mt-1 text-gray-500">
-            {completionPercentage}% Complete
+          
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-yellow-100 text-sm font-medium">Idle/Setup</div>
+                <div className="text-3xl font-bold">{idleMachines}</div>
+              </div>
+              <ClockCircleOutlined className="text-2xl opacity-80" />
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-red-100 text-sm font-medium">Errors/Off</div>
+                <div className="text-3xl font-bold">{errorMachines}</div>
+              </div>
+              <WarningOutlined className="text-2xl opacity-80" />
+            </div>
           </div>
         </div>
-      )}
+      </div>
       
-      <div className={`flex justify-end items-center mt-2 text-xs text-white px-3`}>
-        
-      <div className="flex items-center">
-          <ClockCircleOutlined className="mr-1.5" />
-          {new Date(machine.lastUpdated || machine.last_updated).toLocaleTimeString()}
+      {/* Main Content Area - fills remaining height */}
+      <div className="flex-1 grid grid-cols-12 gap-4 overflow-hidden">
+        {/* Factory Layout - Full Width */}
+        <div className="col-span-12 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-4 flex flex-col border border-gray-200/50">
+          <h3 className="font-bold text-gray-800 mb-4 text-lg flex items-center">
+            <CompassOutlined className="mr-2 text-blue-600" />
+            Factory Layout Overview
+          </h3>
+          <div className="flex-1 relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-200 overflow-hidden overflow-y-auto" style={{ maxHeight: '60vh' }}>
+            {/* EDM Room - Top (Larger) */}
+            <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-r from-purple-100 to-purple-200 border-b-2 border-purple-300 flex flex-col">
+              <div className="text-sm font-bold text-purple-800 p-3 bg-purple-50/50 backdrop-blur-sm border-b border-purple-200">
+                <ProjectOutlined className="mr-2" />
+                EDM Area
+              </div>
+              <div className="flex-1 flex items-center justify-center gap-x-2 ">
+                {machinesByType.edm.slice(0, 4).map((machine) => (
+                  <EnhancedMachineCard 
+                    key={machine.id} 
+                    machine={machine} 
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => onMachineSelect(machine)}
+                    compact={true}
+                    mini={true}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Center Aisle */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 top-1/3 bottom-0 w-3 bg-gradient-to-b from-gray-300 to-gray-400 shadow-lg"></div>
+            
+            {/* Turning Machines - Left Side */}
+            <div className="absolute top-1/3 left-2 bottom-2 w-[48%] flex flex-col">
+              <div className="text-xs font-bold text-blue-800 mb-1 text-center bg-blue-50/80 backdrop-blur-sm rounded-lg p-1 border border-blue-200">
+                <ToolOutlined className="mr-1" />
+                Turning Section
+              </div>
+              <div className="flex-1 grid grid-cols-2 gap-3 p-1 auto-rows-max">
+                {machinesByType.turning.slice(0, 8).map((machine) => (
+                  <EnhancedMachineCard 
+                    key={machine.id} 
+                    machine={machine} 
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => onMachineSelect(machine)}
+                    compact={true}
+                    mini={true}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Milling Machines - Right Side */}
+            <div className="absolute top-1/3 right-2 bottom-2 w-[48%] flex flex-col">
+              <div className="text-xs font-bold text-green-800 mb-1 text-center bg-green-50/80 backdrop-blur-sm rounded-lg p-1 border border-green-200">
+                <AppstoreOutlined className="mr-1" />
+                Milling Section
+              </div>
+              <div className="flex-1 grid grid-cols-2 gap-3 p-1 auto-rows-max">
+                {machinesByType.milling.slice(0, 8).map((machine) => (
+                  <EnhancedMachineCard 
+                    key={machine.id} 
+                    machine={machine} 
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => onMachineSelect(machine)}
+                    compact={true}
+                    mini={true}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Floor Label */}
+            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-gray-200">
+              Main Shop Floor
+            </div>
+          </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
 
+// Enhanced machine card component with images and better design
+const EnhancedMachineCard = ({ machine, isSelected, onSelect, compact = false, mini = false }) => {
+  // Get machine image based on mapping or fallback
+  const getMachineImage = (machine) => {
+    if (machine.imageOverride) return machine.imageOverride;
+    const name = machine.name?.toLowerCase() || '';
+    if (name.includes('dmu') || name.includes('cnc')) {
+      if (name.includes('60')) return dmu60Image;
+      if (name.includes('50')) return dmu50Image;
+      return dmu60MBImage;
+    } else if (name.includes('vmc') || name.includes('milling')) {
+      return vmc800Image;
+    } else if (name.includes('edm') || name.includes('robo') || name.includes('wire')) {
+      return robofilImage;
+    } else if (name.includes('turn') || name.includes('lathe')) {
+      return dmu60EvoImage;
+    } else {
+      switch(machine.type) {
+        case 'turning': return dmu60EvoImage;
+        case 'milling': return vmc800Image;
+        case 'edm': return robofilImage;
+        default: return vmc800Image;
+      }
+    }
+  };
 
+  // Get status styling and background color
+  const getStatusStyling = (status) => {
+    switch(status) {
+      case 'PRODUCTION':
+        return {
+          bg: 'bg-gradient-to-br from-green-400 to-green-600',
+          border: 'border-green-400',
+          text: 'text-green-900',
+          badge: 'bg-green-500',
+        };
+      case 'ON':
+        return {
+          bg: 'bg-gradient-to-br from-yellow-300 to-yellow-500',
+          border: 'border-yellow-400',
+          text: 'text-yellow-900',
+          badge: 'bg-yellow-500',
+        };
+      case 'IDLE':
+        return {
+          bg: 'bg-gradient-to-br from-blue-300 to-blue-500',
+          border: 'border-blue-400',
+          text: 'text-blue-900',
+          badge: 'bg-blue-500',
+        };
+      case 'SETUP':
+        return {
+          bg: 'bg-gradient-to-br from-purple-300 to-purple-500',
+          border: 'border-purple-400',
+          text: 'text-purple-900',
+          badge: 'bg-purple-500',
+        };
+      case 'ERROR':
+        return {
+          bg: 'bg-gradient-to-br from-red-400 to-red-600',
+          border: 'border-red-400',
+          text: 'text-red-900',
+          badge: 'bg-red-500',
+        };
+      case 'MAINTENANCE':
+        return {
+          bg: 'bg-gradient-to-br from-indigo-300 to-indigo-500',
+          border: 'border-indigo-400',
+          text: 'text-indigo-900',
+          badge: 'bg-indigo-500',
+        };
+      default:
+        return {
+          bg: 'bg-gradient-to-br from-gray-200 to-gray-400',
+          border: 'border-gray-300',
+          text: 'text-gray-800',
+          badge: 'bg-gray-400',
+        };
+    }
+  };
 
-// Function to get status color for 2D layout
-const getStatusColor = (status) => {
-  switch(status) {
-    case 'PRODUCTION': return 'green';
-    case 'ON': return 'orange';
-    case 'IDLE': return 'blue';
-    case 'SETUP': return 'purple';
-    case 'ERROR': return 'red';
-    case 'MAINTENANCE': return 'indigo';
-    case 'OFF': default: return 'gray';
+  const statusStyle = getStatusStyling(machine.status);
+  const machineImage = getMachineImage(machine);
+
+  // --- Modern Responsive Card UI ---
+  if (mini) {
+    return (
+      <div 
+        className={`relative rounded-2xl overflow-hidden shadow-lg transform transition-all duration-300 cursor-pointer group border-2 ${statusStyle.border} ${statusStyle.bg} ${isSelected ? 'ring-2 ring-blue-500 scale-105' : 'hover:scale-105 hover:shadow-2xl'}`}
+        onClick={onSelect}
+        style={{ minWidth: 90, minHeight: 110, maxWidth: 150, width: '100%' }}
+      >
+        {/* Image with overlay */}
+        <div className="relative w-full h-14 flex items-center justify-center bg-white/30">
+          <img src={machineImage} alt={machine.name} className="object-contain h-10 w-auto mx-auto drop-shadow-lg" style={{ filter: 'contrast(1.1) saturate(1.2)' }} />
+          <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white shadow ${statusStyle.badge}`}>{machine.status}</div>
+        </div>
+        {/* Content */}
+        <div className="p-1 flex flex-col gap-0.5">
+          <div className={`font-bold text-xs truncate flex items-center gap-1 ${statusStyle.text}`}> 
+            {machine.name}
+            <span className="ml-1 px-1 py-0.5 rounded bg-white/60 text-gray-700 text-[8px] font-semibold uppercase border border-gray-200">{machine.workcenter}</span>
+          </div>
+          <div className="flex justify-between text-[9px] font-medium">
+            <span className="capitalize">{machine.type}</span>
+            <span className="text-gray-700">{machine.currentProgram || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between text-[8px] text-gray-700">
+            <span>Part:</span>
+            <span className="font-semibold text-gray-900">{machine.partNumber || 'N/A'}</span>
+          </div>
+        </div>
+        {/* Selection Indicator */}
+        {isSelected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>}
+      </div>
+    );
   }
+
+  if (compact) {
+    return (
+      <div 
+        className={`relative rounded-xl overflow-hidden shadow-lg transform transition-all duration-500 cursor-pointer group
+          ${isSelected ? 'ring-4 ring-blue-500 scale-105 shadow-2xl' : 'hover:scale-105 hover:shadow-2xl hover:rotate-1'}
+          ${statusStyle.bg} ${statusStyle.border} border-2 backdrop-blur-sm`}
+        onClick={onSelect}
+      >
+        {/* Machine Image Background */}
+        <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity duration-300">
+          <img 
+            src={machineImage} 
+            alt={machine.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
+          />
+        </div>
+        
+        {/* Animated Background Pattern */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        
+        {/* Content */}
+        <div className="relative p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-bold text-sm truncate max-w-[70%] text-white drop-shadow-lg">
+              {machine.name}
+            </div>
+            <div className={`w-3 h-3 rounded-full ${statusStyle.shadow} shadow-lg animate-pulse`}></div>
+          </div>
+          
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="opacity-90 text-white/90">Program:</span>
+              <span className="font-medium truncate max-w-[60%] text-white drop-shadow-sm">{machine.currentProgram || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="opacity-90 text-white/90">Part:</span>
+              <span className="font-medium truncate max-w-[60%] text-white drop-shadow-sm">{machine.partNumber || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="opacity-90 text-white/90">Order:</span>
+              <span className="font-medium truncate max-w-[60%] text-white drop-shadow-sm">{machine.productionOrder || 'N/A'}</span>
+            </div>
+          </div>
+          
+          {/* Status Badge */}
+          <div className="mt-3 text-center">
+            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${statusStyle.text} bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg transform group-hover:scale-110 transition-transform duration-300`}>
+              {machine.status}
+            </span>
+          </div>
+        </div>
+        
+        {/* Glow Effect */}
+        <div className={`absolute inset-0 rounded-xl ${statusStyle.glow} opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-40' : 'group-hover:opacity-20'}`}></div>
+        
+        {/* Selection Indicator */}
+        {isSelected && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full animate-ping"></div>
+        )}
+      </div>
+    );
+  }
+
+  // Full size card
+  return (
+    <div 
+      className={`relative rounded-xl overflow-hidden shadow-xl transform transition-all duration-500 cursor-pointer group
+        ${isSelected ? 'ring-4 ring-blue-500 scale-105 shadow-2xl' : 'hover:scale-105 hover:shadow-2xl'}
+        bg-white border-2 ${statusStyle.border} backdrop-blur-sm`}
+      onClick={onSelect}
+    >
+      {/* Machine Image */}
+      <div className="h-32 relative overflow-hidden">
+        <img 
+          src={machineImage} 
+          alt={machine.name}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          onError={(e) => {
+            e.target.style.display = 'none';
+            e.target.parentElement.className = 'h-32 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center';
+            e.target.parentElement.innerHTML = '<DesktopOutlined className="text-4xl text-gray-400" />';
+          }}
+        />
+        <div className={`absolute top-2 right-2 ${statusStyle.bg} text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg transform group-hover:scale-110 transition-transform duration-300`}>
+          {machine.status}
+        </div>
+        
+        {/* Image Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      </div>
+      
+      {/* Content */}
+      <div className="p-4">
+        <div className="font-bold text-lg mb-3 text-gray-800 truncate group-hover:text-blue-600 transition-colors duration-300">
+          {machine.name}
+        </div>
+        
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between items-center group/item">
+            <span className="text-gray-600 group-hover/item:text-gray-800 transition-colors duration-300">Program Number:</span>
+            <span className="font-medium text-gray-800 truncate max-w-[60%] group-hover/item:text-blue-600 transition-colors duration-300">{machine.currentProgram || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between items-center group/item">
+            <span className="text-gray-600 group-hover/item:text-gray-800 transition-colors duration-300">Part Number:</span>
+            <span className="font-medium text-gray-800 truncate max-w-[60%] group-hover/item:text-blue-600 transition-colors duration-300">{machine.partNumber || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between items-center group/item">
+            <span className="text-gray-600 group-hover/item:text-gray-800 transition-colors duration-300">Order Number:</span>
+            <span className="font-medium text-gray-800 truncate max-w-[60%] group-hover/item:text-blue-600 transition-colors duration-300">{machine.productionOrder || 'N/A'}</span>
+          </div>
+        </div>
+        
+        {/* Status Indicator */}
+        <div className="mt-4 flex items-center justify-center">
+          <div className={`w-4 h-4 rounded-full ${statusStyle.shadow} shadow-lg mr-2 animate-pulse`}></div>
+          <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors duration-300">{machine.status}</span>
+        </div>
+      </div>
+      
+      {/* Glow Effect */}
+      <div className={`absolute inset-0 rounded-xl ${statusStyle.glow} opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-20' : 'group-hover:opacity-10'}`}></div>
+      
+      {/* Selection Indicator */}
+      {isSelected && (
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full animate-ping"></div>
+      )}
+    </div>
+  );
 };
-
-
 
 // Main Dashboard Component
 const SupervisorDashboard = () => {
   const [selectedMachine, setSelectedMachine] = useState(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [searchText, setSearchText] = useState('');
-  const { Title } = Typography;
-  const { initializeWebSocket, cleanup, getMappedMachineData, isConnected, error, fetchOEEData } = useDashboardStore();
+  const [cameraView, setCameraView] = useState('overview');
+  const [renderError, setRenderError] = useState(false);
+  const [compatibility, setCompatibility] = useState(null);
+  const [use3DView, setUse3DView] = useState(true);
+  const { initializeWebSocket, cleanup, getMappedMachineData, isConnected, error } = useDashboardStore();
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -221,16 +582,35 @@ const SupervisorDashboard = () => {
     return () => cleanup();
   }, []);
 
-  // Fetch OEE data when a machine is selected
-  useEffect(() => {
-    if (selectedMachine?.id) {
-      fetchOEEData(selectedMachine.id);
+  // Handle compatibility check results
+  const handleCompatibilityChange = (compatResult) => {
+    console.log('Browser compatibility check result:', compatResult);
+    setCompatibility(compatResult);
+    
+    // If WebGL is not supported, disable 3D view
+    if (compatResult.error && !compatResult.webGLSupported) {
+      setUse3DView(false);
     }
-  }, [selectedMachine]);
+    
+    // Disable 3D view on Firefox with ANGLE renderer until properly fixed
+    if (compatResult.isFirefox && compatResult.renderer && compatResult.renderer.includes('ANGLE')) {
+      console.warn('Firefox with ANGLE renderer detected, using 2D fallback');
+      setUse3DView(false);
+    }
+  };
+
+  // Load previous view preference
+  useEffect(() => {
+    const storedViewPref = localStorage.getItem('use3DView');
+    if (storedViewPref !== null) {
+      setUse3DView(storedViewPref === 'true');
+    }
+  }, []);
 
   // Get the mapped machine data and categorize it
   const machines = getMappedMachineData().map((machine, index) => {
     // Assign machine types based on naming convention or other attributes
+    // This is just a placeholder logic - adjust according to your actual data
     let type = 'milling';
     
     if (machine.name?.toLowerCase().includes('turn') || 
@@ -249,292 +629,153 @@ const SupervisorDashboard = () => {
     };
   });
 
-  // Filter machines based on status and search text
-  const filteredMachines = machines.filter(machine => {
-    const matchesStatus = filterStatus === 'all' || machine.status === filterStatus;
-    const matchesSearch = !searchText || 
-      machine.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      machine.partNumber?.toLowerCase().includes(searchText.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
-
-  // Group machines by status for statistics
-  const machineStats = machines.reduce((stats, machine) => {
-    stats[machine.status] = (stats[machine.status] || 0) + 1;
-    return stats;
-  }, {});
-
   // Handle machine selection
   const handleMachineSelect = (machine) => {
     setSelectedMachine(machine);
-    setDrawerVisible(true);
+    setCameraView('focusMachine');
   };
 
-  // Calculate overall statistics
-  const totalMachines = machines.length;
-  const productionMachines = machineStats['PRODUCTION'] || 0;
-  const idleMachines = machineStats['ON'] || 0;  // Changed from 'IDLE' to 'ON' to match the actual status in the data
-  const errorMachines = machineStats['ERROR'] || 0;
-  const offMachines = machineStats['OFF'] || 0;
-  const maintenanceMachines = machineStats['MAINTENANCE'] || 0;
+  // Camera view options
+  const cameraViewOptions = [
+    { label: <Tooltip title="Overview"><DesktopOutlined /></Tooltip>, value: 'overview' },
+    { label: <Tooltip title="Top Down"><BorderHorizontalOutlined /></Tooltip>, value: 'topDown' },
+    { label: <Tooltip title="First Person"><CompassOutlined /></Tooltip>, value: 'firstPerson' },
+    { label: <Tooltip title="Turning Section"><ToolOutlined /></Tooltip>, value: 'turningSection' },
+    { label: <Tooltip title="Milling Section"><AppstoreOutlined /></Tooltip>, value: 'millingSection' },
+    { label: <Tooltip title="EDM Room"><ProjectOutlined /></Tooltip>, value: 'edmRoom' },
+  ];
+
+  // Handle 3D rendering errors
+  const handleRenderError = (err) => {
+    console.error("3D Rendering error:", err);
+    setRenderError(true);
+    setUse3DView(false);
+  };
+
+  // Handle view toggle
+  const toggleView = (use3D) => {
+    setUse3DView(use3D);
+    localStorage.setItem('use3DView', use3D.toString());
+  };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-fixed">
-      {/* Header with stats */}
-      <div className="bg-white bg-opacity-80 backdrop-blur-sm p-6 rounded-xl shadow-md mb-6 border border-indigo-100">
-        <Row gutter={[24, 24]} align="middle">
-          <Col xs={24} md={16}>
-            <div className="flex items-center">
-            
-                <Lottie 
-                  animationData={shopAnimation}
-                  style={{ width: 55, height: 55 }}
-                  loop={true}
-                  autoplay={true}
-                />
-              
-              <div>
-                <h1 className="text-2xl font-bold m-0 text-gray-800">Shopfloor-View</h1>
-                <p className="text-sm text-indigo-600 m-0">Real-time machine monitoring system</p>
-              </div>
-            </div>
-          </Col>
-          <Col xs={24} md={8}>
-            <div className="flex items-center justify-end gap-3">
-              <Input 
-                placeholder="Search machines..." 
-                prefix={<SearchOutlined className="text-indigo-400" />}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="rounded-xl shadow-inner shadow-indigo-100 border-indigo-200 hover:border-indigo-300 focus:border-indigo-400 focus:shadow-indigo-200"
-                style={{ transition: 'all 0.3s ease' }}
-              />
-              <Dropdown
-                overlay={
-                  <Menu onClick={(e) => setFilterStatus(e.key)} className="rounded-xl shadow-lg p-1">
-                    <Menu.Item key="all" icon={<AppstoreOutlined style={{ color: '#4f46e5' }} />} className="rounded-lg">
-                      <span className="font-medium">All Machines</span>
-                    </Menu.Item>
-                    <Menu.Divider />
-                    <Menu.Item key="PRODUCTION" icon={<CheckCircleOutlined style={{ color: '#10b981' }} />} className="rounded-lg">
-                      <span className="font-medium">Production</span>
-                    </Menu.Item>
-                    <Menu.Item key="ON" icon={<ClockCircleOutlined style={{ color: '#d97706' }} />} className="rounded-lg">
-                      <span className="font-medium">Idle</span>
-                    </Menu.Item>
-                   
-                    <Menu.Item key="OFF" icon={<PoweroffOutlined style={{ color: '#cc3929' }} />} className="rounded-lg">
-                      <span className="font-medium">Offline</span>
-                    </Menu.Item>
-                  </Menu>
-                }
-                trigger={['click']}
-              >
-                <Button 
-                  icon={<FilterOutlined />} 
-                  className={`rounded-xl ${filterStatus !== 'all' ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm' : ''} hover:shadow-md transition-all duration-300`}
-                >
-                  <span className="font-medium">{filterStatus === 'all' ? 'All Statuses' : filterStatus}</span>
-                </Button>
-              </Dropdown>
-            </div>
-          </Col>
-        </Row>
+    <div className="p-6 h-screen bg-gray-100">
+      {/* Browser Compatibility Check */}
+      <BrowserCompatCheck onCompatibilityChange={handleCompatibilityChange} />
+      
+      {/* Connection Status */}
+      {error && (
+        <Alert
+          message="Connection Error"
+          description={error}
+          type="error"
+          showIcon
+          className="mb-4"
+        />
+      )}
+      {!isConnected && !error && (
+        <Alert
+          message="Connecting..."
+          description="Attempting to connect to machine monitoring system..."
+          type="info"
+          showIcon
+          className="mb-4"
+        />
+      )}
 
-        <Row gutter={[24, 24]} className="mt-6">
-          <Col xs={24} sm={12} md={6} lg={4}>
-            <Card 
-              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
-              style={{ backgroundColor: '#f8fafc' }}
-              bodyStyle={{ padding: '20px', position: 'relative' }}
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                <DesktopOutlined className="text-7xl text-indigo-600" />
-              </div>
-              <Statistic 
-                title={<span className="text-indigo-800 font-medium text-base flex items-center gap-2">
-                  <DesktopOutlined className="text-indigo-600" /> Total Machines
-                </span>} 
-                value={totalMachines} 
-                valueStyle={{ color: '#4338ca', fontWeight: 700, fontSize: '28px' }}
-                suffix={<span className="text-xs text-indigo-400 ml-1">Machines</span>}
-              />
-             
-              
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={4}>
-            <Card 
-              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
-              style={{ backgroundColor: '#0c8844' }}
-              bodyStyle={{ padding: '20px', position: 'relative' }}
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                <CheckCircleOutlined className="text-7xl text-white" />
-              </div>
-              <Statistic 
-                title={<span className="text-white font-medium text-base flex items-center gap-2">
-                  <CheckCircleOutlined className="text-white" /> In Production
-                </span>} 
-                value={productionMachines} 
-                valueStyle={{ color: '#ffffff', fontWeight: 700, fontSize: '28px' }}
-                suffix={<span className="text-xs text-white opacity-80 ml-1">Machines</span>}
-              />
-            
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={4}>
-            <Card 
-              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
-              style={{ backgroundColor: '#ebb625' }}
-              bodyStyle={{ padding: '20px', position: 'relative' }}
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                <ClockCircleOutlined className="text-7xl text-white" />
-              </div>
-              <Statistic 
-                title={<span className="text-white font-medium text-base flex items-center gap-2">
-                  <ClockCircleOutlined className="text-white" /> Idle
-                </span>} 
-                value={idleMachines} 
-                valueStyle={{ color: '#ffffff', fontWeight: 700, fontSize: '28px' }}
-                suffix={<span className="text-xs text-white opacity-80 ml-1">Machines</span>}
-              />
-              
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={4}>
-            <Card 
-              className="rounded-xl border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] overflow-hidden"
-              style={{ backgroundColor: '#A9A9A9' }}
-              bodyStyle={{ padding: '20px', position: 'relative' }}
-            >
-              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-                <PoweroffOutlined className="text-7xl text-white" />
-              </div>
-              <Statistic 
-                title={<span className="text-white font-medium text-base flex items-center gap-2">
-                  <PoweroffOutlined className="text-white" /> Offline
-                </span>} 
-                value={offMachines} 
-                valueStyle={{ color: '#ffffff', fontWeight: 700, fontSize: '28px' }}
-                suffix={<span className="text-xs text-white opacity-80 ml-1">Machines</span>}
-              />
-             
-            </Card>
-          </Col>
-        </Row>
-      </div>
-
-      {/* Main content area */}
-      <div className="flex-1 overflow-hidden px-6">
-        {error && (
-          <Alert 
-            message="Connection Error" 
-            description={error} 
-            type="error" 
-            showIcon 
-            className="mb-6 shadow-md rounded-xl border-rose-200"
-          />
-        )}
-
-        {!isConnected && !error && (
-          <Alert 
-            message="Connecting to production data..." 
-            type="info" 
-            showIcon 
-            className="mb-6 shadow-md rounded-xl border-indigo-200 bg-indigo-50"
-          />
-        )}
-
-        {/* Machine Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 overflow-y-auto pb-8 pt-2">
-          {filteredMachines.length > 0 ? (
-            filteredMachines.map(machine => (
-              <div 
-                key={machine.id} 
-                onClick={() => handleMachineSelect(machine)}
-                className="transform transition-all duration-300 hover:translate-y-[-4px] cursor-pointer"
-              >
-                <ModernMachineCard 
-                  machine={machine} 
-                  isSelected={selectedMachine?.id === machine.id}
-                />
-              </div>
-            ))
-          ) : (
-            <div className="col-span-full py-12">
-              <Empty 
-                description={
-                  <span className="text-gray-500 text-lg">
-                    {searchText ? 'No machines match your search criteria' : 'No machines available at the moment'}
-                  </span>
-                }
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                className="opacity-80"
-              />
-              {searchText && (
-                <div className="mt-4 flex justify-center">
-                  <Button 
-                    type="default" 
-                    onClick={() => setSearchText('')} 
-                    icon={<FilterOutlined />}
-                    className="rounded-xl shadow-sm border-indigo-200 hover:border-indigo-400 hover:shadow-md"
-                  >
-                    Clear search filter
-                  </Button>
+      {/* Main Content Area */}
+      <div className="flex flex-row gap-4 h-[calc(100vh-160px)]">
+        {/* Factory Layout Section */}
+        <div className="flex-[2_1_0%] min-w-0 flex flex-col">
+          <Card 
+            title={
+              <div className="flex justify-between items-center">
+                <span>Factory Shop Floor</span>
+                <div className="flex items-center space-x-2">
+                  {compatibility && compatibility.webGLSupported && (
+                    <Button.Group>
+                      <Button 
+                        type={use3DView ? "primary" : "default"} 
+                        onClick={() => toggleView(true)}
+                        icon={<DesktopOutlined />}
+                      >
+                        3D View
+                      </Button>
+                      <Button 
+                        type={!use3DView ? "primary" : "default"} 
+                        onClick={() => toggleView(false)}
+                        icon={<AppstoreOutlined />}
+                      >
+                        2D View
+                      </Button>
+                    </Button.Group>
+                  )}
+                  {use3DView && (
+                    <Radio.Group 
+                      options={cameraViewOptions} 
+                      onChange={(e) => setCameraView(e.target.value)}
+                      value={cameraView}
+                      optionType="button"
+                      buttonStyle="solid"
+                      size="small"
+                      disabled={renderError || !use3DView}
+                    />
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            }
+            className="h-full"
+            bodyStyle={{ 
+              padding: 0, 
+              height: 'calc(100% - 57px)',
+              position: 'relative',
+              overflow: 'auto',
+              minHeight: 400
+            }}
+          >
+            {!use3DView ? (
+              <div className="h-full p-4">
+                <SimpleMachineList 
+                  machines={machines} 
+                  onMachineSelect={handleMachineSelect} 
+                  selectedMachine={selectedMachine}
+                />
+              </div>
+            ) : (
+              <Suspense fallback={
+                <div className="h-full flex items-center justify-center bg-gray-100">
+                  <Spin tip="Loading 3D Factory..." />
+                </div>
+              }>
+                <FactoryScene 
+                  machines={machines}
+                  onMachineSelect={handleMachineSelect}
+                  selectedMachine={selectedMachine}
+                  cameraView={cameraView}
+                  onError={handleRenderError}
+                />
+              </Suspense>
+            )}
+          </Card>
+        </div>
+        {/* Machine Details Section */}
+        <div className="flex-[1_1_0%] min-w-[320px] max-w-[400px]">
+          <MachineDetails 
+            selectedMachine={selectedMachine || (machines.length > 0 ? machines[0] : null)} 
+            onZoomToMachine={() => {
+              if (selectedMachine && !renderError && use3DView) {
+                setCameraView('focusMachine');
+              }
+            }}
+            show3DControls={use3DView && !renderError}
+          />
         </div>
       </div>
-
-      {/* Machine Details Drawer with enhanced styling */}
-      <Drawer 
-        title={
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedMachine ? getStatusInfo(selectedMachine.status).iconBg : 'bg-indigo-600'} shadow-md`}>
-              {selectedMachine ? getStatusInfo(selectedMachine.status).icon : <DesktopOutlined />}
-            </div>
-            <div>
-              <span className="text-lg font-bold">
-                {selectedMachine?.name?.toUpperCase() || 'MACHINE DETAILS'}
-              </span>
-              {selectedMachine && (
-                <div className="flex items-center mt-0.5">
-                  <div className={`w-2 h-2 rounded-full ${selectedMachine.status === 'PRODUCTION' ? 'bg-emerald-500 animate-pulse' : selectedMachine.status === 'ON' ? 'bg-amber-500' : 'bg-slate-500'} mr-1.5`}></div>
-                  <span className="text-xs text-gray-500">
-                    {selectedMachine.status} • Last updated: {new Date(selectedMachine.lastUpdated || selectedMachine.last_updated).toLocaleTimeString()}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        }
-        placement="right"
-        closable={true}
-        onClose={() => setDrawerVisible(false)}
-        open={drawerVisible}
-        width={520}
-        className="custom-drawer"
-        bodyStyle={{ padding: '20px', backgroundColor: '#f8fafc' }}
-        headerStyle={{ 
-          borderBottom: '1px solid #e2e8f0', 
-          padding: '20px 24px',
-          backgroundColor: '#ffffff',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-        }}
-        maskStyle={{ backdropFilter: 'blur(3px)', backgroundColor: 'rgba(15, 23, 42, 0.3)' }}
-      >
-        {selectedMachine && <MachineDetails selectedMachine={selectedMachine} />}
-      </Drawer>
     </div>
   );
 };
 
 // Update the Machine Details section with improved UI
-// Enhanced Machine Details component with improved UI and UX
 const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = true }) => {
   const { fetchOEEData, oeeData } = useDashboardStore();
 
@@ -586,13 +827,11 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
       ? Math.round((selectedMachine.totalCount / selectedMachine.targetCount) * 100) 
       : 0;
 
-  const statusInfo = getStatusInfo(selectedMachine.status);
-
   return (
     <Card 
       title={
         <div className="flex justify-between items-center">
-          <span className={`font-semibold ${statusInfo.textColor}`}>{selectedMachine.name}</span>
+          <span>{selectedMachine.name}</span>
           {show3DControls && (
             <Tooltip title="Focus on this machine">
               <Button 
@@ -600,135 +839,100 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
                 size="small" 
                 icon={<FullscreenOutlined />} 
                 onClick={onZoomToMachine}
-                className={`bg-${statusInfo.color}-600 hover:bg-${statusInfo.color}-700 border-none shadow-md`}
               />
             </Tooltip>
           )}
         </div>
       }
-      className="h-full rounded-xl overflow-hidden shadow-md"
-      bodyStyle={{ height: 'calc(100% - 57px)', padding: '20px', overflow: 'auto' }}
-      headStyle={{ backgroundColor: `var(--ant-${statusInfo.color}-1)` }}
+      className="h-full"
+      bodyStyle={{ height: 'calc(100% - 57px)', padding: '16px', overflow: 'auto' }}
       extra={
-        <Tag 
-          className={`rounded-full px-3 py-0.5 border-${statusInfo.color}-400 text-${statusInfo.color}-700 bg-${statusInfo.color}-50 font-medium`}
-        >
+        <Tag color={
+          selectedMachine.status === 'PRODUCTION' ? 'success' : 
+          selectedMachine.status === 'ON' ? 'warning' : 
+          'default'
+        }>
           {selectedMachine.status}
         </Tag>
       }
     >
       <div className="space-y-4">
-        {/* OEE Components with enhanced visuals */}
+        {/* OEE Components */}
         {oeeData && (
           <Card 
             size="small"
             title={
               <span className="text-sm font-semibold text-gray-700 flex items-center">
-                <DashboardOutlined className="mr-2 text-indigo-600" />
+                <DashboardOutlined className="mr-1" />
                 OEE Analysis
               </span>
             }
-            className="shadow-md rounded-xl overflow-hidden border-0"
-            style={{ backgroundColor: '#f8fafc' }}
-            bodyStyle={{ padding: '16px' }}
-            headStyle={{ borderBottom: '1px solid rgba(139, 92, 246, 0.2)', backgroundColor: '#f5f3ff' }}
+            className="shadow-sm"
+            bodyStyle={{ padding: '12px' }}
           >
-            <div className="grid grid-cols-3 gap-4 p-2">
-              <div className="text-center bg-white p-3 rounded-xl shadow-sm">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center">
                 <Progress
                   type="dashboard"
                   percent={oeeData.average_availability || 0}
-                  width={90}
-                  strokeColor={{
-                    '0%': '#818cf8',
-                    '100%': '#4f46e5'
-                  }}
-                  format={percent => (
-                    <span style={{ fontSize: '1rem', color: '#4338ca', fontWeight: 600 }}>
-                      {percent.toFixed(1)}%
-                    </span>
-                  )}
+                  width={80}
+                  strokeColor="#1890ff"
                 />
-                <div className="text-sm mt-2 font-medium text-indigo-700">Availability</div>
+                <div className="text-xs mt-1">Availability</div>
               </div>
-              <div className="text-center bg-white p-3 rounded-xl shadow-sm">
+              <div className="text-center">
                 <Progress
                   type="dashboard"
                   percent={oeeData.average_performance || 0}
-                  width={90}
-                  strokeColor={{
-                    '0%': '#34d399',
-                    '100%': '#10b981'
-                  }}
-                  format={percent => (
-                    <span style={{ fontSize: '1rem', color: '#047857', fontWeight: 600 }}>
-                      {percent.toFixed(1)}%
-                    </span>
-                  )}
+                  width={80}
+                  strokeColor="#52c41a"
                 />
-                <div className="text-sm mt-2 font-medium text-emerald-700">Performance</div>
+                <div className="text-xs mt-1">Performance</div>
               </div>
-              <div className="text-center bg-white p-3 rounded-xl shadow-sm">
+              <div className="text-center">
                 <Progress
                   type="dashboard"
                   percent={oeeData.average_quality || 0}
-                  width={90}
-                  strokeColor={{
-                    '0%': '#c084fc',
-                    '100%': '#8b5cf6'
-                  }}
-                  format={percent => (
-                    <span style={{ fontSize: '1rem', color: '#7e22ce', fontWeight: 600 }}>
-                      {percent.toFixed(1)}%
-                    </span>
-                  )}
+                  width={80}
+                  strokeColor="#722ed1"
                 />
-                <div className="text-sm mt-2 font-medium text-purple-700">Quality</div>
+                <div className="text-xs mt-1">Quality</div>
               </div>
             </div>
           </Card>
         )}
 
-        {/* Program and Part Details with enhanced style */}
+        {/* Program and Part Details */}
         <Collapse 
           defaultActiveKey={['1']} 
           ghost
-          className="bg-white shadow-md rounded-xl overflow-hidden mt-4 border-0"
+          className="bg-white shadow-sm rounded-md"
         >
           <Collapse.Panel 
             header={
               <span className="text-sm font-semibold text-gray-700 flex items-center">
-                <CodeSandboxOutlined className="mr-2 text-sky-600" />
+                <CodeSandboxOutlined className="mr-2" />
                 Program & Part Details
               </span>
             } 
             key="1"
-            className="border-b border-sky-100"
           >
-            <div className="grid grid-cols-2 gap-4 text-sm p-2">
-              <div className="p-3 bg-white rounded-lg shadow-sm border border-sky-200">
-                <div className="text-sky-500 mb-1 flex items-center">
-                  <RocketOutlined className="mr-1.5" /> Program Number
-                </div>
-                <div className="font-semibold text-sky-900">{selectedMachine.currentProgram || 'N/A'}</div>
+            <div className="grid grid-cols-2 gap-y-3 text-sm">
+              <div>
+                <div className="text-gray-500">Program Number</div>
+                <div className="font-medium">{selectedMachine.currentProgram || 'N/A'}</div>
               </div>
-              <div className="p-3 bg-white rounded-lg shadow-sm border border-emerald-200">
-                <div className="text-emerald-500 mb-1 flex items-center">
-                  <BarcodeOutlined className="mr-1.5" /> Part Number
-                </div>
-                <div className="font-semibold text-emerald-900">{selectedMachine.partNumber || 'N/A'}</div>
+              <div>
+                <div className="text-gray-500">Part Number</div>
+                <div className="font-medium">{selectedMachine.partNumber || 'N/A'}</div>
               </div>
-              <div className="p-3 bg-white rounded-lg shadow-sm border border-amber-200">
-                <div className="text-amber-500 mb-1 flex items-center">
-                  <AppstoreOutlined className="mr-1.5" /> Operation Number
-                </div>
-                <div className="font-semibold text-amber-900">{selectedMachine.operationNumber || 'N/A'}</div>
+              <div>
+                <div className="text-gray-500">Operation Number</div>
+                <div className="font-medium">{selectedMachine.operationNumber || 'N/A'}</div>
               </div>
-              <div className="p-3 bg-white rounded-lg shadow-sm border border-purple-200">
-                <div className="text-purple-500 mb-1 flex items-center">
-                  <FileTextOutlined className="mr-1.5" /> Production Order
-                </div>
-                <div className="font-semibold text-purple-900">{selectedMachine.productionOrder || 'N/A'}</div>
+              <div>
+                <div className="text-gray-500">Production Order</div>
+                <div className="font-medium">{selectedMachine.productionOrder || 'N/A'}</div>
               </div>
               <div className="col-span-2">
                 <div className="text-gray-500">Part Description</div>

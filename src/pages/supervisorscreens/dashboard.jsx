@@ -609,17 +609,31 @@ const SupervisorDashboard = () => {
 
   // Get the mapped machine data and categorize it
   const machines = getMappedMachineData().map((machine, index) => {
-    // Assign machine types based on naming convention or other attributes
-    // This is just a placeholder logic - adjust according to your actual data
-    let type = 'milling';
+    // Assign machine types based on naming convention
+    let type = 'milling'; // default type
     
-    if (machine.name?.toLowerCase().includes('turn') || 
-        machine.partDescription?.toLowerCase().includes('lathe') ||
-        index % 3 === 0) {
+    const machineName = machine.name || '';
+    
+    // EDM machines - check for Robofil or U32J
+    if (machineName.includes('Robofil') || machineName.includes('U32J')) {
+      type = 'edm';
+    }
+    // Turning machines - check for SCH, CNCT-TUR26, CNCT-Pilatus, CNCT-NU7B
+    else if (machineName.includes('SCH') || 
+             machineName.includes('CNCT-TUR26') ||
+             machineName.includes('CNCT-Pilatus') ||
+             machineName.includes('CNCT-NU7B') ||
+             machineName.toLowerCase().includes('turn') || 
+             machine.partDescription?.toLowerCase().includes('lathe')) {
       type = 'turning';
-    } else if (machine.name?.toLowerCase().includes('edm') || 
-               machine.name?.toLowerCase().includes('wire') ||
-               index % 7 === 6) {
+    }
+    // Milling machines - check for DMU
+    else if (machineName.includes('DMU')) {
+      type = 'milling';
+    }
+    // Additional checks for other patterns
+    else if (machineName.toLowerCase().includes('edm') || 
+             machineName.toLowerCase().includes('wire')) {
       type = 'edm';
     }
     
@@ -955,5 +969,63 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
     </Card>
   );
 };
+
+function getMachineWorkcenterType(machine) {
+  const machineNameLower = machine.name?.toLowerCase();
+  const machineModelLower = machine.model?.toLowerCase();
+
+  // 1. Prioritize mapping based on machine.name prefixes (most explicit user request)
+  if (machineNameLower) {
+    if (machineNameLower.startsWith('mmc1-')) {
+      return { workcenter: 'MMC1', type: 'edm', image: robofilImage }; // Assuming robofilImage for MMC1 by default
+    }
+    if (machineNameLower.startsWith('cncm-')) {
+      // Find a specific model match for CNCM if possible, otherwise default to milling
+      const foundInMap = MACHINE_WORKCENTER_MAP.find(m =>
+        m.workcenter === 'CNCM' && machineNameLower.includes(m.model?.toLowerCase())
+      );
+      if (foundInMap) return { workcenter: foundInMap.workcenter, type: foundInMap.type, image: foundInMap.image };
+      return { workcenter: 'CNCM', type: 'milling', image: dmu60Image }; // Default CNCM image
+    }
+    if (machineNameLower.startsWith('cnct-')) {
+      // Find a specific model match for CNCT if possible, otherwise default to turning
+      const foundInMap = MACHINE_WORKCENTER_MAP.find(m =>
+        m.workcenter === 'CNCT' && machineNameLower.includes(m.model?.toLowerCase())
+      );
+      if (foundInMap) return { workcenter: foundInMap.workcenter, type: foundInMap.type, image: foundInMap.image };
+      return { workcenter: 'CNCT', type: 'turning', image: dmu60EvoImage }; // Default CNCT image
+    }
+  }
+
+  // 2. Fallback to general MACHINE_WORKCENTER_MAP lookup using model or name
+  let foundFromMap = MACHINE_WORKCENTER_MAP.find(m =>
+    (machineModelLower && m.model && machineModelLower.includes(m.model.toLowerCase())) ||
+    (machineNameLower && m.model && machineNameLower.includes(m.model.toLowerCase()))
+  );
+  if (foundFromMap) {
+    return {
+      workcenter: foundFromMap.workcenter,
+      type: foundFromMap.type,
+      image: foundFromMap.image
+    };
+  }
+
+  // 3. Fallback to generic keyword matching if no specific map entry found
+  if (machineNameLower) {
+    if (machineNameLower.includes('edm') || machineNameLower.includes('robo') || machineNameLower.includes('wire')) return { workcenter: 'MMC1', type: 'edm' };
+    if (machineNameLower.includes('turn') || machineNameLower.includes('lathe')) return { workcenter: 'CNCT', type: 'turning' };
+    if (machineNameLower.includes('mill') || machineNameLower.includes('dmu') || machineNameLower.includes('vmc')) return { workcenter: 'CNCM', type: 'milling' };
+  }
+
+  // 4. Fallback to workcenter property if it exists and no other match
+  if (machine.workcenter) {
+    const wc = machine.workcenter.toUpperCase();
+    if (wc.includes('MMC1')) return { workcenter: 'MMC1', type: 'edm' };
+    if (wc.includes('CNCM')) return { workcenter: 'CNCM', type: 'milling' };
+    if (wc.includes('CNCT')) return { workcenter: 'CNCT', type: 'turning' };
+  }
+
+  return { workcenter: 'UNKNOWN', type: 'other' };
+}
 
 export default SupervisorDashboard;

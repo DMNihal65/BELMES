@@ -3,9 +3,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { message } from 'antd';
 
 // API endpoints
-const API_BASE_URL = "http://172.18.7.88:1919";
-const MPP_API_BASE_URL = "http://172.18.7.88:1919";
-const WS_URL = "ws://172.18.7.88:1919/production_monitoring/ws/live-status/";
+const API_BASE_URL = "http://172.16.0.203:8002";
+const MPP_API_BASE_URL = "http://172.16.0.203:8002";
+const WS_URL = "ws://172.16.0.203:8002/production_monitoring/ws/live-status/";
 
 // Helper function to get authentication token
 const getAuthToken = () => {

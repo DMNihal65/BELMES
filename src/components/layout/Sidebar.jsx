@@ -46,7 +46,7 @@ function Sidebar() {
   const { unreadCount } = useNotificationStore();
 
   const notificationStyle = {
-    backgroundImage: `url(${notificationBg})`,
+    backgroundImage: `url('/images/notification.jpeg')`,
     backgroundPosition: 'center center',
     backgroundSize: 'cover',
     height: '100px',
@@ -127,7 +127,7 @@ function Sidebar() {
       className: 'order-management-item',
       children: [
         {
-          key: '/supervisor/order-management/order-lists',
+          key: '/supervisor/order-management/',
           label: 'Order Lists',
           icon: <List size={18} />
         },
@@ -141,8 +141,14 @@ function Sidebar() {
 
     {
       key: 'production-planning',
-      icon: <Calendar size={18} />,
-      label: 'Process Engineering Cell',
+      label: (
+        <div className="process-engineering-header">
+          PROCESS ENGINEERING CELL
+        </div>
+      ),
+      popupClassName: 'process-engineering-submenu',
+      className: 'process-engineering-item',
+      popupOffset: [0, 0],
       children: [
 
          {
@@ -170,8 +176,13 @@ function Sidebar() {
     },
     {
       key: '/supervisor/production-monitoring',
-      icon: <Activity size={20} />,
-      label: 'Production Monitoring',
+      label: (
+        <div className="production-monitoring-header">
+          PRODUCTION MONITORING
+        </div>
+      ),
+      popupClassName: 'production-monitoring-submenu',
+      className: 'production-monitoring-item',
       children: [
         {
           key: '/supervisor/production-monitoring/dashboard',
@@ -243,8 +254,14 @@ function Sidebar() {
     // },
     {
       key: '/supervisor/inventory_data_management',
-      icon: <Archive size={20} />,
-      label: 'Inventory Management',
+      label: (
+        <div className="inventory-menu-header">
+          INVENTORY MANAGEMENT
+        </div>
+      ),
+      popupClassName: 'inventory-submenu',
+      className: 'inventory-menu-item',
+      popupOffset: [0, 0],
       children: [
         // {
         //   key: '/supervisor/inventory_data_management/data_management',
@@ -603,7 +620,7 @@ function Sidebar() {
           background-position: center 30%;
         }
         .process-engineering-header {
-          background-image: url(${planningBg});
+          background-image: url('/images/planning.jpeg');
           background-position: center center;
           background-size: cover;
           height: 100px;
@@ -667,7 +684,7 @@ function Sidebar() {
           margin-right: 8px;
         }
         .inventory-menu-header {
-          background-image: url(${inventoryBg});
+          background-image: url('/images/inventory.jpeg');
           background-position: center center;
           background-size: cover;
           height: 100px;
@@ -732,7 +749,7 @@ function Sidebar() {
         }
         
         .inspection-results-item {
-          background-image: url(${qualityBg});
+          background-image: url('/images/quality-bg.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px !important;
@@ -762,7 +779,7 @@ function Sidebar() {
         }
         
         .inventory-data-item {
-          background-image: url(${inventoryBg});
+          background-image: url('/images/inventory-bg.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px !important;
@@ -792,7 +809,7 @@ function Sidebar() {
         }
         
         .help-support-item {
-          background-image: url(${helpBg});
+          background-image: url('/images/help-bg.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px !important;
@@ -822,7 +839,7 @@ function Sidebar() {
         }
         
         .production-monitoring-header {
-          background-image: url(${productionBg});
+          background-image: url('/images/production.png');
           background-position: center center;
           background-size: cover;
           height: 100px;
@@ -944,7 +961,7 @@ function Sidebar() {
           margin-right: 8px;
         }
         .order-management-item > .ant-menu-submenu-title {
-          background-image: url(${orderBg}) !important;
+          background-image: url('/images/order-bg.jpg') !important;
           background-position: center center !important;
           background-size: cover !important;
           height: 100px !important;

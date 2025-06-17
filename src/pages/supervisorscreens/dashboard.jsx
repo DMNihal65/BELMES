@@ -13,12 +13,12 @@ import useDashboardStore from '../../store/dashboard';
 import BrowserCompatCheck from '../../components/3d/BrowserCompatCheck';
 
 // Import machine images
-import dmu60Image from '../../assets/CNCM-DMU-60.png';
-import dmu50Image from '../../assets/CNCM-DMU-50new.png';
-import dmu60MBImage from '../../assets/CNCM-DMU-60MB 5 AXIS.png';
-import vmc800Image from '../../assets/VMC_800.png';
-import robofilImage from '../../assets/MMC1-ROBOFIL 240.png';
-import dmu60EvoImage from '../../assets/dmu-60-evo-linear-product-picture.png';
+import dmu60Image from '/images/CNCM-DMU-60.png';
+import dmu50Image from '/images/CNCM-DMU-50new.png';
+import dmu60MBImage from '/images/CNCM-DMU-60MB 5 AXIS.png';
+import vmc800Image from '/images/VMC_800.png';
+import robofilImage from '/images/MMC1-ROBOFIL 240.png';
+import dmu60EvoImage from '/images/dmu-60-evo-linear-product-picture.png';
 
 // Preload fonts to ensure they are available for 3D rendering
 const preloadLocalFonts = () => {
@@ -183,8 +183,8 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
   // Calculate overall statistics
   const totalMachines = machines.length;
   const activeMachines = statusCounts['PRODUCTION'] || 0;
-  const idleMachines = statusCounts['IDLE'] || 0;
-  const errorMachines = statusCounts['ERROR'] || 0;
+  const idleMachines = statusCounts['ON'] || 0;
+  const errorMachines = statusCounts['OFF'] || 0;
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-green-50">
@@ -221,10 +221,10 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+          <div className="bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-red-100 text-sm font-medium">Errors/Off</div>
+                <div className="text-red-100 text-sm font-medium">Off</div>
                 <div className="text-3xl font-bold">{errorMachines}</div>
               </div>
               <WarningOutlined className="text-2xl opacity-80" />

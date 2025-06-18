@@ -132,7 +132,7 @@ function Sidebar() {
           icon: <List size={18} />
         },
         {
-          key: '/supervisor/order-management/workcenter',
+          key: '/supervisor/configuration/',
           label: 'Workcenter',
           icon: <Factory size={18} />
         }
@@ -343,7 +343,8 @@ function Sidebar() {
     {
       key: '/admin/dashboard',
       label: 'Dashboard',
-      className: 'dashboard-menu-item',
+
+      className: 'dashboard-menu-item ',
     },
     {
       key: '/admin/order-management',

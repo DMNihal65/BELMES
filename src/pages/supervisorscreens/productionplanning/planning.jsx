@@ -33,7 +33,14 @@ import { QRCodeSVG } from 'qrcode.react';
 import * as QRCodeNode from 'qrcode';
 import { create } from 'zustand';
 import moment from 'moment';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
+import WebViewer from '@pdftron/webviewer';
 import useInventoryStore from '../../../store/inventory-store';
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 import useOrderStore from '../../../store/order-store';
 
 const { Title, Text } = Typography;
@@ -98,6 +105,7 @@ const PdcInfo = ({ productionOrder }) => {
   return <span>-</span>;
 };
 
+
 const Planning = () => {
   const screens = Grid.useBreakpoint(); // Added for responsiveness
   // Job and part selection states
@@ -138,14 +146,30 @@ const Planning = () => {
   const [programVersions, setProgramVersions] = useState([]); // Add state for versions
   const [isVersionHistoryModalVisible, setIsVersionHistoryModalVisible] = useState(false); // Add state for modal
   const [isRawMaterialModalVisible, setIsRawMaterialModalVisible] = useState(false);
-  const [isGeneratingRawMaterialPdf, setIsGeneratingRawMaterialPdf] = useState(false);
+  const [isGeneratingRawMaterialPdf, setIsGeneratingRawMaterialPdf] = useState(false); // State for PDF editing
+  const [isPdfEditing, setIsPdfEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [pdfInstance, setPdfInstance] = useState(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [editableFields, setEditableFields] = useState({
+    partNumber: '',
+    location: '',
+    rmSize: '',
+    heatNo: '',
+    rmQty: '',
+    rmPartNo: '',
+    revision: '',
+    rmPartName: '',
+    department: '',
+    orderNo: '',
+    orderQty: ''
+  });
 
   // UI control states
   const [activeTab, setActiveTab] = useState('jobDetails');
   const [currentPage, setCurrentPage] = useState(1);
   const [programCurrentPage, setProgramCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [drawingsLoading, setDrawingsLoading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -705,7 +729,7 @@ const loadInventoryItems = async () => {
       setCompletionStatus(status);
     } catch (error) {
       console.error('Error fetching completion status:', error);
-      message.error('Failed to fetch completion status');
+      // message.error('Failed to fetch completion status');
     }
   };
 
@@ -804,7 +828,7 @@ const loadInventoryItems = async () => {
           await fetchCompletionStatus(partNumber, selectedJob.production_order);
         } catch (error) {
           console.error('Error fetching completion status:', error);
-          message.error('Failed to fetch completion status');
+          // message.error('Failed to fetch completion status');
         }
       }
       
@@ -859,7 +883,7 @@ const loadInventoryItems = async () => {
       const doc = new jsPDF();
       
       // Set better font
-      doc.setFont('helvetica');
+      doc.setFont('NotoSansCondensed');
       
       // Add BEL logo
       const img = new Image();
@@ -868,7 +892,7 @@ const loadInventoryItems = async () => {
       
       // Add company header with better styling
       doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSansCondensed', 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text('FABRICATION COMPONENTS', 105, 15, { align: 'center' });
       doc.setFontSize(16);
@@ -963,11 +987,11 @@ const loadInventoryItems = async () => {
         ],
         [
           {
-            content: 'Gr No.',
+            content: 'Heat No.',
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
           {
-            content: 'N/A',
+            content: '',
             styles: { cellWidth: 100 }
           }
         ],
@@ -977,7 +1001,7 @@ const loadInventoryItems = async () => {
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
           {
-            content: 'N/A',
+            content: '',
             styles: { cellWidth: 100 }
           }
         ],
@@ -1004,7 +1028,7 @@ const loadInventoryItems = async () => {
           cellPadding: 4,
           lineColor: [0, 0, 0],
           lineWidth: 0.1,
-          font: 'helvetica',
+          font: 'NotoSansCondensed',
           textColor: [0, 0, 0]
         },
         headStyles: {
@@ -1053,7 +1077,7 @@ const loadInventoryItems = async () => {
 
       // Add Operation Status header with better styling
       doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSansCondensed', 'bold');
       doc.text('Operation Status', 105, doc.lastAutoTable.finalY + 15, { align: 'center' });
 
       // Create operations table headers
@@ -1190,7 +1214,7 @@ const loadInventoryItems = async () => {
 
       // Waiver Details section
       doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSansCondensed', 'bold');
       doc.text('Waiver Details', 105, doc.lastAutoTable.finalY + 15, { align: 'center' });
 
       const waiverDetailsData = [
@@ -1259,7 +1283,7 @@ const loadInventoryItems = async () => {
 
       // Add Notes section
       doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('NotoSansCondensed', 'bold');
       doc.text('Notes', 20, doc.lastAutoTable.finalY + 50);
 
       // Add Notes box
@@ -1401,12 +1425,12 @@ const loadInventoryItems = async () => {
                     <td className="p-4">{selectedJob.required_quantity || 'N/A'}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
-                    <td className="font-bold p-4 bg-blue-50">Gr No.</td>
-                    <td className="p-4" colSpan="3">N/A</td>
+                    <td className="font-bold p-4 bg-blue-50">Heat No.</td>
+                    <td className="p-4" colSpan="3"></td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Heat No.</td>
-                    <td className="p-4" colSpan="3">N/A</td>
+                    <td className="p-4" colSpan="3"></td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">RM Reference</td>
@@ -2553,6 +2577,253 @@ const loadInventoryItems = async () => {
     setDocumentOperations([]);
   };
 
+  const generatePdfBlob = async () => {
+    if (!selectedJob) return null;
+    
+    setIsGeneratingPdf(true);
+    
+    try {
+      const material = selectedJob.raw_materials?.[0] || {};
+      
+      // Create a new PDF document
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a5',
+        compress: true
+      });
+      
+      // Set document properties
+      doc.setProperties({
+        title: `Job Number Tag - ${selectedJob.production_order || 'N/A'}`,
+        subject: 'Job Number Tag',
+        author: 'BELMES',
+        keywords: 'job, number, tag, production',
+        creator: 'BELMES'
+      });
+      
+      // Add border
+      doc.rect(5, 5, doc.internal.pageSize.getWidth() - 10, doc.internal.pageSize.getHeight() - 10);
+      
+      // Add header
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('FAB/C - RM Traceability Card', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+      
+      // Set up styles
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Add job details
+      let y = 25;
+      
+      const addRow = (label, value, x = 20, width = 80) => {
+        doc.setFont('helvetica', 'bold');
+        doc.text(String(label), x, y);
+        doc.setFont('helvetica', 'normal');
+        const displayValue = value !== undefined && value !== null ? String(value) : 'N/A';
+        doc.text(displayValue, x + 30, y);
+        y += 5;
+      };
+      
+      // Add job details
+      addRow('Job Part No.:', selectedJob.part_number);
+      addRow('RM Name:', material.material_name);
+      addRow('RM Size:', material.size);
+      addRow('Heat No.:', material.gr_number);
+      addRow('RM Qty:', material.quantity);
+      addRow('Part No.:', material.child_part_number);
+      addRow('Rev:', material.revision);
+      addRow('Part Name:', selectedJob.part_description);
+      addRow('Dept:', selectedJob.department);
+      addRow('Order No.:', selectedJob.production_order);
+      addRow('Order Qty:', selectedJob.launched_quantity);
+      
+      // Generate QR code
+      const qrString = [
+        `RM Part No: ${material.child_part_number || 'N/A'}`,
+        `RM Part Name: ${material.description || material.material_name || 'N/A'}`,
+        `RM Qty: ${material.quantity || 'N/A'}`,
+        `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
+        `Order No.: ${selectedJob.production_order || 'N/A'}`,
+        `Order Qty: ${selectedJob.launched_quantity || 'N/A'}`
+      ].filter(Boolean).join('\n');
+      
+      // Add QR code to PDF
+      try {
+        const qrDataUrl = await QRCodeNode.toDataURL(qrString, {
+          margin: 1,
+          scale: 4,
+          width: 80
+        });
+        
+        // Add QR code to the right side
+        doc.addImage(qrDataUrl, 'JPEG', 120, 30, 60, 60);
+      } catch (error) {
+        console.error('Error generating QR code:', error);
+      }
+      
+      // Add footer
+      doc.setFontSize(8);
+      doc.text('Generated by BELMES', 20, doc.internal.pageSize.getHeight() - 10);
+      doc.text(new Date().toLocaleString(), doc.internal.pageSize.getWidth() - 20, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+      
+      // Return the PDF as a blob
+      return doc.output('blob');
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      message.error(`Failed to generate PDF: ${error.message}`);
+      return null;
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [isPdfEditorOpen, setIsPdfEditorOpen] = useState(false);
+  const [viewerInstance, setViewerInstance] = useState(null);
+  const viewer = useRef(null);
+
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages);
+    setIsPdfLoading(false);
+  };
+
+  const goToPrevPage = () =>
+    setPageNumber(prevPageNumber => Math.max(prevPageNumber - 1, 1));
+
+  const goToNextPage = () =>
+    setPageNumber(prevPageNumber => Math.min(prevPageNumber + 1, numPages || 1));
+    
+  const handleOpenPdfEditor = async () => {
+    try {
+      const pdfBlob = await generatePdfBlob();
+      if (pdfBlob) {
+        const url = URL.createObjectURL(pdfBlob);
+        setIsPdfEditorOpen(true);
+        
+        // Initialize WebViewer after the modal is open
+        setTimeout(() => {
+          WebViewer({
+            path: '/lib',
+            initialDoc: url,
+            licenseKey: 'your-license-key-here', // Replace with your license key
+          }, viewer.current).then(instance => {
+            setViewerInstance(instance);
+            
+            // Set up save button
+            const { documentViewer, annotationManager } = instance.Core;
+            
+            // Add save button to the header
+            instance.UI.setHeaderItems(header => {
+              header.push({
+                type: 'actionButton',
+                img: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3v5h8"></polyline></svg>',
+                onClick: async () => {
+                  const doc = documentViewer.getDocument();
+                  const xfdfString = await annotationManager.exportAnnotations({ links: false, widgets: true });
+                  doc.exportAnnotations({
+                    xfdfString,
+                    fields: {
+                      value: true
+                    }
+                  });
+                  
+                  // Save the document
+                  const data = await doc.getFileData({
+                    // saves the document with annotations in a new file
+                    xfdfString
+                  });
+                  
+                  const arr = new Uint8Array(data);
+                  const blob = new Blob([arr], { type: 'application/pdf' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `edited_job_${selectedJob?.production_order || 'tag'}.pdf`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                },
+                title: 'Save PDF',
+                dataElement: 'saveButton'
+              });
+            });
+          });
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error preparing PDF for editing:', error);
+      message.error('Failed to prepare PDF for editing');
+    }
+  };
+  
+  const handleClosePdfEditor = () => {
+    if (viewerInstance) {
+      viewerInstance.UI.dispose();
+      setViewerInstance(null);
+    }
+    setIsPdfEditorOpen(false);
+    
+    // Clean up any blob URLs
+    const iframe = document.querySelector('.webviewer-iframe');
+    if (iframe) {
+      const src = iframe.src;
+      if (src && src.startsWith('blob:')) {
+        URL.revokeObjectURL(src);
+      }
+    }
+  };
+
+  const handleEditPdf = async () => {
+    if (!selectedJob) {
+      message.error('No job selected');
+      return;
+    }
+    
+    try {
+      setIsPdfLoading(true);
+      const pdfBlob = await generatePdfBlob();
+      if (pdfBlob) {
+        const url = URL.createObjectURL(pdfBlob);
+        setPdfUrl(url);
+        setIsPdfEditing(true);
+      }
+    } catch (error) {
+      console.error('Error preparing PDF for editing:', error);
+      message.error('Failed to prepare PDF for editing');
+      setIsPdfLoading(false);
+    }
+  };
+  
+  const handlePdfEditComplete = () => {
+    // In a real implementation, you would save the edited PDF here
+    // For now, we'll just close the editor
+    handlePdfEditCancel();
+    message.success('PDF editing completed (changes not saved)');
+  };
+  
+  const handlePdfEditCancel = () => {
+    if (pdfUrl) {
+      URL.revokeObjectURL(pdfUrl);
+      setPdfUrl(null);
+    }
+    setIsPdfEditing(false);
+    setPageNumber(1);
+  };
+  
+  const downloadEditedPdf = () => {
+    if (pdfUrl) {
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pdfUrl;
+      downloadLink.download = `job_${selectedJob?.production_order || 'tag'}.pdf`;
+      downloadLink.click();
+      message.success('PDF downloaded successfully');
+    }
+  };
+
   const handleShowRawMaterialModal = () => {
     if (!selectedJob) {
       message.error('No job selected');
@@ -2562,256 +2833,336 @@ const loadInventoryItems = async () => {
   };
 
   const handleDownloadRawMaterialJobCard = async () => {
-    if (!selectedJob) {
-      message.error("No job selected for Job Number Tag.");
-      return;
-    }
-    setIsGeneratingRawMaterialPdf(true);
+  if (!selectedJob) {
+    message.error("No job selected for Job Number Tag.");
+    return;
+  }
 
+  setIsGeneratingRawMaterialPdf(true);
+
+  try {
+    // Page and table sizes in points
+    const mmToPt = mm => mm * 2.83465;
+    const pageWidth = mmToPt(80);  // 226.77 pt
+    const pageHeight = mmToPt(50); // 141.73 pt
+    const tableWidth = mmToPt(74); // 209.76 pt
+    const tableHeight = mmToPt(44); // 124.73 pt
+
+    // Centered margins
+    const marginX = (pageWidth - tableWidth) / 2;
+    const marginY = (pageHeight - tableHeight) / 2;
+
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'pt',
+      format: [pageWidth, pageHeight]
+    });
+
+    // Font setup
     try {
-      const doc = new jsPDF();
-
-      // Add BEL logo if available
-      if (typeof belLogo !== 'undefined') {
-        const img = new Image();
-        img.src = belLogo;
-        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
-        try {
-          doc.addImage(img, 'PNG', 10, 5, 30, 15);
-        } catch (e) { console.error("Error adding BEL logo to PDF", e); }
-      }
-
-    // Add company header with better styling
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    // doc.text('FABRICATION COMPONENTS', 105, 15, { align: 'center' });
-    // doc.setFontSize(16);
-    // doc.text('Job Number Tag', 105, 22, { align: 'center' });
-
-      // Prepare table data
-      const material = selectedJob.raw_materials?.[0] || {};
-
-            // Generate QR codes as Data URLs (already done in your code)
-            const qrString = [
-             selectedJob.part_number || '',
-             selectedJob.part_description || '',
-             selectedJob.production_order || '',
-             material.child_part_number || '',
-           ].join(' ; ');
-
-	      // const qrString = [
-        //       'Part Number: ' + (selectedJob.part_number || ''),
-        //       'Part Description: ' + (selectedJob.part_description || ''),
-        //       'Production Order: ' + (selectedJob.production_order || ''),
-        //       'Child Part Number: ' + (material.child_part_number || ''),
-        //     ].join(' ; ');
-      
-      const qrDataUrl = await QRCodeNode.toDataURL(qrString, { errorCorrectionLevel: 'M', margin: 1, width: 60 });
-      
-            
-      const tableBody = [
-        [
-          {
-            content: 'FAB/C - Job Number Tag',
-            colSpan: 2, // Span across two columns
-            styles: {
-              fontStyle: 'bold',
-              halign: 'center', // Center-align the content
-              fillColor: [240, 240, 240], // Optional background color
-              textColor: [0, 0, 0],
-              fontSize: 12,
-              minCellHeight: 15
-            }
-          },
-        ],
-        [
-          {
-            content: 'Part Number',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: selectedJob.part_number || 'N/A',
-            styles: { cellWidth: 80 }
-          }
-        ],
-        [
-          {
-            content: 'Part Description',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: selectedJob.part_description || 'N/A',
-            styles: { cellWidth: 80 }
-          }
-        ],
-        [
-          {
-            content: 'Production Order',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: selectedJob.production_order || 'N/A',
-              styles: { cellWidth: 80 }
-          }
-        ],
-        [
-          {
-            content: 'Child Part Number',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: material.child_part_number || 'N/A',
-            styles: { cellWidth: 80 }
-          }
-        ],      
-        [
-          {
-            content: 'Qty',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: selectedJob.launched_quantity || 'N/A',
-            styles: { cellWidth: 80 }
-          }
-        ],
-        [
-          { content: 'QR Code', styles: { fontStyle: 'bold', cellWidth: 40, minCellHeight: 60 } },
-          { content: '', styles: { cellWidth: 80, minCellHeight: 60 } } // Increase minCellHeight for QR row
-        ]
-        
-      ];
-
-
-
-      
-
-      
-      let qrCellPos = null;
-      
-      // Draw the table (with light borders and centered text)
-      autoTable(doc, {
-        startY: 35,
-        head: [],
-        body: tableBody,
-        theme: 'grid',
-        styles: {
-          fontSize: 10,
-          cellPadding: 4,
-          lineColor: [200, 200, 200], // light gray
-          lineWidth: 0.5,
-          font: 'helvetica',
-          textColor: [0, 0, 0],
-          halign: 'center', // center align all cells
-          valign: 'middle'
-        },
-        columnStyles: {
-          0: { cellWidth: 60, fontStyle: 'bold', halign: 'center' },
-          1: { cellWidth: 110, halign: 'center' }
-        },
-        tableWidth: 'wrap',
-        margin: { horizontal: (doc.internal.pageSize.getWidth() - 170) / 2 }, // Center the table manually
-        didDrawCell: function (data) {
-          // Save the position of the QR Code cell
-          if (
-            data.row.index === tableBody.length - 1 && // last row
-            data.column.index === 1
-          ) {
-            qrCellPos = {
-              x: data.cell.x,
-              y: data.cell.y,
-              width: data.cell.width,
-              height: data.cell.height
-            };
-          }
-        }
-      });
-      // Get the Y position after the table
-      const finalY = doc.lastAutoTable.finalY || 35 + tableBody.length * 10;
-
-      // After autoTable:
-      let tableStartX = 15;
-      let tableWidth = 170;
-      let tableStartY = 35;
-      let tableHeight = tableBody.length * 10; // fallback
-      if (doc.lastAutoTable && doc.lastAutoTable.table) {
-        tableStartX = doc.lastAutoTable.table.x;
-        tableWidth = doc.lastAutoTable.table.width;
-        tableStartY = doc.lastAutoTable.table.y;
-        tableHeight = doc.lastAutoTable.table.height;
-      }
-
-      // Set up QR code grid dimensions
-      const qrGridWidth = 60; // or 80 for bigger QR codes
-      const qrGridHeight = 60; // or 80
-      // const qrSize = 30; // or 40
-      const qrMargin = 20; // margin between table and QR grid
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-      let qrStartX, qrStartY;
-      if (tableStartX + tableWidth + qrMargin + qrGridWidth < pageWidth - 10) {
-        // Enough space to the right
-        qrStartX = tableStartX + tableWidth + qrMargin;
-        qrStartY = tableStartY;
-      } else {
-        // Not enough space, place below the table
-        qrStartX = tableStartX;
-        qrStartY = tableStartY + tableHeight + qrMargin;
-      }
-
-      // const qrDataUrls = [qrDataUrl, qrDataUrl, qrDataUrl, qrDataUrl];
-
-      // // Top row
-      // doc.addImage(qrDataUrls[0], 'PNG', qrStartX, qrStartY, qrSize, qrSize);
-      // doc.addImage(qrDataUrls[1], 'PNG', qrStartX + qrSize, qrStartY, qrSize, qrSize);
-      // // Bottom row
-      // doc.addImage(qrDataUrls[2], 'PNG', qrStartX, qrStartY + qrSize, qrSize, qrSize);
-      // doc.addImage(qrDataUrls[3], 'PNG', qrStartX + qrSize, qrStartY + qrSize, qrSize, qrSize);
-
-      // After autoTable, draw the 2x2 QR codes inside the QR Code cell
-      // if (qrCellPos) {
-      //   // Decrease QR code size for 2x2 grid
-      //   const qrSize = qrCellPos.width / 3 - 2; // Smaller QR codes
-      //   const margin = 2;
-      //   const qrDataUrls = [qrDataUrl, qrDataUrl, qrDataUrl, qrDataUrl]; // Use your actual QR data URLs here
-
-      //   // Calculate total grid size (2 QR codes + margin between them)
-      //   const gridSize = 2 * qrSize + 2 * margin;
-      //   // Calculate starting x and y to center the grid in the cell
-      //   const startX = qrCellPos.x + (qrCellPos.width - gridSize) / 2;
-      //   const startY = qrCellPos.y + (qrCellPos.height - gridSize) / 2;
-
-      //   // Top-left
-      //   doc.addImage(qrDataUrls[0], 'PNG', startX, startY, qrSize, qrSize);
-      //   // Top-right
-      //   doc.addImage(qrDataUrls[1], 'PNG', startX + qrSize + margin, startY, qrSize, qrSize);
-      //   // Bottom-left
-      //   doc.addImage(qrDataUrls[2], 'PNG', startX, startY + qrSize + margin, qrSize, qrSize);
-      //   // Bottom-right
-      //   doc.addImage(qrDataUrls[3], 'PNG', startX + qrSize + margin, startY + qrSize + margin, qrSize, qrSize);
-      // }
-      if (qrCellPos) {
-        // Set QR code size to fit nicely in the cell with a bit more margin
-        const qrSize = Math.min(qrCellPos.width, qrCellPos.height) - 18; // Increased margin for smaller QR
-        const startX = qrCellPos.x + (qrCellPos.width - qrSize) / 2;
-        const startY = qrCellPos.y + (qrCellPos.height - qrSize) / 2;
-      
-        doc.addImage(qrDataUrl, 'PNG', startX, startY, qrSize, qrSize);
-      }
-
-      // Save the PDF
-      const fileName = `RawMaterial_JobCard_${selectedJob.production_order || 'unknown'}.pdf`;
-      doc.save(fileName);
-      message.success('Job Number Tag PDF downloaded successfully.');
-      setIsRawMaterialModalVisible(false);
-
-    } catch (error) {
-      console.error("Error generating Raw Material PDF:", error);
-      message.error(`Failed to generate Raw Material PDF: ${error.message}`);
-    } finally {
-      setIsGeneratingRawMaterialPdf(false);
+      doc.setFont('NotoSans_Condensed', 'normal');
+    } catch {
+      doc.setFont('Lexend', 'normal');
     }
-  };
+
+    // Data prep
+    const material = selectedJob.raw_materials?.[0] || {};
+    const qrString = [
+      `RM Part No: ${material.child_part_number || 'N/A'}`,
+      `RM Part Name: ${material.description || material.material_name || 'N/A'}`,
+      `RM Qty: ${material.quantity || 'N/A'}`,
+      `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
+      `Order No.: ${selectedJob.production_order || 'N/A'}`,
+      `Order Qty: ${selectedJob.launched_quantity || 'N/A'}`
+    ].filter(Boolean).join('\n');
+
+    const qrDataUrl = await QRCodeNode.toDataURL(qrString, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 80
+    });
+
+    // Column widths for 74mm (209.76pt)
+    const colWidths = [
+      tableWidth * 0.18,
+      tableWidth * 0.39,
+      tableWidth * 0.17,
+      tableWidth * 0.26
+    ];
+
+    const headerHeight = 16;
+    const totalDataRows = 9;
+    const dataRowHeight = Math.floor((tableHeight - headerHeight) / totalDataRows);
+
+    // Use standard jsPDF font for PDF generation to avoid loading issues
+    const fontName = 'helvetica';
+    const fontStyle = 'bold';
+
+    // Table structure
+    const tableData = [
+      [{
+        content: 'FAB/C - RM Traceability Card',
+        colSpan: 4,
+        styles: {
+          fontStyle: 'bold',
+          font: 'helvetica',
+          halign: 'center',
+          fontSize: 11,
+          minCellHeight: headerHeight
+        }
+      }],
+      [
+        { content: 'Job Part No.', styles: { fontStyle: 'bold' }},
+        { content: selectedJob.part_number || 'N/A' },
+        { content: 'Location', styles: { fontStyle: 'bold' }},
+        { content: material.location || 'N/A' }
+      ],
+      [
+        { content: 'RM Size', styles: { fontStyle: 'bold' }},
+        { content: material.size || 'N/A', colSpan: 3 }
+      ],
+      [
+        { content: 'Heat No.', styles: { fontStyle: 'bold' }},
+        { content: material.gr_number || 'N/A' },
+        { content: 'RM Qty', styles: { fontStyle: 'bold', halign: 'right' }},
+        { content: material.quantity || 'N/A' }
+      ],
+      [
+        { content: 'RM Part No.', styles: { fontStyle: 'bold' }},
+        { content: material.child_part_number || 'N/A' },
+        { content: 'Rev', styles: { fontStyle: 'bold', halign: 'right' }},
+        { content: material.revision || 'N/A' }
+      ],
+      [
+        { content: 'RM Part Name', styles: { fontStyle: 'bold' }},
+        { content: material.description || material.material_name || 'N/A', colSpan: 2 },
+        { content: '', rowSpan: 4 }
+      ],
+      [
+        { content: 'Dept', styles: { fontStyle: 'bold' }},
+        { content: selectedJob.department || 'N/A', colSpan: 2 }
+      ],
+      [
+        { content: 'Order No.', styles: { fontStyle: 'bold' }},
+        { content: selectedJob.production_order || 'N/A', colSpan: 2 }
+      ],
+      [
+        { content: 'Order Qty', styles: { fontStyle: 'bold' }},
+        { content: selectedJob.launched_quantity || 'N/A', colSpan: 2 }
+      ]
+    ];
+
+    let qrPosition = null;
+
+    // Generate the centered table
+    autoTable(doc, {
+      startY: marginY,
+      body: tableData,
+      theme: 'grid',
+      styles: {
+        fontSize: 4.5,
+        cellPadding: 1, // ~0.1 mm
+        lineColor: [0, 0, 0],
+        lineWidth: 0.2,
+        font: 'helvetica',
+        halign: 'left',
+        valign: 'middle',
+        minCellHeight: dataRowHeight,
+        maxCellHeight: dataRowHeight,
+        textColor: [0, 0, 0],
+        overflow: 'linebreak'
+      },
+      columnStyles: {
+        0: { cellWidth: colWidths[0], fontStyle: 'bold', fontSize: 6 },
+        1: { cellWidth: colWidths[1], fontSize: 6 },
+        2: { cellWidth: colWidths[2], fontStyle: 'bold', fontSize: 6 },
+        3: { cellWidth: colWidths[3], fontSize: 6 }
+      },
+      tableWidth: tableWidth,
+      margin: { left: marginX, right: marginX, top: marginY, bottom: marginY },
+      pageBreak: 'avoid',
+      didDrawCell: (data) => {
+        // Capture the position of the merged cell area (column 3, starting from row 5)
+        // Rows are 0-indexed, so row 5 is the 6th row (RM Part Name)
+        if (data.row.index === 5 && data.column.index === 3) {
+          qrPosition = {
+            x: data.cell.x,
+            y: data.cell.y,
+            width: data.cell.width,
+            height: dataRowHeight * 4 // 4 rows merged
+          };
+        }
+      }
+    });
+
+    // Add QR code with better sizing and positioning
+    if (qrPosition) {
+      const qrPadding = 2; // Add some padding
+      const availableWidth = qrPosition.width - (qrPadding * 2);
+      const availableHeight = qrPosition.height - (qrPadding * 2);
+      
+      // Make QR code square and fit within the available space
+      const qrSize = Math.min(availableWidth, availableHeight);
+      
+      // Center the QR code within the cell
+      const qrX = qrPosition.x + (qrPosition.width - qrSize) / 2;
+      const qrY = qrPosition.y + (qrPosition.height - qrSize) / 2;
+
+      try {
+        // Add a white background for the QR code
+        doc.setFillColor(255, 255, 255);
+        doc.rect(qrX - 1, qrY - 1, qrSize + 2, qrSize + 2, 'F');
+        
+        // Add the QR code
+        doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+        
+        // Add a border around the QR code
+        doc.setDrawColor(0, 0, 0);
+        doc.rect(qrX - 1, qrY - 1, qrSize + 2, qrSize + 2);
+      } catch (error) {
+        console.error('Error adding QR code to PDF:', error);
+      }
+    }
+
+    doc.save(`RawMaterial_JobCard_${selectedJob.production_order || 'unknown'}.pdf`);
+    message.success('Job Number Tag PDF downloaded successfully.');
+    setIsRawMaterialModalVisible(false);
+
+  } catch (error) {
+    console.error("Error generating Raw Material PDF:", error);
+    message.error(`Failed to generate Raw Material PDF: ${error.message}`);
+  } finally {
+    setIsGeneratingRawMaterialPdf(false);
+  }
+};
+
+// Your existing Modal JSX
+{/* Job Number Tag Preview Modal */}
+<Modal
+  title="Job Number Tag Preview"
+  open={isRawMaterialModalVisible}
+  onCancel={() => {
+    setIsRawMaterialModalVisible(false);
+  }}
+  width={800}
+  footer={[
+    <Button key="cancelRM" onClick={() => setIsRawMaterialModalVisible(false)}>
+      Cancel
+    </Button>,
+    <Button
+      key="downloadRM"
+      type="primary"
+      icon={<DownloadOutlined />}
+      onClick={handleDownloadRawMaterialJobCard}
+      loading={isGeneratingRawMaterialPdf}
+    >
+      {isGeneratingRawMaterialPdf ? 'Generating PDF...' : 'Download PDF'}
+    </Button>
+  ]}
+>
+  {selectedJob ? (() => {
+    const material = selectedJob.raw_materials?.[0] || {};
+    const qrString = [
+      `Part No: ${material.child_part_number || 'N/A'}`,
+      `RM Name: ${material.material_name || 'N/A'}`,
+      `RM Qty: ${material.quantity || 'N/A'}`,
+      `Order No: ${selectedJob.production_order || 'N/A'}`
+    ].filter(Boolean).join('\n');
+
+    // Path to the image - update this with your actual image path
+    const logoImage = '/images/logo.png';
+
+    return (
+      <div className="max-h-[80vh] overflow-y-auto p-4 bg-gray-50">
+        <div className="bg-white shadow-lg rounded-lg p-6">
+          <div className="flex flex-col items-center mb-6">
+            <div className="mb-2">
+              <img 
+                src={logoImage} 
+                alt="Company Logo" 
+                className="h-16 w-auto object-contain"
+                onError={(e) => {
+                  e.target.style.display = 'none'; // Hide the image if it fails to load
+                }}
+              />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800">FAB/C - RM Traceability Card</h2>
+            <p className="text-sm text-gray-500">Preview of Job Number Tag</p>
+          </div>
+          
+          <div className="relative border border-gray-300 rounded-lg p-4 bg-white">
+            <table className="w-full text-sm">
+              <tbody>
+                <tr>
+                  <td className="font-semibold p-2 w-1/4">Job Part No.</td>
+                  <td className="p-2 border-b border-gray-200">{selectedJob.part_number || 'N/A'}</td>
+                  <td className="font-semibold p-2 w-1/4">Location</td>
+                  <td className="p-2 border-b border-gray-200">{material.location || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold p-2">RM Name</td>
+                  <td className="p-2 border-b border-gray-200" colSpan="3">{material.material_name || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold p-2">RM Size</td>
+                  <td className="p-2 border-b border-gray-200" colSpan="3">{material.size || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold p-2">Heat No.</td>
+                  <td className="p-2 border-b border-gray-200">{material.gr_number || 'N/A'}</td>
+                  <td className="font-semibold p-2">RM Qty</td>
+                  <td className="p-2 border-b border-gray-200">{material.quantity || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold p-2">Part No.</td>
+                  <td className="p-2 border-b border-gray-200">{material.child_part_number || 'N/A'}</td>
+                  <td className="font-semibold p-2">Rev</td>
+                  <td className="p-2 border-b border-gray-200">{material.revision || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold p-2">Part Name</td>
+                  <td className="p-2 border-b border-gray-200" colSpan="2">
+                    {selectedJob.part_description || 'N/A'}
+                  </td>
+                  <td className="p-2 border-b border-gray-200" rowSpan="4" style={{ position: 'relative', minHeight: '120px' }}>
+                    <div className="absolute inset-0 flex items-center justify-center p-2">
+                      <QRCodeSVG
+                        value={qrString}
+                        size={100}
+                        level="M"
+                        includeMargin={true}
+                        className="border border-gray-200 p-1 rounded"
+                      />
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="font-semibold p-2">Dept</td>
+                  <td className="p-2 border-b border-gray-200" colSpan="2">{selectedJob.department || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold p-2">Order No.</td>
+                  <td className="p-2 border-b border-gray-200" colSpan="2">{selectedJob.production_order || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold p-2">Order Qty</td>
+                  <td className="p-2 border-b border-gray-200" colSpan="2">{selectedJob.launched_quantity || 'N/A'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div className="mt-6 text-center text-sm text-gray-500">
+            <p>This is a preview of the Job Number Tag that will be generated in the PDF.</p>
+            <p className="mt-2">The actual PDF will have the same layout but with optimized printing format.</p>
+          </div>
+        </div>
+      </div>
+    );
+  })() : (
+    <Alert message="No job selected or job data is unavailable." type="warning" showIcon />
+  )}
+</Modal>
 
   // Add this effect to fetch completion status when job is selected
   useEffect(() => {
@@ -2826,7 +3177,7 @@ const loadInventoryItems = async () => {
           setCompletionStatus(status);
         } catch (error) {
           console.error('Error fetching completion status:', error);
-          message.error('Failed to fetch completion status');
+          // message.error('Failed to fetch completion status');
         } finally {
           setLoading(false);
         }
@@ -4377,6 +4728,7 @@ const loadInventoryItems = async () => {
           <Button key="cancelRM" onClick={() => setIsRawMaterialModalVisible(false)}>
             Cancel
           </Button>,
+         
           <Button
             key="downloadRM"
             type="primary"
@@ -4388,72 +4740,184 @@ const loadInventoryItems = async () => {
           </Button>
         ]}
       >
-        {selectedJob ? (
-          () => {
-            const material = selectedJob.raw_materials?.[0] || {};
-            return (
-              <div className="max-h-[70vh] overflow-y-auto p-1 pr-4 bg-gray-50">
-                <div className="bg-white shadow-lg rounded-lg p-6 space-y-6">
-                  {/* Details Table */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Raw Material Details</h3>
-                    <table className="w-full text-sm">
-                      <tbody>
-                        <tr className="border-b hover:bg-gray-50">
-                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Part Number</td>
-                          <td className="p-3 text-gray-800">{selectedJob.part_number || 'N/A'}</td>
-                        </tr>
-                        <tr className="border-b hover:bg-gray-50">
-                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Part Description</td>
-                          <td className="p-3 text-gray-800">{selectedJob.part_description || 'N/A'}</td>
-                        </tr>
-                        <tr className="border-b hover:bg-gray-50">
-                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Production Order</td>
-                          <td className="p-3 text-gray-800">{selectedJob.production_order || 'N/A'}</td>
-                        </tr>
-                        <tr className="border-b hover:bg-gray-50">
-                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Launched Quantity</td>
-                          <td className="p-3 text-gray-800">{selectedJob.launched_quantity || 'N/A'}</td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="font-medium text-gray-600 p-3 bg-gray-100 w-1/3">Child Part Number</td>
-                          <td className="p-3 text-gray-800">{material.child_part_number || 'N/A'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
 
-                  {/* QR Codes Section */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">QR Codes</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6 justify-items-center">
-                      {[
-                        { label: 'Part Number', value: selectedJob.part_number },
-                        { label: 'Production Order', value: selectedJob.production_order },
-                        { label: 'Part Description', value: selectedJob.part_description },
-                        { label: 'Child Part Number', value: material.child_part_number },
-                      ].map((qrItem, index) => (
-                        <div key={index} className="flex flex-col items-center p-3 border border-gray-200 rounded-lg bg-gray-50 shadow-sm hover:shadow-md transition-shadow w-full">
-                          <QRCodeSVG
-                            value={qrItem.value || ''}
-                            size={100} // Adjusted size for better fit
-                            level="M" // M for medium, common for general use
-                            includeMargin={true}
-                            className="mb-2 rounded"
-                          />
-                          <span className="text-xs text-center text-gray-600 font-medium">{qrItem.label}</span>
-                        </div>
-                      ))}
-                    </div>
+        
+        {selectedJob ? (() => {
+          const material = selectedJob.raw_materials?.[0] || {};
+          const qrString = [
+            `RM Part No: ${material.child_part_number || 'N/A'}`,
+            `RM Part Name: ${material.description || material.material_name || 'N/A'}`,
+            `RM Qty: ${material.quantity || 'N/A'}`,
+            `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
+            `Order No.: ${selectedJob.production_order || 'N/A'}`,
+            `Order Qty: ${selectedJob.launched_quantity || 'N/A'}`
+          ].filter(Boolean).join('\n');
+
+          // Table data structure matching the PDF layout
+          const tableData = [
+            // Header row with full width
+            [{
+              content: 'FAB/C - RM Traceability Card',
+              colSpan: 4,
+              styles: {
+                textAlign: 'center',
+                fontWeight: 'bold',
+                fontSize: '0.9rem',
+                backgroundColor: '#f0f0f0',
+                padding: '4px 0',
+                minHeight: '16px',
+                lineHeight: '16px'
+              }
+            }],
+            // Data rows
+            [
+              { content: 'Job Part No.', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: selectedJob.part_number || 'N/A', styles: { padding: '4px 8px' }},
+              { content: 'Location', styles: { fontWeight: 'bold', textAlign: 'right', padding: '4px 8px' }},
+              { content: material.location || 'N/A', styles: { padding: '4px 8px' }}
+            ],
+            [
+              { content: 'RM Name', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: material.material_name || 'N/A', colSpan: 3, styles: { padding: '4px 8px' }}
+            ],
+            [
+              { content: 'RM Size', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: material.size || 'N/A', colSpan: 3, styles: { padding: '4px 8px' }}
+            ],
+            [
+              { content: 'Heat No.', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: material.gr_number || 'N/A', styles: { padding: '4px 8px' }},
+              { content: 'RM Qty', styles: { fontWeight: 'bold', textAlign: 'right', padding: '4px 8px' }},
+              { content: material.quantity || 'N/A', styles: { padding: '4px 8px' }}
+            ],
+            [
+              { content: 'Part No.', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: material.child_part_number || 'N/A', styles: { padding: '4px 8px' }},
+              { content: 'Rev', styles: { fontWeight: 'bold', textAlign: 'right', padding: '4px 8px' }},
+              { content: material.revision || 'N/A', styles: { padding: '4px 8px' }}
+            ],
+            [
+              { content: 'Part Name', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: selectedJob.part_description || 'N/A', colSpan: 2, styles: { padding: '4px 8px' }},
+              { content: '', rowSpan: 4, styles: { position: 'relative', padding: 0 }}
+            ],
+            [
+              { content: 'Dept', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: selectedJob.department || 'N/A', colSpan: 2, styles: { padding: '4px 8px' }}
+            ],
+            [
+              { content: 'Order No.', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: selectedJob.production_order || 'N/A', colSpan: 2, styles: { padding: '4px 8px' }}
+            ],
+            [
+              { content: 'Order Qty', styles: { fontWeight: 'bold', padding: '4px 8px' }},
+              { content: selectedJob.launched_quantity || 'N/A', colSpan: 2, styles: { padding: '4px 8px' }}
+            ]
+          ];
+
+          return (
+            <div className="max-h-[70vh] overflow-y-auto p-4 bg-gray-50">
+              <div className="bg-white shadow-lg rounded-lg p-6 relative">
+                {isEditing && (
+                  <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded">
+                    Editing Mode
                   </div>
+                )}
+                <div className="relative border-2 border-gray-800 bg-white p-1">
+                  <table className="w-full text-sm border-collapse">
+                    <colgroup>
+                      <col className="w-1/4" />
+                      <col className="w-1/4" />
+                      <col className="w-1/4" />
+                      <col className="w-1/4" />
+                    </colgroup>
+                    <tbody>
+                      {/* Header Row */}
+                      <tr className="border-b border-gray-800">
+                        <td 
+                          colSpan={4}
+                          className="text-center font-bold bg-gray-100 p-1"
+                          style={{ fontFamily: '"Noto Sans Condensed", sans-serif', fontWeight: 700, fontSize: '1.1rem' }}
+                        >
+                          FAB/C - RM Traceability Card
+                        </td>
+                      </tr>
+                      
+                      {/* Data Rows */}
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">Job Part No.</td>
+                        <td className="p-1 border-r border-gray-600">{selectedJob.part_number || 'N/A'}</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">Location</td>
+                        <td className="p-1">{material.location || 'N/A'}</td>
+                      </tr>
+                      
+                      {/* <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Name</td>
+                        <td colSpan={3} className="p-1">{material.material_name || 'N/A'}</td>
+                      </tr> */}
+                      
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Size</td>
+                        <td colSpan={3} className="p-1">{material.size || 'N/A'}</td>
+                      </tr>
+                      
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">Heat No.</td>
+                        <td className="p-1 border-r border-gray-600">{material.gr_number || 'N/A'}</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">RM Qty</td>
+                        <td className="p-1">{material.quantity || 'N/A'}</td>
+                      </tr>
+                      
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Part No.</td>
+                        <td className="p-1 border-r border-gray-600">{material.child_part_number || 'N/A'}</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">Rev</td>
+                        <td className="p-1">{material.revision || 'N/A'}</td>
+                      </tr>
+                      
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Part Name</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600">{material.description || material.material_name || 'N/A'}</td>
+                        <td rowSpan={4} className="border-l-2 border-gray-800 p-1" style={{ width: '220px' }}>
+                          <div className="flex flex-col h-full">
+                            <div className="flex-1 flex items-center justify-start pl-2">
+                              <QRCodeSVG
+                                value={qrString}
+                                size={150}
+                                level="M"
+                                includeMargin={true}
+                                className="border border-gray-400"
+                              />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">Dept</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.department || 'N/A'}</td>
+                      </tr>
+                      
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">Order No.</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.production_order || 'N/A'}</td>
+                      </tr>
+                      
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600">Order Qty</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.launched_quantity || 'N/A'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            );
-          }
-        )() : (
+            </div>
+          );
+        })() : (
           <Alert message="No job selected or job data is unavailable." type="warning" showIcon />
         )}
       </Modal>
+
     </div>
   );
 };

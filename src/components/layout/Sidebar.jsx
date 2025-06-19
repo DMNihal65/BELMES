@@ -46,25 +46,22 @@ function Sidebar() {
   const { unreadCount } = useNotificationStore();
 
   const notificationStyle = {
-    backgroundImage: `url('/images/notification.jpeg')`,
+    backgroundImage: `url('/images/notification.jpg')`,
     backgroundPosition: 'center center',
     backgroundSize: 'cover',
     height: '100px',
     margin: '8px',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'center',
-    color: '#fff',
+    color: 'transparent',
     borderRadius: '8px',
+    border: '1px solid #1890ff',
     borderLeft: '4px solid #1890ff',
     position: 'relative',
     overflow: 'hidden',
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)',
-    textAlign: 'center',
     width: 'calc(100% - 16px)',
-    padding: '0 8px',
+    padding: '0',
     boxSizing: 'border-box'
   };
 
@@ -132,7 +129,7 @@ function Sidebar() {
           icon: <List size={18} />
         },
         {
-          key: '/supervisor/order-management/workcenter',
+          key: '/supervisor/configuration/',
           label: 'Workcenter',
           icon: <Factory size={18} />
         }
@@ -329,7 +326,7 @@ function Sidebar() {
     {
       key: '/supervisor/notifications_new',
       label: 'NOTIFICATIONS',
-      style: notificationStyle,
+      className: 'notification-menu-item',
     },
     // {
     //   key: '/supervisor/logs',
@@ -343,7 +340,8 @@ function Sidebar() {
     {
       key: '/admin/dashboard',
       label: 'Dashboard',
-      className: 'dashboard-menu-item',
+
+      className: 'dashboard-menu-item ',
     },
     {
       key: '/admin/order-management',
@@ -528,6 +526,7 @@ function Sidebar() {
     {
       key: '/admin/notifications_new',
       label: 'NOTIFICATIONS',
+      className: 'notification-menu-item',
       style: notificationStyle
     },
     // {
@@ -593,34 +592,35 @@ function Sidebar() {
           justify-content: center;
           color: #fff !important;
           border-radius: 8px;
+          border:1px solid #1890ff;
           border-left: 4px solid #1890ff;
           position: relative;
           overflow: hidden;
         }
         .dashboard-menu-item {
-          background-image: url('/images/dashboard-bg.jpg');
+          background-image: url('/images/dashboard.jpg');
         }
         .quality-menu-item {
-          background-image: url('/images/quality-bg.jpg');
+          background-image: url('/images/quality.jpg');
         }
         .maintenance-menu-item {
-          background-image: url('/images/maintenance-bg.jpg');
+          background-image: url('/images/manintance.jpg');
           background-position: center 30%;
         }
         .energy-menu-item {
-          background-image: url('/images/energy-bg.jpg');
+          background-image: url('/images/energy_mon.jpg');
           background-position: center 30%;
         }
         .documents-menu-item {
-          background-image: url('/images/document-bg.jpg');
+          background-image: url('/images/document_mang.jpg');
           background-position: center 30%;
         }
         .access-control-menu-item {
-          background-image: url('/images/access-control-bg.jpg');
+          background-image: url('/images/access.jpg');
           background-position: center 30%;
         }
         .process-engineering-header {
-          background-image: url('/images/planning.jpeg');
+          background-image: url('/images/planning.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px;
@@ -628,6 +628,7 @@ function Sidebar() {
           align-items: center;
           justify-content: center;
           color: #fff;
+          border:1px solid #1890ff;
           border-radius: 8px;
           border-left: 4px solid #1890ff;
           font-weight: bold;
@@ -684,7 +685,7 @@ function Sidebar() {
           margin-right: 8px;
         }
         .inventory-menu-header {
-          background-image: url('/images/inventory.jpeg');
+          background-image: url('/images/inventory.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px;
@@ -693,6 +694,7 @@ function Sidebar() {
           justify-content: center;
           color: #fff;
           border-radius: 8px;
+          border:1px solid #1890ff;
           border-left: 4px solid #1890ff;
           font-weight: bold;
           text-transform: uppercase;
@@ -749,7 +751,7 @@ function Sidebar() {
         }
         
         .inspection-results-item {
-          background-image: url('/images/quality-bg.jpg');
+          background-image: url('/images/quality.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px !important;
@@ -759,6 +761,7 @@ function Sidebar() {
           justify-content: center;
           color: #fff;
           border-radius: 8px;
+          border:1px solid #1890ff;
           border-left: 4px solid #1890ff;
           font-weight: bold;
           text-transform: uppercase;
@@ -768,7 +771,41 @@ function Sidebar() {
           padding: 0 8px;
           box-sizing: border-box;
         }
-        
+        .help-support-item .ant-menu-title-content {
+          position: absolute !important;
+          bottom: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          height: auto !important;
+          padding: 8px 12px !important;
+          margin: 0 !important;
+          background: rgba(0, 0, 0, 0.75) !important;
+          backdrop-filter: blur(4px) !important;
+          -webkit-backdrop-filter: blur(4px) !important;
+          border-radius: 0 0 8px 8px !important;
+          color: #ffffff !important;
+          font-size: 13px !important;
+          font-weight: 700 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.5px !important;
+          text-align: center !important;
+          line-height: 1.3 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          z-index: 2 !important;
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+        }
+        .help-support-item::before {
+          content: '' !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          background: linear-gradient(135deg, rgba(24, 144, 255, 0.1), rgba(24, 144, 255, 0.05)) !important;
+          z-index: 0 !important;
+        }
         .inspection-results-header {
           width: 100%;
           text-align: center;
@@ -779,7 +816,7 @@ function Sidebar() {
         }
         
         .inventory-data-item {
-          background-image: url('/images/inventory-bg.jpg');
+          background-image: url('/images/inventory.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px !important;
@@ -809,7 +846,7 @@ function Sidebar() {
         }
         
         .help-support-item {
-          background-image: url('/images/help-bg.jpg');
+          background-image: url('/images/help.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px !important;
@@ -819,6 +856,7 @@ function Sidebar() {
           justify-content: center;
           color: #fff;
           border-radius: 8px;
+          border:1px solid #1890ff;
           border-left: 4px solid #1890ff;
           font-weight: bold;
           text-transform: uppercase;
@@ -839,7 +877,7 @@ function Sidebar() {
         }
         
         .production-monitoring-header {
-          background-image: url('/images/production.png');
+          background-image: url('/images/production.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px;
@@ -848,6 +886,7 @@ function Sidebar() {
           justify-content: center;
           color: #fff;
           border-radius: 8px;
+          border:1px solid #1890ff;
           border-left: 4px solid #1890ff;
           font-weight: bold;
           text-transform: uppercase;
@@ -904,7 +943,7 @@ function Sidebar() {
         }
         
         .access-control-header {
-          background-image: url('/images/access-control-bg.jpg');
+          background-image: url('/images/access.jpg');
           background-position: center center;
           background-size: cover;
           height: 100px;
@@ -913,6 +952,7 @@ function Sidebar() {
           justify-content: center;
           color: #fff;
           border-radius: 8px;
+          border:1px solid #1890ff;
           border-left: 4px solid #1890ff;
           font-weight: bold;
           text-transform: uppercase;
@@ -961,7 +1001,7 @@ function Sidebar() {
           margin-right: 8px;
         }
         .order-management-item > .ant-menu-submenu-title {
-          background-image: url('/images/order-bg.jpg') !important;
+          background-image: url('/images/ordermanagment.jpg') !important;
           background-position: center center !important;
           background-size: cover !important;
           height: 100px !important;
@@ -971,6 +1011,7 @@ function Sidebar() {
           justify-content: center !important;
           color: #fff !important;
           border-radius: 8px !important;
+          border:1px solid #1890ff;
           border-left: 4px solid #1890ff !important;
           font-weight: bold !important;
           text-transform: uppercase !important;
@@ -1032,6 +1073,411 @@ function Sidebar() {
         .dashboard-menu-item:hover .ant-menu-title-content {
           background: none;
         }
+
+        /* Add these CSS rules to your existing styles */
+
+/* Position text at bottom with transparent background for main menu items */
+.dashboard-menu-item .ant-menu-title-content,
+.quality-menu-item .ant-menu-title-content,
+.maintenance-menu-item .ant-menu-title-content,
+.energy-menu-item .ant-menu-title-content,
+.documents-menu-item .ant-menu-title-content,
+.access-control-menu-item .ant-menu-title-content,
+[key="/admin/notifications_new"] .ant-menu-title-content,
+[key="/supervisor/notifications_new"] .ant-menu-title-content {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: auto !important;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 2 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Add notification menu item specific styles */
+[key="/admin/notifications_new"]::after,
+[key="/supervisor/notifications_new"]::after {
+  content: "NOTIFICATIONS" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  z-index: 2 !important;
+}
+
+/* Position text at bottom for order management submenu */
+.order-management-item > .ant-menu-submenu-title {
+  position: relative !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+}
+
+.order-management-item > .ant-menu-submenu-title::after {
+  content: "ORDER MANAGEMENT" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  z-index: 2 !important;
+}
+
+.order-management-item > .ant-menu-submenu-title .ant-menu-title-content {
+  display: none !important;
+}
+
+/* Position text at bottom for header elements */
+.process-engineering-header,
+.production-monitoring-header,
+.inventory-menu-header {
+  position: relative !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  color: transparent !important;
+}
+
+.process-engineering-header::after {
+  content: "PROCESS ENGINEERING CELL" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  z-index: 2 !important;
+}
+
+.production-monitoring-header::after {
+  content: "PRODUCTION MONITORING" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  z-index: 2 !important;
+}
+
+.inventory-menu-header::after {
+  content: "INVENTORY MANAGEMENT" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  z-index: 2 !important;
+}
+
+/* For operator menu items */
+.inspection-results-header,
+.inventory-data-header,
+.help-support-header {
+  position: relative !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  color: transparent !important;
+}
+
+.inspection-results-header::after {
+  content: "INSPECTION RESULTS" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  z-index: 2 !important;
+}
+
+.inventory-data-header::after {
+  content: "INVENTORY DATA" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  z-index: 2 !important;
+}
+
+.help-support-header::after {
+  content: "HELP & SUPPORT" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  z-index: 2 !important;
+}
+
+.notification-menu-item {
+  background-image: url('/images/notification.jpg') !important;
+  background-position: center center !important;
+  background-size: cover !important;
+  height: 100px !important;
+  margin: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  border: 1px solid #1890ff !important;
+  border-left: 4px solid #1890ff !important;
+  position: relative !important;
+  overflow: hidden !important;
+  width: calc(100% - 16px) !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.notification-menu-item .ant-menu-title-content {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: auto !important;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 2 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+.notification-menu-item::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.1), rgba(24, 144, 255, 0.05)) !important;
+  z-index: 0 !important;
+}
+
+/* Update the existing selector list to include notification-menu-item */
+.dashboard-menu-item .ant-menu-title-content,
+.quality-menu-item .ant-menu-title-content,
+.maintenance-menu-item .ant-menu-title-content,
+.energy-menu-item .ant-menu-title-content,
+.documents-menu-item .ant-menu-title-content,
+.access-control-menu-item .ant-menu-title-content,
+.notification-menu-item .ant-menu-title-content {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: auto !important;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 2 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+
+/* Add these styles for operator menu items */
+.inspection-results-item,
+.inventory-data-item,
+.help-support-item {
+  background-size: cover;
+  background-position: center;
+  height: 100px !important;
+  margin: 8px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  color: #fff !important;
+  border-radius: 8px;
+  border: 1px solid #1890ff;
+  border-left: 4px solid #1890ff;
+  position: relative;
+  overflow: hidden;
+  width: calc(100% - 16px) !important;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.inspection-results-item::before,
+.inventory-data-item::before,
+.help-support-item::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.1), rgba(24, 144, 255, 0.05)) !important;
+  z-index: 0 !important;
+}
+
+.inspection-results-item .ant-menu-title-content,
+.inventory-data-item .ant-menu-title-content,
+.help-support-item .ant-menu-title-content {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: auto !important;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  border-radius: 0 0 8px 8px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 2 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
       `}</style>
       <div className="p-4 flex justify-center">
         <Image

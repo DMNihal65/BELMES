@@ -783,7 +783,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.16.0.203:8002/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:1918/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1509,7 +1509,7 @@ const Workcenter = () => {
                 />
         
               <div>
-                <h1 className="text-2xl font-bold m-0 text-gray-800">WORKCENTER MANAGEMENT</h1>
+                <h1 className="text-2xl font-bold m-0 text-gray-800">WORKCENTRE MANAGEMENT</h1>
                 <p className="text-sm text-indigo-00 m-0">Link and configure work centres with their respective machines</p>
               </div>
             </div>

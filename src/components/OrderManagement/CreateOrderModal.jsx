@@ -1043,6 +1043,48 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
           </Col>
         </Row>
 
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="raw_material_part_number"
+              label="Raw Material Part Number"
+              rules={[{ required: true, message: 'Please enter Raw Material Part Number' }]}
+            >
+              <Input placeholder="Enter raw material part number" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="raw_material_description"
+              label="Raw Material Description"
+              rules={[{ required: true, message: 'Please enter Raw Material Description' }]}
+            >
+              <Input placeholder="Enter raw material description" />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="raw_material_quantity"
+              label="Raw Material Quantity"
+              rules={[{ required: true, message: 'Please enter Raw Material Quantity' }]}
+            >
+              <InputNumber min={0} style={{ width: '100%' }} placeholder="Enter quantity" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="raw_material_unit_name"
+              label="Unit of Measure"
+              rules={[{ required: true, message: 'Please enter Unit of Measure' }]}
+            >
+              <Input placeholder="Enter unit (e.g., kg, pcs, m)" />
+            </Form.Item>
+          </Col>
+        </Row>
+
         {renderFileUploadSection()}
 
         {/* Show document status if checked */}

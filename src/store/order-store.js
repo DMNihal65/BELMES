@@ -7,10 +7,10 @@ import axios from 'axios';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.16.0.203:8002',
-  QUALITY_URL: 'http://172.16.0.203:8002',
-  PLANNING_URL: 'http://172.16.0.203:8002',
-  SCHEDULING_URL: 'http://172.16.0.203:8002',
+  BASE_URL: 'http://172.18.7.88:1918',
+  QUALITY_URL: 'http://172.18.7.88:1918',
+  PLANNING_URL: 'http://172.18.7.88:1918',
+  SCHEDULING_URL: 'http://172.18.7.88:1918',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
     saveOrder: '/api/v1/planning/save-to-db',
@@ -21,7 +21,7 @@ const API_CONFIG = {
     uploadDrawing: '/api/v1/documents/drawing',
     documents: (productionOrder) => `/api/v1/documents/${productionOrder}`,
     saveOarcToDb: '/api/v1/planning/save-to-db',
-    createOrder: '/api/v1/planning/create_order',
+    createOrder: '/api/v1/planning/create_order1',
     uploadDocumentByType: '/api/v1/document-management/documents/upload-by-type',
     getDocumentsByPartNumber: (partNumber) => `/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
     updateProjectPriorities: '/api/v1/planning/projects/priority',
@@ -148,7 +148,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:1918/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -482,7 +482,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.88:1918/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -865,7 +865,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.16.0.203:8002/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.18.7.88:1918/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -922,7 +922,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.18.7.88:1918/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -993,7 +993,11 @@ const useOrderStore = create((set, get) => ({
           required_quantity: data.required_quantity,
           launched_quantity: data.launched_quantity,
           plant_id: data.plant_id,
-          project_name: data.project_name
+          project_name: data.project_name,
+          raw_material_part_number: data.raw_material_part_number,
+          raw_material_description: data.raw_material_description,
+          raw_material_quantity: data.raw_material_quantity,
+          raw_material_unit_name: data.raw_material_unit_name
         })
       });
 
@@ -1284,7 +1288,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.16.0.203:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:1918/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1534,7 +1538,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.16.0.203:8002/api/v1/master-order/machines/${machineId}`,
+        `http://172.18.7.88:1918/api/v1/master-order/machines/${machineId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1606,7 +1610,7 @@ const useOrderStore = create((set, get) => ({
         timestamp: new Date().toISOString()
       });
 
-      const url = `http://172.16.0.203:8002/api/v1/scheduling/check-order-completion-simple?part_number=${partNumber}&production_order=${productionOrder}`;
+      const url = `http://172.18.7.88:1918/api/v1/scheduling/check-order-completion-simple?part_number=${partNumber}&production_order=${productionOrder}`;
       console.log('API Endpoint URL:', url);
 
       const token = localStorage.getItem('token');

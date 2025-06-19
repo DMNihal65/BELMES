@@ -546,7 +546,7 @@ const OrderDashboard = () => {
                   {/* Label section */}
                   <div className="flex flex-col justify-center">
                     <h3 className="text-emerald-800 font-semibold text-xl leading-tight">
-                      In Progress
+                    Scheduled
                     </h3>
                     <p className="text-emerald-600 text-sm font-medium opacity-80">
                       Active Orders
@@ -744,7 +744,7 @@ const OrderDashboard = () => {
                     />
                   </div>
                 </TabPane>
-                <TabPane tab={<span className="font-semibold">In Progress</span>} key="in_progress">
+                <TabPane tab={<span className="font-semibold">Scheduled</span>} key="in_progress">
                   <div className="h-full overflow-auto">
                     {renderTimelineTable()}
                   </div>

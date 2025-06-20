@@ -997,16 +997,6 @@ const loadInventoryItems = async () => {
         ],
         [
           {
-            content: 'Heat No.',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
-          },
-          {
-            content: '',
-            styles: { cellWidth: 100 }
-          }
-        ],
-        [
-          {
             content: 'RM Reference',
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
@@ -2915,7 +2905,7 @@ const loadInventoryItems = async () => {
         { content: 'Job Part No.', styles: { fontStyle: 'bold' }},
         { content: selectedJob.part_number || 'N/A' },
         { content: 'Location', styles: { fontStyle: 'bold' }},
-        { content: material.location || 'N/A' }
+        { content: material.location || '' }
       ],
       [
         { content: 'RM Size', styles: { fontStyle: 'bold' }},
@@ -2923,7 +2913,7 @@ const loadInventoryItems = async () => {
       ],
       [
         { content: 'Heat No.', styles: { fontStyle: 'bold' }},
-        { content: material.gr_number || 'N/A' },
+        { content: material.gr_number || '' },
         { content: 'RM Qty', styles: { fontStyle: 'bold', halign: 'right' }},
         { content: material.quantity || 'N/A' }
       ],

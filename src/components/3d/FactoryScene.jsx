@@ -25,6 +25,7 @@ const TurningMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
   const gltf = useLoader(GLTFLoader, '/turning.glb');
   const model = useRef();
   const statusLightRef = useRef();
+  const [hovered, setHovered] = useState(false);
   
   // Get status color
   const getStatusColor = (status) => {
@@ -87,14 +88,26 @@ const TurningMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
   // Calculate appropriate status indicator height for the larger scale
   const statusHeight = 0.5; // Adjust based on actual model height
   
+  // Animate scale on selection/hover
+  const animatedScale = isSelected ? scale * 1.12 : hovered ? scale * 1.06 : scale;
+  
   return (
     <group 
       ref={model} 
       position={position} 
       rotation={rotation} 
-      scale={[scale, scale, scale]}
+      scale={[animatedScale, animatedScale, animatedScale]}
       onClick={onClick}
+      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+      onPointerOut={() => setHovered(false)}
     >
+      {/* Outline on hover/selected */}
+      { (hovered || isSelected) && (
+        <mesh position={[0, 0.5, 0]}>
+          <sphereGeometry args={[0.7, 32, 32]} />
+          <meshBasicMaterial color={isSelected ? '#2563eb' : '#facc15'} transparent opacity={0.18} />
+        </mesh>
+      )}
       <primitive object={gltf.scene.clone()} />
       
       {/* Status light */}
@@ -125,29 +138,24 @@ const TurningMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
         </mesh>
       )}
       
-      {machineData && (
-        <Html
-          position={[0, statusHeight + 0.2, 0]}
-          center
-          distanceFactor={15}
-        >
-          <div className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-200 w-40">
-            <div className="text-sm font-bold mb-1 truncate">{machineData.name}</div>
-            <div className="flex justify-between items-center">
-              <div className="text-xs font-medium">Status:</div>
-              <div 
-                className={`text-xs font-bold px-2 py-1 rounded-full ${
-                  machineData.status === 'PRODUCTION' ? 'bg-green-100 text-green-800' :
-                  machineData.status === 'ON' ? 'bg-yellow-100 text-yellow-800' :
-                  machineData.status === 'ERROR' ? 'bg-red-100 text-red-800' :
-                  machineData.status === 'MAINTENANCE' ? 'bg-indigo-100 text-indigo-800' :
-                  machineData.status === 'IDLE' ? 'bg-blue-100 text-blue-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {machineData.status}
-              </div>
-            </div>
+      {/* Tooltip on hover */}
+      {hovered && machineData && (
+        <Html position={[0, 1.2, 0]} center distanceFactor={18} zIndexRange={[100, 0]}>
+          <div style={{
+            background: 'rgba(30,41,59,0.95)',
+            color: '#fff',
+            borderRadius: 8,
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            pointerEvents: 'none',
+            minWidth: 90,
+            textAlign: 'center',
+            letterSpacing: 0.2
+          }}>
+            {machineData.name}<br/>
+            <span style={{fontWeight:400, fontSize:12, color:'#a5f3fc'}}>{machineData.status}</span>
           </div>
         </Html>
       )}
@@ -159,6 +167,7 @@ const MillingMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
   const gltf = useLoader(GLTFLoader, '/machine.glb');
   const model = useRef();
   const statusLightRef = useRef();
+  const [hovered, setHovered] = useState(false);
   
   // Get status color
   const getStatusColor = (status) => {
@@ -221,14 +230,25 @@ const MillingMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
   // Calculate appropriate status indicator height for the larger scale
   const statusHeight = 0.5; // Adjust based on actual model height
   
+  // Animate scale on selection/hover
+  const animatedScale = isSelected ? scale * 1.12 : hovered ? scale * 1.06 : scale;
+  
   return (
     <group 
       ref={model} 
       position={position} 
       rotation={rotation} 
-      scale={[scale, scale, scale]}
+      scale={[animatedScale, animatedScale, animatedScale]}
       onClick={onClick}
+      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+      onPointerOut={() => setHovered(false)}
     >
+      { (hovered || isSelected) && (
+        <mesh position={[0, 0.5, 0]}>
+          <sphereGeometry args={[0.7, 32, 32]} />
+          <meshBasicMaterial color={isSelected ? '#2563eb' : '#facc15'} transparent opacity={0.18} />
+        </mesh>
+      )}
       <primitive object={gltf.scene.clone()} />
       
       {/* Status light */}
@@ -259,29 +279,24 @@ const MillingMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelec
         </mesh>
       )}
       
-      {machineData && (
-        <Html
-          position={[0, statusHeight + 0.2, 0]}
-          center
-          distanceFactor={15}
-        >
-          <div className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-200 w-40">
-            <div className="text-sm font-bold mb-1 truncate">{machineData.name}</div>
-            <div className="flex justify-between items-center">
-              <div className="text-xs font-medium">Status:</div>
-              <div 
-                className={`text-xs font-bold px-2 py-1 rounded-full ${
-                  machineData.status === 'PRODUCTION' ? 'bg-green-100 text-green-800' :
-                  machineData.status === 'ON' ? 'bg-yellow-100 text-yellow-800' :
-                  machineData.status === 'ERROR' ? 'bg-red-100 text-red-800' :
-                  machineData.status === 'MAINTENANCE' ? 'bg-indigo-100 text-indigo-800' :
-                  machineData.status === 'IDLE' ? 'bg-blue-100 text-blue-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {machineData.status}
-              </div>
-            </div>
+      {/* Tooltip on hover */}
+      {hovered && machineData && (
+        <Html position={[0, 1.2, 0]} center distanceFactor={18} zIndexRange={[100, 0]}>
+          <div style={{
+            background: 'rgba(30,41,59,0.95)',
+            color: '#fff',
+            borderRadius: 8,
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            pointerEvents: 'none',
+            minWidth: 90,
+            textAlign: 'center',
+            letterSpacing: 0.2
+          }}>
+            {machineData.name}<br/>
+            <span style={{fontWeight:400, fontSize:12, color:'#a5f3fc'}}>{machineData.status}</span>
           </div>
         </Html>
       )}
@@ -293,6 +308,7 @@ const EDMMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected,
   const gltf = useLoader(GLTFLoader, '/wireedm.glb');
   const model = useRef();
   const statusLightRef = useRef();
+  const [hovered, setHovered] = useState(false);
   
   // Get status color
   const getStatusColor = (status) => {
@@ -355,14 +371,25 @@ const EDMMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected,
   // Calculate appropriate status indicator height for the larger scale
   const statusHeight = 0.5; // Adjust based on actual model height
   
+  // Animate scale on selection/hover
+  const animatedScale = isSelected ? scale * 1.12 : hovered ? scale * 1.06 : scale;
+  
   return (
     <group 
       ref={model} 
       position={position} 
       rotation={rotation} 
-      scale={[scale, scale, scale]}
+      scale={[animatedScale, animatedScale, animatedScale]}
       onClick={onClick}
+      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+      onPointerOut={() => setHovered(false)}
     >
+      { (hovered || isSelected) && (
+        <mesh position={[0, 0.5, 0]}>
+          <sphereGeometry args={[0.7, 32, 32]} />
+          <meshBasicMaterial color={isSelected ? '#2563eb' : '#facc15'} transparent opacity={0.18} />
+        </mesh>
+      )}
       <primitive object={gltf.scene.clone()} />
       
       {/* Status light */}
@@ -393,29 +420,24 @@ const EDMMachineModel = ({ position, rotation, scale = 0.5, onClick, isSelected,
         </mesh>
       )}
       
-      {machineData && (
-        <Html
-          position={[0, statusHeight + 0.15, 0]}
-          center
-          distanceFactor={15}
-        >
-          <div className="bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-200 w-40">
-            <div className="text-sm font-bold mb-1 truncate">{machineData.name}</div>
-            <div className="flex justify-between items-center">
-              <div className="text-xs font-medium">Status:</div>
-              <div 
-                className={`text-xs font-bold px-2 py-1 rounded-full ${
-                  machineData.status === 'PRODUCTION' ? 'bg-green-100 text-green-800' :
-                  machineData.status === 'ON' ? 'bg-yellow-100 text-yellow-800' :
-                  machineData.status === 'ERROR' ? 'bg-red-100 text-red-800' :
-                  machineData.status === 'MAINTENANCE' ? 'bg-indigo-100 text-indigo-800' :
-                  machineData.status === 'IDLE' ? 'bg-blue-100 text-blue-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {machineData.status}
-              </div>
-            </div>
+      {/* Tooltip on hover */}
+      {hovered && machineData && (
+        <Html position={[0, 1.2, 0]} center distanceFactor={18} zIndexRange={[100, 0]}>
+          <div style={{
+            background: 'rgba(30,41,59,0.95)',
+            color: '#fff',
+            borderRadius: 8,
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            pointerEvents: 'none',
+            minWidth: 90,
+            textAlign: 'center',
+            letterSpacing: 0.2
+          }}>
+            {machineData.name}<br/>
+            <span style={{fontWeight:400, fontSize:12, color:'#a5f3fc'}}>{machineData.status}</span>
           </div>
         </Html>
       )}
@@ -482,14 +504,41 @@ const FactoryScene = ({
   // Divide machines into types
   const categorizeMachines = () => {
     // Create categories for milling, turning, and EDM machines
-    const millingMachines = machines.filter(m => m.type === 'milling' || m.id % 3 === 0);
-    const turningMachines = machines.filter(m => m.type === 'turning' || m.id % 3 === 1);
-    const edmMachines = machines.filter(m => m.type === 'edm' || m.id % 3 === 2);
-    
+    const millingMachines = [];
+    const turningMachines = [];
+    const edmMachines = [];
+
+    let millingIdx = 0, turningIdx = 0, edmIdx = 0;
+    machines.forEach((m) => {
+      let type = m.type;
+      if (!type) {
+        // fallback to id-based
+        if (m.id % 3 === 0) type = 'milling';
+        else if (m.id % 3 === 1) type = 'turning';
+        else type = 'edm';
+      }
+      let scenePosition, sceneRotation;
+      if (type === 'milling') {
+        scenePosition = getMachinePosition('milling', millingIdx);
+        sceneRotation = getMachineRotation('milling', millingIdx);
+        millingMachines.push({ ...m, scenePosition, sceneRotation });
+        millingIdx++;
+      } else if (type === 'turning') {
+        scenePosition = getMachinePosition('turning', turningIdx);
+        sceneRotation = getMachineRotation('turning', turningIdx);
+        turningMachines.push({ ...m, scenePosition, sceneRotation });
+        turningIdx++;
+      } else {
+        scenePosition = getMachinePosition('edm', edmIdx);
+        sceneRotation = getMachineRotation('edm', edmIdx);
+        edmMachines.push({ ...m, scenePosition, sceneRotation });
+        edmIdx++;
+      }
+    });
     return {
-      milling: millingMachines.slice(0, 5), // Limit to 5
-      turning: turningMachines.slice(0, 7), // Limit to 7
-      edm: edmMachines.slice(0, 2)          // Limit to 2
+      milling: millingMachines,
+      turning: turningMachines,
+      edm: edmMachines
     };
   };
 
@@ -848,58 +897,43 @@ const FactoryScene = ({
               {quality !== 'low' && <SectionLabels />}
               
               {/* Machine display - Turning Machines */}
-              {machinesByType.turning.map((machine, index) => {
-                const position = getMachinePosition('turning', index);
-                const rotation = getMachineRotation('turning', index);
-                
-                return (
-                  <TurningMachineModel
-                    key={machine.id || `turning-${index}`}
-                    position={position}
-                    rotation={rotation}
-                    scale={12.0}
-                    onClick={() => onMachineSelect(machine)}
-                    isSelected={selectedMachine?.id === machine.id}
-                    machineData={machine}
-                  />
-                );
-              })}
+              {machinesByType.turning.map((machine) => (
+                <TurningMachineModel
+                  key={machine.id}
+                  position={machine.scenePosition}
+                  rotation={machine.sceneRotation}
+                  scale={12.0}
+                  onClick={() => onMachineSelect(machine)}
+                  isSelected={selectedMachine?.id === machine.id}
+                  machineData={machine}
+                />
+              ))}
               
               {/* Machine display - Milling Machines */}
-              {machinesByType.milling.map((machine, index) => {
-                const position = getMachinePosition('milling', index);
-                const rotation = getMachineRotation('milling', index);
-                
-                return (
-                  <MillingMachineModel
-                    key={machine.id || `milling-${index}`}
-                    position={position}
-                    rotation={rotation}
-                    scale={8.0}
-                    onClick={() => onMachineSelect(machine)}
-                    isSelected={selectedMachine?.id === machine.id}
-                    machineData={machine}
-                  />
-                );
-              })}
+              {machinesByType.milling.map((machine) => (
+                <MillingMachineModel
+                  key={machine.id}
+                  position={machine.scenePosition}
+                  rotation={machine.sceneRotation}
+                  scale={8.0}
+                  onClick={() => onMachineSelect(machine)}
+                  isSelected={selectedMachine?.id === machine.id}
+                  machineData={machine}
+                />
+              ))}
               
               {/* Machine display - EDM Machines */}
-              {machinesByType.edm.map((machine, index) => {
-                const position = getMachinePosition('edm', index);
-                const rotation = getMachineRotation('edm', index);
-                
-                return (
-                  <EDMMachineModel
-                    key={machine.id || `edm-${index}`}
-                    position={position}
-                    rotation={rotation}
-                    scale={12.0}
-                    onClick={() => onMachineSelect(machine)}
-                    isSelected={selectedMachine?.id === machine.id}
-                    machineData={machine}
-                  />
-                );
-              })}
+              {machinesByType.edm.map((machine) => (
+                <EDMMachineModel
+                  key={machine.id}
+                  position={machine.scenePosition}
+                  rotation={machine.sceneRotation}
+                  scale={12.0}
+                  onClick={() => onMachineSelect(machine)}
+                  isSelected={selectedMachine?.id === machine.id}
+                  machineData={machine}
+                />
+              ))}
               
               {/* Add workbenches and chairs */}
               {quality !== 'low' && <ShopFloorFurniture />}
@@ -1035,8 +1069,10 @@ const Workbench = ({ position, rotation = [0, 0, 0] }) => {
       
       {/* Legs - simplified to two legs for performance */}
       {[
-        [-2.2, 1.5, 0], 
-        [2.2, 1.5, 0]
+        [-2.2, 1.5, -0.8],
+        [-2.2, 1.5, 0.8],
+        [2.2, 1.5, -0.8],
+        [2.2, 1.5, 0.8]
       ].map((pos, i) => (
         <mesh key={i} position={pos} castShadow receiveShadow>
           <boxGeometry args={[0.2, 3, 2]} />
@@ -1281,6 +1317,7 @@ const EDMRoom = ({ position = [0, 0, 0] }) => {
           {/* "EDM" sign with better visibility */}
           <Text
             position={[0, 11, 0]}
+            font="/Inter-Bold.woff"
             fontSize={1.5}
             color="#1e3a8a"
             anchorX="center"
@@ -1500,6 +1537,7 @@ const Banner = ({ position, rotation = [0, 0, 0], text = "BANNER", color = "#3b8
       
       <Text
         position={[0, 0, 0.03]}
+        font='/fonts/Rubik-VariableFont_wght.ttf'
         color="white"
         fontSize={0.5}
         fontWeight="bold"

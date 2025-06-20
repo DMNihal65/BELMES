@@ -1,18 +1,20 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
 // Advanced camera controller with different viewpoints and transitions
 const CameraController = ({ 
   selectedMachine = null,
   view = 'overview', // 'overview', 'firstPerson', 'topDown', 'focusMachine'
-  enableTransitions = true 
+  enableTransitions = true,
+  setView
 }) => {
   const controlsRef = useRef();
   const cameraRef = useRef();
   const { camera, scene, gl } = useThree();
   const [isLowPerformance, setIsLowPerformance] = useState(false);
+  const [resetRequested, setResetRequested] = useState(false);
   
   // Detect low performance on first render
   useEffect(() => {
@@ -52,7 +54,7 @@ const CameraController = ({
   
   // Define better camera positions for the new shop floor layout
   const viewPositions = {
-    overview: { position: [0, 10, 43], target: [0, 0, 0] },
+    overview: { position: [-40, 40, 50], target: [0, 0, 0] },
     topDown: { position: [0, 70, 0], target: [0, 0, 0] },
     firstPerson: { position: [0, 5, 30], target: [0, 2, -10] },
     turningSection: { position: [-30, 15, 0], target: [-20, 3, 0] },
@@ -104,162 +106,63 @@ const CameraController = ({
     }
   };
   
-  // Update camera when view or selected machine changes
+  // Easing function for smooth camera transitions
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+  
+  // Enhanced camera transition with easing
   useEffect(() => {
     if (!controlsRef.current || !camera) return;
     
     const transition = transitionRef.current;
     let targetPosition, targetLookAt;
     
-    // Determine target position and look-at point based on view type
     if (view === 'focusMachine' && selectedMachine) {
-      // For focused machine view, determine machine position
-      const machinePos = getMachinePosition(selectedMachine);
-      
-      // Calculate offset based on machine type for better viewing angle
-      const offsetMultiplier = selectedMachine.type === 'turning' ? 1.2 : 
-                              selectedMachine.type === 'edm' ? 1.5 : 1;
-      
-      // Position camera at an offset from the machine for a good view
-      // Place camera in front of the machine based on its implied rotation
-      if (selectedMachine.type === 'turning') {
-        // For turning machines (left side)
-        targetPosition = [
-          machinePos[0] + 10, 
-          machinePos[1] + 5, 
-          machinePos[2]
-        ];
-      } else if (selectedMachine.type === 'milling') {
-        // For milling machines (right side)
-        targetPosition = [
-          machinePos[0] - 10, 
-          machinePos[1] + 5, 
-          machinePos[2]
-        ];
-      } else if (selectedMachine.type === 'edm') {
-        // For EDM machines (back)
-        targetPosition = [
-          machinePos[0], 
-          machinePos[1] + 5, 
-          machinePos[2] + 10
-        ];
-      } else {
-        // Default positioning
-        targetPosition = [
-          machinePos[0] + 8 * offsetMultiplier, 
-          machinePos[1] + 5, 
-          machinePos[2] + 8 * offsetMultiplier
-        ];
-      }
-      
-      // Look at the machine, slightly above ground level for better composition
-      targetLookAt = [
-        machinePos[0],
-        machinePos[1] + 2,
-        machinePos[2]
+      const machinePos = selectedMachine.scenePosition || getMachinePosition(selectedMachine);
+      const offsetMultiplier = selectedMachine.type === 'turning' ? 1.2 : selectedMachine.type === 'edm' ? 1.1 : 1.3;
+      targetPosition = [
+        machinePos[0] + 6 * offsetMultiplier,
+        machinePos[1] + 5 * offsetMultiplier,
+        machinePos[2] + 7 * offsetMultiplier
       ];
+      targetLookAt = machinePos;
     } else {
-      // Use predefined view position
-      targetPosition = viewPositions[view]?.position || viewPositions.overview.position;
-      targetLookAt = viewPositions[view]?.target || viewPositions.overview.target;
+      // Default overview
+      targetPosition = [-30, 20, 42];
+      targetLookAt = [0, 0, 0];
     }
-    
-    const shouldTransition = enableTransitions && !isLowPerformance;
-    
-    if (shouldTransition) {
-      // Start transition
-      transition.inProgress = true;
-      transition.progress = 0;
-      
-      // Store current camera position and target
-      transition.startPosition.copy(camera.position);
-      transition.startTarget.copy(controlsRef.current.target);
-      
-      // Set end position and target
-      transition.endPosition.set(...targetPosition);
-      transition.endTarget.set(...targetLookAt);
-    } else {
-      // Immediately set camera position and target
-      camera.position.set(...targetPosition);
-      controlsRef.current.target.set(...targetLookAt);
-      
-      // Make sure to update controls
+
+    // Animate camera with cubic easing
+    let start = null;
+    const duration = 1100; // ms
+    const initialPos = camera.position.clone();
+    const initialTarget = controlsRef.current.target.clone();
+    function animateCamera(ts) {
+      if (!start) start = ts;
+      const elapsed = ts - start;
+      const t = Math.min(1, elapsed / duration);
+      const eased = easeInOutCubic(t);
+      camera.position.lerpVectors(initialPos, new THREE.Vector3(...targetPosition), eased);
+      controlsRef.current.target.lerpVectors(initialTarget, new THREE.Vector3(...targetLookAt), eased);
       controlsRef.current.update();
-    }
-  }, [view, selectedMachine, camera, enableTransitions, isLowPerformance]);
-  
-  // Handle smooth camera transitions
-  useFrame((state, delta) => {
-    if (!controlsRef.current) return;
-    
-    const transition = transitionRef.current;
-    
-    // Skip transitions on low performance devices
-    if (isLowPerformance && transition.inProgress) {
-      transition.inProgress = false;
-      camera.position.copy(transition.endPosition);
-      controlsRef.current.target.copy(transition.endTarget);
-      controlsRef.current.update();
-      return;
-    }
-    
-    if (transition.inProgress) {
-      // Update progress
-      transition.progress += delta / transition.duration;
-      
-      if (transition.progress >= 1) {
-        // Finish transition
-        transition.progress = 1;
-        transition.inProgress = false;
-      }
-      
-      // Apply easing function for smooth movement
-      const easeProgress = easeOutCubic(transition.progress);
-      
-      // Update camera position
-      camera.position.lerpVectors(
-        transition.startPosition,
-        transition.endPosition,
-        easeProgress
-      );
-      
-      // Update orbit controls target
-      if (controlsRef.current) {
-        controlsRef.current.target.lerpVectors(
-          transition.startTarget,
-          transition.endTarget,
-          easeProgress
-        );
-        
-        // Ensure controls are updated
-        controlsRef.current.update();
+      if (t < 1) {
+        requestAnimationFrame(animateCamera);
       }
     }
-  });
+    requestAnimationFrame(animateCamera);
+  }, [view, selectedMachine, camera]);
   
-  // Easing function for smoother transitions
-  const easeOutCubic = (x) => {
-    return 1 - Math.pow(1 - x, 3);
+  // Reset view handler
+  const handleResetView = () => {
+    setView('overview');
+    setResetRequested(true);
+    setTimeout(() => setResetRequested(false), 500);
   };
   
   // Optimize controls based on performance level
   const getControlsConfig = () => {
-    if (isLowPerformance) {
-      return {
-        enablePan: true,
-        enableZoom: true,
-        enableRotate: true,
-        minDistance: 5,
-        maxDistance: 100,
-        maxPolarAngle: Math.PI / 2 - 0.1,
-        minPolarAngle: Math.PI / 12,
-        dampingFactor: 0, // No damping for better performance
-        enableDamping: false,
-        rotateSpeed: 0.5,
-        zoomSpeed: 0.8,
-      };
-    }
-    
+    // Always enable damping for smooth panning
     return {
       enablePan: true,
       enableZoom: true,
@@ -268,9 +171,10 @@ const CameraController = ({
       maxDistance: 100,
       maxPolarAngle: Math.PI / 2 - 0.1,
       minPolarAngle: Math.PI / 12,
-      dampingFactor: 0.1,
+      dampingFactor: 0.2,
       enableDamping: true,
       rotateSpeed: 0.5,
+      zoomSpeed: 0.8,
     };
   };
   
@@ -289,6 +193,34 @@ const CameraController = ({
         ref={controlsRef}
         {...getControlsConfig()}
       />
+      
+      {/* Floating Reset View Button */}
+      <Html position={[0, 0, 0]} zIndexRange={[1000, 0]} style={{ pointerEvents: 'auto' }}>
+        <div style={{ position: 'fixed', top: 24, right: 32, zIndex: 1000 }}>
+          <button
+            onClick={handleResetView}
+            style={{
+              background: '#1e293b',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              padding: '10px 18px',
+              fontWeight: 600,
+              fontSize: 15,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+              cursor: 'pointer',
+              opacity: resetRequested ? 0.6 : 1,
+              transition: 'opacity 0.2s',
+              outline: 'none',
+              letterSpacing: 0.2
+            }}
+            title="Reset to overview"
+            disabled={resetRequested}
+          >
+            ⟳ Reset View
+          </button>
+        </div>
+      </Html>
     </>
   );
 };

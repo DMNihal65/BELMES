@@ -18,6 +18,7 @@ import dmu50Image from '/images/CNCM-DMU-50new.png';
 import dmu60MBImage from '/images/CNCM-DMU-60MB 5 AXIS.png';
 import vmc800Image from '/images/VMC_800.png';
 import robofilImage from '/images/MMC1-ROBOFIL 240.png';
+import robofillImage2 from '/images/MMC1U32J.png'
 import dmu60EvoImage from '/images/dmu-60-evo-linear-product-picture.png';
 
 // Preload fonts to ensure they are available for 3D rendering
@@ -243,7 +244,7 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
           </h3>
           <div className="flex-1 relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-200 overflow-hidden overflow-y-auto" style={{ maxHeight: '60vh' }}>
             {/* EDM Room - Top (Larger) */}
-            <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-r from-purple-100 to-purple-200 border-b-2 border-purple-300 flex flex-col">
+            {/* <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-r from-purple-100 to-purple-200 border-b-2 border-purple-300 flex flex-col">
               <div className="text-sm font-bold text-purple-800 p-3 bg-purple-50/50 backdrop-blur-sm border-b border-purple-200">
                 <ProjectOutlined className="mr-2" />
                 EDM Area
@@ -260,14 +261,14 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
                   />
                 ))}
               </div>
-            </div>
+            </div> */}
             
             {/* Center Aisle */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 top-1/3 bottom-0 w-3 bg-gradient-to-b from-gray-300 to-gray-400 shadow-lg"></div>
+            <div className="absolute left-1/2 transform -translate-x-1/2 top-0 bottom-0 w-3 bg-gradient-to-b from-gray-300 to-gray-400 shadow-lg"></div>
             
             {/* Turning Machines - Left Side */}
-            <div className="absolute top-1/3 left-2 bottom-2 w-[48%] flex flex-col">
-              <div className="text-xs font-bold text-blue-800 mb-1 text-center bg-blue-50/80 backdrop-blur-sm rounded-lg p-1 border border-blue-200">
+            <div className="absolute top-0 left-2 bottom-2 w-[48%] flex flex-col">
+              <div className="text-xl font-bold text-blue-800 mb-1 text-center bg-blue-50/80 backdrop-blur-sm rounded-lg p-1 border border-blue-200">
                 <ToolOutlined className="mr-1" />
                 Turning Section
               </div>
@@ -286,8 +287,8 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
             </div>
             
             {/* Milling Machines - Right Side */}
-            <div className="absolute top-1/3 right-2 bottom-2 w-[48%] flex flex-col">
-              <div className="text-xs font-bold text-green-800 mb-1 text-center bg-green-50/80 backdrop-blur-sm rounded-lg p-1 border border-green-200">
+            <div className="absolute top-0 right-2 bottom-2 w-[48%] flex flex-col">
+              <div className="text-xl font-bold text-green-800 mb-1 text-center bg-green-50/80 backdrop-blur-sm rounded-lg p-1 border border-green-200">
                 <AppstoreOutlined className="mr-1" />
                 Milling Section
               </div>
@@ -304,11 +305,30 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
                 ))}
               </div>
             </div>
+
+            <div className="absolute top-[450px] left-0 right-0 h-1/3 bg-gradient-to-r from-purple-100 to-purple-200 border-b-2 border-purple-300 flex flex-col">
+              <div className="text-xl text-center font-bold text-purple-800 p-3 bg-purple-50/50 backdrop-blur-sm border-b border-purple-200">
+                <ProjectOutlined className="mr-2" />
+                EDM Area
+              </div>
+              <div className="flex-1 flex items-center justify-center gap-x-2 ">
+                {machinesByType.edm.slice(0, 4).map((machine) => (
+                  <EnhancedMachineCard 
+                    key={machine.id} 
+                    machine={machine} 
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => onMachineSelect(machine)}
+                    compact={true}
+                    mini={true}
+                  />
+                ))}
+              </div>
+            </div>
             
             {/* Floor Label */}
-            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-gray-200">
+            {/* <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-gray-200">
               Main Shop Floor
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
@@ -329,14 +349,14 @@ const EnhancedMachineCard = ({ machine, isSelected, onSelect, compact = false, m
     } else if (name.includes('vmc') || name.includes('milling')) {
       return vmc800Image;
     } else if (name.includes('edm') || name.includes('robo') || name.includes('wire')) {
-      return robofilImage;
+      return robofillImage2;
     } else if (name.includes('turn') || name.includes('lathe')) {
       return dmu60EvoImage;
     } else {
       switch(machine.type) {
         case 'turning': return dmu60EvoImage;
         case 'milling': return vmc800Image;
-        case 'edm': return robofilImage;
+        case 'edm': return robofillImage2;
         default: return vmc800Image;
       }
     }
@@ -977,7 +997,7 @@ function getMachineWorkcenterType(machine) {
   // 1. Prioritize mapping based on machine.name prefixes (most explicit user request)
   if (machineNameLower) {
     if (machineNameLower.startsWith('mmc1-')) {
-      return { workcenter: 'MMC1', type: 'edm', image: robofilImage }; // Assuming robofilImage for MMC1 by default
+      return { workcenter: 'MMC1', type: 'edm', image: robofillImage2 }; // Assuming robofilImage for MMC1 by default
     }
     if (machineNameLower.startsWith('cncm-')) {
       // Find a specific model match for CNCM if possible, otherwise default to milling

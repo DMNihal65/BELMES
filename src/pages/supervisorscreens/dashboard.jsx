@@ -306,7 +306,7 @@ const SimpleMachineList = ({ machines, onMachineSelect, selectedMachine }) => {
               </div>
             </div>
 
-            <div className="absolute top-[450px] left-0 right-0 h-1/3 bg-gradient-to-r from-purple-100 to-purple-200 border-b-2 border-purple-300 flex flex-col">
+            <div className="absolute top-[600px] left-0 right-0 h-1/3 bg-gradient-to-r from-purple-100 to-purple-200 border-b-2 border-purple-300 flex flex-col">
               <div className="text-xl text-center font-bold text-purple-800 p-3 bg-purple-50/50 backdrop-blur-sm border-b border-purple-200">
                 <ProjectOutlined className="mr-2" />
                 EDM Area
@@ -417,6 +417,12 @@ const EnhancedMachineCard = ({ machine, isSelected, onSelect, compact = false, m
     }
   };
 
+  // Helper to trim workcenter prefixes from machine name
+  const getDisplayName = (name) => {
+    if (!name) return '';
+    return name.replace(/^(CNCM|CNCT|MMC1)[-_\s]*/i, '');
+  };
+
   const statusStyle = getStatusStyling(machine.status);
   const machineImage = getMachineImage(machine);
 
@@ -436,7 +442,7 @@ const EnhancedMachineCard = ({ machine, isSelected, onSelect, compact = false, m
         {/* Content */}
         <div className="p-1 flex flex-col gap-0.5">
           <div className={`font-bold text-xs truncate flex items-center gap-1 ${statusStyle.text}`}> 
-            {machine.name}
+            {getDisplayName(machine.name)}
             <span className="ml-1 px-1 py-0.5 rounded bg-white/60 text-gray-700 text-[8px] font-semibold uppercase border border-gray-200">{machine.workcenter}</span>
           </div>
           <div className="flex justify-between text-[9px] font-medium">
@@ -481,7 +487,7 @@ const EnhancedMachineCard = ({ machine, isSelected, onSelect, compact = false, m
         <div className="relative p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="font-bold text-sm truncate max-w-[70%] text-white drop-shadow-lg">
-              {machine.name}
+              {getDisplayName(machine.name)}
             </div>
             <div className={`w-3 h-3 rounded-full ${statusStyle.shadow} shadow-lg animate-pulse`}></div>
           </div>
@@ -908,7 +914,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
               <div className="text-center">
                 <Progress
                   type="dashboard"
-                  percent={oeeData.average_availability || 0}
+                  percent={oeeData.average_availability ? Number(oeeData.average_availability.toFixed(2)) : 0}
                   width={80}
                   strokeColor="#1890ff"
                 />
@@ -917,7 +923,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
               <div className="text-center">
                 <Progress
                   type="dashboard"
-                  percent={oeeData.average_performance || 0}
+                  percent={oeeData.average_performance ? Number(oeeData.average_performance.toFixed(2)) : 0}
                   width={80}
                   strokeColor="#52c41a"
                 />
@@ -926,7 +932,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
               <div className="text-center">
                 <Progress
                   type="dashboard"
-                  percent={oeeData.average_quality || 0}
+                  percent={oeeData.average_quality ? Number(oeeData.average_quality.toFixed(2)) : 0}
                   width={80}
                   strokeColor="#722ed1"
                 />
@@ -954,7 +960,13 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
             <div className="grid grid-cols-2 gap-y-3 text-sm">
               <div>
                 <div className="text-gray-500">Program Number</div>
-                <div className="font-medium">{selectedMachine.currentProgram || 'N/A'}</div>
+                <Tooltip title={selectedMachine.currentProgram || 'N/A'}>
+                  <div className="font-medium truncate max-w-[120px] cursor-pointer">
+                    {selectedMachine.currentProgram && selectedMachine.currentProgram.length > 12
+                      ? selectedMachine.currentProgram.slice(0, 12) + '...'
+                      : selectedMachine.currentProgram || 'N/A'}
+                  </div>
+                </Tooltip>
               </div>
               <div>
                 <div className="text-gray-500">Part Number</div>

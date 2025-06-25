@@ -7,10 +7,10 @@ import axios from 'axios';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.16.0.203:8002',
-  QUALITY_URL: 'http://172.16.0.203:8002',
-  PLANNING_URL: 'http://172.16.0.203:8002',
-  SCHEDULING_URL: 'http://172.16.0.203:8002',
+  BASE_URL: 'http://172.18.7.88:4455',
+  QUALITY_URL: 'http://172.18.7.88:4455',
+  PLANNING_URL: 'http://172.18.7.88:4455',
+  SCHEDULING_URL: 'http://172.18.7.88:4455',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
     saveOrder: '/api/v1/planning/save-to-db',
@@ -148,7 +148,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.18.7.88:4455/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -211,35 +211,43 @@ const useOrderStore = create((set, get) => ({
   updateOrder: async (updatedOrder) => {
     set({ isLoading: true, error: null });
     try {
+      console.log('Updating order with data:', updatedOrder);
+      
       const response = await fetch(
-        `${API_CONFIG.BASE_URL}/api/v1/planning/orders/${updatedOrder.id}`,
+        `http://172.18.7.88:4455/api/v1/planning/orders/${updatedOrder.id}`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'accept': 'application/json'
           },
           body: JSON.stringify({
-            part_description: updatedOrder.part_description,
-            required_quantity: updatedOrder.required_quantity,
-            wbs_element: updatedOrder.wbs_element,
-            sale_order: updatedOrder.sale_order,
-            project: {
-              name: updatedOrder.project.name
-            }
+            wbs_element: updatedOrder.wbs_element || updatedOrder.wbsElement,
+            part_number: updatedOrder.part_number || updatedOrder.partNumber,
+            part_description: updatedOrder.part_description || updatedOrder.materialDescription,
+            total_operations: updatedOrder.total_operations || updatedOrder.totalOperations,
+            required_quantity: updatedOrder.required_quantity || updatedOrder.targetQuantity,
+            launched_quantity: updatedOrder.launched_quantity || updatedOrder.launchedQuantity,
+            plant_id: updatedOrder.plant_id || updatedOrder.plant,
+            sale_order: updatedOrder.sale_order || updatedOrder.salesOrderNumber,
+            project_name: updatedOrder.project_name || updatedOrder.projectName
           })
         }
       );
 
+      const responseData = await response.json();
+      console.log('Update order response:', responseData);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update order');
+        const errorMessage = responseData.detail || responseData.message || `HTTP error! status: ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       // Update the order in the local state
       set(state => ({
         orders: state.orders.map(order => 
-          order.id === updatedOrder.id ? updatedOrder : order
+          order.id === updatedOrder.id ? { ...order, ...responseData } : order
         ),
         isLoading: false
       }));
@@ -247,7 +255,11 @@ const useOrderStore = create((set, get) => ({
       // Fetch fresh data to ensure consistency
       await get().fetchAllOrders();
 
-      return { success: true, message: 'Order updated successfully' };
+      return { 
+        success: true, 
+        message: 'Order updated successfully',
+        data: responseData
+      };
     } catch (error) {
       console.error('Error updating order:', error);
       set({ error: error.message, isLoading: false });
@@ -482,7 +494,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -865,7 +877,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.16.0.203:8002/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.18.7.88:4455/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -922,7 +934,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.18.7.88:4455/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -1288,7 +1300,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.16.0.203:8002/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.18.7.88:4455/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1538,7 +1550,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.16.0.203:8002/api/v1/master-order/machines/${machineId}`,
+        `http://172.18.7.88:4455/api/v1/master-order/machines/${machineId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1610,7 +1622,7 @@ const useOrderStore = create((set, get) => ({
         timestamp: new Date().toISOString()
       });
 
-      const url = `http://172.16.0.203:8002/api/v1/scheduling/check-order-completion-simple?part_number=${partNumber}&production_order=${productionOrder}`;
+      const url = `http://172.18.7.88:4455/api/v1/scheduling/check-order-completion-simple?part_number=${partNumber}&production_order=${productionOrder}`;
       console.log('API Endpoint URL:', url);
 
       const token = localStorage.getItem('token');

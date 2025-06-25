@@ -2356,13 +2356,15 @@ const DocumentManagement = () => {
         pagination={{
           total: totalDocuments,
           pageSize: 5,
-          showSizeChanger: true,
+          showSizeChanger: false,
           showTotal: (total) => `Total ${total} items`,
           onChange: (page, pageSize) => {
             if (selectedFolder && selectedFolder !== 'all') {
               fetchFolderDocuments(selectedFolder, page, pageSize);
             }
-          }
+          },
+          pageSizeOptions: [],
+          hideOnSinglePage: true
         }}
         className="custom-table"
       />

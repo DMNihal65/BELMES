@@ -15,6 +15,22 @@ const { Dragger } = Upload;
 const { TextArea } = Input;
 const { Step } = Steps;
 
+function mergeFormWithOarcData(oarcData, formValues) {
+  const updated = { ...oarcData };
+  if (formValues.production_order) updated["Prod Order No"] = formValues.production_order;
+  if (formValues.sale_order) updated["Sale Order"] = formValues.sale_order;
+  if (formValues.project_name) updated["Project Name"] = formValues.project_name;
+  if (formValues.priority) updated["Priority"] = formValues.priority;
+  if (formValues.wbs_element) updated["WBS"] = formValues.wbs_element;
+  if (formValues.part_number) updated["Part No"] = formValues.part_number;
+  if (formValues.part_description) updated["Part Desc"] = formValues.part_description;
+  if (formValues.total_operations) updated["Total Operations"] = formValues.total_operations;
+  if (formValues.required_quantity) updated["Required Qty"] = formValues.required_quantity;
+  if (formValues.launched_quantity) updated["Launched Qty"] = formValues.launched_quantity;
+  if (formValues.plant_id) updated["Plant"] = formValues.plant_id;
+  return updated;
+}
+
 const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData = null }) => {
   const [form] = Form.useForm();
   const mppUploadRef = React.useRef(null);
@@ -560,6 +576,15 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     try {
       form.setFields([{ name: 'submit', errors: [] }]);
       
+      // Always get the latest values from the form
+      const latestValues = form.getFieldsValue();
+      // Use latestValues instead of values for all order data
+      // ... replace all usages of 'values' with 'latestValues' in this function ...
+      // For example:
+      // const orderData = { ...latestValues, ...otherFields };
+      // ... rest of the function ...
+
+      // Handle new order creation (OARC or manual)
       if (!isManualCreate) {
         // Handle OARC upload case
         const productionOrder = localStorage.getItem('currentProductionOrder');
@@ -574,17 +599,44 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
           throw new Error('No stored data found');
         }
 
-        // Save OARC data
+        // Merge OARC data with form values, mapping form fields to OARC keys
+        const mergedData = mergeFormWithOarcData(storedData, latestValues);
+
+        // Prepare MPP FormData if file exists
+        let mppFormData = null;
+        if (mppFile) {
+          mppFormData = new FormData();
+          mppFormData.append('file', mppFile);
+          mppFormData.append('name', mppDocName || `MPP_${latestValues.part_number}`);
+          mppFormData.append('doc_type', 'MPP');
+          mppFormData.append('part_number', latestValues.part_number);
+          mppFormData.append('description', mppDescription || `MPP for ${latestValues.part_number}`);
+          mppFormData.append('version', mppVersion || 'v1');
+        }
+
+        // Prepare Drawing FormData if file exists
+        let drawingFormData = null;
+        if (drawingFile) {
+          drawingFormData = new FormData();
+          drawingFormData.append('file', drawingFile);
+          drawingFormData.append('name', drawingDocName || `DRAWING_${latestValues.part_number}`);
+          drawingFormData.append('doc_type', 'ENGINEERING_DRAWING');
+          drawingFormData.append('part_number', latestValues.part_number);
+          drawingFormData.append('description', drawingDescription || `Drawing for ${latestValues.part_number}`);
+          drawingFormData.append('version', drawingVersion || 'v1');
+        }
+
+        // Save OARC data with the form values (send only mergedData)
         const result = await saveOarcDataToDb(
-          storedData,
+          mergedData,
           mppFile,
           drawingFile,
-          mppDocName,
-          mppDescription,
-          mppVersion,
-          drawingDocName,
-          drawingDescription,
-          drawingVersion
+          mppDocName || `MPP_${latestValues.part_number}`,
+          mppDescription || `MPP for ${latestValues.part_number}`,
+          mppVersion || 'v1',
+          drawingDocName || `DRAWING_${latestValues.part_number}`,
+          drawingDescription || `Drawing for ${latestValues.part_number}`,
+          drawingVersion || 'v1'
         );
 
         // Clean up localStorage
@@ -601,26 +653,35 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       } else {
         // Handle manual creation case
         try {
-          console.log('Creating manual order with values:', values);
-          
-          // Create a payload object for better debugging
-          const orderPayload = {
-            ...values,
-            mppFile,
-            drawingFile,
-            mppDocName,
-            mppDescription,
-            mppVersion,
-            drawingDocName,
-            drawingDescription,
-            drawingVersion
-          };
-          
-          // Log the payload
-          console.log('Order payload:', orderPayload);
-          
-          const result = await createManualOrder(orderPayload);
-          
+          // Prepare FormData for file uploads if files exist
+          let mppFormData = null;
+          if (mppFile) {
+            mppFormData = new FormData();
+            mppFormData.append('file', mppFile);
+            mppFormData.append('name', mppDocName || `MPP_${latestValues.part_number}`);
+            mppFormData.append('doc_type', 'MPP');
+            mppFormData.append('part_number', latestValues.part_number);
+            mppFormData.append('description', mppDescription || `MPP for ${latestValues.part_number}`);
+            mppFormData.append('version', mppVersion || 'v1');
+          }
+
+          let drawingFormData = null;
+          if (drawingFile) {
+            drawingFormData = new FormData();
+            drawingFormData.append('file', drawingFile);
+            drawingFormData.append('name', drawingDocName || `DRAWING_${latestValues.part_number}`);
+            drawingFormData.append('doc_type', 'ENGINEERING_DRAWING');
+            drawingFormData.append('part_number', latestValues.part_number);
+            drawingFormData.append('description', drawingDescription || `Drawing for ${latestValues.part_number}`);
+            drawingFormData.append('version', drawingVersion || 'v1');
+          }
+
+          const result = await createManualOrder({
+            ...latestValues,
+            mppFormData,
+            drawingFormData
+          });
+
           console.log('Manual order creation result:', result);
 
           if (result.fileUploadError) {
@@ -628,11 +689,10 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
           } else {
             message.success('Order and documents created successfully');
           }
-
           await onCreate(result);
-        } catch (createError) {
-          console.error('Detailed manual order creation error:', createError);
-          throw new Error(`Failed to create order: ${createError.message || 'Unknown error'}`);
+        } catch (error) {
+          console.error('Detailed order creation error:', error);
+          throw new Error(`Failed to create order: ${error.message || 'Unknown error'}`);
         }
       }
 
@@ -643,23 +703,54 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
 
     } catch (error) {
       console.error('Order submission error:', error);
-      message.error(error.message || 'Failed to create order');
+      message.error(error.message || `Failed to ${initialData ? 'update' : 'create'} order`);
       form.setFields([{
         name: 'submit',
-        errors: [error.message || 'Failed to create order']
+        errors: [error.message || `Failed to ${initialData ? 'update' : 'create'} order`]
       }]);
     }
   };
 
   useEffect(() => {
-    if (visible && initialData) {
+    if (initialData) {
+      // If we have initial data, we're in edit mode
       form.setFieldsValue({
-        ...initialData,
-        deliveryDate: initialData.deliveryDate ? dayjs(initialData.deliveryDate) : undefined,
+        // Map the fields from initialData to form fields
+        production_order: initialData.production_order,
+        sale_order: initialData.sale_order,
+        wbs_element: initialData.wbs_element,
+        part_number: initialData.part_number,
+        part_description: initialData.part_description,
+        total_operations: initialData.total_operations,
+        required_quantity: initialData.required_quantity,
+        launched_quantity: initialData.launched_quantity,
+        plant_id: initialData.plant_id,
+        // Map any other fields as needed
       });
+      
+      // Set the order data for reference
+      setOrderData(initialData);
+      setIsManualCreate(true);
       setCurrentStep(1);
+      
+      // Fetch documents when part number changes or when in edit mode
+      const fetchDocuments = async () => {
+        const partNumber = initialData?.part_number || form.getFieldValue('part_number');
+        if (partNumber) {
+          await fetchDocumentsByPartNumber(partNumber);
+        }
+      };
+      
+      fetchDocuments();
+    } else {
+      // Reset form when opening modal for new order
+      form.resetFields();
+      setCurrentStep(0);
+      setIsManualCreate(false);
+      setOrderData(null);
+      clearDocuments();
     }
-  }, [visible, initialData, form]);
+  }, [initialData, form]);
 
   useEffect(() => {
     if (!visible) {
@@ -684,6 +775,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       if (productionOrder) {
         const storageKey = `oarcData_${productionOrder}`;
         const storedData = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        
         if (storedData) {
           setOperations(storedData.Operations || []);
           setRawMaterials(storedData["Raw Materials"] || []);
@@ -721,55 +813,51 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       className="p-4"
     >
       <Divider>Order Information</Divider>
-      
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
-            name="orderNumber"
+            name="production_order"
             label="Production Order"
+            rules={[{ required: true, message: 'Please enter Production Order' }]}
           >
-            <Input disabled />
+            <Input />
           </Form.Item>
         </Col>
         <Col span={12}>
           <Form.Item
-            name="salesOrderNumber"
+            name="sale_order"
             label="Sales Order"
+            rules={[{ required: true, message: 'Please enter Sales Order' }]}
           >
-            <Input disabled />
+            <Input />
           </Form.Item>
         </Col>
       </Row>
-
       <Divider>Project Information</Divider>
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
-            name="projectName"
+            name="project_name"
             label="Project Name"
+            rules={[{ required: true, message: 'Please enter Project Name' }]}
           >
-            <Input disabled />
+            <Input />
           </Form.Item>
         </Col>
         <Col span={12}>
           <Form.Item
             name="priority"
             label="Priority"
+            rules={[{ required: true, message: 'Please enter Priority' }]}
           >
-            <Input disabled />
+            <Input />
           </Form.Item>
         </Col>
       </Row>
-
-      {Array.isArray(rawMaterials) && rawMaterials.length > 0 && renderRawMaterials()}
-
-      {Array.isArray(operations) && operations.length > 0 && renderOperations()}
-
-      <Divider/>
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
-            name="wbsElement"
+            name="wbs_element"
             label="WBS Element"
             rules={[{ required: true, message: 'Please enter WBS Element' }]}
           >
@@ -778,7 +866,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         </Col>
         <Col span={12}>
           <Form.Item
-            name="partNumber"
+            name="part_number"
             label="Part Number"
             rules={[{ required: true, message: 'Please enter Part Number' }]}
           >
@@ -804,75 +892,54 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
           </Form.Item>
         </Col>
       </Row>
-  
       <Form.Item
-        name="materialDescription"
+        name="part_description"
         label="Part Description"
         rules={[{ required: true, message: 'Please enter Part Description' }]}
       >
         <Input />
       </Form.Item>
-  
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            name="totalOperations"
+            name="total_operations"
             label="Total Operations"
             rules={[{ required: true, message: 'Please enter Total Operations' }]}
           >
-            <InputNumber 
-              style={{ width: '100%' }} 
-              min={1}
-              parser={value => parseInt(value) || 0}
-            />
+            <InputNumber style={{ width: '100%' }} min={1} />
           </Form.Item>
         </Col>
         <Col span={8}>
           <Form.Item
-            name="targetQuantity"
+            name="required_quantity"
             label="Required Quantity"
             rules={[{ required: true, message: 'Please enter Required Quantity' }]}
           >
-            <InputNumber 
-              style={{ width: '100%' }} 
-              min={1}
-              parser={value => parseInt(value) || 0}
-            />
+            <InputNumber style={{ width: '100%' }} min={1} />
           </Form.Item>
         </Col>
         <Col span={8}>
           <Form.Item
-            name="launchedQuantity"
+            name="launched_quantity"
             label="Launched Quantity"
             rules={[{ required: true, message: 'Please enter Launched Quantity' }]}
           >
-            <InputNumber 
-              style={{ width: '100%' }} 
-              min={0}
-              parser={value => parseInt(value) || 0}
-            />
+            <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
         </Col>
       </Row>
-  
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
-            name="plant"
+            name="plant_id"
             label="Plant ID"
             rules={[{ required: true, message: 'Please enter Plant ID' }]}
           >
-            <InputNumber 
-              style={{ width: '100%' }} 
-              min={1}
-              parser={value => parseInt(value) || 0}
-            />
+            <InputNumber style={{ width: '100%' }} min={1} />
           </Form.Item>
         </Col>
       </Row>
-
       {renderFileUploadSection()}
-
       {error && (
         <Alert
           message="Error"
@@ -882,7 +949,6 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
           className="mb-4"
         />
       )}
-
       <Form.Item className="mb-0">
         <Space className="w-full justify-end">
           <Button onClick={handleCancel}>Cancel</Button>
@@ -905,9 +971,15 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       layout="vertical"
       onFinish={handleSubmit}
       initialValues={{
-        total_operations: 1,
-        required_quantity: 1,
-        launched_quantity: 0
+        total_operations: initialData?.total_operations || 1,
+        required_quantity: initialData?.required_quantity || 1,
+        launched_quantity: initialData?.launched_quantity || 0,
+        production_order: initialData?.production_order || '',
+        sale_order: initialData?.sale_order || '',
+        wbs_element: initialData?.wbs_element || '',
+        part_number: initialData?.part_number || '',
+        part_description: initialData?.part_description || '',
+        plant_id: initialData?.plant_id || ''
       }}
       className="p-4"
     >
@@ -1567,7 +1639,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
                     value={drawingVersion}
                     onChange={(e) => setDrawingVersion(e.target.value)}
                     placeholder="Enter version (e.g. v1)"
-                  />
+                  >
+                  </Input>
                 </Form.Item>
                 <Upload
                   maxCount={1}

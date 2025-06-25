@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert, message } from 'antd';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert, message, Switch } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, PlusCircleOutlined, CloseOutlined, DatabaseOutlined, UserOutlined, ClockCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -33,6 +33,8 @@ function InspectionResult() {
   const [ftpApprovalStatus, setFtpApprovalStatus] = useState(null);
   const [measuredData, setMeasuredData] = useState(null);
   const [isMeasuredDataModalVisible, setIsMeasuredDataModalVisible] = useState(false);
+  const [viewMode, setViewMode] = useState('all');
+  const [currentOperationData, setCurrentOperationData] = useState(null);
 
   useEffect(() => {
     const fetchPartNumbers = async () => {
@@ -60,6 +62,52 @@ function InspectionResult() {
 
     fetchPartNumbers();
   }, [navigate]);
+
+  useEffect(() => {
+    const loadCurrentOperation = () => {
+      try {
+        const currentJobStr = localStorage.getItem('currentJobData');
+        const activeOpStr = localStorage.getItem('activeOperation');
+        
+        if (currentJobStr && activeOpStr) {
+          const currentJob = JSON.parse(currentJobStr);
+          const activeOp = JSON.parse(activeOpStr);
+          
+          console.log('Current Job Data:', currentJob);
+          console.log('Active Operation:', activeOp);
+          
+          // Find the active operation details from currentJob operations
+          const activeOperation = currentJob.operations?.find(
+            op => op.operation_number === activeOp.operation_number
+          ) || activeOp;
+
+          // Format the data to match inspection data structure
+          const formattedData = {
+            key: currentJob.order_id || activeOp.operation_id,
+            order_id: currentJob.order_id || activeOp.operation_id,
+            production_order: currentJob.production_order || '',
+            part_number: currentJob.part_number || '',
+            operations: currentJob.operations?.map(op => ({
+              ...op,
+              operation_number: op.operation_number.toString()
+            })) || [],
+            active_operation: {
+              ...activeOperation,
+              operation_number: activeOperation.operation_number.toString()
+            }
+          };
+          
+          setCurrentOperationData(formattedData);
+        } else {
+          console.log('No current job or active operation found in localStorage');
+        }
+      } catch (error) {
+        console.error('Error loading current job data:', error);
+      }
+    };
+
+    loadCurrentOperation();
+  }, [selectedPartNumber]);
 
   const handlePartNumberChange = async (value) => {
     try {
@@ -473,8 +521,8 @@ function InspectionResult() {
     },
   ];
 
-  // Enhanced columns with conditional icons
-  const columns = [
+  // Update the columns definition to handle current view
+  const columns = useMemo(() => [
     {
       title: 'Order ID',
       dataIndex: 'order_id',
@@ -499,34 +547,44 @@ function InspectionResult() {
       dataIndex: 'operations',
       key: 'operations',
       width: '28%',
-      render: (operations, record) => (
-        <Space wrap>
-          {operations.map((op) => {
-            // Check if operation has measurement data
-            const hasData = record.inspection_data.some(
-              data => data.operation_number === op && 
-              data.inspections && 
-              data.inspections.length > 0
-            );
+      render: (operations, record) => {
+        // If in current operation view, only show the active operation
+        const opsToShow = viewMode === 'current' ? 
+          [record.active_operation] : 
+          operations;
 
-            return (
-              <Button
-                key={op}
-                type={hasData ? "primary" : "default"}
-                onClick={() => handleOperationClick(op, record)}
-                icon={hasData ? <CheckCircleOutlined /> : <PlusCircleOutlined />}
-                className={`
-                  transition-all duration-300
-                  ${hasData ? 'hover:shadow-md' : 'hover:border-blue-400'}
-                `}
-                size="small"
-              >
-                OP {op}
-              </Button>
-            );
-          })}
-        </Space>
-      ),
+        return (
+          <Space wrap>
+            {opsToShow.map((op) => {
+              // For all operations view, op is the operation number itself
+              const opNumber = viewMode === 'current' ? op.operation_number : op;
+              
+              // Check if operation has measurement data
+              const hasData = record.inspection_data?.some(
+                data => data.operation_number === opNumber && 
+                data.inspections && 
+                data.inspections.length > 0
+              );
+
+              return (
+                <Button
+                  key={opNumber}
+                  type={hasData ? "default" : "dashed"}
+                  onClick={() => handleOperationClick(opNumber, record)}
+                  icon={hasData ? <CheckCircleOutlined /> : <PlusCircleOutlined />}
+                  className={`
+                    transition-all duration-300
+                    ${hasData ? 'hover:border-blue-400' : ''}
+                  `}
+                  size="small"
+                >
+                  OP {opNumber}
+                </Button>
+              );
+            })}
+          </Space>
+        );
+      },
     },
     {
       title: 'Final Inspection',
@@ -548,7 +606,7 @@ function InspectionResult() {
         );
       },
     }
-  ];
+  ], [viewMode]); // Add viewMode to dependencies
 
   // Handle export to Excel
   const handleExport = () => {
@@ -1404,6 +1462,170 @@ function InspectionResult() {
     return flatData;
   };
 
+  // Update the handleViewModeChange function
+  const handleViewModeChange = (checked) => {
+    setViewMode(checked ? 'current' : 'all');
+    if (checked) {
+      try {
+        const currentJobStr = localStorage.getItem('currentJobData');
+        const activeOpStr = localStorage.getItem('activeOperation');
+        
+        if (currentJobStr && activeOpStr) {
+          const currentJob = JSON.parse(currentJobStr);
+          const activeOp = JSON.parse(activeOpStr);
+          
+          const formattedData = {
+            key: currentJob.order_id || activeOp.operation_id,
+            order_id: currentJob.order_id || activeOp.operation_id,
+            production_order: currentJob.production_order || '',
+            part_number: currentJob.part_number || '',
+            operations: currentJob.operations?.map(op => op.operation_number.toString()) || [activeOp.operation_number.toString()],
+            active_operation: activeOp,
+            inspection_data: currentJob.operations?.map(op => ({
+              operation_number: op.operation_number.toString(),
+              inspections: []
+            })) || [{
+              operation_number: activeOp.operation_number.toString(),
+              inspections: []
+            }]
+          };
+          
+          setCurrentOperationData(formattedData);
+        } else {
+          console.log('No current job or active operation found when switching view');
+          message.info('No current job data found');
+        }
+      } catch (error) {
+        console.error('Error loading current job data:', error);
+        message.error('Failed to load current job data');
+      }
+    }
+  };
+
+  // Update the formatCurrentOperationData function
+  const formatCurrentOperationData = useMemo(() => {
+    if (!currentOperationData) return null;
+    
+    return [{
+      ...currentOperationData,
+      operations: [currentOperationData.active_operation], // Only include active operation
+      key: currentOperationData.order_id
+    }];
+  }, [currentOperationData]);
+
+  // Define the current operation columns correctly
+  const currentOperationColumns = useMemo(() => [
+    {
+      title: 'Operation ID',
+      dataIndex: 'operation_id',
+      key: 'operation_id',
+      width: '8%'
+    },
+    {
+      title: 'Operation Number',
+      dataIndex: 'operation_number',
+      key: 'operation_number',
+      width: '8%'
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      width: '15%'
+    },
+    {
+      title: 'Work Center',
+      dataIndex: 'work_center',
+      key: 'work_center',
+      width: '8%',
+      render: (text) => (
+        <Tag color="blue">{text}</Tag>
+      )
+    },
+    {
+      title: 'Quantities',
+      children: [
+        {
+          title: 'Required',
+          dataIndex: 'required_quantity',
+          key: 'required_quantity',
+          width: '8%'
+        },
+        {
+          title: 'Completed',
+          dataIndex: 'completed_quantity',
+          key: 'completed_quantity',
+          width: '8%'
+        },
+        {
+          title: 'Rejected',
+          dataIndex: 'rejected_quantity',
+          key: 'rejected_quantity',
+          width: '8%'
+        },
+        {
+          title: 'Remaining',
+          dataIndex: 'remaining_quantity',
+          key: 'remaining_quantity',
+          width: '8%'
+        }
+      ]
+    },
+    {
+      title: 'Times (Hours)',
+      children: [
+        {
+          title: 'Cycle Time',
+          dataIndex: 'ideal_cycle_time',
+          key: 'ideal_cycle_time',
+          width: '8%',
+          render: (time) => time?.toFixed(2) || '-'
+        },
+        {
+          title: 'Setup Time',
+          dataIndex: 'setup_time',
+          key: 'setup_time',
+          width: '8%',
+          render: (time) => time?.toFixed(2) || '-'
+        },
+        {
+          title: 'Operation Time',
+          dataIndex: 'operation_time',
+          key: 'operation_time',
+          width: '8%',
+          render: (time) => time?.toFixed(2) || '-'
+        }
+      ]
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      width: '13%',
+      render: (_, record) => (
+        <Space direction="vertical" size="small">
+          <Tag color={record.is_complete ? 'success' : 'processing'}>
+            {record.is_complete ? 'Completed' : 'In Progress'}
+          </Tag>
+          {record.can_log && (
+            <Tag color="green">Can Log</Tag>
+          )}
+          {record.work_center_schedulable && (
+            <Tag color="blue">Schedulable</Tag>
+          )}
+        </Space>
+      )
+    }
+  ], []); // Empty dependency array since columns don't depend on any props or state
+
+  // Add this before the return statement
+  const currentOperationRow = useMemo(() => {
+    if (!currentOperationData) return null;
+    return {
+      ...currentOperationData,
+      key: currentOperationData.operation_id
+    };
+  }, [currentOperationData]);
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <style>{styles}</style>
@@ -1452,7 +1674,12 @@ function InspectionResult() {
                   <span className="text-lg font-semibold">Inspection History</span>
                   {loading && <Spin size="small" />}
                 </Space>
-              
+                <Switch
+                  checkedChildren="Current Operation"
+                  unCheckedChildren="All Operations"
+                  onChange={handleViewModeChange}
+                  className="custom-switch"
+                />
               </div>
             }
             className="shadow-sm border-0 rounded-lg"
@@ -1461,6 +1688,79 @@ function InspectionResult() {
               <div className="flex justify-center items-center p-12">
                 <Spin size="large" />
               </div>
+            ) : viewMode === 'current' ? (
+              currentOperationData ? (
+                <div style={{ maxWidth: '95%', margin: '0 auto' }}>
+                  {/* <Alert
+                    message={
+                      <Space direction="vertical" size="small" className="w-full">
+                        <Space>
+                          <Text strong>Current Job:</Text>
+                          <Text>Production Order: {currentOperationData.production_order}</Text>
+                          <Divider type="vertical" />
+                          <Text>Part Number: {currentOperationData.part_number}</Text>
+                        </Space>
+                        <Space>
+                          <Text strong>Active Operation:</Text>
+                          <Tag color="blue">OP {currentOperationData.active_operation.operation_number}</Tag>
+                          <Text>{currentOperationData.active_operation.description}</Text>
+                        </Space>
+                        <Space>
+                          <Text strong>Work Center:</Text>
+                          <Tag color="cyan">{currentOperationData.active_operation.work_center}</Tag>
+                          <Divider type="vertical" />
+                          <Text strong>Status:</Text>
+                          <Tag color={currentOperationData.active_operation.is_complete ? 'success' : 'processing'}>
+                            {currentOperationData.active_operation.is_complete ? 'Completed' : 'In Progress'}
+                          </Tag>
+                        </Space>
+                        <Space>
+                          <Statistic 
+                            title="Required Qty" 
+                            value={currentOperationData.active_operation.required_quantity} 
+                            valueStyle={{ fontSize: '14px' }}
+                          />
+                          <Divider type="vertical" />
+                          <Statistic 
+                            title="Completed Qty" 
+                            value={currentOperationData.active_operation.completed_quantity} 
+                            valueStyle={{ fontSize: '14px' }}
+                          />
+                          <Divider type="vertical" />
+                          <Statistic 
+                            title="Remaining Qty" 
+                            value={currentOperationData.active_operation.remaining_quantity} 
+                            valueStyle={{ fontSize: '14px' }}
+                          />
+                        </Space>
+                      </Space>
+                    }
+                    type="info"
+                    showIcon
+                    className="mb-4"
+                  /> */}
+                  <Table
+                    columns={columns}
+                    dataSource={[currentOperationData]}
+                    pagination={false}
+                    scroll={{ x: 1200 }}
+                    className="custom-table"
+                    bordered
+                    size="middle"
+                    sticky
+                  />
+                </div>
+              ) : (
+                <Empty 
+                  description={
+                    <div className="text-gray-500">
+                      <p>No active operation data available</p>
+                      <p className="text-sm">Please make sure an operation is selected</p>
+                    </div>
+                  }
+                  className="my-12"
+                />
+              )
             ) : inspectionData && inspectionData.length > 0 ? (
               <div style={{ maxWidth: '90%', margin: '0 auto' }}>
                 <Table
@@ -1681,269 +1981,26 @@ const styles = `
     transition: background-color 0.3s;
   }
 
+  .ant-statistic {
+    margin-right: 24px;
+  }
+
   .ant-statistic-title {
-    color: #4b5563;
-    margin-bottom: 8px;
+    font-size: 12px;
+    color: #6b7280;
   }
 
   .ant-statistic-content {
-    color: #1f2937;
-    font-size: 1.25rem;
+    font-size: 14px !important;
   }
 
-  .ant-card-head {
-    border-bottom: 1px solid #e5e7eb;
-    min-height: 48px;
+  .ant-alert-info {
+    background-color: #f0f7ff;
+    border: 1px solid #e0e7ff;
   }
 
-  .ant-card-head-title {
-    padding: 12px 0;
-  }
-
-  .ant-modal-content {
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  }
-
-  .ant-table-cell.measured-value {
-    font-family: monospace;
-    font-size: 0.95rem;
-  }
-
-  .dimension-type-cell {
-    font-weight: 500;
-    color: #374151;
-  }
-
-  .zone-cell {
-    font-weight: 500;
-    color: #4b5563;
-    background: #f3f4f6;
-  }
-
-  @keyframes progress {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(100%);
-    }
-  }
-  
-  .animate-progress {
-    animation: progress 2s infinite linear;
-  }
-
-  .qms-loading-modal .ant-modal-content {
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-
-  .qms-loading-modal .ant-modal-body {
-    padding: 24px;
-  }
-
-  /* Enhanced measurement table styling */
-  .measurement-modal .ant-modal-content {
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  
-  .measurement-modal .ant-modal-header {
-    background: #f0f7ff;
-    border-bottom: 1px solid #e0e7ff;
-    padding: 16px 24px;
-  }
-  
-  .measurement-modal .ant-statistic-title {
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-  
-  .measurement-modal .ant-statistic-content {
-    font-size: 24px;
-    font-weight: 500;
-  }
-  
-  .tab-button {
-    padding: 8px 16px;
-    height: auto;
-    border-radius: 8px 8px 0 0;
-    transition: all 0.3s;
-  }
-  
-  .tab-button:hover {
-    transform: translateY(-2px);
-  }
-  
-  .active-tab {
-    font-weight: 500;
-    border-bottom: 2px solid #1890ff;
-  }
-  
-  .length-tab.active-tab {
-    color: #16a34a;
-    border-bottom-color: #16a34a;
-  }
-  
-  .gdt-tab.active-tab {
-    color: #7e22ce;
-    border-bottom-color: #7e22ce;
-  }
-  
-  .holes-tab.active-tab {
-    color: #ea580c;
-    border-bottom-color: #ea580c;
-  }
-  
-  .custom-measurement-table .ant-table-thead > tr > th {
-    background: #f8fafc;
-    text-align: center;
-    font-weight: 600;
-    color: #334155;
-  }
-  
-  .custom-measurement-table .zone-tag {
-    border-radius: 4px;
-    font-weight: 500;
-    text-align: center;
-    display: block;
-    margin: 0 auto;
-    width: fit-content;
-  }
-  
-  .custom-measurement-table .holes-tag {
-    border-radius: 4px;
-    font-weight: 500;
-    text-align: center;
-    display: block;
-    margin: 0 auto;
-    width: fit-content;
-    font-size: 11px;
-    white-space: normal;
-    line-height: 1.4;
-    max-width: 180px;
-  }
-  
-  .custom-measurement-table .instrument-tag {
-    text-align: center;
-    display: block;
-    margin: 0 auto;
-    width: fit-content;
-  }
-  
-  .dimension-type {
-    font-weight: 500;
-    color: #334155;
-  }
-  
-  .gdt-symbol {
-    font-family: monospace;
-    letter-spacing: 0.5px;
-  }
-  
-  .nominal-value {
-    font-weight: 500;
-  }
-  
-  .zone-button {
-    min-width: 90px;
-    border-radius: 20px;
-    font-weight: 500;
-    transition: all 0.3s;
-    margin: 4px;
-  }
-  
-  .zone-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  }
-
-  /* Styles for the simplified measurement table */
-  .measurement-table .ant-table-thead > tr > th {
-    background: #f0f5ff;
-    font-weight: 600;
-    text-align: center;
-    color: #1e3a8a;
-    padding: 12px 8px;
-  }
-  
-  .measurement-table .ant-table-tbody > tr > td {
-    padding: 12px 8px;
-    text-align: center;
-  }
-  
-  .zone-tag {
-    display: inline-block;
-    font-weight: 500;
-    min-width: 40px;
-  }
-  
-  .instrument-tag {
-    display: inline-block;
-    font-family: monospace;
-    font-size: 12px;
-  }
-  
-  .tab-button {
-    border-radius: 6px;
-    margin-right: 4px;
-    margin-bottom: 4px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-  }
-  
-  .zone-button {
-    font-size: 11px;
-    height: 24px;
-    border-radius: 12px;
-    padding: 0 10px;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .custom-modal .ant-modal-header {
-    border-radius: 12px 12px 0 0;
-    padding: 16px 24px;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
-  }
-  
-  .custom-modal .ant-modal-body {
-    padding: 24px;
-  }
-
-  .detailed-measurements-table .ant-table-container {
-    overflow-x: auto;
-  }
-  
-  .detailed-measurements-table .ant-table-cell {
-    white-space: nowrap;
-    padding: 12px 16px;
-  }
-  
-  .detailed-measurements-table .ant-table-thead > tr > th {
-    background: #f0f5ff;
-    font-weight: 600;
-    text-align: center;
-    color: #1e3a8a;
-    padding: 12px 16px;
-  }
-  
-  .detailed-measurements-table .ant-table-tbody > tr > td {
-    padding: 12px 16px;
-    text-align: center;
-  }
-  
-  .detailed-measurements-table .ant-table-pagination {
-    margin: 16px 0;
-  }
-  
-  .detailed-measurements-table .ant-table-wrapper {
-    width: 100%;
-    overflow-x: auto;
+  .ant-alert-message {
+    margin-bottom: 0;
   }
 `;
 

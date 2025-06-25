@@ -4,6 +4,37 @@ import { Spin, Tooltip } from 'antd';
 import moment from 'moment';
 
 const usePlanningStore = create((set) => ({
+  // Function to fetch operations for tool management
+  fetchOperationsForTool: async (productionOrder) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/planning/search_order2?production_order=${productionOrder}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to fetch operations');
+      }
+
+      // Extract operations from the response
+      const operations = data.orders?.[0]?.operations || [];
+      console.log('Fetched operations:', operations); // Debug log
+      
+      // Transform operations for dropdown
+      const formattedOperations = operations.map(op => ({
+        ...op,
+        value: op.id, // Use operation id as the value
+        label: `${op.operation_number} - ${op.operation_description || 'No Description'}`,
+      }));
+
+      console.log('Formatted operations:', formattedOperations); // Debug log
+      set({ isLoading: false, error: null });
+      return formattedOperations;
+    } catch (error) {
+      console.error('Error fetching operations for tool:', error);
+      set({ error: error.message, isLoading: false });
+      return [];
+    }
+  },
   searchResults: [],
   allOrders: [],
   partNumbers: [],
@@ -248,8 +279,38 @@ const usePlanningStore = create((set) => ({
       mppDetails: null,
       error: null,
       isLoading: false,
-      searchResults: [], // Clear search results as well
     });
+  },
+
+  // Check order completion status
+  checkOrderCompletion: async (partNumber, productionOrder) => {
+    set({ isLoading: true, error: null });
+    try {
+      console.log('Checking completion status for:', { partNumber, productionOrder });
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/scheduling/check-order-completion-simple/${partNumber}/${productionOrder}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        },
+        mode: 'cors'
+      });
+
+      // First check if the response is ok
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Completion status response:', data);
+      
+      set({ isLoading: false, error: null });
+      return data;
+    } catch (error) {
+      console.error('Completion status check error:', error);
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
   },
 
   // Add new function to fetch active parts
@@ -381,9 +442,16 @@ const usePlanningStore = create((set) => ({
   // Function to update operation details
   updateOperationDetails: async (partNumber, operationNumber, updateData) => {
     try {
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      console.log('Sending operation update data:', {
+        partNumber,
+        operationNumber,
+        updateData
+      });
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/planning/operations/${updateData.production_order}/${operationNumber}`, {
         method: 'PUT',
         headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -391,12 +459,27 @@ const usePlanningStore = create((set) => ({
           setup_time: updateData.setup_time,
           ideal_cycle_time: updateData.ideal_cycle_time,
           work_center_code: updateData.work_center_code,
-          machine_id: updateData.machine_id
+          machine_id: updateData.machine_id,
+          production_order: updateData.production_order
         })
       });
 
+      // Try to get detailed error information if the request fails
       if (!response.ok) {
-        throw new Error('Failed to update operation details');
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('API error response:', errorData);
+        } catch (parseError) {
+          errorData = await response.text();
+          console.error('API error text:', errorData);
+        }
+        
+        throw new Error(
+          errorData && typeof errorData === 'object' && errorData.detail 
+            ? errorData.detail 
+            : 'Failed to update operation details'
+        );
       }
 
       const data = await response.json();
@@ -422,7 +505,7 @@ const usePlanningStore = create((set) => ({
 
       console.log('Sending machine update data:', formattedData);
 
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/planning/operations/${partNumber}/${operationNumber}`, {
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/planning/operations/${updateData.production_order}/${operationNumber}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -472,6 +555,10 @@ const usePlanningStore = create((set) => ({
       throw error;
     }
   },
+
+
+
+
 
   // Function to fetch MPP by identifier (production order and operation)
   fetchMppByIdentifier: async (productionOrder, operationNumber) => {
@@ -738,12 +825,12 @@ const usePlanningStore = create((set) => ({
       console.log('Documents response:', documentsData);
 
       // Check if MPP document exists and has latest version
-      if (documentsData.mpp_document?.latest_version?.id) {
+      if (documentsData.mpp_document?.id) {
         console.log('Found MPP document, attempting download');
         
         // Download the document
         const downloadResponse = await fetch(
-          `http://172.18.7.88:4455/api/v1/document-management/documents/${documentsData.mpp_document.latest_version.id}/download-latest`, {
+          `http://172.18.7.88:4455/api/v1/document-management/documents/${documentsData.mpp_document.id}/download-latest`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'accept': '*/*'
@@ -753,26 +840,16 @@ const usePlanningStore = create((set) => ({
         if (downloadResponse.ok) {
           const contentType = downloadResponse.headers.get('content-type');
           if (contentType && !contentType.includes('application/json')) {
-            // Get filename from Content-Disposition header if available
-            let filename = 'document';
+            // Get filename from Content-Disposition header
             const contentDisposition = downloadResponse.headers.get('content-disposition');
-            if (contentDisposition) {
-              const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-              if (filenameMatch && filenameMatch[1]) {
-                filename = filenameMatch[1].replace(/['"]/g, '');
-              }
-            }
-
-            // Check if this is a CNC program file
-            const isCncProgram = filename.match(/\.(nc|cnc|prt|mpf)$/i) || 
-                              documentsData.mpp_document.name?.toLowerCase().includes('cnc');
+            // const contentDisposition = downloadResponse.headers.get('content-disposition');
+console.log('Content-Disposition Header:', contentDisposition);
+            const filename = contentDisposition 
             
-            if (isCncProgram && filename.includes('.')) {
-              // Replace existing extension with .txt
-              filename = filename.replace(/\.[^.]+$/, '.txt');
-            } else if (isCncProgram) {
-              filename += '.txt';
-            }
+      ? contentDisposition.match(/filename="?([^"]+)"?/)[1] 
+      : 'document';
+
+            // Use the original filename as is
 
             const blob = await downloadResponse.blob();
             const url = window.URL.createObjectURL(blob);
@@ -947,17 +1024,14 @@ const usePlanningStore = create((set) => ({
         
         try {
           // Update the operation with the default machine
-          await fetch(`http://172.18.7.88:4455/api/v1/planning/operations/${partNumber}/${operationData.operation_number}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+          await updateOperationMachine(
+            partNumber,
+            operationData.operation_number,
+            {
               ...operationData,
               machine_id: defaultMachine.id
-            })
-          });
+            }
+          );
         } catch (updateError) {
           console.error('Error assigning default machine:', updateError);
           // Continue even if machine assignment fails
@@ -1007,31 +1081,14 @@ const usePlanningStore = create((set) => ({
     return false;
   },
 
-  // Update the uploadIpidDocument function to use the correct endpoint
-  uploadIpidDocument: async (file, productionOrder, operationNumber, documentName, description = '', versionNumber = '1', metadata = '{}') => {
+  // Updated uploadIpidDocument function to use FormData directly
+  uploadIpidDocument: async (formData) => {
     try {
-      if (!productionOrder) {
-        throw new Error('Production order number is required');
-      }
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('production_order', productionOrder);
-      formData.append('operation_number', operationNumber);
-      formData.append('document_name', documentName);
-      formData.append('description', description || '');
-      formData.append('version_number', versionNumber);
-      formData.append('metadata', metadata);
-
-      console.log('Uploading IPID with data:', {
-        productionOrder,
-        operationNumber,
-        documentName,
-        description,
-        versionNumber,
-        metadata
-      });
-
+      set({ isLoading: true, error: null });
+      
+      // Log what we're sending
+      console.log('Uploading IPID document');
+      
       const response = await fetch('http://172.18.7.88:4455/api/v1/document-management/ipid/upload/', {
         method: 'POST',
         headers: {
@@ -1047,633 +1104,65 @@ const usePlanningStore = create((set) => ({
 
       const data = await response.json();
       console.log('IPID Upload Response:', data);
+      set({ isLoading: false });
+      
       return {
         success: true,
-        data,
-        operationNumber
+        data
       };
     } catch (error) {
       console.error('Error uploading IPID document:', error);
-      throw error;
-    }
-  },
-
-  // Add function to fetch machine utilization data
-  fetchMachineUtilization: async (month, year) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/scheduling/machine-utilization?month=${month}&year=${year}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch machine utilization data');
-      }
-
-      const data = await response.json();
-      set({ isLoading: false });
-      return data;
-    } catch (error) {
-      console.error('Error fetching machine utilization:', error);
-      set({ isLoading: false, error: error.message });
-      return [];
-    }
-  },
-
-  // Add function to fetch machine utilization data by date range
-  fetchMachineUtilizationByDateRange: async (startDate, endDate) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      // Format dates as YYYY-MM-DD if they are not already
-      const formattedStartDate = typeof startDate === 'string' ? startDate : startDate.format('YYYY-MM-DD');
-      const formattedEndDate = typeof endDate === 'string' ? endDate : endDate.format('YYYY-MM-DD');
-      
-      console.log(`Fetching machine utilization for date range: ${formattedStartDate} to ${formattedEndDate}`);
-      
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/scheduling/machine-utilization/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch machine utilization data for date range');
-      }
-
-      const data = await response.json();
-      set({ isLoading: false });
-      return data;
-    } catch (error) {
-      console.error('Error fetching machine utilization by date range:', error);
-      set({ isLoading: false, error: error.message });
-      return [];
-    }
-  },
-
-  // Function to add a tool to an order
-  addOrderTool: async (toolData) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      // Format the data for the API - order_id should be a number, not a string
-      const formattedToolData = {
-        ...toolData,
-        // The API expects these as numbers, not strings
-        order_id: Number(toolData.order_id),
-        operation_id: Number(toolData.operation_id)
-      };
-      
-      // Log the data we're sending to help with debugging
-      console.log('Sending formatted tool data to API:', formattedToolData);
-      
-      const response = await fetch('http://172.18.7.88:4455/api/v1/toolsprograms/ordertools/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formattedToolData)
-      });
-
-      // Get response data
-      let data;
-      
-      try {
-        data = await response.json();
-        console.log('API Response Data:', data);
-      } catch (error) {
-        console.error('Error parsing response:', error);
-        data = {};
-      }
-
-      if (!response.ok) {
-        const errorMessage = data.detail || `Failed to add tool: ${response.status} ${response.statusText}`;
-        console.error('API Error:', errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      set({ isLoading: false });
-      
-      // Return the response data in the expected format
-      return {
-        id: data.id,
-        tool_name: data.tool_name || formattedToolData.tool_name,
-        tool_number: data.tool_number || formattedToolData.tool_number,
-        bel_partnumber: data.bel_partnumber || formattedToolData.bel_partnumber,
-        description: data.description || formattedToolData.description,
-        quantity: data.quantity || formattedToolData.quantity,
-        order_id: data.order_id || formattedToolData.order_id,
-        operation_id: data.operation_id || formattedToolData.operation_id
-        // We don't include productionOrder and partNumber here as those will be added by the component
-      };
-    } catch (error) {
-      console.error('Error adding tool:', error);
       set({ isLoading: false, error: error.message });
       throw error;
     }
   },
 
-  // Function to update an existing tool
-  updateOrderTool: async (toolId, toolData) => {
+  // Add function to fetch document versions
+  fetchDocumentVersions: async (documentId) => {
     try {
       set({ isLoading: true, error: null });
       
-      // Format the data for the API - order_id should be a number, not a string
-      const formattedToolData = {
-        ...toolData,
-        // The API expects these as numbers, not strings
-        order_id: Number(toolData.order_id),
-        operation_id: Number(toolData.operation_id)
-      };
-      
-      // Log the data we're sending to help with debugging
-      console.log(`Updating tool ${toolId} with data:`, formattedToolData);
-      
-      // Making sure the URL has the correct format
-      const apiUrl = `http://172.18.7.88:4455/api/v1/toolsprograms/ordertools/${toolId}/`;
-      console.log(`Sending PUT request to: ${apiUrl}`);
-      
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formattedToolData)
-      });
-
-      // Get response data
-      let data;
-      
-      try {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          data = await response.json();
-        } else {
-          const text = await response.text();
-          console.log('Non-JSON response:', text);
-          data = { message: text };
-        }
-        console.log('API Response Status:', response.status);
-        console.log('API Response Data for update:', data);
-      } catch (error) {
-        console.error('Error parsing update response:', error);
-        data = {};
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
       }
-
-      if (!response.ok) {
-        const errorMessage = data.detail || `Failed to update tool: ${response.status} ${response.statusText}`;
-        console.error('API Error during update:', errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      set({ isLoading: false });
       
-      // Return the response data in the expected format
-      return {
-        id: data.id || toolId,
-        tool_name: data.tool_name || formattedToolData.tool_name,
-        tool_number: data.tool_number || formattedToolData.tool_number,
-        bel_partnumber: data.bel_partnumber || formattedToolData.bel_partnumber,
-        description: data.description || formattedToolData.description,
-        quantity: data.quantity || formattedToolData.quantity,
-        order_id: data.order_id || formattedToolData.order_id,
-        operation_id: data.operation_id || formattedToolData.operation_id,
-        updated_at: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Error updating tool:', error);
-      set({ isLoading: false, error: error.message });
-      throw error;
-    }
-  },
-
-  // Function to delete a tool by ID
-  deleteOrderTool: async (toolId) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      console.log(`Deleting tool with ID: ${toolId}`);
-      
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/ordertools/${toolId}/`, {
-        method: 'DELETE',
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/documents/${documentId}/versions`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'accept': 'application/json'
         }
       });
 
       if (!response.ok) {
-        let errorMessage;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.detail || `Failed to delete tool: ${response.status} ${response.statusText}`;
-        } catch (error) {
-          errorMessage = `Failed to delete tool: ${response.status} ${response.statusText}`;
-        }
-        console.error('API Error during delete:', errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      set({ isLoading: false });
-      return true; // Return success
-    } catch (error) {
-      console.error('Error deleting tool:', error);
-      set({ isLoading: false, error: error.message });
-      throw error;
-    }
-  },
-
-  // Function to fetch tools by order_id
-  fetchToolsByOrderId: async (orderId) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      console.log(`Fetching tools for order ID: ${orderId}`);
-      
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/ordertools/?order_id=${orderId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
-        }
-      });
-
-      // Get response data
-      let data;
-      
-      try {
-        data = await response.json();
-        console.log('Order tools data:', data);
-      } catch (error) {
-        console.error('Error parsing tools response:', error);
-        data = [];
-      }
-
-      if (!response.ok) {
-        const errorMessage = typeof data === 'object' && data.detail 
-          ? data.detail 
-          : `Failed to fetch tools: ${response.status} ${response.statusText}`;
-        console.error('API Error fetching tools:', errorMessage);
-        
-        // We don't want to throw an error for 404 (no tools found)
-        if (response.status !== 404) {
-          throw new Error(errorMessage);
+        if (response.status === 404) {
+          console.log('No versions found for document:', documentId);
+          set({ isLoading: false });
+          return [];
         }
         
-        // Return empty array for 404
-        set({ isLoading: false });
-        return [];
-      }
-
-      set({ isLoading: false });
-      
-      // Format the tools data for the UI
-      return Array.isArray(data) ? data.map(tool => ({
-        id: tool.id,
-        tool_name: tool.tool_name,
-        tool_number: tool.tool_number,
-        bel_partnumber: tool.bel_partnumber,
-        description: tool.description,
-        quantity: tool.quantity,
-        order_id: tool.order_id,
-        operation_id: tool.operation_id,
-        created_at: tool.created_at,
-        updated_at: tool.updated_at,
-        // Additional fields for table display that might be needed
-        productionOrder: '', // This will be added by the component
-        operationNumber: '', // This will be added by the component
-        operationDescription: '' // This will be added by the component
-      })) : [];
-    } catch (error) {
-      console.error('Error fetching tools by order ID:', error);
-      set({ isLoading: false, error: error.message });
-      return [];
-    }
-  },
-
-  // Add function to add a new program
-  addOrderProgram: async (programData) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      // Format the data for the API if needed
-      const formattedProgramData = {
-        ...programData,
-        // The API expects these as numbers, not strings
-        order_id: Number(programData.order_id),
-        operation_id: Number(programData.operation_id)
-      };
-      
-      // Log the data we're sending to help with debugging
-      console.log('Sending formatted program data to API:', formattedProgramData);
-      
-      const response = await fetch('http://172.18.7.88:4455/api/v1/toolsprograms/programs/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formattedProgramData)
-      });
-
-      // Get response data
-      let data;
-      
-      try {
-        data = await response.json();
-        console.log('API Response Data:', data);
-      } catch (error) {
-        console.error('Error parsing response:', error);
-        data = {};
-      }
-
-      if (!response.ok) {
-        const errorMessage = data.detail || `Failed to add program: ${response.status} ${response.statusText}`;
-        console.error('API Error:', errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      set({ isLoading: false });
-      
-      // Return the response data in the expected format
-      return {
-        id: data.id,
-        program_name: data.program_name || formattedProgramData.program_name,
-        program_number: data.program_number || formattedProgramData.program_number,
-        version: data.version || formattedProgramData.version,
-        order_id: data.order_id || formattedProgramData.order_id,
-        operation_id: data.operation_id || formattedProgramData.operation_id,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        update_date: data.update_date
-      };
-    } catch (error) {
-      console.error('Error adding program:', error);
-      set({ isLoading: false, error: error.message });
-      throw error;
-    }
-  },
-
-  // Function to fetch programs by order_id
-  fetchProgramsByOrderId: async (orderId) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      console.log(`Fetching programs for order ID: ${orderId}`);
-      
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/programs/?order_id=${orderId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
-        }
-      });
-
-      // Get response data
-      let data;
-      
-      try {
-        data = await response.json();
-        console.log('Order programs data:', data);
-      } catch (error) {
-        console.error('Error parsing programs response:', error);
-        data = [];
-      }
-
-      if (!response.ok) {
-        const errorMessage = typeof data === 'object' && data.detail 
-          ? data.detail 
-          : `Failed to fetch programs: ${response.status} ${response.statusText}`;
-        console.error('API Error fetching programs:', errorMessage);
-        
-        // We don't want to throw an error for 404 (no programs found)
-        if (response.status !== 404) {
-          throw new Error(errorMessage);
-        }
-        
-        // Return empty array for 404
-        set({ isLoading: false });
-        return [];
-      }
-
-      set({ isLoading: false });
-      
-      // Format the programs data for the UI
-      return Array.isArray(data) ? data.map(program => ({
-        id: program.id,
-        program_name: program.program_name,
-        program_number: program.program_number,
-        version: program.version,
-        order_id: program.order_id,
-        operation_id: program.operation_id,
-        created_at: program.created_at,
-        updated_at: program.updated_at,
-        update_date: program.update_date,
-        // Additional fields for table display that might be needed
-        productionOrder: '', // This will be added by the component
-        operationNumber: '', // This will be added by the component
-        operationDescription: '' // This will be added by the component
-      })) : [];
-    } catch (error) {
-      console.error('Error fetching programs by order ID:', error);
-      set({ isLoading: false, error: error.message });
-      return [];
-    }
-  },
-
-  // Function to update an existing program
-  updateOrderProgram: async (programId, programData) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      // Format the data for the API
-      const formattedProgramData = {
-        ...programData,
-        // The API expects these as numbers, not strings
-        order_id: Number(programData.order_id),
-        operation_id: Number(programData.operation_id)
-      };
-      
-      // Log the data we're sending
-      console.log(`Updating program ${programId} with data:`, formattedProgramData);
-      
-      const apiUrl = `http://172.18.7.88:4455/api/v1/toolsprograms/programs/${programId}/`;
-      console.log(`Sending PUT request to: ${apiUrl}`);
-      
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formattedProgramData)
-      });
-
-      // Get response data
-      let data;
-      
-      try {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          data = await response.json();
-        } else {
-          const text = await response.text();
-          console.log('Non-JSON response:', text);
-          data = { message: text };
-        }
-        console.log('API Response Status:', response.status);
-        console.log('API Response Data for update:', data);
-      } catch (error) {
-        console.error('Error parsing update response:', error);
-        data = {};
-      }
-
-      if (!response.ok) {
-        const errorMessage = data.detail || `Failed to update program: ${response.status} ${response.statusText}`;
-        console.error('API Error during update:', errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      set({ isLoading: false });
-      
-      // Return the response data in the expected format
-      return {
-        id: data.id || programId,
-        program_name: data.program_name || formattedProgramData.program_name,
-        program_number: data.program_number || formattedProgramData.program_number,
-        version: data.version || formattedProgramData.version,
-        order_id: data.order_id || formattedProgramData.order_id,
-        operation_id: data.operation_id || formattedProgramData.operation_id,
-        updated_at: new Date().toISOString(),
-        update_date: data.update_date || new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Error updating program:', error);
-      set({ isLoading: false, error: error.message });
-      throw error;
-    }
-  },
-
-  // Function to delete a program by ID
-  deleteOrderProgram: async (programId) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      console.log(`Deleting program with ID: ${programId}`);
-      
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/programs/${programId}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        let errorMessage;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.detail || `Failed to delete program: ${response.status} ${response.statusText}`;
-        } catch (error) {
-          errorMessage = `Failed to delete program: ${response.status} ${response.statusText}`;
-        }
-        console.error('API Error during delete:', errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      set({ isLoading: false });
-      return true; // Return success
-    } catch (error) {
-      console.error('Error deleting program:', error);
-      set({ isLoading: false, error: error.message });
-      throw error;
-    }
-  },
-
-  // Function to update CNC program version
-  updateProgramVersion: async (programId, file, versionNumber) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      // Create FormData object to send multipart/form-data
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('version_number', versionNumber);
-      
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/cnc-program/${programId}/versions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          // Don't set Content-Type header - browser will set it automatically with boundary
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to update program version');
+        throw new Error(errorData.detail || 'Failed to fetch document versions');
       }
 
       const data = await response.json();
+      console.log('Document versions:', data);
       set({ isLoading: false });
-      return data;
+      return Array.isArray(data) ? data : [];
     } catch (error) {
-      console.error('Error updating program version:', error);
-      set({ isLoading: false, error: error.message });
-      throw error;
-    }
-  },
-
-  // Function to fetch program versions by document ID
-  fetchProgramVersions: async (documentId) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      console.log(`Fetching versions for document ID: ${documentId}`);
-      
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/cnc-program/${documentId}/versions`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to fetch program versions');
-      }
-
-      const data = await response.json();
-      console.log('Program versions data:', data);
-      set({ isLoading: false });
-      
-      // Format the versions data for the UI
-      return Array.isArray(data) ? data.map(version => ({
-        id: version.id,
-        version_number: version.version_number,
-        created_at: version.created_at,
-        file_size: version.file_size || 0,
-        file_name: version.file_name || '',
-        document_id: documentId
-      })) : [];
-    } catch (error) {
-      console.error('Error fetching program versions:', error);
+      console.error('Error fetching document versions:', error);
       set({ isLoading: false, error: error.message });
       return [];
     }
   },
 
-  // Function to upload CNC program document
-  uploadCncProgram: async (formData) => {
+  // Update the uploadDocumentVersion function to use the correct endpoint
+  uploadDocumentVersion: async (documentId, formData) => {
     try {
       set({ isLoading: true, error: null });
       
-      const response = await fetch('http://172.18.7.88:4455/api/v1/document-management/cnc-program/upload/', {
+      // Use the correct API base URL (172.18.7.88:4455)
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/documents/${documentId}/versions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -1683,16 +1172,119 @@ const usePlanningStore = create((set) => ({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to upload CNC program');
+        throw new Error(errorData.detail || 'Failed to upload document version');
       }
 
       const data = await response.json();
       set({ isLoading: false });
       return data;
     } catch (error) {
-      console.error('Error uploading CNC program:', error);
+      console.error('Error uploading document version:', error);
       set({ isLoading: false, error: error.message });
       throw error;
+    }
+  },
+
+  // Download document with original file extension
+  downloadDocument: async (documentId, versionId = null, originalFileName = null) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      // Construct the download URL
+      let downloadUrl = `http://172.18.7.88:4455/api/v1/document-management/documents/${documentId}/download`;
+      
+      // Add version ID if provided
+      if (versionId) {
+        downloadUrl += `?version_id=${versionId}`;
+      }
+
+      console.log(`Downloading document from: ${downloadUrl}`);
+      
+      // Fetch the document
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'accept': '*/*'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download document: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get the blob data
+      const blob = await response.blob();
+      
+      // Get the filename from the content-disposition header or use the original filename
+      let filename = 'document';
+      const contentDisposition = response.headers.get('content-disposition') || '';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      } else if (originalFileName) {
+        filename = originalFileName;
+      }
+      
+      console.log(`Downloading file as: ${filename}`);
+      
+      // Create a blob URL for the file
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element to trigger the download
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename; // This will force download with the specified filename
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
+      
+      return { success: true, filename };
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Add function to fetch IPID documents by production order
+  fetchIpidDocumentsByPo: async (productionOrder) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/ipid/by-po/${productionOrder}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          set({ isLoading: false });
+          return [];
+        }
+        
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch IPID documents');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error fetching IPID documents by PO:', error);
+      set({ isLoading: false, error: error.message });
+      return [];
     }
   },
 
@@ -1701,7 +1293,7 @@ const usePlanningStore = create((set) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const url = new URL('http://172.18.7.88:4455/api/v1/scheduling/part-production-pdc');
+      const url = new URL('http://172.18.7.88:4455/api/v1/scheduling/part-production-pdc11');
       if (partNumber) url.searchParams.append('part_number', partNumber);
       if (productionOrder) url.searchParams.append('production_order', productionOrder);
       
@@ -1817,7 +1409,7 @@ const usePlanningStore = create((set) => ({
         throw new Error('Authentication token not found');
       }
       const response = await fetch(
-        `http://172.18.7.88:4455/api/v1/document-management/documents/?page=1&page_size=10&part_number=${partNumber}`,
+        `http://172.18.7.88:4455/api/v1/document-management/documents/?page=1&page_size=100&part_number=${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1831,6 +1423,7 @@ const usePlanningStore = create((set) => ({
       const data = await response.json();
       // Filter only engineering drawing documents (doc_type_id: 2)
       const drawings = data.items.filter(item => item.doc_type_id === 2);
+      console.log('Engineering drawings:', drawings);
       return { items: drawings };
     } catch (error) {
       console.error('Error fetching engineering drawings:', error);
@@ -1838,238 +1431,525 @@ const usePlanningStore = create((set) => ({
     }
   },
 
-  // Function to download a specific document
-  downloadDocument: async (documentId, documentName = null) => {
+  // Add function to fetch IPID structure by production order
+  fetchIpidStructure: async (productionOrder) => {
     try {
+      set({ isLoading: true, error: null });
+      
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Authentication token not found');
       }
-
-      // First, try to fetch document details to get the proper name
-      if (!documentName) {
-        try {
-          console.log(`Fetching document details for ID: ${documentId}`);
-          const docDetailsResponse = await fetch(`http://172.18.7.88:4455/api/v1/document-management/documents/${documentId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'accept': 'application/json'
-            }
-          });
-          
-          if (docDetailsResponse.ok) {
-            const docDetails = await docDetailsResponse.json();
-            documentName = docDetails.name || `document_${documentId}`;
-            console.log(`Retrieved document name: ${documentName}`);
-          } else {
-            console.warn(`Failed to get document details: ${docDetailsResponse.status}`);
-          }
-        } catch (detailsError) {
-          console.warn('Could not fetch document details:', detailsError);
-          // Continue with the download even if we can't get the details
-        }
-      }
-
-      // Now proceed with the actual download
-      console.log(`Downloading document ID: ${documentId}, Name: ${documentName || 'unknown'}`);
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/documents/${documentId}/download-latest`, {
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/ipid/structure/${productionOrder}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'accept': '*/*'
+          'accept': 'application/json'
         }
       });
-      
+
+      if (response.status === 404) {
+        set({ isLoading: false });
+        return null;
+      }
+
       if (!response.ok) {
-        console.error(`Failed to download document: ${response.status} ${response.statusText}`);
-        throw new Error(`Failed to download document: ${response.status} ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch IPID structure');
       }
 
-      // Get filename from Content-Disposition header if available
-      let filename = documentName || 'document';
-      const contentDisposition = response.headers.get('content-disposition');
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          const headerFilename = filenameMatch[1].replace(/['"]/g, '');
-          // Only use the header filename if we didn't already get a document name
-          if (!documentName) {
-            filename = headerFilename;
-          }
-          console.log(`Content-Disposition filename: ${headerFilename}`);
-        }
-      }
-
-      // Check if this is a CNC program file from the filename or context
-      const isCncProgram = filename.match(/\.(nc|cnc|prt|mpf)$/i) || 
-                          documentId.toString().includes('cnc-program');
-      
-      if (isCncProgram) {
-        // Always use .txt extension for CNC program files
-        if (filename.includes('.')) {
-          // Replace existing extension with .txt
-          filename = filename.replace(/\.[^.]+$/, '.txt');
-        } else {
-          // Otherwise just append the extension
-          filename += '.txt';
-        }
-        console.log(`Using CNC program filename with .txt extension: ${filename}`);
-      } else if (!filename.includes('.')) {
-        // If no extension, try to determine from content type
-        const contentType = response.headers.get('content-type');
-        let extension = '';
-        
-        if (contentType) {
-          switch (contentType) {
-            case 'application/pdf':
-              extension = '.pdf';
-              break;
-            case 'text/plain':
-              extension = '.txt';
-              break;
-            case 'application/octet-stream':
-              // Default to .txt for octet-stream instead of .nc
-              extension = '.txt';
-              break;
-            case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-              extension = '.xlsx';
-              break;
-            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-              extension = '.docx';
-              break;
-            case 'image/jpeg':
-              extension = '.jpg';
-              break;
-            case 'image/png':
-              extension = '.png';
-              break;
-            default:
-              extension = '.txt';  // Default to .txt
-          }
-        } else {
-          extension = '.txt';  // Default to .txt if no content type
-        }
-        
-        filename += extension;
-        console.log(`Added extension based on content type: ${filename}`);
-      }
-
-      const blob = await response.blob();
-      
-      // Create download link and trigger click
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Cleanup
-      setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }, 100);
-      
-      return { success: true, filename }; // Return success indicator
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
     } catch (error) {
-      console.error('Error downloading document:', error);
-      return { success: false, error: error.message }; // Return failure indicator
+      console.error('Error fetching IPID structure:', error);
+      set({ isLoading: false, error: error.message });
+      return null;
     }
   },
 
-  // Update the fetchPdcForCurrentJob function to correctly fetch from the main endpoint
+  // Add this function to fetch machine utilization by date range
+  fetchMachinePlanningByDateRange: async (startDate, endDate) => {
+    try {
+      set({ isLoading: true, error: null });
+      // Format dates for API call
+      const formattedStartDate = startDate.format('YYYY-MM-DD');
+      const formattedEndDate = endDate.format('YYYY-MM-DD');
+      
+      // Make API call to correct endpoint
+      const response = await fetch(
+        `http://172.18.7.88:4455/api/v1/scheduling/machine-utilization/range?start_date=${formattedStartDate}&end_date=${formattedEndDate}`, 
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'accept': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch machine utilization data');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error fetching machine utilization by date range:', error);
+      set({ isLoading: false, error: error.message });
+      return [];
+    }
+  },
+
+  // Add this function to fetch PDC for the current job
   fetchPdcForCurrentJob: async (productionOrder) => {
     try {
-      // First check if the part is active
+      if (!productionOrder) {
+        console.error('No production order provided to fetchPdcForCurrentJob');
+        return { pdc: null, status: 'error', data_source: null };
+      }
+
+      // First check if this production order is in the active parts
       const { activeParts } = usePlanningStore.getState();
       const activePart = activeParts.find(part => 
-        part.production_order === productionOrder
+        part.production_order === productionOrder || 
+        part.production_order_number === productionOrder
       );
       
-      const isActive = activePart && activePart.status === 'active';
-      console.log(`Checking if ${productionOrder} is active:`, isActive);
-      
-      // If part is inactive, immediately return "Not yet scheduled" status
-      if (!isActive) {
-        console.log(`Part ${productionOrder} is inactive, returning inactive status`);
-        return {
-          pdc: null,
-          status: 'inactive',
-          data_source: null
-        };
+      // If part is not active, return appropriate status
+      if (!activePart || activePart.status !== 'active') {
+        console.log(`Production order ${productionOrder} is not active`);
+        return { pdc: null, status: 'inactive', data_source: null };
       }
       
-      // If active, fetch the PDC data from the main endpoint that returns all PDCs
-      console.log(`Fetching PDC data for active part ${productionOrder}`);
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/scheduling/part-production-pdc`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
+      // If part is active, fetch the PDC data using both part_number and production_order
+      const partNumber = activePart.part_number;
+      
+      // Use the new endpoint with both part_number and production_order
+      const response = await fetch(
+        `http://172.18.7.88:4455/api/v1/scheduling/part-production-pdc11?part_number=${partNumber}&production_order=${productionOrder}`, 
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'accept': 'application/json'
+          }
         }
-      });
+      );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch PDC data');
+      if (response.status === 404) {
+        // Part is active but no PDC data yet
+        console.log(`No PDC data found for part number: ${partNumber}, production order: ${productionOrder}`);
+        return { pdc: null, status: 'active', data_source: null };
       }
-
-      const pdcData = await response.json();
-      console.log(`PDC data response:`, pdcData);
-      
-      // Find the matching PDC entry for this production order
-      const matchingPdc = pdcData.find(item => item.production_order === productionOrder);
-      
-      if (matchingPdc) {
-        console.log(`Found matching PDC for ${productionOrder}:`, matchingPdc);
-        return {
-          pdc: matchingPdc.pdc,
-          status: 'active',
-          data_source: matchingPdc.data_source
-        };
-      }
-
-      // If no matching PDC found but part is active, return active state but null PDC
-      console.log(`No matching PDC found for active part ${productionOrder}`);
-      return {
-        pdc: null,
-        status: 'active',
-        data_source: null
-      };
-    } catch (error) {
-      console.error('Error fetching PDC for current job:', error);
-      return {
-        pdc: null,
-        status: 'error',
-        data_source: null
-      };
-    }
-  },
-
-  // Add this new function to fetch PDC data
-  fetchPdcData: async (productionOrder) => {
-    try {
-      const response = await fetch(`http://172.18.7.88:4455/api/v1/scheduling/part-production-pdc?production_order=${productionOrder}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'accept': 'application/json'
-        }
-      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch PDC data');
       }
 
       const data = await response.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return {
-          pdc: data[0].pdc,
-          status: data[0].status,
-          data_source: data[0].data_source
+      console.log('PDC data:', data);
+      
+      // If we have PDC data, return it with active status
+      if (data && Array.isArray(data) && data.length > 0) {
+        // Find the matching record with both part_number and production_order
+        const pdcData = data.find(item => 
+          item.part_number === partNumber && 
+          item.production_order === productionOrder
+        ) || data[0];
+        
+        return { 
+          pdc: pdcData.pdc, 
+          status: 'active', 
+          data_source: pdcData.data_source 
         };
       }
-      return null;
+      
+      // If no data returned but request was successful
+      return { pdc: null, status: 'active', data_source: null };
     } catch (error) {
       console.error('Error fetching PDC data:', error);
-      return null;
+      return { pdc: null, status: 'error', data_source: null };
+    }
+  },
+
+  // Function to fetch tools by order ID
+  fetchToolsByOrderId: async (orderId) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/ordertools/?order_id=${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch tools');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      
+      // Format the tools data for the UI
+      return Array.isArray(data) ? data.map(tool => ({
+        id: tool.id,
+        tool_name: tool.tool_name,
+        tool_number: tool.tool_number,
+        bel_partnumber: tool.bel_partnumber,
+        description: tool.description,
+        quantity: tool.quantity,
+        order_id: tool.order_id,
+        operation_id: tool.operation_id,
+        created_at: tool.created_at,
+        updated_at: tool.updated_at,
+        // Additional fields for table display that might be needed
+        productionOrder: '', // This will be added by the component
+        operationNumber: '', // This will be added by the component
+        operationDescription: '' // This will be added by the component
+      })) : [];
+    } catch (error) {
+      console.error('Error fetching tools by order ID:', error);
+      set({ isLoading: false, error: error.message });
+      return [];
+    }
+  },
+
+  // Function to add a tool to an order
+  addOrderTool: async (toolData) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Format the data for the API - order_id should be a number, not a string
+      const formattedToolData = {
+        ...toolData,
+        // The API expects these as numbers, not strings
+        order_id: Number(toolData.order_id),
+        operation_id: Number(toolData.operation_id),
+        quantity: Number(toolData.quantity)
+      };
+      
+      // Log the data we're sending to help with debugging
+      console.log('Sending formatted tool data to API:', formattedToolData);
+      
+      const response = await fetch('http://172.18.7.88:4455/api/v1/toolsprograms/ordertools/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formattedToolData)
+      });
+
+      // Get response data
+      let data;
+      
+      try {
+        data = await response.json();
+        console.log('API Response Data:', data);
+      } catch (error) {
+        console.error('Error parsing response:', error);
+        data = {};
+      }
+
+      if (!response.ok) {
+        const errorMessage = data.detail || `Failed to add tool: ${response.status} ${response.statusText}`;
+        console.error('API Error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error adding tool:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+  // Function to update a tool
+  updateOrderTool: async (toolId, toolData) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Format the data for the API
+      const formattedToolData = {
+        ...toolData,
+        order_id: Number(toolData.order_id),
+        operation_id: Number(toolData.operation_id),
+        quantity: Number(toolData.quantity)
+      };
+      
+      console.log('Updating tool with data:', formattedToolData);
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/ordertools/${toolId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formattedToolData)
+      });
+
+      // Try to parse response as JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        data = {};
+      }
+
+      if (!response.ok) {
+        const errorMessage = data.detail || `Failed to update tool: ${response.status} ${response.statusText}`;
+        console.error('API Error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error updating tool:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+  // Function to delete a tool
+  deleteOrderTool: async (toolId) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/ordertools/${toolId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+
+      // Try to parse response as JSON if available
+      let data = {};
+      try {
+        if (response.headers.get('content-type')?.includes('application/json')) {
+          data = await response.json();
+        }
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+      }
+
+      if (!response.ok) {
+        const errorMessage = data.detail || `Failed to delete tool: ${response.status} ${response.statusText}`;
+        console.error('API Error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      set({ isLoading: false });
+      return true; // Return success
+    } catch (error) {
+      console.error('Error deleting tool:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+  // Function to fetch programs by order ID
+  fetchProgramsByOrderId: async (orderId) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/orderprograms/by-order/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch programs');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      
+      // Format the programs data for the UI
+      return Array.isArray(data) ? data.map(program => ({
+        id: program.id,
+        program_name: program.program_name,
+        program_number: program.program_number,
+        description: program.program_name, // Use program_name as description if not available
+        version: program.version || 'v1',
+        order_id: program.order_id,
+        operation_id: program.operation_id,
+        created_at: program.created_at,
+        updated_at: program.updated_at
+      })) : [];
+    } catch (error) {
+      console.error('Error fetching programs by order ID:', error);
+      set({ isLoading: false, error: error.message });
+      return [];
+    }
+  },
+
+  // Function to add a program to an order
+  addOrderProgram: async (programData) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Format the data for the API
+      const formattedProgramData = {
+        ...programData,
+        order_id: Number(programData.order_id),
+        operation_id: Number(programData.operation_id)
+      };
+      
+      console.log('Sending program data to API:', formattedProgramData);
+      
+      const response = await fetch('http://172.18.7.88:4455/api/v1/toolsprograms/orderprograms/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formattedProgramData)
+      });
+
+      // Get response data
+      let data;
+      try {
+        data = await response.json();
+        console.log('API Response Data:', data);
+      } catch (error) {
+        console.error('Error parsing response:', error);
+        data = {};
+      }
+
+      if (!response.ok) {
+        const errorMessage = data.detail || `Failed to add program: ${response.status} ${response.statusText}`;
+        console.error('API Error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error adding program:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+  // Function to update a program
+  updateOrderProgram: async (programId, programData) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Format the data for the API
+      const formattedProgramData = {
+        ...programData,
+        order_id: Number(programData.order_id),
+        operation_id: Number(programData.operation_id)
+      };
+      
+      console.log('Updating program with data:', formattedProgramData);
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/orderprograms/${programId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formattedProgramData)
+      });
+
+      // Try to parse response as JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        data = {};
+      }
+
+      if (!response.ok) {
+        const errorMessage = data.detail || `Failed to update program: ${response.status} ${response.statusText}`;
+        console.error('API Error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error updating program:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+  // Function to delete a program
+  deleteOrderProgram: async (programId) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/toolsprograms/orderprograms/${programId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+
+      // Try to parse response as JSON if available
+      let data = {};
+      try {
+        if (response.headers.get('content-type')?.includes('application/json')) {
+          data = await response.json();
+        }
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+      }
+
+      if (!response.ok) {
+        const errorMessage = data.detail || `Failed to delete program: ${response.status} ${response.statusText}`;
+        console.error('API Error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      set({ isLoading: false });
+      return true; // Return success
+    } catch (error) {
+      console.error('Error deleting program:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+  // Function to upload CNC program
+  uploadCncProgram: async (formData) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch('http://172.18.7.88:4455/api/v1/document-management/cnc-program/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload CNC program');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error uploading CNC program:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
     }
   },
 
@@ -2086,7 +1966,14 @@ const usePlanningStore = create((set) => ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch CNC program details');
+        if (response.status === 404) {
+          // No programs found for this part
+          set({ isLoading: false });
+          return [];
+        }
+        
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch CNC program details');
       }
 
       const data = await response.json();
@@ -2095,10 +1982,130 @@ const usePlanningStore = create((set) => ({
     } catch (error) {
       console.error('Error fetching CNC program details:', error);
       set({ isLoading: false, error: error.message });
+      return [];
+    }
+  },
+
+  // Function to update program version
+  updateProgramVersion: async (documentId, file, versionNumber) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      // Create FormData object for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('version_number', versionNumber);
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/documents/${documentId}/versions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update program version');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error updating program version:', error);
+      set({ isLoading: false, error: error.message });
       throw error;
     }
   },
 
+  // Function to fetch program versions
+  fetchProgramVersions: async (documentId) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/documents/${documentId}/versions`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch program versions');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error fetching program versions:', error);
+      set({ isLoading: false, error: error.message });
+      return [];
+    }
+  },
+
+  // Function to upload CNC program
+  uploadCncProgram: async (formData) => {
+    try {
+      set({ isLoading: true, error: null });
+      const response = await fetch('http://172.18.7.88:4455/api/v1/document-management/cnc-program/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to upload CNC program');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error uploading CNC program:', error);
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
+
+
+  // Function to fetch CNC program details by part number
+  fetchCncProgramDetails: async (partNumber) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(`http://172.18.7.88:4455/api/v1/document-management/cnc-program/by-part/${partNumber}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // No programs found for this part
+          set({ isLoading: false });
+          return [];
+        }
+        
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch CNC program details');
+      }
+
+      const data = await response.json();
+      set({ isLoading: false });
+      return data;
+    } catch (error) {
+      console.error('Error fetching CNC program details:', error);
+      set({ isLoading: false, error: error.message });
+      return [];
+    }
+  }
 }));
 
 export default usePlanningStore;

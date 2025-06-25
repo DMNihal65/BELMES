@@ -576,7 +576,7 @@ const useEnergyStore = create((set, get) => ({
         const formattedDate = moment(date).format('YYYY-MM-DD');
         const xhr = new XMLHttpRequest();
         
-        xhr.open('GET', `http://172.16.0.203:8002/api/v5/total_energy_costs?date=${formattedDate}`, true);
+        xhr.open('GET', `http://172.18.7.88:4455/api/v5/total_energy_costs?date=${formattedDate}`, true);
         
         xhr.setRequestHeader('Accept', 'application/json');
         xhr.setRequestHeader('Content-Type', 'application/json');

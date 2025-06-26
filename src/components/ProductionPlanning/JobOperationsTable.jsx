@@ -122,29 +122,8 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       });
       setOperations(sortedOperations);
     } else {
-      // Try to load from localStorage if initialOperations is empty
-      try {
-        const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
-        const cachedOperations = localStorage.getItem(storageKey);
-        if (cachedOperations) {
-          const parsedOperations = JSON.parse(cachedOperations);
-          
-          // Ensure all operations loaded from localStorage have work_center properly set
-          const formattedOperations = parsedOperations.map(op => ({
-            ...op,
-            work_center: op.work_center || op.work_center_code || '',
-            primary_machine: op.primary_machine || null
-          }));
-          
-          console.log('Loaded operations from localStorage:', formattedOperations);
-          setOperations(formattedOperations);
-        } else {
-          setOperations([]);
-        }
-      } catch (error) {
-        console.error('Error loading operations from localStorage:', error);
-        setOperations([]);
-      }
+      // No longer loading from localStorage
+      setOperations([]);
     }
     
     // Refresh operations data from server when component mounts
@@ -392,14 +371,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           return op;
         });
         
-        // Store updated operations in localStorage
-        try {
-          const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
-          localStorage.setItem(storageKey, JSON.stringify(updatedOperations));
-        } catch (storageError) {
-          console.error('Error updating operations in localStorage:', storageError);
-        }
-        
         return updatedOperations;
       });
       
@@ -527,14 +498,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           return aNum - bNum;
         });
 
-        // Store in localStorage as a backup
-        try {
-          const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
-          localStorage.setItem(storageKey, JSON.stringify(sortedOperations));
-          console.log('Operations cached in localStorage');
-        } catch (storageError) {
-          console.error('Error caching operations:', storageError);
-        }
+        // No longer storing operations in localStorage
         
         return sortedOperations;
       });
@@ -597,14 +561,6 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
           
           console.log('Updated operations from server:', sortedOperations);
           setOperations(sortedOperations);
-          
-          // Also update localStorage
-          try {
-            const storageKey = `operations_${partNumber}_${productionOrder || orderNumber}`;
-            localStorage.setItem(storageKey, JSON.stringify(sortedOperations));
-          } catch (storageError) {
-            console.error('Error caching refreshed operations:', storageError);
-          }
         }
       }
     } catch (error) {

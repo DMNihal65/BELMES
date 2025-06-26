@@ -561,30 +561,24 @@ function InspectionResult() {
               
               // Check if operation has measurement data
               const hasData = record.inspection_data?.some(
-                data => data.operation_number === opNumber && 
-                data.inspections && 
-                data.inspections.length > 0
+                data => data.operation_number === opNumber && data.inspections && data.inspections.length > 0
               );
 
               return (
                 <Button
                   key={opNumber}
-                  type={hasData ? "default" : "dashed"}
-                  onClick={() => handleOperationClick(opNumber, record)}
+                  type={hasData ? 'primary' : 'default'}
                   icon={hasData ? <CheckCircleOutlined /> : <PlusCircleOutlined />}
-                  className={`
-                    transition-all duration-300
-                    ${hasData ? 'hover:border-blue-400' : ''}
-                  `}
-                  size="small"
+                  onClick={() => handleOperationClick(opNumber, record)}
+                  className={`hover:scale-105 transition-transform ${hasData ? 'bg-green-500 border-green-500 hover:bg-green-600 hover:border-green-600' : ''}`}
                 >
-                  OP {opNumber}
+                  {opNumber}
                 </Button>
               );
             })}
           </Space>
         );
-      },
+      }
     },
     {
       title: 'Final Inspection',
@@ -593,15 +587,20 @@ function InspectionResult() {
       width: '20%',
       fixed: 'right',
       render: (inspectionData, record) => {
+        // Check if there's any final inspection data (operation 999)
+        const hasFinalInspection = record.inspection_data?.some(
+          data => data.operation_number === 999 && data.inspections && data.inspections.length > 0
+        );
+        
         return (
           <Button
-            type="primary"
+            type={hasFinalInspection ? 'primary' : 'default'}
             size="small"
-            icon={<EyeOutlined />}
+            icon={hasFinalInspection ? <CheckCircleOutlined /> : <EyeOutlined />}
             onClick={() => handleOperationClick('final', record)}
-            className="hover:scale-105 transition-transform"
+            className={`hover:scale-105 transition-transform ${hasFinalInspection ? 'bg-green-500 border-green-500 hover:bg-green-600 hover:border-green-600' : ''}`}
           >
-            View Final Inspection
+            {hasFinalInspection ? 'View Final Inspection' : 'No Final Data'}
           </Button>
         );
       },

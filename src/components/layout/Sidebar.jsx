@@ -476,7 +476,7 @@ function Sidebar() {
     // },
     {
       key: '/admin/energy-monitoring-bel',
-      label: 'ENERGY MONITORING BEL',
+      label: 'ENERGY MONITORING',
       className: 'energy-menu-item',
       style: {
         textAlign: 'center',

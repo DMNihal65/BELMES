@@ -67,9 +67,9 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
   const [drawingFile, setDrawingFile] = useState(null);
   const [mppDocName, setMppDocName] = useState('');
   const [mppVersion, setMppVersion] = useState('v1');
+  const [mppDescription, setMppDescription] = useState('');
   const [drawingDocName, setDrawingDocName] = useState('');
   const [drawingVersion, setDrawingVersion] = useState('v1');
-  const [mppDescription, setMppDescription] = useState('');
   const [drawingDescription, setDrawingDescription] = useState('');
   const [oarcData, setOarcData] = useState(null);
   const [operations, setOperations] = useState([]);
@@ -80,6 +80,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
   const [drawingVersionFile, setDrawingVersionFile] = useState(null);
   const [newMppVersion, setNewMppVersion] = useState('');
   const [newDrawingVersion, setNewDrawingVersion] = useState('');
+  const [currentOarcData, setCurrentOarcData] = useState(null);
+  const [currentProductionOrder, setCurrentProductionOrder] = useState(null);
 
   const steps = [
     {
@@ -91,6 +93,31 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       description: 'Fill order information',
     }
   ];
+
+  // Utility function to clean up any existing localStorage OARC data
+  const cleanupLocalStorageOarcData = () => {
+    try {
+      // Remove any existing OARC data from localStorage
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('oarcData_') || key === 'currentProductionOrder')) {
+          keysToRemove.push(key);
+        }
+      }
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+        console.log(`Cleaned up localStorage key: ${key}`);
+      });
+      
+      if (keysToRemove.length > 0) {
+        console.log(`Cleaned up ${keysToRemove.length} localStorage OARC data entries`);
+      }
+    } catch (error) {
+      console.error('Error cleaning up localStorage OARC data:', error);
+    }
+  };
 
   const handleOarcUpload = async (file) => {
     try {
@@ -126,15 +153,14 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         "Document Verification": {}
       };
 
-      const storageKey = `oarcData_${result["Prod Order No"]}`;
-      localStorage.setItem('currentProductionOrder', result["Prod Order No"]);
-      localStorage.setItem(storageKey, JSON.stringify(completeData));
+      setCurrentOarcData(completeData);
+      setCurrentProductionOrder(result["Prod Order No"]);
 
       setOrderData(completeData);
       setOperations(result.Operations);
       setRawMaterials(result["Raw Materials"]);
 
-      console.log('Stored complete data:', completeData);
+      console.log('Stored complete data in state:', completeData);
 
       form.setFieldsValue({
         production_order: result["Prod Order No"],
@@ -149,6 +175,9 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         launched_quantity: result["Launched Qty"],
         plant_id: result["Plant"]
       });
+      
+      // Move to the next step after successful upload
+      setCurrentStep(1);
 
       // Fetch existing documents for the part number
       if (result["Part No"]) {
@@ -323,6 +352,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     setDrawingVersionFile(null);
     setNewMppVersion('');
     setNewDrawingVersion('');
+    setCurrentOarcData(null);
+    setCurrentProductionOrder(null);
     onCancel();
   };
 
@@ -578,29 +609,16 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       
       // Always get the latest values from the form
       const latestValues = form.getFieldsValue();
-      // Use latestValues instead of values for all order data
-      // ... replace all usages of 'values' with 'latestValues' in this function ...
-      // For example:
-      // const orderData = { ...latestValues, ...otherFields };
-      // ... rest of the function ...
 
       // Handle new order creation (OARC or manual)
       if (!isManualCreate) {
-        // Handle OARC upload case
-        const productionOrder = localStorage.getItem('currentProductionOrder');
-        if (!productionOrder) {
-          throw new Error('No production order found');
-        }
-
-        const storageKey = `oarcData_${productionOrder}`;
-        const storedData = JSON.parse(localStorage.getItem(storageKey));
-        
-        if (!storedData) {
-          throw new Error('No stored data found');
+        // Handle OARC upload case - use state instead of localStorage
+        if (!currentProductionOrder || !currentOarcData) {
+          throw new Error('No production order data found. Please upload OARC document again.');
         }
 
         // Merge OARC data with form values, mapping form fields to OARC keys
-        const mergedData = mergeFormWithOarcData(storedData, latestValues);
+        const mergedData = mergeFormWithOarcData(currentOarcData, latestValues);
 
         // Prepare MPP FormData if file exists
         let mppFormData = null;
@@ -639,9 +657,9 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
           drawingVersion || 'v1'
         );
 
-        // Clean up localStorage
-        localStorage.removeItem(storageKey);
-        localStorage.removeItem('currentProductionOrder');
+        // Clear OARC data from state after successful save
+        setCurrentOarcData(null);
+        setCurrentProductionOrder(null);
 
         if (result.fileUploadError) {
           message.warning('Order was saved but there was an issue uploading some files: ' + result.fileUploadError);
@@ -771,21 +789,9 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
 
   useEffect(() => {
     if (visible) {
-      const productionOrder = localStorage.getItem('currentProductionOrder');
-      if (productionOrder) {
-        const storageKey = `oarcData_${productionOrder}`;
-        const storedData = JSON.parse(localStorage.getItem(storageKey) || '{}');
-        
-        if (storedData) {
-          setOperations(storedData.Operations || []);
-          setRawMaterials(storedData["Raw Materials"] || []);
-        }
-      }
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    if (visible) {
+      // Clean up any existing localStorage OARC data
+      cleanupLocalStorageOarcData();
+      
       // Clear form
       form.resetFields();
       
@@ -801,8 +807,29 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       
       // Clear document store state
       clearDocuments();
+      
+      // Clear OARC data from state
+      setCurrentOarcData(null);
+      setCurrentProductionOrder(null);
     }
   }, [visible, form]);
+
+  // Cleanup effect when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clear sensitive data from memory when component unmounts
+      setCurrentOarcData(null);
+      setCurrentProductionOrder(null);
+      setOrderData(null);
+      setOperations([]);
+      setRawMaterials([]);
+      setMppFile(null);
+      setDrawingFile(null);
+      
+      // Clean up any remaining localStorage OARC data
+      cleanupLocalStorageOarcData();
+    };
+  }, []);
 
   const renderOrderForm = () => (
     <Form
@@ -939,6 +966,24 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
           </Form.Item>
         </Col>
       </Row>
+      
+      {/* Display Operations */}
+      {operations?.length > 0 && (
+        <div className="mb-6">
+         
+          {renderOperations()}
+        </div>
+      )}
+      
+      {/* Display Raw Materials */}
+      {rawMaterials?.length > 0 && (
+        <div className="mb-6">
+        
+          {renderRawMaterials()}
+        </div>
+      )}
+      
+      
       {renderFileUploadSection()}
       {error && (
         <Alert
@@ -1799,7 +1844,12 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         renderManualCreateForm()
       )}
 
-      {currentStep === 1 && !isManualCreate && renderOrderForm()}
+      {currentStep === 1 && !isManualCreate && (
+        <div className="bg-white rounded-lg p-6 mt-4">
+          {/* <h3 className="text-lg font-semibold mb-4">Order Details</h3> */}
+          {renderOrderForm()}
+        </div>
+      )}
     </Modal>
   );
 };

@@ -3,60 +3,25 @@ import { create } from 'zustand';
 const API_BASE_URL = 'http://172.18.7.88:4455/api/v1/planning';
 const API_PLANNING_BASE_URL = 'http://172.18.7.88:4455/api/v1/planning';
 
-// Helper function to get stored order from localStorage
-const getStoredOrder = () => {
-  const storedOrder = localStorage.getItem('selectedOrder');
-  return storedOrder ? JSON.parse(storedOrder) : null;
-};
-
 const DEFAULT_PART_NUMBER = '213511100114';
 
 const useOperatorMppStore = create((set, get) => ({
   allOrders: [],
-  selectedOrder: getStoredOrder(),
-  orderDetails: getStoredOrder(),
+  selectedOrder: null,
+  orderDetails: null,
   isLoading: false,
   error: null,
   isOrderChangeAllowed: true,
 
-  // Update the init function
+  // Initialize the store
   init: async () => {
-    const storedOrder = getStoredOrder();
-    if (storedOrder) {
-      try {
-        const response = await fetch(`${API_PLANNING_BASE_URL}/search_order?part_number=${storedOrder.part_number}`);
-        const data = await response.json();
-        
-        if (data.orders && data.orders.length > 0) {
-          const freshOrderData = data.orders[0];
-          localStorage.setItem('selectedOrder', JSON.stringify(freshOrderData));
-          set({ 
-            orderDetails: freshOrderData,
-            currentActiveOrder: freshOrderData
-          });
-          return;
-        }
-      } catch (error) {
-        console.error('Error loading stored order:', error);
-      }
-    }
-    
-    // Only load default if no stored order exists or there was an error
-    try {
-      const response = await fetch(`${API_PLANNING_BASE_URL}/search_order?part_number=${DEFAULT_PART_NUMBER}`);
-      const data = await response.json();
-      
-      if (data.orders && data.orders.length > 0) {
-        const defaultOrder = data.orders[0];
-        localStorage.setItem('selectedOrder', JSON.stringify(defaultOrder));
-        set({ 
-          orderDetails: defaultOrder,
-          currentActiveOrder: defaultOrder
-        });
-      }
-    } catch (error) {
-      console.error('Error loading default order:', error);
-    }
+    // No longer loading from localStorage
+    // Just set initial state
+    set({
+      selectedOrder: null,
+      orderDetails: null,
+      currentActiveOrder: null
+    });
   },
 
   // Fetch all orders

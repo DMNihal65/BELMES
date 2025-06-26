@@ -375,29 +375,11 @@ const loadInventoryItems = async () => {
     },
   };
 
-  // Load saved selection from localStorage on component mount
+  // Initialize part details from props or state
   useEffect(() => {
-    const savedSelection = localStorage.getItem('selectedJobDetails');
-    if (savedSelection) {
-      const { partNumber, productionOrder, projectName, partDescription } = JSON.parse(savedSelection);
-      setSelectedPartNumber(partNumber);
-      setSelectedProductionOrder(productionOrder);
-      setSelectedProjectName(projectName);
-      setSelectedPartDescription(partDescription);
-    }
+    // No longer loading from localStorage
+    console.log('Component mounted');
   }, []);
-
-  // Save selection to localStorage whenever it changes
-  useEffect(() => {
-    if (selectedPartNumber && selectedProductionOrder) {
-      localStorage.setItem('selectedJobDetails', JSON.stringify({
-        partNumber: selectedPartNumber,
-        productionOrder: selectedProductionOrder,
-        projectName: selectedProjectName,
-        partDescription: selectedPartDescription
-      }));
-    }
-  }, [selectedPartNumber, selectedProductionOrder, selectedProjectName, selectedPartDescription]);
 
   // Fetch part numbers and active parts on component mount
   React.useEffect(() => {
@@ -405,80 +387,11 @@ const loadInventoryItems = async () => {
     fetchActiveParts();
     // Clear PDC data when the component mounts
     setPdcData(null);
-
-    // Load saved job and tools data from localStorage
-    const savedJob = localStorage.getItem('selectedJob');
-    if (savedJob) {
-      try {
-        const parsedJob = JSON.parse(savedJob);
-        setSelectedJob(parsedJob);
-        setSelectedOrderNumber(parsedJob?.production_order);
-        console.log('Restored job from localStorage:', parsedJob);
-        
-        // Only fetch PDC data for the restored job if needed
-        // We'll handle this in a separate useEffect below
-        
-        // After restoring the job, check for saved tools that match this job
-        const savedTools = localStorage.getItem('jobTools');
-        if (savedTools) {
-          try {
-            const parsedTools = JSON.parse(savedTools);
-            // Only use saved tools if they match the restored job
-            if (parsedTools.length > 0 && parsedTools[0].productionOrder === parsedJob.production_order) {
-              setTools(parsedTools);
-              console.log('Restored matching tools from localStorage:', parsedTools);
-            } else {
-              console.log('Saved tools do not match the restored job - initializing empty tools');
-              setTools([]);
-            }
-          } catch (error) {
-            console.error('Error parsing saved tools:', error);
-            setTools([]);
-          }
-        }
-
-        // Also restore saved programs from localStorage
-        const savedPrograms = localStorage.getItem('jobPrograms');
-        if (savedPrograms) {
-          try {
-            const parsedPrograms = JSON.parse(savedPrograms);
-            // Only use saved programs if they match the restored job
-            if (parsedPrograms.length > 0 && parsedPrograms[0].productionOrder === parsedJob.production_order) {
-              setPrograms(parsedPrograms);
-              console.log('Restored matching programs from localStorage:', parsedPrograms);
-            } else {
-              console.log('Saved programs do not match the restored job - initializing empty programs');
-              setPrograms([]);
-            }
-          } catch (error) {
-            console.error('Error parsing saved programs:', error);
-            setPrograms([]);
-          }
-        }
-        
-        // Remove this block
-        // Restore saved program documents from localStorage
-        const savedProgramDocuments = localStorage.getItem('programDocuments');
-        if (savedProgramDocuments) {
-          try {
-            const parsedDocuments = JSON.parse(savedProgramDocuments);
-            // Only use saved documents if they match the restored job
-            if (parsedDocuments.length > 0 && parsedDocuments[0].part_number === parsedJob.part_number) {
-              setProgramDocuments(parsedDocuments);
-              console.log('Restored matching program documents from localStorage:', parsedDocuments);
-            } else {
-              console.log('Saved program documents do not match the restored job - initializing empty documents');
-              setProgramDocuments([]);
-            }
-          } catch (error) {
-            console.error('Error parsing saved program documents:', error);
-            setProgramDocuments([]);
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing saved job:', error);
-      }
-    }
+    
+    // Initialize empty tools, programs and documents
+    setTools([]);
+    setPrograms([]);
+    setProgramDocuments([]);
   }, [fetchAllOrders, fetchActiveParts]);
 
   // Add a new useEffect to fetch PDC data when selectedJob changes
@@ -530,29 +443,7 @@ const loadInventoryItems = async () => {
     };
 
     fetchPdcForCurrentJob();
-  }, [selectedJob, fetchPartProductionPDC]); // Include fetchPartProductionPDC in the dependency array
-
-  // Save selectedJob to localStorage when it changes
-  useEffect(() => {
-    if (selectedJob) {
-      localStorage.setItem('selectedJob', JSON.stringify(selectedJob));
-    }
-  }, [selectedJob]);
-
-  // Save tools to localStorage when they change
-  useEffect(() => {
-    if (tools.length > 0) {
-      localStorage.setItem('jobTools', JSON.stringify(tools));
-    }
-  }, [tools]);
-
-  // Save programs to localStorage when they change
-  useEffect(() => {
-    if (programs.length > 0) {
-      localStorage.setItem('jobPrograms', JSON.stringify(programs));
-      console.log('Saved programs to localStorage:', programs);
-    }
-  }, [programs]);
+  }, [selectedJob, fetchPartProductionPDC]);
 
   // Use effect to set form values when selectedTool changes
   useEffect(() => {
@@ -739,6 +630,7 @@ const loadInventoryItems = async () => {
       setLoading(true);
       setSelectedJob(null);
       setCompletionStatus(null); // Reset completion status when selecting new job
+      setSelectedProductionOrder(partNumber); // Set the selected production order
       
       if (!partNumber) {
         setSelectedJob(null);
@@ -759,8 +651,7 @@ const loadInventoryItems = async () => {
             console.log('Job details:', jobData);
             setSelectedJob(jobData);
             
-            // Save to localStorage for persistence
-            localStorage.setItem('selectedJob', JSON.stringify(jobData));
+            // Job data is now only stored in state
             
             // PDC data will be fetched by the useEffect hook when selectedJob changes
             // No need to fetch it here
@@ -777,12 +668,10 @@ const loadInventoryItems = async () => {
               }));
               
               setTools(enhancedToolsData);
-              localStorage.setItem('tools', JSON.stringify(enhancedToolsData));
             } catch (toolsError) {
               console.error('Error fetching tools:', toolsError);
-              // Fall back to localStorage if available
-              const savedTools = JSON.parse(localStorage.getItem('tools') || '[]');
-              setTools(savedTools);
+              // Reset tools on error
+              setTools([]);
             }
             
             try {
@@ -798,12 +687,10 @@ const loadInventoryItems = async () => {
               }));
               
               setPrograms(enhancedProgramsData);
-              localStorage.setItem('programs', JSON.stringify(enhancedProgramsData));
             } catch (programsError) {
               console.error('Error fetching programs:', programsError);
-              // Fall back to localStorage if available
-              const savedPrograms = JSON.parse(localStorage.getItem('programs') || '[]');
-              setPrograms(savedPrograms);
+              // Reset programs on error
+              setPrograms([]);
             }
             
             return jobData;
@@ -863,9 +750,7 @@ const loadInventoryItems = async () => {
     setTools([]);
     setPrograms([]);
     setPdcData(null);
-    localStorage.removeItem('selectedJob');
-    localStorage.removeItem('jobTools');
-    localStorage.removeItem('jobPrograms');
+    // No need to clear localStorage as we're not using it anymore
   };
 
   const handleShowPreview = () => {
@@ -1932,11 +1817,7 @@ const loadInventoryItems = async () => {
         return null;
       }).filter(Boolean);
       
-      setProgramDocuments(prevDocs => {
-        const updatedDocs = [...prevDocs, ...newDocuments];
-        localStorage.setItem('programDocuments', JSON.stringify(updatedDocs));
-        return updatedDocs;
-      });
+      setProgramDocuments(prevDocs => [...prevDocs, ...newDocuments]);
       
       message.success(`${files.length} CNC program(s) uploaded successfully`);
       setIsAddDocumentModalVisible(false);
@@ -1949,36 +1830,6 @@ const loadInventoryItems = async () => {
       setLoading(false);
     }
   };
-
-  // Add new function to handle operation selection for a file
-  const handleOperationSelect = (fileUid, operationId) => {
-    console.log(`Assigning operation ID ${operationId} to file ${fileUid}`);
-    
-    // Find the operation details for better feedback
-    const operation = documentOperations.find(op => String(op.id) === String(operationId));
-    
-    setFileOperationMappings(prev => ({
-      ...prev,
-      [fileUid]: operationId
-    }));
-    
-    // Show feedback message
-    if (operation) {
-      message.success(`Assigned Operation ${operation.operation_number} to file`);
-    }
-  };
-
-  // Add this useEffect to set the form values when the modal opens
-  useEffect(() => {
-    if (isAddDocumentModalVisible && selectedJob) {
-      const selectedOrder = partNumbers.find(order => order.productionOrder === selectedJob.production_order);
-      if (selectedOrder) {
-        addDocumentForm.setFieldsValue({
-          part_number: selectedOrder.partNumber || selectedJob.part_number
-        });
-      }
-    }
-  }, [isAddDocumentModalVisible, selectedJob, partNumbers, addDocumentForm]);
 
   // Add effect to fetch program documents when job changes or tab changes
   useEffect(() => {
@@ -2046,25 +1897,9 @@ const loadInventoryItems = async () => {
           
           console.log('Processed CNC program documents:', mappedDocuments);
           setProgramDocuments(mappedDocuments);
-          
-          // Store in localStorage for persistence
-          localStorage.setItem('programDocuments', JSON.stringify(mappedDocuments));
         } catch (error) {
           console.error('Error fetching program documents:', error);
-          
-          // Try to load from localStorage as fallback
-          const savedDocuments = localStorage.getItem('programDocuments');
-          if (savedDocuments) {
-            try {
-              const parsedDocuments = JSON.parse(savedDocuments);
-              setProgramDocuments(parsedDocuments);
-            } catch (parseError) {
-              console.error('Error parsing saved documents:', parseError);
-              setProgramDocuments([]);
-            }
-          } else {
-            setProgramDocuments([]);
-          }
+          setProgramDocuments([]);
         } finally {
           setLoading(false);
         }
@@ -3185,28 +3020,28 @@ const loadInventoryItems = async () => {
       <Row justify="space-between" align="middle" wrap>
         <Col flex="1">
           <Form.Item label="Select Job/Production Order" className="mb-0" style={{ width: '100%', fontWeight: 600, fontSize: '26px' }}>
-            <Select
-              className="job-select"
-              showSearch
-              style={{ width: '100%', maxWidth: 300 }}
-              placeholder="Select Production Order"
-              optionFilterProp="label"
-              value={selectedOrderNumber}
-              onChange={handleJobSelect}
-              filterOption={(input, option) =>
-                option.label.toLowerCase().includes(input.toLowerCase())
-              }
-            >
-              {partNumbers.map(order => (
-                <Option 
-                  key={order.id} 
-                  value={order.value}
-                  label={order.label}
-                >
-                  {order.label}
-                </Option>
-              ))}
-            </Select>
+          <Select
+  className="job-select"
+  showSearch
+  style={{ width: '100%', maxWidth: 300 }}
+  placeholder="Select Production Order"
+  optionFilterProp="label"
+  value={selectedProductionOrder}  // Changed from selectedOrderNumber
+  onChange={handleJobSelect}
+  filterOption={(input, option) =>
+    option.label.toLowerCase().includes(input.toLowerCase())
+  }
+>
+  {partNumbers.map(order => (
+    <Option 
+      key={order.id} 
+      value={order.value}
+      label={order.label}
+    >
+      {order.label}
+    </Option>
+  ))}
+</Select>
           </Form.Item>
         </Col>
 

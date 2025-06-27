@@ -1023,11 +1023,24 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('Failed to download document');
       }
 
+      // Get the content-disposition header to extract the filename
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = `document_${documentId}_v${versionId}`;
+      
+      // Extract filename from content-disposition if available
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          // Remove any surrounding quotes
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
       const blob = await response.blob();
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `document_${documentId}_v${versionId}.pdf`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       URL.revokeObjectURL(downloadUrl);
@@ -1035,7 +1048,7 @@ const useDocumentStore = create((set, get) => ({
 
       // Track download
       await get().incrementDownloadCount(documentId);
-      return { success: true };
+      return { success: true, filename };
 
     } catch (error) {
       console.error('Download error:', error);

@@ -165,6 +165,17 @@ const Planning = () => {
     orderQty: ''
   });
 
+  // File operation mappings state
+  const [fileOperationMappings, setFileOperationMappings] = useState({});
+
+  // Handle operation selection for files
+  const handleOperationSelect = useCallback((fileUid, operationId) => {
+    setFileOperationMappings(prev => ({
+      ...prev,
+      [fileUid]: operationId
+    }));
+  }, []);
+
   // UI control states
   const [activeTab, setActiveTab] = useState('jobDetails');
   const [currentPage, setCurrentPage] = useState(1);
@@ -310,9 +321,6 @@ const loadInventoryItems = async () => {
     },
     showUploadList: true,
   };
-
-  // Add new state for tracking file-operation mappings
-  const [fileOperationMappings, setFileOperationMappings] = useState({});
 
   // Update documentUploadProps
   const documentUploadProps = {

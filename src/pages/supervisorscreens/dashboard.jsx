@@ -641,7 +641,12 @@ const SupervisorDashboard = () => {
     const machineName = machine.name || '';
     
     // EDM machines - check for Robofil or U32J
-    if (machineName.includes('Robofil') || machineName.includes('U32J')) {
+    if (
+      machineName.includes('Robofil') ||
+      machineName.includes('U32J') ||
+      machineName.startsWith('NEWC-') ||
+      (machine.workcenter && machine.workcenter.toUpperCase() === 'NEWC')
+    ) {
       type = 'edm';
     }
     // Turning machines - check for SCH, CNCT-TUR26, CNCT-Pilatus, CNCT-NU7B

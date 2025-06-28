@@ -77,7 +77,13 @@ const Workcenter = () => {
 
   useEffect(() => {
     console.log('Workcenters updated:', workcenters);
-    setData(workcenters || []);
+    // Filter out rows where type, make, or model is 'Default'
+    const filtered = (workcenters || []).filter(item =>
+      item.type !== 'Default' &&
+      item.make !== 'Default' &&
+      item.model !== 'Default'
+    );
+    setData(filtered);
   }, [workcenters]);
 
   useEffect(() => {
@@ -501,13 +507,13 @@ const Workcenter = () => {
               okText="Yes"
               cancelText="No"
             >
-              <Button
+              {/* <Button
                 type="link"
                 icon={<DeleteOutlined />}
                 className="text-red-600 hover:text-red-700"
               >
                 Delete
-              </Button>
+              </Button> */}
             </Popconfirm>
           </Space>
         );
@@ -783,7 +789,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:4455/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.16.0.203:8002/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1514,14 +1520,14 @@ const Workcenter = () => {
               </div>
             </div>
             <div className="flex gap-3">
-              <Input.Search
+              {/* <Input.Search
                 placeholder="Search workcenters..."
                 size="middle"
                 value={searchText}
                 onChange={(e) => handleSearch(e.target.value)}
                 style={{ width: 250 }}
                 allowClear
-              />
+              /> */}
               <Button 
                 type="primary"
                 icon={<PlusOutlined />}

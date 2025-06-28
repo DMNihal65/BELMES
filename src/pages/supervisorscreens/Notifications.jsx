@@ -19,7 +19,7 @@ import {
   DatePicker
 } from 'antd';
 import { Wrench, Package, Bell, CheckCircle, RefreshCw, Ruler, Filter } from 'lucide-react';
-import useNotificationStore from '../../store/notification';
+import useNotificationStore from '../../store/notificationNew';
 import { ToolFilled, FilterOutlined, ToolOutlined, } from '@ant-design/icons';
 import useInventoryStore from '../../store/inventory-store';
 

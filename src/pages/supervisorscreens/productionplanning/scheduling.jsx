@@ -711,7 +711,7 @@ const Scheduling = () => {
   useEffect(() => {
     const fetchPartDescriptions = async () => {
       try {
-        const response = await fetch('http://172.18.7.88:4455/api/v1/planning/all_orders');
+        const response = await fetch('http://172.16.0.203:8002/api/v1/planning/all_orders');
         const data = await response.json();
         
         // Create a mapping of part numbers to their descriptions

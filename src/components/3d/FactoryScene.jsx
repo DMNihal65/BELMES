@@ -1317,7 +1317,7 @@ const EDMRoom = ({ position = [0, 0, 0] }) => {
           {/* "EDM" sign with better visibility */}
           <Text
             position={[0, 11, 0]}
-            font="/Inter-Bold.woff"
+            font="/fonts/Rubik-VariableFont_wght.ttf"
             fontSize={1.5}
             color="#1e3a8a"
             anchorX="center"

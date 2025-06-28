@@ -302,8 +302,12 @@ const CapacityPlanning = () => {
       const data = await fetchMachinePlanningByDateRange(startDate, endDate);
       
       if (Array.isArray(data) && data.length > 0) {
-        // Filter machines to only include those with work_center_bool = true
-        const filteredData = data.filter(machine => machine.work_center_bool === true);
+        // Filter machines to only include those with work_center_bool = true AND exclude "Default" machines
+        const filteredData = data.filter(machine => 
+          machine.work_center_bool === true && 
+          machine.machine_make !== 'Default' && 
+          machine.machine_model !== 'Default'
+        );
         
         if (filteredData.length > 0) {
           // Store the full machine data first
@@ -313,7 +317,7 @@ const CapacityPlanning = () => {
         } else {
           setMachineUtilizationData([]);
           updateChartWithUtilizationData([]);
-          message.info('No work centre machines available for the selected date range');
+          message.info('No valid work centre machines available for the selected date range');
         }
       } else {
         setMachineUtilizationData([]);
@@ -349,10 +353,10 @@ const CapacityPlanning = () => {
 
     // Extract machine models/makes with cleaner names for display
     const machines = data.map(item => {
-      // Use make and model but format nicely
-      const machineName = item.machine_make && item.machine_make !== 'Default' ? 
-        `${item.machine_make}${item.machine_model !== 'Default' ? ' ' + item.machine_model : ''}` 
-        : `Machine ${item.machine_id}`;
+      // Since we filter out "Default" machines, we can safely use make and model
+      const machineName = item.machine_make && item.machine_model ? 
+        `${item.machine_make} ${item.machine_model}` 
+        : item.machine_make || `Machine ${item.machine_id}`;
       return machineName;
     });
     
@@ -569,7 +573,7 @@ const CapacityPlanning = () => {
             <Title level={4} style={{ margin: 0, color: 'black', fontWeight: 'bold' }}>Machine Capacity Planning</Title>
             <Text type="secondary">Monitor and analyze machine utilization across the shop floor</Text>
             <div className="mt-2">
-              <Tag color="blue" icon={<AlertOutlined />}>Only work centre machines are displayed</Tag>
+              <Tag color="blue" icon={<AlertOutlined />}>Only valid work centre machines (excluding "Default" machines) are displayed</Tag>
             </div>
           </div>
         </div>

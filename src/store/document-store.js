@@ -2,6 +2,115 @@ import { create } from 'zustand';
 import useAuthStore from './auth-store';
 import { message } from 'antd';
 
+// Utility function to get token from multiple sources with fallback
+const getAuthToken = () => {
+  // Try Zustand store first
+  const authStore = useAuthStore.getState();
+  if (authStore.token) {
+    return authStore.token;
+  }
+  
+  // Fallback to localStorage
+  const localToken = localStorage.getItem('token');
+  if (localToken) {
+    return localToken;
+  }
+  
+  // Try parsing auth-storage
+  try {
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      if (parsed.state?.token) {
+        return parsed.state.token;
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing auth storage:', error);
+  }
+  
+  return null;
+};
+
+// Utility function to handle API requests with retry logic
+const makeApiRequest = async (url, options = {}, retries = 3) => {
+  const token = getAuthToken();
+  
+  if (!token) {
+    throw new Error('No authentication token found. Please log in again.');
+  }
+
+  const defaultOptions = {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...options.headers
+    },
+    timeout: 30000, // 30 second timeout
+    ...options
+  };
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), defaultOptions.timeout);
+      
+      const response = await fetch(url, {
+        ...defaultOptions,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      // Handle 401 Unauthorized
+      if (response.status === 401) {
+        // Clear invalid token
+        useAuthStore.getState().logout();
+        throw new Error('Session expired. Please log in again.');
+      }
+
+      // Handle other HTTP errors
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        
+        // Retry on 5xx errors or network issues
+        if (response.status >= 500 || response.status === 0) {
+          if (attempt < retries) {
+            const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+            console.warn(`Request failed, retrying in ${delay}ms (attempt ${attempt}/${retries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      return response;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout. Please try again.');
+      }
+      
+      if (attempt === retries) {
+        throw error;
+      }
+      
+      // Retry on network errors
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.warn(`Network error, retrying in ${delay}ms (attempt ${attempt}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      throw error;
+    }
+  }
+};
+
 const useDocumentStore = create((set, get) => ({
   folders: [],
   documents: [],
@@ -23,62 +132,35 @@ const useDocumentStore = create((set, get) => ({
 
   // Fetch document types
   fetchDocTypes: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch('http://172.16.0.203:8002/api/v1/document-management/document-types/', {
-        headers: {
-          'accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch document types');
-      }
-
+      const response = await makeApiRequest('http://172.18.7.88:4479/api/v1/document-management/document-types/');
       const data = await response.json();
+      
       set({ 
         documentTypes: data,
-        isLoading: false 
+        isLoading: false,
+        error: null
       });
+      
+      return data;
     } catch (error) {
-      set({ error: error.message, isLoading: false });
-      message.error(error.message);
+      const errorMessage = error.message || 'Failed to fetch document types';
+      set({ error: errorMessage, isLoading: false });
+      message.error(errorMessage);
+      throw error;
     }
   },
 
   // List folders with proper tree structure
   fetchFolders: async (parentId = null) => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
       const url = parentId 
-        ? `http://172.16.0.203:8002/api/v1/document-management/folders/?parent_id=${parentId}`
-        : 'http://172.16.0.203:8002/api/v1/document-management/folders/';
+        ? `http://172.18.7.88:4479/api/v1/document-management/folders/?parent_id=${parentId}`
+        : 'http://172.18.7.88:4479/api/v1/document-management/folders/';
 
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch folders');
-      }
-
+      const response = await makeApiRequest(url);
       const data = await response.json();
       
       // Transform the response to match the expected format and filter active folders
@@ -97,7 +179,7 @@ const useDocumentStore = create((set, get) => ({
 
       set(state => {
         if (!parentId) {
-          return { folders: transformedFolders, isLoading: false };
+          return { folders: transformedFolders, isLoading: false, error: null };
         } else {
           const updateFolderChildren = (folders) => {
             return folders.map(folder => {
@@ -113,15 +195,17 @@ const useDocumentStore = create((set, get) => ({
           
           return { 
             folders: updateFolderChildren(state.folders),
-            isLoading: false 
+            isLoading: false,
+            error: null
           };
         }
       });
 
       return transformedFolders;
     } catch (error) {
-      set({ error: error.message, isLoading: false });
-      message.error(error.message);
+      const errorMessage = error.message || 'Failed to fetch folders';
+      set({ error: errorMessage, isLoading: false });
+      message.error(errorMessage);
       return [];
     }
   },
@@ -129,28 +213,14 @@ const useDocumentStore = create((set, get) => ({
   // Fetch part numbers
   fetchPartNumbers: async () => {
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/all_orders', {
-        headers: {
-          'accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch part numbers');
-      }
-
+      const response = await makeApiRequest('http://172.18.7.88:4479/api/v1/planning/all_orders');
       const data = await response.json();
-      set({ partNumbers: data });
+      set({ partNumbers: data, error: null });
       return data;
     } catch (error) {
-      message.error(error.message);
+      const errorMessage = error.message || 'Failed to fetch part numbers';
+      set({ error: errorMessage });
+      message.error(errorMessage);
       throw error;
     }
   },
@@ -158,10 +228,10 @@ const useDocumentStore = create((set, get) => ({
   // Upload document
   uploadDocument: async (formData) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
       // Log the FormData contents for debugging
@@ -169,7 +239,7 @@ const useDocumentStore = create((set, get) => ({
         console.log(pair[0] + ': ' + pair[1]);
       }
 
-      const response = await fetch('http://172.16.0.203:8002/api/v1/document-management/documents/upload/', {
+      const response = await fetch('http://172.18.7.88:4479/api/v1/document-management/documents/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -179,7 +249,7 @@ const useDocumentStore = create((set, get) => ({
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Upload error response:', errorData); // Debug log
+        console.error('Upload error response:', errorData);
         throw new Error(errorData.detail || 'Failed to upload document');
       }
 
@@ -193,109 +263,119 @@ const useDocumentStore = create((set, get) => ({
 
   // Fetch folder documents
   fetchFolderDocuments: async (folderId, page = 1, pageSize = 10) => {
+    set({ isLoading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token || !folderId) {
-        // Silently return empty data instead of throwing error
+      if (!folderId) {
+        set({ documents: [], totalDocuments: 0, isLoading: false, error: null });
         return { items: [], total: 0 };
       }
 
-      const response = await fetch(
-        `http://172.16.0.203:8002/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${100}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          }
-        }
+      const response = await makeApiRequest(
+        `http://172.18.7.88:4479/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${100}`
       );
-
-      if (!response.ok) {
-        // Don't show error popup, just return empty data
-        return { items: [], total: 0 };
-      }
 
       const data = await response.json();
       
       // Filter active documents and format them
       const activeDocuments = data.items.filter(doc => doc.is_active);
       
-      // Format the documents data
+      // Format the documents data with error handling for version fetching
       const formattedDocuments = await Promise.all(activeDocuments.map(async doc => {
-        // Fetch versions for each document
-        const versions = await get().fetchDocumentVersions(doc.id);
-        return {
-          ...doc,
-          key: doc.id,
-          versions,
-          file_size: doc.latest_version?.file_size 
-            ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
-            : null,
-          created_at: new Date(doc.created_at).toISOString(),
-          version_number: doc.latest_version?.version_number || '1.0'
-        };
+        try {
+          // Fetch versions for each document with retry logic
+          const versions = await get().fetchDocumentVersions(doc.id);
+          return {
+            ...doc,
+            key: doc.id,
+            versions,
+            file_size: doc.latest_version?.file_size 
+              ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+              : null,
+            created_at: new Date(doc.created_at).toISOString(),
+            version_number: doc.latest_version?.version_number || '1.0'
+          };
+        } catch (versionError) {
+          console.warn(`Failed to fetch versions for document ${doc.id}:`, versionError);
+          // Return document without versions if version fetch fails
+          return {
+            ...doc,
+            key: doc.id,
+            versions: [],
+            file_size: doc.latest_version?.file_size 
+              ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+              : null,
+            created_at: new Date(doc.created_at).toISOString(),
+            version_number: doc.latest_version?.version_number || '1.0'
+          };
+        }
       }));
 
       set({ 
         documents: formattedDocuments,
         totalDocuments: activeDocuments.length,
-        isLoading: false 
+        isLoading: false,
+        error: null
       });
 
       return { items: formattedDocuments, total: activeDocuments.length };
     } catch (error) {
-      set({ error: error.message, isLoading: false });
-      // Remove error popup
+      const errorMessage = error.message || 'Failed to fetch folder documents';
+      set({ error: errorMessage, isLoading: false });
+      message.error(errorMessage);
       return { items: [], total: 0 };
     }
   },
 
   // Create document version
   createVersion: async (documentId, versionData) => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`/api/v1/documents/${documentId}/versions/`, {
+      const response = await makeApiRequest(`/api/v1/documents/${documentId}/versions/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(versionData),
       });
       const data = await response.json();
+      set({ isLoading: false, error: null });
       return data;
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      const errorMessage = error.message || 'Failed to create version';
+      set({ error: errorMessage, isLoading: false });
       throw error;
     }
   },
 
   // List versions
   fetchVersions: async (documentId) => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`/api/v1/documents/${documentId}/versions`);
+      const response = await makeApiRequest(`/api/v1/documents/${documentId}/versions`);
       const data = await response.json();
       set(state => ({
         versions: { ...state.versions, [documentId]: data },
-        isLoading: false
+        isLoading: false,
+        error: null
       }));
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      const errorMessage = error.message || 'Failed to fetch versions';
+      set({ error: errorMessage, isLoading: false });
     }
   },
 
   // Delete document
   deleteDocument: async (documentId) => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
-      await fetch(`/api/v1/documents/${documentId}`, {
+      await makeApiRequest(`/api/v1/documents/${documentId}`, {
         method: 'DELETE',
       });
       set(state => ({
         documents: state.documents.filter(doc => doc.id !== documentId),
-        isLoading: false
+        isLoading: false,
+        error: null
       }));
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      const errorMessage = error.message || 'Failed to delete document';
+      set({ error: errorMessage, isLoading: false });
       throw error;
     }
   },
@@ -303,19 +383,8 @@ const useDocumentStore = create((set, get) => ({
   // Update folder
   updateFolder: async (folderId, updateData) => {
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/documents/folders/${folderId}`, {
+      const response = await makeApiRequest(`http://172.18.7.88:4479/api/v1/documents/folders/${folderId}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           folder_name: updateData.folder_name,
           parent_folder_id: updateData.parent_folder_id,
@@ -340,18 +409,8 @@ const useDocumentStore = create((set, get) => ({
   // Create document type
   createDocType: async (docTypeData) => {
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch('http://172.16.0.203:8002/api/v1/document-management/document-types/', {
+      const response = await makeApiRequest('http://172.18.7.88:4479/api/v1/document-management/document-types/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
           name: docTypeData.name,
           description: docTypeData.description,
@@ -376,81 +435,74 @@ const useDocumentStore = create((set, get) => ({
 
   // Search documents by text and other parameters
   searchDocuments: async (query, docTypeId = null, folderId = null) => {
+    set({ isLoading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token || query.length < 3) {
+      if (!query || query.length < 3) {
+        set({ isLoading: false, error: null });
         return { items: [], total: 0 };
       }
 
-      let url = `http://172.16.0.203:8002/api/v1/document-management/documents/search/?query=${encodeURIComponent(query)}`;
+      let url = `http://172.18.7.88:4479/api/v1/document-management/documents/search/?query=${encodeURIComponent(query)}`;
       if (docTypeId) url += `&doc_type_id=${docTypeId}`;
       if (folderId) url += `&folder_id=${folderId}`;
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        return { items: [], total: 0 };
-      }
-
+      const response = await makeApiRequest(url);
       const data = await response.json();
       
       // Format the documents data similar to fetchFolderDocuments
       const formattedDocuments = await Promise.all(data.map(async doc => {
-        return {
-          ...doc,
-          key: doc.id,
-          file_size: doc.latest_version?.file_size 
-            ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
-            : null,
-          created_at: new Date(doc.created_at).toISOString(),
-          version_number: doc.latest_version?.version_number || '1.0'
-        };
+        try {
+          return {
+            ...doc,
+            key: doc.id,
+            file_size: doc.latest_version?.file_size 
+              ? (doc.latest_version.file_size / (1024 * 1024)).toFixed(2) 
+              : null,
+            created_at: new Date(doc.created_at).toISOString(),
+            version_number: doc.latest_version?.version_number || '1.0'
+          };
+        } catch (error) {
+          console.warn(`Error formatting document ${doc.id}:`, error);
+          return {
+            ...doc,
+            key: doc.id,
+            file_size: null,
+            created_at: new Date().toISOString(),
+            version_number: '1.0'
+          };
+        }
       }));
 
       set({ 
         documents: formattedDocuments,
         totalDocuments: formattedDocuments.length,
-        isLoading: false 
+        isLoading: false,
+        error: null
       });
 
       return { items: formattedDocuments, total: formattedDocuments.length };
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      const errorMessage = error.message || 'Failed to search documents';
+      set({ error: errorMessage, isLoading: false });
       return { items: [], total: 0 };
     }
   },
 
   // Search documents by part number
   searchByPartNumber: async (partNumber, docTypeId = null) => {
+    set({ isLoading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
+      if (!partNumber) {
+        set({ isLoading: false, error: null });
         return { items: [], total: 0 };
       }
 
-      let url = `http://172.16.0.203:8002/api/v1/document-management/documents/by-part-number/${encodeURIComponent(partNumber)}`;
+      let url = `http://172.18.7.88:4479/api/v1/document-management/documents/by-part-number/${encodeURIComponent(partNumber)}`;
       if (docTypeId) {
         url += `?doc_type_id=${docTypeId}`;
       }
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        return { items: [], total: 0 };
-      }
-
+      const response = await makeApiRequest(url);
       const data = await response.json();
       
       // Format the documents data similar to other document responses
@@ -467,12 +519,14 @@ const useDocumentStore = create((set, get) => ({
       set({ 
         documents: formattedDocuments,
         totalDocuments: formattedDocuments.length,
-        isLoading: false 
+        isLoading: false,
+        error: null
       });
 
       return { items: formattedDocuments, total: formattedDocuments.length };
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      const errorMessage = error.message || 'Failed to search by part number';
+      set({ error: errorMessage, isLoading: false });
       return { items: [], total: 0 };
     }
   },
@@ -480,16 +534,16 @@ const useDocumentStore = create((set, get) => ({
   // Download document version
   downloadDocumentVersion: async (documentId, versionId = null) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
       // Construct URL based on whether versionId is provided
       const url = versionId 
-        ? `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
-        : `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download-latest`;
+        ? `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/download-latest`;
 
       const response = await fetch(url, {
         headers: {
@@ -499,6 +553,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to download document version');
       }
 
@@ -513,25 +571,9 @@ const useDocumentStore = create((set, get) => ({
   // Fetch document versions
   fetchDocumentVersions: async (documentId) => {
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch(
-        `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/versions`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'accept': 'application/json'
-          }
-        }
+      const response = await makeApiRequest(
+        `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/versions`
       );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch document versions');
-      }
 
       const data = await response.json();
       // Filter active versions
@@ -546,18 +588,8 @@ const useDocumentStore = create((set, get) => ({
   // Add this new method for deleting folders
   deleteFolder: async (folderId) => {
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/document-management/folders/${folderId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
-        }
+      const response = await makeApiRequest(`http://172.18.7.88:4479/api/v1/document-management/folders/${folderId}`, {
+        method: 'DELETE'
       });
 
       if (!response.ok) {
@@ -580,19 +612,8 @@ const useDocumentStore = create((set, get) => ({
   // Add copyDocument method
   copyDocument: async (copyData) => {
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/documents/${copyData.document_id}/copy`, {
+      const response = await makeApiRequest(`http://172.18.7.88:4479/api/v1/documents/${copyData.document_id}/copy`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           new_folder_id: copyData.new_folder_id,
           new_document_name: copyData.new_document_name
@@ -614,7 +635,11 @@ const useDocumentStore = create((set, get) => ({
   // Update the uploadNewVersion method to allow custom version numbers
   uploadNewVersion: async (documentId, file, customVersionNumber = null) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
       
       // First get existing versions to determine next version number if not provided
       const existingVersions = await get().fetchDocumentVersions(documentId);
@@ -631,7 +656,7 @@ const useDocumentStore = create((set, get) => ({
       formData.append('metadata', '{}');
 
       const response = await fetch(
-        `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/versions`,
+        `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/versions`,
         {
           method: 'POST',
           headers: {
@@ -643,6 +668,10 @@ const useDocumentStore = create((set, get) => ({
       );
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to upload new version');
       }
@@ -657,14 +686,18 @@ const useDocumentStore = create((set, get) => ({
 
   updateVersion: async (documentId, versionId, file, metadata = {}) => {
     try {
-      const token = useAuthStore.getState().token;
-      const formData = new FormData();
+      const token = getAuthToken();
       
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+      
+      const formData = new FormData();
       formData.append('file', file);
       formData.append('metadata', JSON.stringify(metadata));
 
       const response = await fetch(
-        `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/version/${versionId}`,
+        `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/version/${versionId}`,
         {
           method: 'PUT',
           headers: {
@@ -676,6 +709,10 @@ const useDocumentStore = create((set, get) => ({
       );
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to update version');
       }
@@ -700,9 +737,13 @@ const useDocumentStore = create((set, get) => ({
 
   deleteVersion: async (documentId, versionId) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
 
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/documents/${documentId}/versions/${versionId}`, {
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      const response = await fetch(`http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/versions/${versionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -711,6 +752,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to delete version');
       }
 
@@ -724,13 +769,13 @@ const useDocumentStore = create((set, get) => ({
   // Add download tracking
   incrementDownloadCount: async (documentId) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/documents/${documentId}/download-count`, {
+      const response = await fetch(`http://172.18.7.88:4479/api/v1/documents/${documentId}/download-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -739,6 +784,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to update download count');
       }
 
@@ -770,13 +819,13 @@ const useDocumentStore = create((set, get) => ({
   // Add view tracking
   incrementViewCount: async (documentId) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/documents/${documentId}/view-count`, {
+      const response = await fetch(`http://172.18.7.88:4479/api/v1/documents/${documentId}/view-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -785,6 +834,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to update view count');
       }
 
@@ -805,10 +858,10 @@ const useDocumentStore = create((set, get) => ({
   // Create new folder
   createFolder: async (folderData) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
       // Format the request body according to API requirements
@@ -819,7 +872,7 @@ const useDocumentStore = create((set, get) => ({
 
       console.log('Creating folder with data:', requestData); // Debug log
 
-      const response = await fetch('http://172.16.0.203:8002/api/v1/document-management/folders/', {
+      const response = await fetch('http://172.18.7.88:4479/api/v1/document-management/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -830,6 +883,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.detail?.[0]?.msg || 'Failed to create folder');
       }
@@ -845,15 +902,15 @@ const useDocumentStore = create((set, get) => ({
   // Add a new function to get preview URL
   getPreviewUrl: async (documentId, versionId = null) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
       const url = versionId 
-        ? `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
-        : `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download-latest`;
+        ? `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/download-latest`;
 
       const response = await fetch(url, {
         headers: {
@@ -863,6 +920,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to get preview URL');
       }
 
@@ -876,29 +937,19 @@ const useDocumentStore = create((set, get) => ({
 
   // Add this new function for production order search
   searchByProductionOrder: async (productionOrderId, docTypeId = null) => {
+    set({ isLoading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      if (!token) {
+      if (!productionOrderId) {
+        set({ isLoading: false, error: null });
         return { items: [], total: 0 };
       }
 
-      let url = `http://172.16.0.203:8002/api/v1/document-management/documents/by-production-order/${productionOrderId}`;
+      let url = `http://172.18.7.88:4479/api/v1/document-management/documents/by-production-order/${productionOrderId}`;
       if (docTypeId) {
         url += `?doc_type_id=${docTypeId}`;
       }
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        return { items: [], total: 0 };
-      }
-
+      const response = await makeApiRequest(url);
       const data = await response.json();
       
       const formattedDocuments = data.map(doc => ({
@@ -914,12 +965,14 @@ const useDocumentStore = create((set, get) => ({
       set({ 
         documents: formattedDocuments,
         totalDocuments: formattedDocuments.length,
-        isLoading: false 
+        isLoading: false,
+        error: null
       });
 
       return { items: formattedDocuments, total: formattedDocuments.length };
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      const errorMessage = error.message || 'Failed to search by production order';
+      set({ error: errorMessage, isLoading: false });
       return { items: [], total: 0 };
     }
   },
@@ -927,34 +980,50 @@ const useDocumentStore = create((set, get) => ({
   // Add this function to fetch orders
   fetchAllOrders: async () => {
     try {
-      const token = useAuthStore.getState().token;
-      set({ isLoadingOrders: true });
+      const token = getAuthToken();
+      set({ isLoadingOrders: true, error: null });
 
-      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/all_orders', {
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      const response = await fetch('http://172.18.7.88:4479/api/v1/planning/all_orders', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        set({ allOrders: data, isLoadingOrders: false });
+      if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
+        throw new Error('Failed to fetch orders');
       }
+
+      const data = await response.json();
+      set({ allOrders: data, isLoadingOrders: false, error: null });
+      return data;
     } catch (error) {
       console.error('Error fetching orders:', error);
-      set({ isLoadingOrders: false });
+      set({ isLoadingOrders: false, error: error.message });
+      throw error;
     }
   },
 
   // Add this function to handle version selection for downloads
   handleVersionDownload: async (documentId, versionId) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
       
       const url = versionId 
-        ? `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
-        : `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download-latest`;
+        ? `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/download-latest`;
 
       const response = await fetch(url, {
         headers: {
@@ -964,6 +1033,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to download document');
       }
 
@@ -989,10 +1062,10 @@ const useDocumentStore = create((set, get) => ({
   // Update the downloadDocument function to handle batch downloads
   downloadDocument: async (documentId, versionId = null) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
       // If no versionId is provided, return all versions for selection
@@ -1010,7 +1083,7 @@ const useDocumentStore = create((set, get) => ({
       }
 
       // Download specific version
-      const url = `http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
+      const url = `http://172.18.7.88:4479/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
 
       const response = await fetch(url, {
         headers: {
@@ -1020,6 +1093,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to download document');
       }
 
@@ -1059,13 +1136,13 @@ const useDocumentStore = create((set, get) => ({
   // Add this new function for uploading machine documents
   uploadMachineDocument: async (formData) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch('http://172.16.0.203:8002/api/v1/document-management/machine-documents/upload/', {
+      const response = await fetch('http://172.18.7.88:4479/api/v1/document-management/machine-documents/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1074,6 +1151,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to upload machine document');
       }
@@ -1089,14 +1170,14 @@ const useDocumentStore = create((set, get) => ({
   // Add fetchMachines function
   fetchMachines: async () => {
     try {
-      const token = useAuthStore.getState().token;
-      set({ isLoadingMachines: true });
+      const token = getAuthToken();
+      set({ isLoadingMachines: true, error: null });
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch('http://172.16.0.203:8002/api/v1/master-order/machines/', {
+      const response = await fetch('http://172.18.7.88:4479/api/v1/master-order/machines/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -1104,11 +1185,15 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error('Failed to fetch machines');
       }
 
       const data = await response.json();
-      set({ machines: data, isLoadingMachines: false });
+      set({ machines: data, isLoadingMachines: false, error: null });
       return data;
     } catch (error) {
       console.error('Error fetching machines:', error);
@@ -1120,13 +1205,13 @@ const useDocumentStore = create((set, get) => ({
   // Add deleteVersion method with the correct endpoint
   deleteDocumentVersion: async (versionId) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/document-management/document-versions/${versionId}`, {
+      const response = await fetch(`http://172.18.7.88:4479/api/v1/document-management/document-versions/${versionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1135,6 +1220,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to delete version');
       }
@@ -1149,13 +1238,13 @@ const useDocumentStore = create((set, get) => ({
   // Add deleteDocumentType method
   deleteDocumentType: async (docTypeId, force = false) => {
     try {
-      const token = useAuthStore.getState().token;
+      const token = getAuthToken();
       
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.16.0.203:8002/api/v1/document-management/document-types/${docTypeId}?force=${force}`, {
+      const response = await fetch(`http://172.18.7.88:4479/api/v1/document-management/document-types/${docTypeId}?force=${force}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1164,6 +1253,10 @@ const useDocumentStore = create((set, get) => ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          throw new Error('Session expired. Please log in again.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to delete document type');
       }
@@ -1179,6 +1272,34 @@ const useDocumentStore = create((set, get) => ({
       throw error;
     }
   },
+
+  // Add metrics functions
+  fetchMetrics: async () => {
+    set({ isLoadingMetrics: true, metricsError: null });
+    try {
+      const response = await makeApiRequest('http://172.18.7.88:4479/api/v1/document-management/metrics/');
+      const data = await response.json();
+      set({ metrics: data, isLoadingMetrics: false, metricsError: null });
+      return data;
+    } catch (error) {
+      const errorMessage = error.message || 'Failed to fetch metrics';
+      set({ metricsError: errorMessage, isLoadingMetrics: false });
+      throw error;
+    }
+  },
+
+  refreshMetrics: async () => {
+    return await get().fetchMetrics();
+  },
+
+  // Clear error state
+  clearError: () => set({ error: null, metricsError: null }),
+
+  // Set selected folder
+  setSelectedFolder: (folderId) => set({ selectedFolder: folderId }),
+
+  // Clear documents
+  clearDocuments: () => set({ documents: [], totalDocuments: 0 }),
 }));
 
 export default useDocumentStore;

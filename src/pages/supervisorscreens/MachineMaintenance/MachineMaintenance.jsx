@@ -303,11 +303,13 @@ export default function MachineMaintenance() {
     }
   ];
 
-  const filteredData = machines.filter(machine => {
-    const matchesMachine = !filterMachine || machine.machine_make.toLowerCase().includes(filterMachine.toLowerCase());
-    const matchesStatus = !filterStatus || machine.status_name === filterStatus;
-    return matchesMachine && matchesStatus;
-  });
+  const filteredData = machines
+    .filter(machine => machine.machine_make !== 'Default') // Filter out machines with name "Default"
+    .filter(machine => {
+      const matchesMachine = !filterMachine || machine.machine_make.toLowerCase().includes(filterMachine.toLowerCase());
+      const matchesStatus = !filterStatus || machine.status_name === filterStatus;
+      return matchesMachine && matchesStatus;
+    });
 
   if (error) {
     return (
@@ -349,7 +351,9 @@ export default function MachineMaintenance() {
                           <span className="font-medium">All Machines</span>
                         </Menu.Item>
                         <Menu.Divider />
-                        {[...new Set(machines.map(machine => machine.machine_make))].map(machineMake => (
+                        {[...new Set(machines
+                          .filter(machine => machine.machine_make !== 'Default') // Filter out Default machines from dropdown
+                          .map(machine => machine.machine_make))].map(machineMake => (
                           <Menu.Item key={machineMake} className="rounded-lg">
                             <span className="font-medium">{machineMake}</span>
                           </Menu.Item>
@@ -424,7 +428,7 @@ export default function MachineMaintenance() {
                 title={<span className="text-indigo-600 font-medium text-base flex items-center gap-2">
                   <DesktopOutlined className="text-indigo-700" /> Total Machines
                 </span>} 
-                value={totalMachines} 
+                value={machines.filter(machine => machine.machine_make !== 'Default').length} 
                 valueStyle={{ color: '#4338ca', fontWeight: 700, fontSize: '28px' }}
                 suffix={<span className="text-xs text-indigo-400 ml-1">Machines</span>}
               />
@@ -444,7 +448,7 @@ export default function MachineMaintenance() {
                 title={<span className="text-green-800 font-medium text-base flex items-center gap-2">
                   <CheckCircleOutlined className="text-green-600" /> Active Machines
                 </span>} 
-                value={machines.filter(m => m.status_name === 'ON').length}
+                value={machines.filter(m => m.machine_make !== 'Default' && m.status_name === 'ON').length}
                 valueStyle={{ color: '#16a34a', fontWeight: 700, fontSize: '28px' }}
                 suffix={<span className="text-xs text-green-400 ml-1">Machines</span>}
               />
@@ -464,7 +468,7 @@ export default function MachineMaintenance() {
                 title={<span className="text-red-800 font-medium text-base flex items-center gap-2">
                   <CloseCircleOutlined className="text-red-600" /> Inactive Machines
                 </span>} 
-                value={machines.filter(m => m.status_name === 'OFF').length}
+                value={machines.filter(m => m.machine_make !== 'Default' && m.status_name === 'OFF').length}
                 valueStyle={{ color: '#dc2626', fontWeight: 700, fontSize: '28px' }}
                 suffix={<span className="text-xs text-red-400 ml-1">Machines</span>}
               />

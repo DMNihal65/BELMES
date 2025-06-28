@@ -105,7 +105,7 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [customVersionNumber, setCustomVersionNumber] = useState("");
   const [useCustomVersion, setUseCustomVersion] = useState(false);
-  const { fetchDocumentVersions, uploadNewVersion, deleteDocumentVersion, fetchFolderDocuments, documents } = useDocumentStore();
+  const { fetchDocumentVersions, uploadNewVersion, deleteDocumentVersion, fetchFolderDocuments, documents, updateVersion } = useDocumentStore();
 
   // Calculate next version number for auto increment
   const getNextVersionNumber = () => {
@@ -210,12 +210,24 @@ const VersionManagementModal = ({ visible, document, onClose }) => {
 
   const handleFileUpdate = async (file, versionId) => {
     try {
-      await updateVersion(document.id, versionId, file);
+      // Get the version details to preserve the version number
+      const versionToUpdate = versions.find(v => v.id === versionId);
+      if (!versionToUpdate) {
+        message.error('Version not found');
+        return;
+      }
+
+      // First delete the old version
+      await deleteDocumentVersion(versionId);
+      
+      // Then upload a new version with the same version number
+      const result = await uploadNewVersion(document.id, file, versionToUpdate.version_number);
+      
       message.success('Version updated successfully');
       await loadVersions(); // Refresh versions list
       await fetchFolderDocuments(); // Refresh main document list
     } catch (error) {
-      message.error('Failed to update version');
+      message.error('Failed to update version: ' + error.message);
     }
   };
 
@@ -753,7 +765,9 @@ const DocumentManagement = () => {
     uploadMachineDocument,
     fetchMachines, // Add this
     machines, // Add this
-    isLoadingMachines // Add this
+    isLoadingMachines, // Add this
+    error, // Add error state
+    clearError // Add clear error function
   } = useDocumentStore();
   const [contextMenu, setContextMenu] = useState({
     visible: false,
@@ -832,17 +846,51 @@ const DocumentManagement = () => {
   const [machineUploadForm] = Form.useForm();
   const [uploadLoading, setUploadLoading] = useState(false);
 
-  // Update useEffect to use store's fetchAllOrders
+  // Add retry logic utility
+  const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        console.warn(`Operation failed (attempt ${attempt}/${maxRetries}):`, error);
+        
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Wait before retrying with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt - 1)));
+      }
+    }
+  };
+
+  // Update useEffect to use store's fetchAllOrders with retry logic
   useEffect(() => {
-    fetchAllOrders();
+    const loadOrders = async () => {
+      try {
+        await retryOperation(() => fetchAllOrders());
+      } catch (error) {
+        console.error('Failed to fetch orders after retries:', error);
+        message.error('Failed to load orders. Please refresh the page.');
+      }
+    };
+    loadOrders();
   }, []);
 
-  // Add useEffect to fetch machines
+  // Add useEffect to fetch machines with retry logic
   useEffect(() => {
-    fetchMachines();
+    const loadMachines = async () => {
+      try {
+        await retryOperation(() => fetchMachines());
+      } catch (error) {
+        console.error('Failed to fetch machines after retries:', error);
+        message.error('Failed to load machines. Please refresh the page.');
+      }
+    };
+    loadMachines();
   }, []);
 
-  // Update the handleCreateDocType function
+  // Update the handleCreateDocType function with retry logic
   const handleCreateDocType = async () => {
     try {
       // Format the data properly before sending
@@ -853,7 +901,7 @@ const DocumentManagement = () => {
         is_active: newDocType.is_active
       };
 
-      const result = await createDocType(docTypeData);
+      const result = await retryOperation(() => createDocType(docTypeData));
       
       if (result) {
         message.success('Document type created successfully');
@@ -866,15 +914,15 @@ const DocumentManagement = () => {
           is_active: true
         });
         // Refresh document types list
-        await fetchDocTypes();
+        await retryOperation(() => fetchDocTypes());
       }
     } catch (error) {
       console.error('Create document type error:', error);
-      message.error('Failed to create document type');
+      message.error('Failed to create document type: ' + error.message);
     }
   };
 
-  // Add handler for document type deletion
+  // Add handler for document type deletion with retry logic
   const handleDeleteDocType = (docType) => {
     Modal.confirm({
       title: 'Delete Document Type',
@@ -891,9 +939,9 @@ const DocumentManagement = () => {
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          await deleteDocumentType(docType.id, false);
+          await retryOperation(() => deleteDocumentType(docType.id, false));
           message.success(`Document type "${docType.name}" deleted successfully`);
-          await fetchDocTypes(); // Refresh the document types list
+          await retryOperation(() => fetchDocTypes()); // Refresh the document types list
         } catch (error) {
           if (error.message.includes('used by') && error.message.includes('active documents')) {
             Modal.confirm({
@@ -912,9 +960,9 @@ const DocumentManagement = () => {
               cancelText: 'Cancel',
               onOk: async () => {
                 try {
-                  await deleteDocumentType(docType.id, true);
+                  await retryOperation(() => deleteDocumentType(docType.id, true));
                   message.success(`Document type "${docType.name}" force deleted successfully`);
-                  await fetchDocTypes(); // Refresh the document types list
+                  await retryOperation(() => fetchDocTypes()); // Refresh the document types list
                 } catch (innerError) {
                   message.error(`Failed to force delete: ${innerError.message}`);
                 }
@@ -940,20 +988,20 @@ const DocumentManagement = () => {
     return () => document.removeEventListener('click', handleClick);
   }, [contextMenu.visible]);
 
-  // Add back the onExpand function
+  // Add back the onExpand function with retry logic
   const onExpand = async (expandedKeys, { expanded, node }) => {
     setExpandedKeys(expandedKeys);
     if (expanded) {
       try {
-        await fetchFolders(node.key);
+        await retryOperation(() => fetchFolders(node.key));
       } catch (error) {
-        message.error('Failed to load subfolders');
+        message.error('Failed to load subfolders: ' + error.message);
       }
     }
   };
 
   useEffect(() => {
-    if (selectedDocument?.name?.toLowerCase().endsWith('.pdf')) {
+    if (selectedDocument?.name?.toLowerCase().endsWith('.pdf') && selectedDocument?.versionUrl) {
       const loadPdf = async () => {
         try {
           const loadingTask = pdfjsLib.getDocument(selectedDocument.versionUrl);
@@ -985,56 +1033,36 @@ const DocumentManagement = () => {
     }
   }, [selectedDocument]);
 
-  // Fetch document types and part numbers on mount
+  // Fetch document types and part numbers on mount with retry logic
   useEffect(() => {
     const fetchData = async () => {
-      await fetchDocTypes();
-      await fetchPartNumbers();
-      await fetchFolders();
+      try {
+        await Promise.all([
+          retryOperation(() => fetchDocTypes()),
+          retryOperation(() => fetchPartNumbers()),
+          retryOperation(() => fetchFolders())
+        ]);
+      } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+        message.error('Failed to load initial data. Please refresh the page.');
+      }
     };
     fetchData();
   }, [fetchDocTypes, fetchPartNumbers, fetchFolders]);
 
   useEffect(() => {
-    fetchFolders();
-  }, [fetchFolders]);
-
-  // Update the click outside handler
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const folderTree = document.querySelector('.folder-tree-container');
-      const uploadBtn = document.querySelector('[data-testid="upload-button"]');
-      const newFolderBtn = document.querySelector('[data-testid="new-folder-button"]');
-      
-      // Check if click is outside folder tree and not on buttons
-      if (folderTree && 
-          !folderTree.contains(event.target) && 
-          !uploadBtn?.contains(event.target) && 
-          !newFolderBtn?.contains(event.target)) {
-        // Only reset folder context for general clicks, not for upload/new folder
-        if (!isUploadModalVisible && !isNewFolderModalVisible) {
-          setSelectedFolder(null);
-          setCurrentFolderContext({
-            folderId: null,
-            folderPath: [],
-            folderName: 'Root'
-          });
-          fetchFolderDocuments(null); // Fetch root level documents
-        }
+    const loadFolders = async () => {
+      try {
+        await retryOperation(() => fetchFolders());
+      } catch (error) {
+        console.error('Failed to fetch folders:', error);
+        message.error('Failed to load folders. Please refresh the page.');
       }
     };
+    loadFolders();
+  }, [fetchFolders]);
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isUploadModalVisible, isNewFolderModalVisible]);
-
-  // Update the New Folder button click handler
-  const handleNewFolderClick = () => {
-    setIsNewFolderModalVisible(true);
-    // Current folder context is already maintained from selection
-  };
-
-  // Update the folder selection handler
+  // Update the folder selection handler with retry logic
   const handleFolderSelect = async (selectedKeys, info) => {
     if (!selectedKeys.length) {
       // Handle deselection
@@ -1044,7 +1072,12 @@ const DocumentManagement = () => {
         folderPath: [],
         folderName: 'Root'
       });
-      await fetchFolderDocuments(null);
+      try {
+        await retryOperation(() => fetchFolderDocuments(null));
+      } catch (error) {
+        console.error('Failed to fetch root documents:', error);
+        message.error('Failed to load documents. Please try again.');
+      }
       return;
     }
 
@@ -1069,114 +1102,15 @@ const DocumentManagement = () => {
       folderName: info.node.title
     });
 
-    await fetchFolderDocuments(folderId);
+    try {
+      await retryOperation(() => fetchFolderDocuments(folderId));
+    } catch (error) {
+      console.error('Failed to fetch folder documents:', error);
+      message.error('Failed to load folder documents. Please try again.');
+    }
   };
 
-  // Update the folder tree rendering
-  const renderFolderTree = (folders) => {
-    return folders.map(folder => ({
-      key: folder.id.toString(),
-      title: folder.folder_name,
-      icon: <FolderOutlined />,
-      children: folder.children && folder.children.length > 0 
-        ? renderFolderTree(folder.children) 
-        : undefined,
-      isLeaf: false,
-      parent_folder_id: folder.parent_folder_id
-    }));
-  };
-
-  // Add this function before the renderLeftSidebar function
-  const handleRightClick = ({ event, node }) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setContextMenu({
-      visible: true,
-      x: event.clientX,
-      y: event.clientY,
-      folder: {
-        id: node.key,
-        folder_name: node.title
-      }
-    });
-  };
-
-  // Update the renderLeftSidebar function to include the right-click menu
-  const renderLeftSidebar = () => (
-    <div className="folder-tree-container" style={{ 
-      width: '300px',
-      height: 'calc(100vh - 120px)',
-      padding: '20px',
-      borderRight: '1px solid #e8e8e8',
-      backgroundColor: '#fff',
-      overflowY: 'auto',
-      marginRight: '24px'
-    }}>
-      <div className="folder-header mb-4">
-        {/* <div className="flex items-center justify-between mb-3">
-          <Text strong>Folders</Text>
-        </div> */}
-        <div className="flex items-center space-x-2 mb-4">
-        <Button
-              type="primary"
-              icon={<CloudUploadOutlined />}
-              onClick={handleUploadClick}
-            >
-              Upload
-            </Button>
-            <Button
-              icon={<FolderOutlined />}
-              onClick={handleNewFolderClick}
-            >
-              New Folder
-            </Button>
-        </div>
-        {/* Show current path */}
-        {/* {selectedFolder && (
-          <div className="text-sm text-gray-500 mb-2">
-            Current Path: {getCurrentPath()}
-          </div>
-        )} */}
-      </div>
-      <Tree
-        showIcon
-        defaultExpandAll={false}
-        expandedKeys={expandedKeys}
-        onExpand={onExpand}
-        onSelect={handleFolderSelect}
-        onRightClick={handleRightClick}  // Keep the right-click handler
-        treeData={renderFolderTree(folders)}
-        className="custom-tree"
-        selectedKeys={[selectedFolder]}
-        icon={({ expanded }) => (
-          <FolderOutlined 
-            style={{ 
-              color: expanded ? '#1890ff' : '#8c8c8c',
-              fontSize: '16px'
-            }}
-          />
-        )}
-      />
-    </div>
-  );
-
-  // Update breadcrumb to show correct path
-  const renderBreadcrumb = () => (
-    <Breadcrumb className="mb-4">
-      <Breadcrumb.Item onClick={() => handleFolderSelect(['all'])}>
-        <HomeOutlined /> Home
-      </Breadcrumb.Item>
-      {currentFolderContext.folderPath.map((item) => (
-        <Breadcrumb.Item key={item.key}>
-          <span className="cursor-pointer" onClick={() => handleFolderSelect([item.key])}>
-            {item.title}
-          </span>
-        </Breadcrumb.Item>
-      ))}
-    </Breadcrumb>
-  );
-
-  // Update the create folder handler to handle root/child folder creation
+  // Update the create folder handler to handle root/child folder creation with retry logic
   const handleCreateFolder = async () => {
     try {
       if (!newFolderName.trim()) {
@@ -1189,23 +1123,23 @@ const DocumentManagement = () => {
         parent_folder_id: currentFolderContext.folderId || null
       };
 
-      await createFolder(folderData);
+      await retryOperation(() => createFolder(folderData));
       setIsNewFolderModalVisible(false);
       setNewFolderName('');
       message.success('Folder created successfully');
       
       // Refresh folders based on context
       if (currentFolderContext.folderId) {
-        await fetchFolders(currentFolderContext.folderId);
+        await retryOperation(() => fetchFolders(currentFolderContext.folderId));
       } else {
-        await fetchFolders();
+        await retryOperation(() => fetchFolders());
       }
     } catch (error) {
       message.error('Failed to create folder: ' + error.message);
     }
   };
 
-  // Update the handleFolderDelete function with null checks
+  // Update the handleFolderDelete function with retry logic
   const handleFolderDelete = async (folder) => {
     if (!folder || !folder.id) {
       console.error('Invalid folder object:', folder);
@@ -1232,9 +1166,9 @@ const DocumentManagement = () => {
         onOk: async () => {
           try {
             console.log('Confirming delete for folder ID:', folder.id);
-            await deleteFolder(folder.id);
+            await retryOperation(() => deleteFolder(folder.id));
             message.success(`Folder "${folder.folder_name}" deleted successfully`);
-            await fetchFolders(); // Refresh the folder list
+            await retryOperation(() => fetchFolders()); // Refresh the folder list
             
             // Reset selected folder if deleted folder was selected
             if (selectedFolder === folder.id) {
@@ -1447,7 +1381,7 @@ const DocumentManagement = () => {
         console.log(pair[0] + ': ' + pair[1]);
       }
 
-      await uploadDocument(formData);
+      await retryOperation(() => uploadDocument(formData));
       message.success('Document uploaded successfully');
       setIsUploadModalVisible(false);
       uploadForm.resetFields();
@@ -1455,7 +1389,7 @@ const DocumentManagement = () => {
       setSelectedPartNumber(null);
       
       if (currentFolderContext.folderId) {
-        await fetchFolderDocuments(currentFolderContext.folderId);
+        await retryOperation(() => fetchFolderDocuments(currentFolderContext.folderId));
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -1624,24 +1558,34 @@ const DocumentManagement = () => {
     if (!value || value.length < 2) {
       // If search is cleared, show current folder documents
       if (selectedFolder) {
-        await fetchFolderDocuments(selectedFolder);
+        try {
+          await retryOperation(() => fetchFolderDocuments(selectedFolder));
+        } catch (error) {
+          console.error('Failed to fetch folder documents:', error);
+          message.error('Failed to load documents. Please try again.');
+        }
       }
       return;
     }
 
-    if (searchType === 'partNumber') {
-      // Call the part number search function
-      await searchByPartNumber(
-        value,
-        selectedDocType?.id || null
-      );
-    } else {
-      // Call the text search function
-      await searchDocuments(
-        value,
-        selectedDocType?.id || null,
-        currentFolderContext.folderId
-      );
+    try {
+      if (searchType === 'partNumber') {
+        // Call the part number search function
+        await retryOperation(() => searchByPartNumber(
+          value,
+          selectedDocType?.id || null
+        ));
+      } else {
+        // Call the text search function
+        await retryOperation(() => searchDocuments(
+          value,
+          selectedDocType?.id || null,
+          currentFolderContext.folderId
+        ));
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      message.error('Search failed: ' + error.message);
     }
   };
 
@@ -1813,21 +1757,21 @@ const DocumentManagement = () => {
   // Update the handleDownload function
   const handleDownload = async (record) => {
     try {
-      const result = await downloadDocument(record.id);
+      const result = await retryOperation(() => downloadDocument(record.id));
       if (result.success && result.versions) {
         setDownloadVersions(result.versions);
         setSelectedDownloadDoc(record);
         setDownloadModalVisible(true);
       }
     } catch (error) {
-      message.error('Failed to fetch document versions');
+      message.error('Failed to fetch document versions: ' + error.message);
     }
   };
 
   // Update the preview handler
   const handlePreview = async (record) => {
     try {
-      const versions = await fetchDocumentVersions(record.id);
+      const versions = await retryOperation(() => fetchDocumentVersions(record.id));
       
       if (versions.length > 1) {
         setSelectedDocument(record);
@@ -1835,7 +1779,7 @@ const DocumentManagement = () => {
         setPreviewModalVisible(true);
       } else {
         try {
-          const url = await getPreviewUrl(record.id);
+          const url = await retryOperation(() => getPreviewUrl(record.id));
           
           if (record.name?.toLowerCase().endsWith('.pdf')) {
             setSelectedDocument({
@@ -1877,12 +1821,12 @@ const DocumentManagement = () => {
             });
           }
         } catch (error) {
-          message.error('Failed to load preview');
+          message.error('Failed to load preview: ' + error.message);
           console.error('Preview error:', error);
         }
       }
     } catch (error) {
-      message.error('Failed to load document versions');
+      message.error('Failed to load document versions: ' + error.message);
       console.error('Version fetch error:', error);
     }
   };
@@ -1944,7 +1888,7 @@ const DocumentManagement = () => {
           disabled={!selectedPreviewVersion}
           onClick={async () => {
             try {
-              const url = await getPreviewUrl(selectedDocument.id, selectedPreviewVersion.id);
+              const url = await retryOperation(() => getPreviewUrl(selectedDocument.id, selectedPreviewVersion.id));
               
               if (selectedDocument.name?.toLowerCase().endsWith('.pdf')) {
                 setSelectedDocument({
@@ -1983,7 +1927,7 @@ const DocumentManagement = () => {
                   content: `This file type cannot be previewed. Would you like to download "${selectedDocument.name}" (${selectedPreviewVersion.version_number}) instead?`,
                   okText: 'Download',
                   cancelText: 'Cancel',
-                  onOk: () => handleDownload(selectedDocument)
+                  onOk: () => downloadDocument(selectedDocument.id, selectedPreviewVersion.id)
                 });
               }
             } catch (error) {
@@ -2021,24 +1965,31 @@ const DocumentManagement = () => {
     </Modal>
   );
 
-  // Add this effect to refresh document versions when folder changes
-  useEffect(() => {
-    const refreshDocuments = async () => {
-      if (selectedFolder && selectedFolder !== 'all') {
-        await fetchFolderDocuments(selectedFolder);
-      }
-    };
-    refreshDocuments();
-  }, [selectedFolder]);
-
-  // Add this effect to refresh documents when needed
+  // Add this effect to refresh document versions when folder changes with retry logic
   useEffect(() => {
     const refreshDocuments = async () => {
       if (selectedFolder && selectedFolder !== 'all') {
         try {
-          await fetchFolderDocuments(selectedFolder);
+          await retryOperation(() => fetchFolderDocuments(selectedFolder));
         } catch (error) {
           console.error('Failed to refresh documents:', error);
+          message.error('Failed to refresh documents. Please try again.');
+        }
+      }
+    };
+
+    refreshDocuments();
+  }, [selectedFolder]);
+
+  // Add this effect to refresh documents when needed with retry logic
+  useEffect(() => {
+    const refreshDocuments = async () => {
+      if (selectedFolder && selectedFolder !== 'all') {
+        try {
+          await retryOperation(() => fetchFolderDocuments(selectedFolder));
+        } catch (error) {
+          console.error('Failed to refresh documents:', error);
+          message.error('Failed to refresh documents. Please try again.');
         }
       }
     };
@@ -2046,33 +1997,78 @@ const DocumentManagement = () => {
     refreshDocuments();
   }, [selectedFolder, versionModalVisible]); // Add versionModalVisible to dependencies
 
-  // Add this function to handle version modal close
+  // Add this function to handle version modal close with retry logic
   const handleVersionModalClose = async () => {
     setVersionModalVisible(false);
     setSelectedVersionDoc(null);
     // Refresh the document list to show updated version numbers
     if (selectedFolder && selectedFolder !== 'all') {
-      await fetchFolderDocuments(selectedFolder);
+      try {
+        await retryOperation(() => fetchFolderDocuments(selectedFolder));
+      } catch (error) {
+        console.error('Failed to refresh documents after version modal close:', error);
+        message.error('Failed to refresh documents. Please try again.');
+      }
     } else {
-      await fetchFolderDocuments();
+      try {
+        await retryOperation(() => fetchFolderDocuments());
+      } catch (error) {
+        console.error('Failed to refresh documents after version modal close:', error);
+        message.error('Failed to refresh documents. Please try again.');
+      }
     }
   };
 
-  // Update the preview modal close handler
-  const handlePreviewModalClose = () => {
-    setIsPreviewModalVisible(false);
-    setPreviewModalVisible(false);
-    setSelectedPreviewVersion(null);
-    if (selectedDocument?.versionUrl) {
-      window.URL.revokeObjectURL(selectedDocument.versionUrl);
+  // Update the handleMachineDocumentUpload function with retry logic
+  const handleMachineDocumentUpload = async (values) => {
+    if (!selectedFile) {
+      message.error('Please select a file to upload');
+      return;
     }
-    setSelectedDocument(null);
+
+    setUploadLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('machine_id', values.machine_id);
+      formData.append('document_name', values.document_name);
+      formData.append('document_type', values.document_type);
+      formData.append('description', values.description || '');
+      formData.append('version_number', values.version_number || '1.0');
+
+      await retryOperation(() => uploadMachineDocument(formData));
+      message.success('Machine document uploaded successfully');
+      setIsMachineUploadVisible(false);
+      machineUploadForm.resetFields();
+      setSelectedFile(null);
+      
+      // Refresh the current folder's documents if we're in a folder
+      if (currentFolderContext.folderId) {
+        await retryOperation(() => fetchFolderDocuments(currentFolderContext.folderId));
+      }
+    } catch (error) {
+      message.error('Failed to upload machine document: ' + error.message);
+    } finally {
+      setUploadLoading(false);
+    }
   };
 
-  // Update the download modal close handler
-  const handleDownloadModalClose = () => {
-    setDownloadModalVisible(false);
-    setSelectedVersions([]);
+  // Add error display component
+  const renderErrorAlert = () => {
+    if (error) {
+      return (
+        <Alert
+          message="Error"
+          description={error}
+          type="error"
+          showIcon
+          closable
+          onClose={clearError}
+          className="mb-4"
+        />
+      );
+    }
+    return null;
   };
 
   const documentTypeButton = (
@@ -2481,40 +2477,6 @@ const DocumentManagement = () => {
     }
   `;
 
-  // Handle machine document upload
-  const handleMachineDocumentUpload = async (values) => {
-    if (!selectedFile) {
-      message.error('Please select a file to upload');
-      return;
-    }
-
-    setUploadLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('machine_id', values.machine_id);
-      formData.append('document_name', values.document_name);
-      formData.append('document_type', values.document_type);
-      formData.append('description', values.description || '');
-      formData.append('version_number', values.version_number || '1.0');
-
-      await uploadMachineDocument(formData);
-      message.success('Machine document uploaded successfully');
-      setIsMachineUploadVisible(false);
-      machineUploadForm.resetFields();
-      setSelectedFile(null);
-      
-      // Refresh the current folder's documents if we're in a folder
-      if (currentFolderContext.folderId) {
-        await fetchFolderDocuments(currentFolderContext.folderId);
-      }
-    } catch (error) {
-      message.error('Failed to upload machine document: ' + error.message);
-    } finally {
-      setUploadLoading(false);
-    }
-  };
-
   // Render machine document upload modal
   const renderMachineUploadModal = () => (
     <Modal
@@ -2613,6 +2575,184 @@ const DocumentManagement = () => {
     </Modal>
   );
 
+  // Update the click outside handler to be more specific
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const folderTree = document.querySelector('.folder-tree-container');
+      const uploadBtn = document.querySelector('[data-testid="upload-button"]');
+      const newFolderBtn = document.querySelector('[data-testid="new-folder-button"]');
+      const mainContent = document.querySelector('.ant-col-flex-auto'); // Main content area
+      const tableArea = document.querySelector('.custom-table'); // Table area
+      const modalArea = document.querySelector('.ant-modal'); // Modal area
+      const dropdownArea = document.querySelector('.ant-dropdown'); // Dropdown area
+      const contextMenuArea = document.querySelector('.ant-menu'); // Context menu area
+      
+      // Check if click is outside folder tree and not on buttons
+      if (folderTree && 
+          !folderTree.contains(event.target) && 
+          !uploadBtn?.contains(event.target) && 
+          !newFolderBtn?.contains(event.target)) {
+        
+        // Don't reset if clicking in main content area, table, modals, dropdowns, or context menus
+        if (mainContent?.contains(event.target) || 
+            tableArea?.contains(event.target) || 
+            modalArea?.contains(event.target) || 
+            dropdownArea?.contains(event.target) || 
+            contextMenuArea?.contains(event.target) ||
+            event.target.closest('.ant-table') ||
+            event.target.closest('.ant-modal') ||
+            event.target.closest('.ant-dropdown') ||
+            event.target.closest('.ant-menu') ||
+            event.target.closest('.ant-btn') ||
+            event.target.closest('.ant-tooltip') ||
+            event.target.closest('.ant-popover')) {
+          return; // Don't reset if clicking in these areas
+        }
+        
+        // Only reset folder context for clicks in truly empty areas
+        if (!isUploadModalVisible && !isNewFolderModalVisible) {
+          // Check if we're clicking in the main document area but not on any interactive elements
+          const isInMainArea = event.target.closest('.ant-col-flex-auto');
+          const isOnInteractiveElement = event.target.closest('button, input, select, a, .ant-table-row, .ant-table-cell, .ant-dropdown-trigger, .ant-tooltip, .ant-popover');
+          
+          if (!isInMainArea || isOnInteractiveElement) {
+            return; // Don't reset if clicking on interactive elements
+          }
+          
+          // Only reset if clicking in empty space within the main area
+          setSelectedFolder(null);
+          setCurrentFolderContext({
+            folderId: null,
+            folderPath: [],
+            folderName: 'Root'
+          });
+          fetchFolderDocuments(null); // Fetch root level documents
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isUploadModalVisible, isNewFolderModalVisible]);
+
+  // Update the New Folder button click handler
+  const handleNewFolderClick = () => {
+    setIsNewFolderModalVisible(true);
+    // Current folder context is already maintained from selection
+  };
+
+  // Update the folder tree rendering
+  const renderFolderTree = (folders) => {
+    return folders.map(folder => ({
+      key: folder.id.toString(),
+      title: folder.folder_name,
+      icon: <FolderOutlined />,
+      children: folder.children && folder.children.length > 0 
+        ? renderFolderTree(folder.children) 
+        : undefined,
+      isLeaf: false,
+      parent_folder_id: folder.parent_folder_id
+    }));
+  };
+
+  // Add this function before the renderLeftSidebar function
+  const handleRightClick = ({ event, node }) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      folder: {
+        id: node.key,
+        folder_name: node.title
+      }
+    });
+  };
+
+  // Update the renderLeftSidebar function to include the right-click menu
+  const renderLeftSidebar = () => (
+    <div className="folder-tree-container" style={{ 
+      width: '300px',
+      height: 'calc(100vh - 120px)',
+      padding: '20px',
+      borderRight: '1px solid #e8e8e8',
+      backgroundColor: '#fff',
+      overflowY: 'auto',
+      marginRight: '24px'
+    }}>
+      <div className="folder-header mb-4">
+        <div className="flex items-center space-x-2 mb-4">
+        <Button
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              onClick={handleUploadClick}
+            >
+              Upload
+            </Button>
+            <Button
+              icon={<FolderOutlined />}
+              onClick={handleNewFolderClick}
+            >
+              New Folder
+            </Button>
+        </div>
+      </div>
+      <Tree
+        showIcon
+        defaultExpandAll={false}
+        expandedKeys={expandedKeys}
+        onExpand={onExpand}
+        onSelect={handleFolderSelect}
+        onRightClick={handleRightClick}  // Keep the right-click handler
+        treeData={renderFolderTree(folders)}
+        className="custom-tree"
+        selectedKeys={[selectedFolder]}
+        icon={({ expanded }) => (
+          <FolderOutlined 
+            style={{ 
+              color: expanded ? '#1890ff' : '#8c8c8c',
+              fontSize: '16px'
+            }}
+          />
+        )}
+      />
+    </div>
+  );
+
+  // Update breadcrumb to show correct path
+  const renderBreadcrumb = () => (
+    <Breadcrumb className="mb-4">
+      <Breadcrumb.Item onClick={() => handleFolderSelect(['all'])}>
+        <HomeOutlined /> Home
+      </Breadcrumb.Item>
+      {currentFolderContext.folderPath.map((item) => (
+        <Breadcrumb.Item key={item.key}>
+          <span className="cursor-pointer" onClick={() => handleFolderSelect([item.key])}>
+            {item.title}
+          </span>
+        </Breadcrumb.Item>
+      ))}
+    </Breadcrumb>
+  );
+
+  // Update the preview modal close handler
+  const handlePreviewModalClose = () => {
+    setIsPreviewModalVisible(false);
+    setPreviewModalVisible(false);
+    setSelectedPreviewVersion(null);
+    if (selectedDocument?.versionUrl) {
+      window.URL.revokeObjectURL(selectedDocument.versionUrl);
+    }
+    setSelectedDocument(null);
+  };
+
+  // Update the download modal close handler
+  const handleDownloadModalClose = () => {
+    setDownloadModalVisible(false);
+    setSelectedVersions([]);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="bg-white rounded-lg shadow-sm mb-4 p-4">
@@ -2635,31 +2775,19 @@ const DocumentManagement = () => {
               </p>
             </div>
           </div>
-          {/* <div className="flex gap-2">Cannot delete the only version of a document
-            <Button
-              type="primary"
-              icon={<CloudUploadOutlined />}
-              onClick={handleUploadClick}
-            >
-              Upload
-            </Button>
-            <Button
-              icon={<FolderOutlined />}
-              onClick={handleNewFolderClick}
-            >
-              New Folder
-            </Button>
-          </div> */}
         </div>
         
-        <MetricsCards 
+        {/* <MetricsCards 
           documents={documents}
           folders={folders}
           documentTypes={documentTypes}
-        />
+        /> */}
       </div>
 
       <Card bordered={false} className="shadow-sm" bodyStyle={{ padding: '16px' }}>
+        {/* Add error alert */}
+        {renderErrorAlert()}
+        
         <Row gutter={[16, 16]}>
           <Col flex="220px">
             {renderLeftSidebar()}

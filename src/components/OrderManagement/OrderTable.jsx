@@ -54,6 +54,7 @@ const OrderTable = ({ orders, onRefresh }) => {
     form.setFieldsValue({
       part_description: record.part_description,
       required_quantity: record.required_quantity,
+      launched_quantity: record.launched_quantity || 0,
       wbs_element: record.wbs_element,
       sale_order: record.sale_order,
       project: record.project?.name
@@ -68,6 +69,7 @@ const OrderTable = ({ orders, onRefresh }) => {
         ...editingOrder,
         part_description: values.part_description,
         required_quantity: values.required_quantity,
+        launched_quantity: values.launched_quantity,
         wbs_element: values.wbs_element,
         sale_order: values.sale_order,
         project: {
@@ -311,11 +313,18 @@ const OrderTable = ({ orders, onRefresh }) => {
           </Form.Item>
 
           <Form.Item
+            label="Required Quantity"
             name="required_quantity"
-            label="Quantity"
-            rules={[{ required: true, message: 'Please enter quantity' }]}
+            rules={[{ required: true, message: 'Please input the required quantity!' }]}
           >
             <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            label="Launched Quantity"
+            name="launched_quantity"
+            rules={[{ required: true, message: 'Please input the launched quantity!' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
 
           <Form.Item

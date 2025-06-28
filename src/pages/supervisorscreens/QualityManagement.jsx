@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Row, Col, Button, Space, Select, Input, 
   Table, Modal, Steps, Tabs, Form, Statistic,
@@ -26,7 +26,8 @@ import {
   StarOutlined, 
   StarFilled,
   UploadOutlined,
-  SearchOutlined
+  SearchOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { qualityStore } from '../../store/quality-store';
@@ -67,40 +68,82 @@ const QualityManagementDashboard = () => {
   const [error, setError] = useState(null);
   const [inspectionDetails, setInspectionDetails] = useState(null);
   const [selectedOperation, setSelectedOperation] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
+  // Memoized fetch function with retry logic
+  const fetchOrdersWithRetry = useCallback(async (retryAttempt = 0) => {
+    const maxRetries = 3;
+    
+    try {
       setLoading(true);
-      try {
-        const data = await qualityStore.fetchAllOrders();
-        setOrderOptions(data);
-        setError(null);
-      } catch (err) {
+      setError(null);
+      setIsRetrying(retryAttempt > 0);
+      
+      const data = await qualityStore.fetchAllOrders();
+      setOrderOptions(data);
+      setRetryCount(0);
+      setIsRetrying(false);
+    } catch (err) {
+      console.error(`Fetch attempt ${retryAttempt + 1} failed:`, err);
+      
+      if (retryAttempt < maxRetries - 1) {
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryAttempt + 1)));
+        return fetchOrdersWithRetry(retryAttempt + 1);
+      } else {
         setError(err.message);
-        message.error('Failed to load orders');
-      } finally {
-        setLoading(false);
+        message.error('Failed to load orders after multiple attempts. Please refresh the page.');
+        setRetryCount(retryAttempt + 1);
+        setIsRetrying(false);
       }
-    };
-
-    fetchOrders();
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Fetch inspection details when part is selected
-  const handlePartSelect = async (value) => {
+  // Initial data fetch
+  useEffect(() => {
+    fetchOrdersWithRetry();
+  }, [fetchOrdersWithRetry]);
+
+  // Memoized part selection with retry logic
+  const handlePartSelect = useCallback(async (value) => {
+    if (!value) {
+      setSelectedPart(null);
+      setInspectionDetails(null);
+      return;
+    }
+
     setSelectedPart(value);
     setLoading(true);
+    setError(null);
+    
     try {
       const details = await qualityStore.fetchInspectionDetails(value);
       setInspectionDetails(details);
       setError(null);
     } catch (err) {
+      console.error('Error fetching inspection details:', err);
       setError(err.message);
-      message.error('Failed to load inspection details');
+      message.error('Failed to load inspection details. Please try again.');
+      
+      // Clear the selection on error
+      setSelectedPart(null);
+      setInspectionDetails(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Retry function for failed requests
+  const handleRetry = useCallback(() => {
+    if (selectedPart) {
+      handlePartSelect(selectedPart);
+    } else {
+      fetchOrdersWithRetry();
+    }
+  }, [selectedPart, handlePartSelect, fetchOrdersWithRetry]);
 
   // IPID Table columns
   const ipidColumns = [
@@ -635,6 +678,34 @@ const QualityManagementDashboard = () => {
         </div>
       </div>
 
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          message="Error Loading Data"
+          description={
+            <div>
+              <p>{error}</p>
+              <p className="mt-2">
+                <Button 
+                  type="primary" 
+                  size="small" 
+                  icon={<ReloadOutlined />}
+                  onClick={handleRetry}
+                  loading={isRetrying}
+                >
+                  {isRetrying ? `Retrying (${retryCount})` : 'Retry'}
+                </Button>
+              </p>
+            </div>
+          }
+          type="error"
+          showIcon
+          closable
+          onClose={() => setError(null)}
+          className="mb-4"
+        />
+      )}
+
       {/* Part Selection with improved UI */}
       <Card className="shadow-sm hover:shadow-md transition-all duration-300">
         <Row gutter={24} align="middle">
@@ -661,13 +732,29 @@ const QualityManagementDashboard = () => {
                       <Spin size="small" /> Loading...
                     </div>
                   ) : error ? (
-                    <Alert type="error" message="Error loading data" showIcon />
+                    <div className="text-center py-2">
+                      <Alert type="error" message="Error loading data" showIcon />
+                    </div>
                   ) : (
                     'No data found'
                   )
                 }
+                allowClear
+                showArrow
               />
             </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Space>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={handleRetry}
+                loading={isRetrying}
+                disabled={loading}
+              >
+                Refresh
+              </Button>
+            </Space>
           </Col>
         </Row>
       </Card>

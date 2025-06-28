@@ -474,8 +474,8 @@ const Productivity = ({ onBack }) => {
                     fontSize: '20px',
                     marginTop: '2px'
                   }}>
-                    {machine.energy.toFixed(2)} kWh
-                  </div>
+                       {(machine.energy || 0).toFixed(2)} kWh
+  </div>
                 </div>
               </Card>
             </Col>

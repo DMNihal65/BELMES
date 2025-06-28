@@ -77,6 +77,12 @@ function Header() {
   // Handle logout
   const handleLogout = () => {
     logout();
+
+    // Manually remove specific localStorage items
+    localStorage.removeItem('allMachinesEnergyData');
+    localStorage.removeItem('allMachinesEnergyData_timestamp');
+    localStorage.removeItem('machineData');
+
     navigate('/login');
   };
   

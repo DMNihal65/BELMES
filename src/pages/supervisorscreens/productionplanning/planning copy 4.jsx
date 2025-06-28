@@ -111,10 +111,7 @@ const Planning = () => {
   // Job and part selection states
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedPartNumber, setSelectedPartNumber] = useState(null);
-  const [selectedProductionOrder, setSelectedProductionOrder] = useState(() => {
-    // Try to load from localStorage on mount
-    return localStorage.getItem('selectedProductionOrder') || null;
-  });
+  const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
   const [selectedProjectName, setSelectedProjectName] = useState(null);
   const [selectedPartDescription, setSelectedPartDescription] = useState(null);
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
@@ -637,12 +634,6 @@ const loadInventoryItems = async () => {
   };
 
   const handleJobSelect = async (partNumber) => {
-    // Save to localStorage
-    if (partNumber) {
-      localStorage.setItem('selectedProductionOrder', partNumber);
-    } else {
-      localStorage.removeItem('selectedProductionOrder');
-    }
     try {
       console.log('Job selected:', partNumber);
       setLoading(true);
@@ -2711,12 +2702,12 @@ const loadInventoryItems = async () => {
     // Data prep
     const material = selectedJob.raw_materials?.[0] || {};
     const qrString = [
-      `RM Part No: ${material.child_part_number || 'N/A'}`,
-      `RM Part Description: ${material.description || 'N/A'}`,
-      `RM Qty: ${material.quantity || 'N/A'}`,
-      `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
-      `Order No.: ${selectedJob.production_order || 'N/A'}`,
-      `Order Qty: ${selectedJob.launched_quantity || 'N/A'}`
+      `RM Part No: ${editableFields.rmPartNo || 'N/A'}`,
+      `RM Part Description: ${editableFields.rmPartName || 'N/A'}`,
+      `RM Qty: ${editableFields.rmQty || 'N/A'}`,
+      `Job Part No.: ${editableFields.partNumber || 'N/A'}`,
+      `Order No.: ${editableFields.orderNo || 'N/A'}`,
+      `Order Qty: ${editableFields.orderQty || 'N/A'}`
     ].filter(Boolean).join('\n');
 
     const qrDataUrl = await QRCodeNode.toDataURL(qrString, {
@@ -2748,54 +2739,54 @@ const loadInventoryItems = async () => {
         colSpan: 4,
         styles: {
           fontStyle: 'bold',
-          font: 'NotoSansCondensed',
+          font: 'helvetica',
           halign: 'center',
           fontSize: 11,
           minCellHeight: headerHeight
         }
       }],
       [
-        { content: 'Job Part No.', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.partNumber || 'N/A', styles: { font: 'NotoSansCondensed' } },
-        { content: 'Location', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.location || 'N/A', styles: { font: 'NotoSansCondensed' } }
+        { content: 'Job Part No.', styles: { fontStyle: 'bold' }},
+        { content: editableFields.partNumber || 'N/A' },
+        { content: 'Location', styles: { fontStyle: 'bold' }},
+        { content: editableFields.location || 'N/A' }
       ],
       [
-        { content: 'RM Name', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmName || 'N/A', colSpan: 3, styles: { font: 'NotoSansCondensed' } }
+        { content: 'RM Name', styles: { fontStyle: 'bold' }},
+        { content: editableFields.rmName || 'N/A', colSpan: 3 }
       ],
       [
-        { content: 'RM Size', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmSize || 'N/A', colSpan: 3, styles: { font: 'NotoSansCondensed' } }
+        { content: 'RM Size', styles: { fontStyle: 'bold' }},
+        { content: editableFields.rmSize || 'N/A', colSpan: 3 }
       ],
       [
-        { content: 'Heat No.', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.heatNo || 'N/A', styles: { font: 'NotoSansCondensed' } },
-        { content: 'RM Qty', styles: { fontStyle: 'bold', halign: 'right', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmQty || 'N/A', styles: { font: 'NotoSansCondensed' } }
+        { content: 'Heat No.', styles: { fontStyle: 'bold' }},
+        { content: editableFields.heatNo || 'N/A' },
+        { content: 'RM Qty', styles: { fontStyle: 'bold', halign: 'right' }},
+        { content: editableFields.rmQty || 'N/A' }
       ],
       [
-        { content: 'RM Part No.', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmPartNo || 'N/A', styles: { font: 'NotoSansCondensed' } },
-        { content: 'Rev', styles: { fontStyle: 'bold', halign: 'right', font: 'NotoSansCondensed' }},
-        { content: editableFields.revision || 'N/A', styles: { font: 'NotoSansCondensed' } }
+        { content: 'RM Part No.', styles: { fontStyle: 'bold' }},
+        { content: editableFields.rmPartNo || 'N/A' },
+        { content: 'Rev', styles: { fontStyle: 'bold', halign: 'right' }},
+        { content: editableFields.revision || 'N/A' }
       ],
       [
-        { content: 'RM Part Name', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmPartName || 'N/A', colSpan: 2, styles: { font: 'NotoSansCondensed' } },
-        { content: '', rowSpan: 4, styles: { font: 'NotoSansCondensed' } }
+        { content: 'RM Part Name', styles: { fontStyle: 'bold' }},
+        { content: editableFields.rmPartName || 'N/A', colSpan: 2 },
+        { content: '', rowSpan: 4 }
       ],
       [
-        { content: 'Dept', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.department || 'N/A', colSpan: 2, styles: { font: 'NotoSansCondensed' } }
+        { content: 'Dept', styles: { fontStyle: 'bold' }},
+        { content: editableFields.department || 'N/A', colSpan: 2 }
       ],
       [
-        { content: 'Order No.', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.orderNo || 'N/A', colSpan: 2, styles: { font: 'NotoSansCondensed' } }
+        { content: 'Order No.', styles: { fontStyle: 'bold' }},
+        { content: editableFields.orderNo || 'N/A', colSpan: 2 }
       ],
       [
-        { content: 'Order Qty', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.orderQty || 'N/A', colSpan: 2, styles: { font: 'NotoSansCondensed' } }
+        { content: 'Order Qty', styles: { fontStyle: 'bold' }},
+        { content: editableFields.orderQty || 'N/A', colSpan: 2 }
       ]
     ];
 
@@ -2807,15 +2798,15 @@ const loadInventoryItems = async () => {
       body: tableData,
       theme: 'grid',
       styles: {
-        fontSize: 4.5,
-        cellPadding: 1, // ~0.1 mm
+        fontSize: 3.5, // reduce font size
+        cellPadding: 0.5, // reduce padding
+        minCellHeight: dataRowHeight - 1, // reduce row height
+        maxCellHeight: dataRowHeight - 1,
         lineColor: [0, 0, 0],
         lineWidth: 0.2,
-        font: 'NotoSansCondensed',
+        font: 'helvetica',
         halign: 'left',
         valign: 'middle',
-        minCellHeight: dataRowHeight,
-        maxCellHeight: dataRowHeight,
         textColor: [0, 0, 0],
         overflow: 'linebreak'
       },
@@ -2942,9 +2933,21 @@ const loadInventoryItems = async () => {
               <tbody>
                 <tr>
                   <td className="font-semibold p-2 w-1/4">Job Part No.</td>
-                  <td className="p-2 border-b border-gray-200">{selectedJob.part_number || 'N/A'}</td>
+                  <td className="p-2 border-b border-gray-200">
+                    <Input
+                      value={editableFields.partNumber}
+                      onChange={e => setEditableFields(f => ({ ...f, partNumber: e.target.value }))}
+                      size="small"
+                    />
+                  </td>
                   <td className="font-semibold p-2 w-1/4">Location</td>
-                  <td className="p-2 border-b border-gray-200">{material.location || 'N/A'}</td>
+                  <td className="p-2 border-b border-gray-200">
+                    <Input
+                      value={editableFields.location}
+                      onChange={e => setEditableFields(f => ({ ...f, location: e.target.value }))}
+                      size="small"
+                    />
+                  </td>
                 </tr>
                 <tr>
                   <td className="font-semibold p-2">RM Name</td>
@@ -3054,13 +3057,6 @@ const loadInventoryItems = async () => {
     }
   }, [isRawMaterialModalVisible, selectedJob]);
 
-  // On mount, if selectedProductionOrder is set (from localStorage), auto-select it
-  useEffect(() => {
-    if (selectedProductionOrder) {
-      handleJobSelect(selectedProductionOrder);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   
   return (
     <div className="space-y-6 p-6">
@@ -4720,39 +4716,90 @@ const loadInventoryItems = async () => {
                       {/* Data Rows */}
                       <tr className="border-b border-gray-800">
                         <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Job Part No.</td>
-                        <td className="p-1 border-r border-gray-600">{selectedJob.part_number || 'N/A'}</td>
+                        <td className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.partNumber}
+                            onChange={e => setEditableFields(f => ({ ...f, partNumber: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
                         <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Location:</td>
-                        <td className="p-1">{material.location || ''}</td>
+                        <td className="p-1" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.location}
+                            onChange={e => setEditableFields(f => ({ ...f, location: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
                       </tr>
-                      
-                      {/* <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">RM Name</td>
-                        <td colSpan={3} className="p-1">{material.material_name || 'N/A'}</td>
-                      </tr> */}
-                      
+                      <tr className="border-b border-gray-800">
+                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Name</td>
+                        <td colSpan={3} className="p-1" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.rmName}
+                            onChange={e => setEditableFields(f => ({ ...f, rmName: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
+                      </tr>
                       <tr className="border-b border-gray-800">
                         <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Size</td>
-                        <td colSpan={3} className="p-1" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{material.size || ''}</td>
+                        <td colSpan={3} className="p-1" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.rmSize}
+                            onChange={e => setEditableFields(f => ({ ...f, rmSize: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
                       </tr>
-                      
                       <tr className="border-b border-gray-800">
                         <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Heat No.</td>
-                        <td className="p-1 border-r border-gray-600">{material.gr_number || ''}</td>
+                        <td className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.heatNo}
+                            onChange={e => setEditableFields(f => ({ ...f, heatNo: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
                         <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Qty</td>
-                        <td className="p-1">{material.quantity || ''}</td>
+                        <td className="p-1" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <InputNumber
+                            value={editableFields.rmQty}
+                            onChange={value => setEditableFields(f => ({ ...f, rmQty: value }))}
+                            size="small"
+                            min={0}
+                            style={{ width: '100%' }}
+                          />
+                        </td>
                       </tr>
-                      
                       <tr className="border-b border-gray-800">
                         <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Part No.</td>
-                        <td className="p-1 border-r border-gray-600">{material.child_part_number || 'N/A'}</td>
+                        <td className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.rmPartNo}
+                            onChange={e => setEditableFields(f => ({ ...f, rmPartNo: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
                         <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Rev</td>
-                        <td className="p-1">{material.revision || ''}</td>
+                        <td className="p-1" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.revision}
+                            onChange={e => setEditableFields(f => ({ ...f, revision: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
                       </tr>
-                      
                       <tr className="border-b border-gray-800">
                         <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Part description</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{material.description || material.material_name || 'N/A'}</td>
-                        <td rowSpan={4} className="border-l-2 border-gray-800 p-1" style={{ width: '220px' }}>
+                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.rmPartName}
+                            onChange={e => setEditableFields(f => ({ ...f, rmPartName: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
+                        <td rowSpan={4} className="border-l-2 border-gray-800 p-1" style={{ width: '220px', fontFamily: 'Noto Sans Condensed, sans-serif' }}>
                           <div className="flex flex-col h-full">
                             <div className="flex-1 flex items-center justify-start pl-2">
                               <QRCodeSVG
@@ -4766,20 +4813,37 @@ const loadInventoryItems = async () => {
                           </div>
                         </td>
                       </tr>
-                      
                       <tr className="border-b border-gray-800">
                         <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Dept</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{selectedJob.department || ''}</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.department}
+                            onChange={e => setEditableFields(f => ({ ...f, department: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
                       </tr>
-                      
                       <tr className="border-b border-gray-800">
                         <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Order No.</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{selectedJob.production_order || 'N/A'}</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <Input
+                            value={editableFields.orderNo}
+                            onChange={e => setEditableFields(f => ({ ...f, orderNo: e.target.value }))}
+                            size="small"
+                          />
+                        </td>
                       </tr>
-                      
                       <tr className="border-b border-gray-800">
                         <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Order Qty</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{selectedJob.launched_quantity || ''}</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>
+                          <InputNumber
+                            value={editableFields.orderQty}
+                            onChange={value => setEditableFields(f => ({ ...f, orderQty: value }))}
+                            size="small"
+                            min={0}
+                            style={{ width: '100%' }}
+                          />
+                        </td>
                       </tr>
                     </tbody>
                   </table>

@@ -214,10 +214,34 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
   const renderOperations = () => (
     <div className="mb-4">
       <Divider>Operations</Divider>
+      <div className="mb-2 flex justify-between items-center">
+        <span className="text-sm text-gray-600">
+          {operations?.length > 0 
+            ? "Edit operations data below:" 
+            : "No operations found. Click 'Add Operation' to add new operations:"
+          }
+        </span>
+        <Button 
+          type="primary" 
+          size="small"
+          onClick={() => {
+            const newOperation = {
+              "Oprn No": (operations?.length || 0) + 1,
+              "Wc/Plant": "",
+              "Operation": "",
+              "Setup Time": 0,
+              "Per Pc Time": 0
+            };
+            setOperations([...(operations || []), newOperation]);
+          }}
+        >
+          Add Operation
+        </Button>
+      </div>
       <Table
-        dataSource={operations?.map(op => ({
+        dataSource={operations?.map((op, index) => ({
           ...op, // Keep all original fields
-          key: op["Oprn No"],
+          key: op["Oprn No"] || index,
           operation_number: op["Oprn No"],
           workcenter: op["Wc/Plant"],
           operation_description: op["Operation"],
@@ -227,36 +251,124 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         size="small"
         pagination={false}
         scroll={{ y: 250, x: 1000 }}
+        locale={{
+          emptyText: (
+            <div className="py-8 text-center text-gray-500">
+              <p>No operations added yet.</p>
+              <p className="text-sm">Click "Add Operation" to start adding operations.</p>
+            </div>
+          )
+        }}
         columns={[
           {
             title: 'Operation No',
             dataIndex: 'operation_number',
             key: 'operation_number',
             width: 120,
+            render: (text, record, index) => (
+              <InputNumber
+                value={text}
+                min={1}
+                style={{ width: '100%' }}
+                onChange={(value) => {
+                  const updatedOperations = [...operations];
+                  updatedOperations[index]["Oprn No"] = value;
+                  setOperations(updatedOperations);
+                }}
+              />
+            ),
           },
           {
             title: 'Workcenter',
             dataIndex: 'workcenter',
             key: 'workcenter',
             width: 150,
+            render: (text, record, index) => (
+              <Input
+                value={text}
+                placeholder="Enter workcenter"
+                onChange={(e) => {
+                  const updatedOperations = [...operations];
+                  updatedOperations[index]["Wc/Plant"] = e.target.value;
+                  setOperations(updatedOperations);
+                }}
+              />
+            ),
           },
           {
             title: 'Operation',
             dataIndex: 'operation_description',
             key: 'operation_description',
             width: 250,
+            render: (text, record, index) => (
+              <Input
+                value={text}
+                placeholder="Enter operation description"
+                onChange={(e) => {
+                  const updatedOperations = [...operations];
+                  updatedOperations[index]["Operation"] = e.target.value;
+                  setOperations(updatedOperations);
+                }}
+              />
+            ),
           },
           {
             title: 'Setup Time',
             dataIndex: 'setup_time',
             key: 'setup_time',
             width: 120,
+            render: (text, record, index) => (
+              <InputNumber
+                value={text}
+                min={0}
+                style={{ width: '100%' }}
+                onChange={(value) => {
+                  const updatedOperations = [...operations];
+                  updatedOperations[index]["Setup Time"] = value;
+                  setOperations(updatedOperations);
+                }}
+              />
+            ),
           },
           {
             title: 'Per Piece Time',
             dataIndex: 'per_piece_time',
             key: 'per_piece_time',
             width: 150,
+            render: (text, record, index) => (
+              <InputNumber
+                value={text}
+                min={0}
+                style={{ width: '100%' }}
+                onChange={(value) => {
+                  const updatedOperations = [...operations];
+                  updatedOperations[index]["Per Pc Time"] = value;
+                  setOperations(updatedOperations);
+                }}
+              />
+            ),
+          },
+          {
+            title: 'Actions',
+            key: 'actions',
+            width: 80,
+            render: (_, record, index) => (
+              <Button
+                type="text"
+                danger
+                size="small"
+                onClick={() => {
+                  const updatedOperations = operations.filter((_, i) => i !== index);
+                  // Reorder operation numbers
+                  updatedOperations.forEach((operation, i) => {
+                    operation["Oprn No"] = i + 1;
+                  });
+                  setOperations(updatedOperations);
+                }}
+              >
+                Delete
+              </Button>
+            ),
           }
         ]}
       />
@@ -266,10 +378,36 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
   const renderRawMaterials = () => (
     <div className="mb-4">
       <Divider>Raw Materials</Divider>
+      <div className="mb-2 flex justify-between items-center">
+        <span className="text-sm text-gray-600">
+          {rawMaterials?.length > 0 
+            ? "Edit raw materials data below:" 
+            : "No raw materials found. Click 'Add Material' to add a new material:"
+          }
+        </span>
+        <Button 
+          type="primary" 
+          size="small"
+          disabled={rawMaterials && rawMaterials.length > 0}
+          onClick={() => {
+            const newMaterial = {
+              "Sl.No": (rawMaterials?.length || 0) + 1,
+              "Child Part No": "",
+              "Description": "",
+              "Qty Per Set": 0,
+              "UoM": "",
+              "Total Qty": 0
+            };
+            setRawMaterials([...(rawMaterials || []), newMaterial]);
+          }}
+        >
+          Add Material
+        </Button>
+      </div>
       <Table
-        dataSource={rawMaterials?.map(material => ({
+        dataSource={rawMaterials?.map((material, index) => ({
           ...material, // Keep all original fields
-          key: material["Sl.No"],
+          key: material["Sl.No"] || index,
           serial_number: material["Sl.No"],
           child_part_number: material["Child Part No"],
           description: material["Description"],
@@ -280,42 +418,144 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         size="small"
         pagination={false}
         scroll={{ y: 250, x: 1000 }}
+        locale={{
+          emptyText: (
+            <div className="py-8 text-center text-gray-500">
+              <p>No raw materials added yet.</p>
+              <p className="text-sm">Click "Add Material" to add a new material.</p>
+            </div>
+          )
+        }}
         columns={[
           {
             title: 'Sl. No',
             dataIndex: 'serial_number',
             key: 'serial_number',
             width: 80,
+            render: (text, record, index) => (
+              <InputNumber
+                value={text}
+                min={1}
+                style={{ width: '100%' }}
+                onChange={(value) => {
+                  const updatedMaterials = [...rawMaterials];
+                  updatedMaterials[index]["Sl.No"] = value;
+                  setRawMaterials(updatedMaterials);
+                }}
+              />
+            ),
           },
           {
             title: 'Part Number',
             dataIndex: 'child_part_number',
             key: 'child_part_number',
             width: 180,
+            render: (text, record, index) => (
+              <Input
+                value={text}
+                placeholder="Enter part number"
+                onChange={(e) => {
+                  const updatedMaterials = [...rawMaterials];
+                  updatedMaterials[index]["Child Part No"] = e.target.value;
+                  setRawMaterials(updatedMaterials);
+                }}
+              />
+            ),
           },
           {
             title: 'Description',
             dataIndex: 'description',
             key: 'description',
             width: 250,
+            render: (text, record, index) => (
+              <Input
+                value={text}
+                placeholder="Enter description"
+                onChange={(e) => {
+                  const updatedMaterials = [...rawMaterials];
+                  updatedMaterials[index]["Description"] = e.target.value;
+                  setRawMaterials(updatedMaterials);
+                }}
+              />
+            ),
           },
           {
             title: 'Quantity Per Set',
             dataIndex: 'quantity_per_set',
             key: 'quantity_per_set',
             width: 140,
+            render: (text, record, index) => (
+              <InputNumber
+                value={text}
+                min={0}
+                style={{ width: '100%' }}
+                onChange={(value) => {
+                  const updatedMaterials = [...rawMaterials];
+                  updatedMaterials[index]["Qty Per Set"] = value;
+                  // Auto-calculate total quantity based on required quantity
+                  const requiredQty = form.getFieldValue('required_quantity') || 0;
+                  updatedMaterials[index]["Total Qty"] = value * requiredQty;
+                  setRawMaterials(updatedMaterials);
+                }}
+              />
+            ),
           },
           {
             title: 'UoM',
             dataIndex: 'unit_of_measure',
             key: 'unit_of_measure',
             width: 100,
+            render: (text, record, index) => (
+              <Input
+                value={text}
+                placeholder="e.g., kg, pcs"
+                onChange={(e) => {
+                  const updatedMaterials = [...rawMaterials];
+                  updatedMaterials[index]["UoM"] = e.target.value;
+                  setRawMaterials(updatedMaterials);
+                }}
+              />
+            ),
           },
           {
             title: 'Total Quantity',
             dataIndex: 'total_quantity',
             key: 'total_quantity',
             width: 140,
+            render: (text, record, index) => (
+              <InputNumber
+                value={text}
+                min={0}
+                style={{ width: '100%' }}
+                onChange={(value) => {
+                  const updatedMaterials = [...rawMaterials];
+                  updatedMaterials[index]["Total Qty"] = value;
+                  setRawMaterials(updatedMaterials);
+                }}
+              />
+            ),
+          },
+          {
+            title: 'Actions',
+            key: 'actions',
+            width: 80,
+            render: (_, record, index) => (
+              <Button
+                type="text"
+                danger
+                size="small"
+                onClick={() => {
+                  const updatedMaterials = rawMaterials.filter((_, i) => i !== index);
+                  // Reorder serial numbers
+                  updatedMaterials.forEach((material, i) => {
+                    material["Sl.No"] = i + 1;
+                  });
+                  setRawMaterials(updatedMaterials);
+                }}
+              >
+                Delete
+              </Button>
+            ),
           }
         ]}
       />
@@ -339,6 +579,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
     setCurrentStep(0);
     setFileList([]);
     setRawMaterials([]);
+    setOperations([]);
     setIsManualCreate(false);
     setMppDocName('');
     setMppVersion('v1');
@@ -530,7 +771,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         required_quantity: values.required_quantity,
         launched_quantity: values.launched_quantity,
         plant_id: values.plant_id,
-        project_name: values.project_name
+        project_name: values.project_name,
+        raw_materials: rawMaterials // Include the edited raw materials
       };
 
       // Create FormData for MPP document if either file exists or document exists
@@ -582,6 +824,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       // Call createManualOrder with all the data
       const result = await createManualOrder({
         ...orderData,
+        raw_materials: rawMaterials, // Include the edited raw materials
+        operations: operations, // Include the edited operations
         mppFormData,
         drawingFormData
       });
@@ -619,6 +863,16 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
 
         // Merge OARC data with form values, mapping form fields to OARC keys
         const mergedData = mergeFormWithOarcData(currentOarcData, latestValues);
+        
+        // Update raw materials in the merged data with any edits made by the user
+        if (rawMaterials && rawMaterials.length > 0) {
+          mergedData["Raw Materials"] = rawMaterials;
+        }
+        
+        // Update operations in the merged data with any edits made by the user
+        if (operations && operations.length > 0) {
+          mergedData["Operations"] = operations;
+        }
 
         // Prepare MPP FormData if file exists
         let mppFormData = null;
@@ -696,6 +950,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
 
           const result = await createManualOrder({
             ...latestValues,
+            raw_materials: rawMaterials, // Include the edited raw materials
+            operations: operations, // Include the edited operations
             mppFormData,
             drawingFormData
           });
@@ -777,6 +1033,7 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       setCurrentStep(0);
       setFileList([]);
       setRawMaterials([]);
+      setOperations([]);
       setIsManualCreate(false);
     } else if (initialData) {
       form.setFieldsValue({
@@ -830,6 +1087,17 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       cleanupLocalStorageOarcData();
     };
   }, []);
+
+  // Function to recalculate total quantities when required quantity changes
+  const recalculateTotalQuantities = (requiredQty) => {
+    if (requiredQty && rawMaterials && rawMaterials.length > 0) {
+      const updatedMaterials = rawMaterials.map(material => ({
+        ...material,
+        "Total Qty": (material["Qty Per Set"] || 0) * requiredQty
+      }));
+      setRawMaterials(updatedMaterials);
+    }
+  };
 
   const renderOrderForm = () => (
     <Form
@@ -942,7 +1210,11 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
             label="Required Quantity"
             rules={[{ required: true, message: 'Please enter Required Quantity' }]}
           >
-            <InputNumber style={{ width: '100%' }} min={1} />
+            <InputNumber 
+              style={{ width: '100%' }} 
+              min={1} 
+              onChange={recalculateTotalQuantities}
+            />
           </Form.Item>
         </Col>
         <Col span={8}>
@@ -968,20 +1240,14 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
       </Row>
       
       {/* Display Operations */}
-      {operations?.length > 0 && (
-        <div className="mb-6">
-         
-          {renderOperations()}
-        </div>
-      )}
+      <div className="mb-6">
+        {renderOperations()}
+      </div>
       
       {/* Display Raw Materials */}
-      {rawMaterials?.length > 0 && (
-        <div className="mb-6">
-        
-          {renderRawMaterials()}
-        </div>
-      )}
+      <div className="mb-6">
+        {renderRawMaterials()}
+      </div>
       
       
       {renderFileUploadSection()}
@@ -1125,7 +1391,11 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
               label="Required Quantity"
               rules={[{ required: true, message: 'Please enter Required Quantity' }]}
             >
-              <InputNumber min={1} style={{ width: '100%' }} />
+              <InputNumber 
+                min={1} 
+                style={{ width: '100%' }} 
+                onChange={recalculateTotalQuantities}
+              />
             </Form.Item>
           </Col>
           <Col span={8}>

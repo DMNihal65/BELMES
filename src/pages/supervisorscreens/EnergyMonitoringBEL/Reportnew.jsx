@@ -14,7 +14,7 @@ const { Title, Text } = Typography;
 const Report = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { date, machineData, returnPath } = location.state || { date: null, machineData: [], returnPath: '/supervisor/energy-monitoring-bel' };
+  const { date, machineData, returnPath , fromDate , toDate} = location.state || { date: null, machineData: [], returnPath: '/supervisor/energy-monitoring-bel' };
   const reportRef = useRef(null);
   const chartRef = useRef(null);
   
@@ -274,7 +274,7 @@ const Report = () => {
             textOutline: 'none'
           },
           formatter: function() {
-            return this.total.toFixed(2);
+            return (this.total || 0).toFixed(2);
           }
         },
         gridLineColor: '#e6e6e6',
@@ -559,9 +559,9 @@ const Report = () => {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <Text strong style={{ display: 'block', fontSize: '16px' }}>
-                  {formattedDate}
-                </Text>
+            <Text strong style={{ fontSize: '16px' }}>
+              From Date: {fromDate} &nbsp;&nbsp;|&nbsp;&nbsp; To Date: {toDate}
+            </Text>
                 <Text style={{ display: 'block', color: '#666', marginTop: '8px' }}>
                   Report Generated: {moment().format('MMMM D, YYYY, h:mm A')}
             </Text>

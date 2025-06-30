@@ -63,10 +63,18 @@ const LogsTab = () => {
   };
   
   const getMachineName = (machine) => {
-    if (machine.work_center && machine.work_center.description) {
-      return `${machine.work_center.description} (${machine.work_center.code})`;
-    }
-    return machine.make ? `${machine.make} ${machine.model || ''}` : `Machine ${machine.id}`;
+    if (!machine) return 'Unknown Machine';
+    const make = machine.make || '';
+    const model = machine.model || '';
+    const wc = machine.work_center || {};
+    const wcDesc = wc.description || '';
+    const wcCode = wc.code || '';
+    let label = '';
+    if (make) label += make;
+    if (model) label += (label ? ' ' : '') + model;
+    if (wcDesc) label += (label ? ' (' : '(') + wcDesc + ')';
+    if (wcCode) label += ` [${wcCode}]`;
+    return label.trim() || `Machine ${machine.id}`;
   };
   
   const renderItemResponseStatus = (response) => {
@@ -166,6 +174,48 @@ const LogsTab = () => {
     },
   ];
   
+  // Helper to check if machine is 'Default'
+  const isDefaultMachine = (machine) => {
+    const name = machine?.name || '';
+    const make = machine?.make || '';
+    const model = machine?.model || '';
+    const wcDesc = machine?.work_center?.description || '';
+    return (
+      name.trim().toLowerCase() === 'default' ||
+      make.trim().toLowerCase() === 'default' ||
+      model.trim().toLowerCase() === 'default' ||
+      wcDesc.trim().toLowerCase() === 'default'
+    );
+  };
+  
+  // Update filter and fetch logs immediately
+  const handleMachineFilter = (value) => {
+    setFilters({ ...filters, machine_id: value, page: 1 });
+    fetchChecklistLogs();
+  };
+  const handleProductionOrderFilter = (value) => {
+    setFilters({ ...filters, production_order: value, page: 1 });
+    fetchChecklistLogs();
+  };
+  const handleDateRangeFilter = (dates) => {
+    if (dates) {
+      setFilters({
+        ...filters,
+        from_date: dates[0]?.format('YYYY-MM-DD'),
+        to_date: dates[1]?.format('YYYY-MM-DD'),
+        page: 1
+      });
+    } else {
+      setFilters({
+        ...filters,
+        from_date: null,
+        to_date: null,
+        page: 1
+      });
+    }
+    fetchChecklistLogs();
+  };
+  
   return (
     <div>
       <div className="flex justify-between mb-4">
@@ -192,10 +242,10 @@ const LogsTab = () => {
               placeholder="Select Machine"
               style={{ width: '100%' }}
               allowClear
-              onChange={(value) => setFilters({ ...filters, machine_id: value })}
+              onChange={handleMachineFilter}
               value={filters.machine_id}
             >
-              {machines.map(machine => (
+              {machines.filter(machine => !isDefaultMachine(machine)).map(machine => (
                 <Option key={machine.id} value={machine.id}>
                   {getMachineName(machine)}
                 </Option>
@@ -203,61 +253,12 @@ const LogsTab = () => {
             </Select>
           </div>
           
-          <div>
-            <div className="mb-2 font-medium">Production Order</div>
-            <Input 
-              placeholder="Enter production order"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onPressEnter={() => {
-                setFilters({ ...filters, production_order: searchText });
-                handleSearch();
-              }}
-              suffix={
-                <Tooltip title="Search">
-                  <SearchOutlined 
-                    onClick={() => {
-                      setFilters({ ...filters, production_order: searchText });
-                      handleSearch();
-                    }} 
-                    style={{ cursor: 'pointer' }}
-                  />
-                </Tooltip>
-              }
-            />
-          </div>
           
-          <div>
-            <div className="mb-2 font-medium">Date Range</div>
-            <RangePicker 
-              style={{ width: '100%' }}
-              onChange={(dates) => {
-                if (dates) {
-                  setFilters({ 
-                    ...filters, 
-                    from_date: dates[0]?.format('YYYY-MM-DD'), 
-                    to_date: dates[1]?.format('YYYY-MM-DD')
-                  });
-                } else {
-                  setFilters({ 
-                    ...filters, 
-                    from_date: null, 
-                    to_date: null
-                  });
-                }
-              }}
-            />
-          </div>
+          
+          
         </div>
         
-        <div className="flex justify-end mt-4">
-          <Space>
-            <Button onClick={handleReset}>Reset Filters</Button>
-            <Button type="primary" onClick={handleSearch} icon={<SearchOutlined />}>
-              Search
-            </Button>
-          </Space>
-        </div>
+        
       </Card>
       
       <Table
@@ -272,8 +273,11 @@ const LogsTab = () => {
           showSizeChanger: true,
           pageSizeOptions: ['10', '20', '50'],
           showTotal: (total) => `Total ${total} logs`,
+          onChange: (page, pageSize) => {
+            setFilters({ ...filters, page, page_size: pageSize });
+            fetchChecklistLogs();
+          },
         }}
-        onChange={handleTableChange}
       />
       
       {/* Log Details Modal */}

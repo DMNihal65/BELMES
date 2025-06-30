@@ -218,7 +218,7 @@ const Scheduling = () => {
   
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
 
-  // Get unique machines from schedule data
+  // Get unique machines from schedule data, excluding any with 'Default' in the name
   const availableMachines = React.useMemo(() => {
     if (!scheduleData?.work_centers) return [];
     
@@ -226,15 +226,17 @@ const Scheduling = () => {
     const workCenterMachines = scheduleData.work_centers
       .filter(wc => wc.is_schedulable === true) // Only include work centres that are schedulable
       .flatMap(wc => 
-        wc.machines.map(machine => ({
-          id: machine.id,  // Original machine ID
-          machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work centre code and machine ID
-          name: machine.name,
-          work_center_code: wc.work_center_code,
-          work_center_name: wc.work_center_name,
-          displayName: `${wc.work_center_code} - ${machine.name}`,  // Display format
-          order: scheduleData.work_centers.indexOf(wc) * 100 + wc.machines.indexOf(machine) // Preserve order
-        }))
+        wc.machines
+          .filter(machine => !machine.name.includes('Default')) // Filter out machines with 'Default' in the name
+          .map(machine => ({
+            id: machine.id,  // Original machine ID
+            machineId: `${wc.work_center_code}-${machine.id}`,  // Unique identifier using work centre code and machine ID
+            name: machine.name,
+            work_center_code: wc.work_center_code,
+            work_center_name: wc.work_center_name,
+            displayName: `${wc.work_center_code} - ${machine.name}`,  // Display format
+            order: scheduleData.work_centers.indexOf(wc) * 100 + wc.machines.indexOf(machine) // Preserve order
+          }))
     );
     
     // Get machines from scheduled operations to check which ones are running
@@ -711,7 +713,7 @@ const Scheduling = () => {
   useEffect(() => {
     const fetchPartDescriptions = async () => {
       try {
-        const response = await fetch('http://172.18.7.88:4479/api/v1/planning/all_orders');
+        const response = await fetch('http://172.18.7.88:4493/api/v1/planning/all_orders');
         const data = await response.json();
         
         // Create a mapping of part numbers to their descriptions

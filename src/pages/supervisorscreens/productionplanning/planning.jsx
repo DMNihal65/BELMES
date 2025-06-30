@@ -874,7 +874,7 @@ const loadInventoryItems = async () => {
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
           {
-            content: 'NA',
+            content: '',
             styles: { cellWidth: 100 }
           }
         ],
@@ -904,7 +904,7 @@ const loadInventoryItems = async () => {
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
           {
-            content: selectedJob.rm_reference || 'N/A',
+            content: selectedJob.rm_reference || '',
             styles: { cellWidth: 100 }
           }
         ]
@@ -1327,7 +1327,7 @@ const loadInventoryItems = async () => {
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">RM Reference</td>
-                    <td className="p-4" colSpan="3">{selectedJob.rm_reference || 'N/A'}</td>
+                    <td className="p-4" colSpan="3">{selectedJob.rm_reference || ''}</td>
                   </tr>
                 </tbody>
               </table>

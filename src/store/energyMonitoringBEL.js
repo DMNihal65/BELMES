@@ -8,19 +8,19 @@ const API_TIMEOUT = 10000; // Increase timeout to 10 seconds
 const MAX_RETRIES = 1;
 
 // Use the correct WebSocket endpoint for machines data
-// const WS_MACHINES_ENDPOINT = 'ws://172.18.7.88:4479/api/v1/energymonitoring/ws/machines_data';
+// const WS_MACHINES_ENDPOINT = 'ws://172.18.7.88:4493/api/v1/energymonitoring/ws/machines_data';
 
 // Update the WebSocket endpoint for shiftwise energy data
-const WS_SHIFTWISE_ENERGY_ENDPOINT = 'http://172.18.7.88:4479/api/v1/energy-monitoring/shiftwise-energy-stream';
+const WS_SHIFTWISE_ENERGY_ENDPOINT = 'http://172.18.7.88:4493/api/v1/energy-monitoring/shiftwise-energy-stream';
 
 // Add the HTTP endpoint for historical data
-// const HISTORY_API_ENDPOINT = 'http://172.18.7.88:4479/api/v1/energymonitoring/shiftwise_energy_history_by_date';
+// const HISTORY_API_ENDPOINT = 'http://172.18.7.88:4493/api/v1/energymonitoring/shiftwise_energy_history_by_date';
 
 // Update the endpoint constant
-const MACHINE_STATUS_ENDPOINT = 'http://172.18.7.88:4479/api/v1/energy-monitoring/machine-status-stream';
+const MACHINE_STATUS_ENDPOINT = 'http://172.18.7.88:4493/api/v1/energy-monitoring/machine-status-stream';
 
 // Update the endpoint constant to use the specific epoch time
-const COMBINED_HISTORY_ENDPOINT = 'http://172.18.7.88:4479/api/v1/energy-monitoring/combined-history/1746586800';
+const COMBINED_HISTORY_ENDPOINT = 'http://172.18.7.88:4493/api/v1/energy-monitoring/combined-history/1746586800';
 
 const useEnergyMonitoringBelStore = create((set, get) => ({
   // Machine data
@@ -313,7 +313,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       }
       
       // Create WebSocket connection
-      const wsUrl = `ws://172.18.7.88:4479/api/v1/energymonitoring/ws/live_data`;
+      const wsUrl = `ws://172.18.7.88:4493/api/v1/energymonitoring/ws/live_data`;
       console.log(`Connecting to WebSocket at ${wsUrl}`);
       
       const socket = new WebSocket(wsUrl);
@@ -511,7 +511,7 @@ const useEnergyMonitoringBelStore = create((set, get) => ({
       
       const apiParamName = apiParamMap[parameterName] || parameterName;
       
-      const baseUrl = `http://172.18.7.88:4479/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
+      const baseUrl = `http://172.18.7.88:4493/api/v1/energymonitoring/filtered_history_data/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}&column_name=${apiParamName}`;
       
       console.log(`Fetching filtered history data from ${baseUrl}`);
       
@@ -806,88 +806,142 @@ disconnectShiftwiseEnergyWebSocket: () => {
   },
   
   // Update the fetchShiftwiseEnergyHistoryByDate function
-  fetchShiftwiseEnergyHistoryByDate: async (date) => {
-    set({ isLoading: false, error: null });
+fetchShiftwiseEnergyHistoryByDate: async (fromDate, toDate = null) => {
+  set({ isLoading: true, error: null });
+  
+  try {
+    let momentFromDate, momentToDate;
     
-    try {
-      // Handle different date formats
-      let momentDate;
-      if (date && date._isAMomentObject) {
-        momentDate = date;
-      } else if (date && typeof date === 'string') {
-        momentDate = moment(date);
-      } else if (date && date.$d) {
-        // Handle Ant Design DatePicker date object
-        momentDate = moment(date.$d);
-      } else {
-        console.error('Invalid date format received:', date);
-        throw new Error('Invalid date format');
-      }
-
-      // Ensure we have a valid moment date
-      if (!momentDate.isValid()) {
-        console.error('Invalid moment date:', momentDate);
-        throw new Error('Invalid date');
-      }
-
-      // Set time to 8:30 AM in local time
-      momentDate = momentDate.hours(8).minutes(30).seconds(0).milliseconds(0);
-
-      // Convert to epoch timestamp
-      const epochTimestamp = momentDate.unix();
-      console.log(
-        `Selected date and time: ${momentDate.format('YYYY-MM-DD HH:mm:ss')} (epoch: ${epochTimestamp})`
-      );
-
-      // Use the specific endpoint with the epoch time
-      const response = await axios.get(`http://172.18.7.88:4479/api/v1/energy-monitoring/combined-history/${epochTimestamp}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      });
-      
-      console.log('Historical energy data API response:', response.data);
-      
-      if (response.data && response.data.machines) {
-        // Process the machines data
-        const processedData = response.data.machines.map(machine => ({
-          id: machine.machine_id,
-          machine_name: machine.machine_name,
-          energy: parseFloat(parseFloat(machine.total_energy || 0).toFixed(3)),
-          max_energy: Math.max(40, parseFloat(parseFloat(machine.total_energy || 0).toFixed(3)) * 1.2), // Dynamic max based on highest value
-          first_shift: parseFloat(parseFloat(machine.first_shift || 0).toFixed(3)),
-          second_shift: parseFloat(parseFloat(machine.second_shift || 0).toFixed(3)),
-          third_shift: parseFloat(parseFloat(machine.third_shift || 0).toFixed(3)),
-          timestamp: response.data.timestamp,
-          cost: parseFloat((parseFloat(machine.total_energy || 0).toFixed(3) * 12.5).toFixed(2)) // Calculate cost based on energy
-        }));
-        
-        // Store the data in the store
-        set({ 
-          allMachinesEnergyData: processedData,
-          isLoading: false 
-        });
-        
-        return processedData;
-      } else {
-        throw new Error('Invalid data format from API');
-      }
-      
-    } catch (error) {
-      console.error('Error fetching historical energy data:', error);
-      
-      // Generate mock historical data as fallback
-      const mockData = generateMockHistoricalEnergyData(date);
-      set({ 
-        allMachinesEnergyData: mockData,
-        isLoading: false, 
-        error: error.message 
-      });
-      return mockData;
+    // Handle fromDate
+    if (fromDate && fromDate._isAMomentObject) {
+      momentFromDate = fromDate;
+    } else if (fromDate && typeof fromDate === 'string') {
+      momentFromDate = moment(fromDate);
+    } else if (fromDate && fromDate.$d) {
+      // Handle Ant Design DatePicker date object
+      momentFromDate = moment(fromDate.$d);
+    } else {
+      console.error('Invalid fromDate format received:', fromDate);
+      throw new Error('Invalid fromDate format');
     }
-  },
+
+    // Handle toDate - if not provided, use fromDate (single day range)
+    if (toDate) {
+      if (toDate && toDate._isAMomentObject) {
+        momentToDate = toDate;
+      } else if (toDate && typeof toDate === 'string') {
+        momentToDate = moment(toDate);
+      } else if (toDate && toDate.$d) {
+        // Handle Ant Design DatePicker date object
+        momentToDate = moment(toDate.$d);
+      } else {
+        console.error('Invalid toDate format received:', toDate);
+        throw new Error('Invalid toDate format');
+      }
+    } else {
+      // If no toDate provided, use the same date as fromDate for single day range
+      momentToDate = momentFromDate.clone();
+    }
+
+    // Ensure we have valid moment dates
+    if (!momentFromDate.isValid()) {
+      console.error('Invalid moment fromDate:', momentFromDate);
+      throw new Error('Invalid fromDate');
+    }
+    
+    if (!momentToDate.isValid()) {
+      console.error('Invalid moment toDate:', momentToDate);
+      throw new Error('Invalid toDate');
+    }
+
+    // Set from_date to 8:30 AM of the selected from date
+    const fromDateWithTime = momentFromDate.clone().hours(8).minutes(30).seconds(0).milliseconds(0);
+    
+    // Set to_date to 8:30 AM of the next day after toDate (to include the full toDate day)
+    const toDateWithTime = momentToDate.clone().hours(8).minutes(30).seconds(0).milliseconds(0);
+
+    // Convert to epoch timestamps
+    const fromEpoch = fromDateWithTime.unix();
+    const toEpoch = toDateWithTime.unix();
+    
+    console.log(
+      `Date range selected: ${momentFromDate.format('YYYY-MM-DD')} to ${momentToDate.format('YYYY-MM-DD')}`
+    );
+    console.log(
+      `API query range: ${fromDateWithTime.format('YYYY-MM-DD HH:mm:ss')} to ${toDateWithTime.format('YYYY-MM-DD HH:mm:ss')} (epochs: ${fromEpoch} - ${toEpoch})`
+    );
+
+    // Use the updated endpoint with query parameters
+    const response = await axios.get(`http://172.18.7.88:4493/api/v1/energy-monitoring/combined-history/`, {
+      params: {
+        from_timestamp: fromEpoch,
+        to_timestamp: toEpoch
+      },
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000
+    });
+    
+    console.log('Historical energy data API response:', response.data);
+    
+    // Updated data processing to match the new API response structure
+    if (response.data && response.data.machines) {
+      // Process the machines data from the new API structure
+      const processedData = response.data.machines.map(machine => ({
+        id: machine.machine_id,
+        machine_name: machine.machine_name,
+        energy: parseFloat(parseFloat(machine.total_energy || 0).toFixed(3)),
+        max_energy: Math.max(40, parseFloat(parseFloat(machine.total_energy || 0).toFixed(3)) * 1.2), // Dynamic max based on value
+        first_shift: parseFloat(parseFloat(machine.first_shift || 0).toFixed(3)),
+        second_shift: parseFloat(parseFloat(machine.second_shift || 0).toFixed(3)),
+        third_shift: parseFloat(parseFloat(machine.third_shift || 0).toFixed(3)),
+        timestamp: response.data.from_timestamp, // Use from_timestamp as timestamp
+        cost: parseFloat((parseFloat(machine.total_energy || 0).toFixed(3) * 12.5).toFixed(2)), // Calculate cost based on energy
+        // Additional metadata for reporting
+        date_range: {
+          from: response.data.from_timestamp,
+          to: response.data.to_timestamp,
+          from_epoch: response.data.epoch_range.from,
+          to_epoch: response.data.epoch_range.to
+        },
+        // Include grand totals for summary
+        grand_totals: response.data.grand_totals
+      }));
+      
+      console.log('Processed data:', processedData);
+      
+      // Store the data in the store
+      set({ 
+        allMachinesEnergyData: processedData,
+        isLoading: false,
+        // Store additional range information
+        currentDateRange: {
+          from: response.data.from_timestamp,
+          to: response.data.to_timestamp,
+          grand_totals: response.data.grand_totals,
+          machine_totals: response.data.machine_totals
+        }
+      });
+      
+      return processedData;
+    } else {
+      throw new Error('Invalid data format from API - missing machines array');
+    }
+    
+  } catch (error) {
+    console.error('Error fetching historical energy data:', error);
+    
+    // Set error state and return empty array
+    set({ 
+      allMachinesEnergyData: [],
+      isLoading: false, 
+      error: error.message 
+    });
+    return [];
+  }
+},
   
   // Update startMachineStatusPolling to use SSE
   startMachineStatusPolling: () => {
@@ -928,7 +982,7 @@ disconnectShiftwiseEnergyWebSocket: () => {
       }
 
       // Create new EventSource for parameters using the original endpoint
-      const eventSource = new EventSource(`http://172.18.7.88:4479/api/v1/energy-monitoring/machine/${machineId}/parameters-stream`);
+      const eventSource = new EventSource(`http://172.18.7.88:4493/api/v1/energy-monitoring/machine/${machineId}/parameters-stream`);
       
       // Store the EventSource instance
       set({ parametersEventSource: eventSource });
@@ -980,7 +1034,7 @@ disconnectShiftwiseEnergyWebSocket: () => {
     
     try {
       // Create new EventSource for parameter history
-      const eventSource = new EventSource(`http://172.18.7.88:4479/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history-stream`);
+      const eventSource = new EventSource(`http://172.18.7.88:4493/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history-stream`);
       
       // Handle connection open
       eventSource.onopen = () => {
@@ -1044,7 +1098,7 @@ disconnectShiftwiseEnergyWebSocket: () => {
       const startTimestamp = Math.floor(startTime.valueOf() / 1000);
       const endTimestamp = Math.floor(endTime.valueOf() / 1000);
       
-      const url = `http://172.18.7.88:4479/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history?start_time=${startTimestamp}&end_time=${endTimestamp}`;
+      const url = `http://172.18.7.88:4493/api/v1/energy-monitoring/machine/${machineId}/parameter/${parameter}/history?start_time=${startTimestamp}&end_time=${endTimestamp}`;
       
       console.log('Fetching historical data from:', url);
       

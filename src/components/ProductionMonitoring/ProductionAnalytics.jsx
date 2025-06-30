@@ -72,7 +72,7 @@ function ProductionAnalytics() {
   const fetchWorkCenters = async () => {
     setLoadingWorkCenters(true);
     try {
-      const response = await axios.get('http://172.18.7.88:4479/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await axios.get('http://172.18.7.88:4493/api/v1/master-order/workcenters/?skip=0&limit=100');
       const workCentersData = response.data;
       
       // No longer filtering by is_schedulable
@@ -146,11 +146,18 @@ function ProductionAnalytics() {
     setSelectedMachines(values);
   };
 
-  // Filter machine timelines based on selected machines
+  // Filtered list of available machines (no 'default' in name)
+  const filteredAvailableMachines = useMemo(() =>
+    availableMachines.filter(name => name && !name.toLowerCase().includes('default')),
+    [availableMachines]
+  );
+
+  // Filter machine timelines based on selected machines, also filter out 'default' machines
   const getFilteredMachineTimelines = () => {
     if (!analyticsData.machineTimelines) return [];
     return analyticsData.machineTimelines.filter(m => 
-      selectedMachines.includes(m.machine_name)
+      selectedMachines.includes(m.machine_name) &&
+      m.machine_name && !m.machine_name.toLowerCase().includes('default')
     );
   };
   
@@ -501,20 +508,35 @@ function ProductionAnalytics() {
     return {
       tooltip: {
         trigger: 'item',
+        borderWidth: 1,
+        borderColor: '#ccc',
+        padding: 10,
+        textStyle: {
+          color: '#333'
+        },
         formatter: (params) => {
           if (!params.data) return '';
           
-          // Destructure with defaults to prevent undefined values
           const [index, startTime, endTime, status = 'Unknown', machineName = 'Unknown', program = ''] = params.data;
           
-          // Use the extracted values rather than accessing data properties
+          const durationHours = dayjs(endTime).diff(dayjs(startTime), 'hour', true);
+          let durationStr = '';
+          if (durationHours < 1) {
+            durationStr = `${dayjs(endTime).diff(dayjs(startTime), 'minute')} mins`;
+          } else {
+            durationStr = `${durationHours.toFixed(1)} hrs`;
+          }
+
           return `
-            <div style="font-weight:bold">${machineName}</div>
-            <div>Status: <span style="color:${statusColors[status] || '#8884d8'}">${status}</span></div>
-            <div>Start: ${dayjs(startTime).format('MMM D, YYYY HH:mm')}</div>
-            <div>End: ${dayjs(endTime).format('MMM D, YYYY HH:mm')}</div>
-            <div>Duration: ${dayjs(endTime).diff(dayjs(startTime), 'hour', true).toFixed(1)} hrs</div>
-            ${program ? `<div>Program: ${program}</div>` : ''}
+            <div style="font-weight:bold; font-size: 14px; margin-bottom: 5px;">${machineName}</div>
+            <div style="display: flex; align-items: center; margin-bottom: 5px;">
+              <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${statusColors[status] || '#8884d8'}; margin-right: 8px;"></span>
+              <strong>Status:</strong> <span style="margin-left: 5px;">${status}</span>
+            </div>
+            <div><strong>Start:</strong> ${dayjs(startTime).format('MMM D, YYYY HH:mm')}</div>
+            <div><strong>End:</strong> ${dayjs(endTime).format('MMM D, YYYY HH:mm')}</div>
+            <div><strong>Duration:</strong> ${durationStr}</div>
+            ${program ? `<div><strong>Program:</strong> ${program}</div>` : ''}
           `;
         }
       },
@@ -538,11 +560,27 @@ function ProductionAnalytics() {
           start: 0,
           end: 100,
           handleIcon: 'M10.7,11.9v-1.3H9.3v1.3c-4.9,0.3-8.8,4.4-8.8,9.4c0,5,3.9,9.1,8.8,9.4v1.3h1.3v-1.3c4.9-0.3,8.8-4.4,8.8-9.4C19.5,16.3,15.6,12.2,10.7,11.9z M13.3,24.4H6.7V23h6.6V24.4z M13.3,19.6H6.7v-1.4h6.6V19.6z',
-          handleSize: '80%'
+          handleSize: '80%',
+          showDetail: false,
+        },
+        {
+          type: 'slider',
+          yAxisIndex: 0,
+          filterMode: 'weakFilter',
+          width: 15,
+          right: '2%',
+          start: 0,
+          end: 100,
+          showDetail: false,
         },
         {
           type: 'inside',
           xAxisIndex: 0,
+          filterMode: 'weakFilter'
+        },
+        {
+          type: 'inside',
+          yAxisIndex: 0,
           filterMode: 'weakFilter'
         }
       ],
@@ -569,22 +607,23 @@ function ProductionAnalytics() {
         min: timeRange.start,
         max: timeRange.end,
         axisLabel: {
-          formatter: '{yyyy}-{MM}-{dd} {HH}:{mm}',
-          rotate: 45
-        }
+          formatter: (value) => dayjs(value).format('MM-DD HH:mm'),
+          hideOverlap: true,
+        },
+        axisLine: { lineStyle: { color: '#ccc' } },
+        splitLine: { show: true, lineStyle: { color: '#eee' } }
       },
       yAxis: {
         type: 'category',
         data: filteredMachines.map(m => m.name),
         axisLabel: {
           formatter: (value) => {
-            // Truncate long machine names
             return value.length > 15 ? value.substring(0, 15) + '...' : value;
           },
-          tooltip: {
-            show: true
-          }
-        }
+          tooltip: { show: true }
+        },
+        axisLine: { show: false },
+        axisTick: { show: false }
       },
       series: [
         {
@@ -599,27 +638,28 @@ function ProductionAnalytics() {
             const status = api.value(3);
             const color = statusColors[status] || '#8884d8';
             
-            // Only render if width is positive (valid time range)
             if (width < 1) return;
             
             return {
               type: 'rect',
+              clip: true,
               shape: {
                 x: start[0],
                 y: start[1] - height / 2,
                 width: width,
-                height: height
+                height: height,
+                r: [3, 3, 3, 3]
               },
               style: {
                 fill: color,
                 stroke: '#fff',
-                lineWidth: 1
+                lineWidth: 0.5
               }
             };
           },
           encode: {
-            x: [1, 2], // start_time, end_time
-            y: 0,      // machine index
+            x: [1, 2],
+            y: 0,
           },
           data: filteredTimelineData.map(item => {
             const machineIndex = filteredMachines.findIndex(m => m.id === item.machine_id);
@@ -846,20 +886,21 @@ function ProductionAnalytics() {
                       options={
                         (() => {
                           let machineOptions = [];
-                          
                           if (analyticsData.timelineData?.machines) {
-                            // No longer filtering for schedulable machines only
-                            machineOptions = analyticsData.timelineData.machines.map(machine => ({
-                              label: machine.name,
-                              value: machine.name
-                            }));
+                            machineOptions = analyticsData.timelineData.machines
+                              .filter(machine => machine.name && !machine.name.toLowerCase().includes('default'))
+                              .map(machine => ({
+                                label: machine.name,
+                                value: machine.name
+                              }));
                           } else if (analyticsData.machineTimelines) {
-                            machineOptions = analyticsData.machineTimelines.map(machine => ({
-                              label: machine.machine_name,
-                              value: machine.machine_name
-                            }));
+                            machineOptions = analyticsData.machineTimelines
+                              .filter(machine => machine.machine_name && !machine.machine_name.toLowerCase().includes('default'))
+                              .map(machine => ({
+                                label: machine.machine_name,
+                                value: machine.machine_name
+                              }));
                           }
-                          
                           return machineOptions;
                         })()
                       }

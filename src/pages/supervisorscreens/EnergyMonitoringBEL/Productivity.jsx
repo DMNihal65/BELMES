@@ -8,10 +8,11 @@ import useEnergyMonitoringBelStore from '../../../store/energyMonitoringBEL';
 import { isEqual } from 'lodash';
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
 const Productivity = ({ onBack }) => {
   const navigate = useNavigate();
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDateRange, setSelectedDateRange] = useState(null);
   const [isLive, setIsLive] = useState(true);
   const [machineData, setMachineData] = useState([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
@@ -98,15 +99,15 @@ const Productivity = ({ onBack }) => {
     };
   }, [isLive]);
 
-  const handleDateChange = async (date) => {
+  const handleDateRangeChange = async (dates) => {
     try {
       setIsDataLoading(true);
       // Set loading state and update UI state
       useEnergyMonitoringBelStore.setState({ isLoading: true });
-      setSelectedDate(date);
-      setIsLive(!date);
+      setSelectedDateRange(dates);
+      setIsLive(!dates);
       
-      if (!date) {
+      if (!dates || dates.length === 0) {
         // If returning to live mode, reconnect WebSocket
         handleGoLive();
         return;
@@ -115,13 +116,16 @@ const Productivity = ({ onBack }) => {
       // If switching to history mode, disconnect WebSocket
       disconnectShiftwiseEnergyWebSocket();
       
-      // Format the date for logging
-      const formattedDate = date.format('YYYY-MM-DD');
-      console.log(`Fetching historical data for date: ${formattedDate}`);
+      const [fromDate, toDate] = dates;
+      
+      // Format the dates for logging
+      const formattedFromDate = fromDate.format('YYYY-MM-DD');
+      const formattedToDate = toDate.format('YYYY-MM-DD');
+      console.log(`Fetching historical data from ${formattedFromDate} to ${formattedToDate}`);
       
       try {
-        // Pass the moment date object directly to the store function
-        const historyData = await fetchShiftwiseEnergyHistoryByDate(date);
+        // Pass both fromDate and toDate to the store function
+        const historyData = await fetchShiftwiseEnergyHistoryByDate(fromDate, toDate);
         
         // Process the data if available
         if (historyData && Array.isArray(historyData) && historyData.length > 0) {
@@ -130,7 +134,7 @@ const Productivity = ({ onBack }) => {
           setMachineData(historyData);
           prevDataRef.current = historyData;
         } else {
-          console.warn('No historical data available for the selected date');
+          console.warn('No historical data available for the selected date range');
           // Show empty data with message instead of fallback data
           setMachineData([]);
           prevDataRef.current = [];
@@ -143,7 +147,7 @@ const Productivity = ({ onBack }) => {
       }
       
     } catch (error) {
-      console.error('Error in handleDateChange:', error);
+      console.error('Error in handleDateRangeChange:', error);
       useEnergyMonitoringBelStore.setState({ isLoading: false });
       setMachineData([]);
       prevDataRef.current = [];
@@ -157,7 +161,7 @@ const Productivity = ({ onBack }) => {
   const handleGoLive = () => {
     console.log('Switching to live mode...');
     setIsDataLoading(true);
-    setSelectedDate(null);
+    setSelectedDateRange(null);
     setIsLive(true);
     // Clear existing data before reconnecting
     setMachineData([]);
@@ -167,7 +171,7 @@ const Productivity = ({ onBack }) => {
   };
 
   const handleViewReport = () => {
-    if (selectedDate) {
+    if (selectedDateRange && selectedDateRange.length === 2) {
       // Calculate costs for each machine before sending to report
       const reportData = machineData.map(machine => ({
         ...machine,
@@ -177,9 +181,12 @@ const Productivity = ({ onBack }) => {
       
       console.log('Sending data to report:', reportData);
       
+      const [fromDate, toDate] = selectedDateRange;
       navigate('/supervisor/energy-monitoring-bel/report', { 
         state: { 
-          date: selectedDate.format('YYYY-MM-DD'),
+          fromDate: fromDate.format('YYYY-MM-DD'),
+          toDate: toDate.format('YYYY-MM-DD'),
+          dateRange: `${fromDate.format('YYYY-MM-DD')} to ${toDate.format('YYYY-MM-DD')}`,
           machineData: reportData,
           returnPath: '/supervisor/energy-monitoring-bel/machines'
         } 
@@ -309,6 +316,20 @@ const Productivity = ({ onBack }) => {
     return true;
   }
 
+  // Helper function to format date range display
+  const getDateRangeDisplay = () => {
+    if (!selectedDateRange || selectedDateRange.length !== 2) return '';
+    const [fromDate, toDate] = selectedDateRange;
+    
+    // If same date, show single date
+    if (fromDate.format('YYYY-MM-DD') === toDate.format('YYYY-MM-DD')) {
+      return fromDate.format('MMMM D, YYYY');
+    }
+    
+    // Different dates, show range
+    return `${fromDate.format('MMM D')} - ${toDate.format('MMM D, YYYY')}`;
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       {/* Header Section */}
@@ -341,19 +362,20 @@ const Productivity = ({ onBack }) => {
             fontWeight: 600
           }}
         >
-          {isLive ? 'Live Energy Monitoring' : 'Historical Energy Data'}
+          {isLive ? 'Live Energy Monitoring' : `Historical Energy Data - ${getDateRangeDisplay()}`}
         </Title>
         <Space size="middle">
-          <DatePicker 
-            value={selectedDate}
-            onChange={handleDateChange}
-            style={{ width: '150px' }}
-            placeholder="Select date"
+          <RangePicker 
+            value={selectedDateRange}
+            onChange={handleDateRangeChange}
+            style={{ width: '300px' }}
+            placeholder={['From Date', 'To Date']}
             format="YYYY-MM-DD"
             disabledDate={(current) => {
               // Disable future dates
               return current && current > moment().endOf('day');
             }}
+            allowClear={true}
           />
         
           <Button
@@ -371,7 +393,7 @@ const Productivity = ({ onBack }) => {
             type="primary"
             icon={<FileTextOutlined />}
             onClick={handleViewReport}
-            disabled={!selectedDate || machineData.length === 0}
+            disabled={!selectedDateRange || machineData.length === 0}
             style={{
               backgroundColor: '#3b82f6',
               borderColor: '#2563eb'
@@ -399,7 +421,7 @@ const Productivity = ({ onBack }) => {
       )}
 
       {/* No data message */}
-      {!isLoading && !isDataLoading && selectedDate && machineData.length === 0 && (
+      {!isLoading && !isDataLoading && selectedDateRange && machineData.length === 0 && (
         <div style={{ 
           textAlign: 'center', 
           padding: '80px 0',
@@ -415,7 +437,7 @@ const Productivity = ({ onBack }) => {
               color: '#64748b'
             }}
           >
-            No energy monitoring data available for {selectedDate.format('MMMM D, YYYY')}
+            No energy monitoring data available for {getDateRangeDisplay()}
           </Text>
           <Button
             type="primary"
@@ -475,7 +497,7 @@ const Productivity = ({ onBack }) => {
                     marginTop: '2px'
                   }}>
                        {(machine.energy || 0).toFixed(2)} kWh
-  </div>
+                  </div>
                 </div>
               </Card>
             </Col>
@@ -534,4 +556,4 @@ const Productivity = ({ onBack }) => {
   );
 };
 
-export default Productivity; 
+export default Productivity;

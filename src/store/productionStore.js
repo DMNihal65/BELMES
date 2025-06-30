@@ -20,8 +20,8 @@ const calculateUptime = (lastUpdated) => {
   return moment(lastUpdated).fromNow();
 };
 
-const BASE_URL = 'http://172.18.7.88:4479/production_monitoring';
-const WS_URL = 'ws://172.18.7.88:4479/production_monitoring/ws/live-status/';
+const BASE_URL = 'http://172.18.7.88:4493/production_monitoring';
+const WS_URL = 'ws://172.18.7.88:4493/production_monitoring/ws/live-status/';
 
 const useProductionStore = create(
   devtools((set, get) => ({
@@ -86,9 +86,12 @@ const useProductionStore = create(
             const data = JSON.parse(event.data);
             // Check if data is an array or single object
             const machinesData = Array.isArray(data) ? data : [data];
-            
+            // Filter out machines with 'default' in their name
+            const filteredMachines = machinesData.filter(machine =>
+              machine.machine_name && !machine.machine_name.toLowerCase().includes('default')
+            );
             set({
-              machines: machinesData.map(machine => ({
+              machines: filteredMachines.map(machine => ({
                 machine_id: machine.machine_id || 0,
                 machine_name: machine.machine_name || 'Unknown',
                 status: machine.status || 'OFFLINE',
@@ -185,7 +188,7 @@ const useProductionStore = create(
     // Fetch work centres for filtering machines
     fetchWorkCenters: async () => {
       try {
-        const response = await axios.get('http://172.18.7.88:4479/api/v1/master-order/workcenters/?skip=0&limit=100');
+        const response = await axios.get('http://172.18.7.88:4493/api/v1/master-order/workcenters/?skip=0&limit=100');
         const workcenters = response.data;
         
         // No longer filtering by is_schedulable
@@ -340,10 +343,27 @@ const useProductionStore = create(
           }
         });
 
+        // Filter out machines with 'default' in their name from timelineData.machines
+        let timelineData = response.data;
+        if (timelineData && Array.isArray(timelineData.machines)) {
+          timelineData = {
+            ...timelineData,
+            machines: timelineData.machines.filter(m => m.name && !m.name.toLowerCase().includes('default'))
+          };
+        }
+        // Also filter timeline_data to only include valid machines
+        if (timelineData && Array.isArray(timelineData.timeline_data) && Array.isArray(timelineData.machines)) {
+          const validMachineIds = new Set(timelineData.machines.map(m => m.id));
+          timelineData = {
+            ...timelineData,
+            timeline_data: timelineData.timeline_data.filter(item => validMachineIds.has(item.machine_id))
+          };
+        }
+
         set({ 
           analyticsData: {
             ...get().analyticsData,
-            timelineData: response.data,
+            timelineData: timelineData,
             isLoading: false,
             error: null
           }

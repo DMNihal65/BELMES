@@ -33,7 +33,7 @@ function InspectionResult() {
   const [ftpApprovalStatus, setFtpApprovalStatus] = useState(null);
   const [measuredData, setMeasuredData] = useState(null);
   const [isMeasuredDataModalVisible, setIsMeasuredDataModalVisible] = useState(false);
-  const [viewMode, setViewMode] = useState('all');
+  const [viewMode, setViewMode] = useState('current');
   const [currentOperationData, setCurrentOperationData] = useState(null);
 
   useEffect(() => {
@@ -1677,6 +1677,7 @@ function InspectionResult() {
                   checkedChildren="Current Operation"
                   unCheckedChildren="All Operations"
                   onChange={handleViewModeChange}
+                  defaultChecked
                   className="custom-switch"
                 />
               </div>

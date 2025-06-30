@@ -126,7 +126,7 @@ const DynamicSchedulingGraph = () => {
   // Add new function to fetch part details
   const fetchPartDetails = async () => {
     try {
-      const response = await axios.get('http://172.18.7.88:4479/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.88:4493/api/v1/planning/all_orders');
       setPartDetails(response.data);
     } catch (err) {
       console.error('Error fetching part details:', err);
@@ -200,11 +200,13 @@ const DynamicSchedulingGraph = () => {
     scheduleData.work_centers.forEach(wc => {
       // Only process work centres that are schedulable
       if (wc.is_schedulable) {
-        wc.machines.forEach(machine => {
-          const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
-          machineMapping[machine.id] = machineFullName;
-          machineNameToId[machineFullName] = machine.id;
-        });
+        wc.machines
+          .filter(machine => !machine.name.includes('Default')) // Filter out machines with 'Default' in the name
+          .forEach(machine => {
+            const machineFullName = `${wc.work_center_code}-${machine.name}-${machine.id}`;
+            machineMapping[machine.id] = machineFullName;
+            machineNameToId[machineFullName] = machine.id;
+          });
       }
     });
 
@@ -212,7 +214,9 @@ const DynamicSchedulingGraph = () => {
     scheduleData.work_centers.forEach(wc => {
       // Only add groups for schedulable work centres
       if (wc.is_schedulable) {
-        wc.machines.forEach(machine => {
+        wc.machines
+          .filter(machine => !machine.name.includes('Default')) // Filter out machines with 'Default' in the name
+          .forEach(machine => {
           // Check if this machine has any operations for the selected parts and production orders
           const hasRelevantOperations = () => {
             // If no filters are applied, show all machines

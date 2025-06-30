@@ -21,6 +21,7 @@ const AssignmentsTab = () => {
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
   
   useEffect(() => {
     fetchChecklists();
@@ -104,6 +105,20 @@ const AssignmentsTab = () => {
     return displayName.trim() || `Machine ${machine.id}`;
   };
   
+  // Helper to check if machine is 'Default'
+  const isDefaultMachine = (machine) => {
+    const name = machine?.name || '';
+    const make = machine?.make || '';
+    const model = machine?.model || '';
+    const wcDesc = machine?.work_center?.description || '';
+    return (
+      name.trim().toLowerCase() === 'default' ||
+      make.trim().toLowerCase() === 'default' ||
+      model.trim().toLowerCase() === 'default' ||
+      wcDesc.trim().toLowerCase() === 'default'
+    );
+  };
+  
   const columns = [
     {
       title: 'ID',
@@ -147,21 +162,7 @@ const AssignmentsTab = () => {
         </Tag>
       ),
     },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: '10%',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="View Checklist Details">
-            <Button 
-              icon={<FileSearchOutlined />} 
-              size="small"
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
+    
   ];
   
   return (
@@ -199,7 +200,7 @@ const AssignmentsTab = () => {
             loading={loading}
             optionLabelProp="label"
           >
-            {machines.map(machine => (
+            {machines.filter(machine => !isDefaultMachine(machine)).map(machine => (
               <Option 
                 key={machine.id} 
                 value={machine.id}
@@ -233,9 +234,11 @@ const AssignmentsTab = () => {
           rowKey="id"
           loading={loading}
           pagination={{
-            defaultPageSize: 10,
+            current: pagination.current,
+            pageSize: pagination.pageSize,
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50'],
+            onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
           }}
         />
       ) : (

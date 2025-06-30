@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import dayjs from 'dayjs';
 import axios from 'axios';
 
-const BASE_URL = 'http://172.18.7.88:4479';
+const BASE_URL = 'http://172.18.7.88:4490';
 
 // Helper function to find min/max dates
 const findDateRange = (items) => {
@@ -29,13 +29,15 @@ const findDateRange = (items) => {
 const useGanttStore = create((set, get) => ({
   dateRange: [dayjs().startOf('day'), dayjs().endOf('day')],
   selectedMachine: 'all',
-  ganttData: [],
+  ganttData: [], // This will be the data displayed in the chart
+  allGanttData: [], // This will store all data for the date range
+  machines: [], // This will store the list of unique, valid machines
   isLoading: false,
   error: null,
   lastRefresh: null,
 
   fetchGanttData: async (forceRefresh = false, customDateRange = null) => {
-    const { dateRange, selectedMachine } = get();
+    const { dateRange } = get();
     const rangeToUse = customDateRange || dateRange;
     
     set({ isLoading: true, error: null });
@@ -43,9 +45,8 @@ const useGanttStore = create((set, get) => ({
     try {
       const queryParams = new URLSearchParams();
       
-      if (selectedMachine !== 'all') {
-        queryParams.append('machine_id', selectedMachine);
-      }
+      // We will now always fetch all machines for the given date range
+      // and filter on the client. The 'machine_id' param is removed from the query.
 
       // Use provided date range or current store date range
       if (!forceRefresh && rangeToUse?.[0] && rangeToUse?.[1]) {
@@ -122,24 +123,28 @@ const useGanttStore = create((set, get) => ({
           po: op.production_order,
           status: op.status
         }));
-
-      // Log transformed data
-      console.log('Transformed data counts:', {
-        production: productionItems.length,
-        scheduled: scheduledItems.length
-      });
-
+      
       const combinedData = [...productionItems, ...scheduledItems];
 
-      // Add debug information about the final data
+      // Filter out "Default" machines from the entire dataset, checking if the name includes "default"
+      const allDataFiltered = combinedData.filter(item => 
+        item.machine && !item.machine.toLowerCase().includes('default')
+      );
+
+      // Get unique machine names from the filtered data
+      const uniqueMachines = [...new Set(allDataFiltered.map(item => item.machine))].sort();
+      
       console.log('Final data analysis:', {
-        totalItems: combinedData.length,
-        uniqueMachines: [...new Set(combinedData.map(item => item.machine))],
-        dateRange: findDateRange(combinedData)
+        totalItems: allDataFiltered.length,
+        uniqueMachines: uniqueMachines,
+        dateRange: findDateRange(allDataFiltered)
       });
 
       set({ 
-        ganttData: combinedData,
+        allGanttData: allDataFiltered, // Store all valid data
+        ganttData: allDataFiltered, // Initially display all valid data
+        machines: uniqueMachines, // Set the dynamic machine list
+        selectedMachine: 'all', // Reset selection to 'all'
         isLoading: false,
         lastRefresh: dayjs(),
         error: null
@@ -150,7 +155,9 @@ const useGanttStore = create((set, get) => ({
       set({ 
         error: error.message || 'Failed to fetch data. Please try again.',
         isLoading: false,
-        ganttData: []
+        ganttData: [],
+        allGanttData: [],
+        machines: []
       });
     }
   },
@@ -171,7 +178,16 @@ const useGanttStore = create((set, get) => ({
   },
 
   setSelectedMachine: (machine) => {
-    set({ selectedMachine: machine });
+    const { allGanttData } = get();
+    // Filter the displayed data on the client side
+    const newGanttData = machine === 'all'
+      ? allGanttData
+      : allGanttData.filter(item => item.machine === machine);
+
+    set({ 
+      selectedMachine: machine,
+      ganttData: newGanttData
+    });
   },
 
   resetData: () => {
@@ -181,9 +197,12 @@ const useGanttStore = create((set, get) => ({
       selectedMachine: 'all',
       error: null,
       lastRefresh: null,
-      ganttData: []
+      ganttData: [],
+      allGanttData: [],
+      machines: []
     });
-    get().fetchGanttData(true);
+    // Refetch all data for the default range
+    get().fetchGanttData();
   }
 }));
 

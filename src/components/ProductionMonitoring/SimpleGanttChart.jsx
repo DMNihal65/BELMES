@@ -7,16 +7,6 @@ import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 
-const MACHINES = [
-  { id: 'MMC1-M1', name: 'MMC1-M1' },
-  { id: 'CNCT-m2', name: 'CNCT-m2' },
-  { id: 'CNCM-m3', name: 'CNCM-m3' },
-  { id: 'SMFD-m4', name: 'SMFD-m4' },
-  { id: 'SMPD-m5', name: 'SMPD-m5' },
-  { id: 'QFAB-m6', name: 'QFAB-m6' },
-  { id: 'FAB-C-PC-m9', name: 'FAB-C-PC-m9' }
-];
-
 const VIEW_MODES = {
   daily: {
     label: 'Daily',
@@ -39,7 +29,8 @@ const VIEW_MODES = {
 };
 
 const SimpleGanttChart = ({ 
-  data = [], 
+  data = [],
+  machines = [],
   dateRange, 
   selectedMachine,
   onDateChange,
@@ -198,20 +189,35 @@ const SimpleGanttChart = ({
               style={{ width: 200 }}
               options={[
                 { value: 'all', label: 'All Machines' },
-                ...MACHINES.map(m => ({ value: m.id, label: m.name }))
+                ...machines.map(m => ({ value: m, label: m }))
               ]}
               placeholder="Select Machine"
               disabled={isLoading}
             />
             
-            <Radio.Group 
-              value={viewMode} 
+            <Radio.Group
+              value={viewMode}
               onChange={handleViewModeChange}
               disabled={isLoading}
-              className="mr-4"
+              size="small"
+              className="mr-2 flex items-center"
+              style={{ gap: 2 }}
             >
               {Object.entries(VIEW_MODES).map(([key, { label }]) => (
-                <Radio.Button key={key} value={key}>{label}</Radio.Button>
+                <Radio.Button
+                  className="text-xs px-2 py-0 h-6 leading-6"
+                  key={key}
+                  value={key}
+                  style={{
+                    minWidth: 60,
+                    padding: '0 6px',
+                    fontSize: 12,
+                    height: 24,
+                    lineHeight: '22px'
+                  }}
+                >
+                  {label.replace(' View', '')}
+                </Radio.Button>
               ))}
             </Radio.Group>
 

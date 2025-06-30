@@ -53,6 +53,10 @@ const OEEDashboard = () => {
     sortBy: 'oee',
     sortDirection: 'desc'
   });
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+  });
   const [allMachinesOEE, setAllMachinesOEE] = useState([]);
   const [isLoadingMachines, setIsLoadingMachines] = useState(false);
   const [selectedMachineData, setSelectedMachineData] = useState(null);
@@ -98,7 +102,7 @@ const OEEDashboard = () => {
       }
       
       const response = await axios.get(
-        `http://172.18.7.88:4479/production_monitoring/overall-oee-analytics/?${params.toString()}`
+        `http://172.18.7.88:4493/production_monitoring/overall-oee-analytics/?${params.toString()}`
       );
       
       setOverallOEEData(response.data);
@@ -130,7 +134,7 @@ const OEEDashboard = () => {
       }
       
       const response = await axios.get(
-        `http://172.18.7.88:4479/production_monitoring/detailed-shift-summary/?${params.toString()}`
+        `http://172.18.7.88:4493/production_monitoring/detailed-shift-summary/?${params.toString()}`
       );
       
       // Transform data for table
@@ -173,7 +177,7 @@ const OEEDashboard = () => {
       
       // Fetch data for each machine
       const promises = machineIds.map(id => 
-        axios.get(`http://172.18.7.88:4479/production_monitoring/machine-oee-analysis/${id}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`)
+        axios.get(`http://172.18.7.88:4493/production_monitoring/machine-oee-analysis/${id}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`)
       );
       
       const results = await Promise.allSettled(promises);
@@ -204,7 +208,7 @@ const OEEDashboard = () => {
       const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
       
       const response = await axios.get(
-        `http://172.18.7.88:4479/production_monitoring/machine-oee-analysis/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        `http://172.18.7.88:4493/production_monitoring/machine-oee-analysis/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
       );
       
       if (response.data && response.data.oee_trends) {
@@ -247,6 +251,10 @@ const OEEDashboard = () => {
     loadShiftSummaryData();
     fetchAllMachinesOEE();
     fetchOverallOEEAnalytics();
+  };
+
+  const handleTableChange = (pagination) => {
+    setPagination(pagination);
   };
   
   // Sort shift summary data
@@ -859,11 +867,13 @@ const OEEDashboard = () => {
                 columns={columns} 
                 dataSource={filteredShiftSummaryData} 
                 scroll={{ x: 1500, y: 600 }}
-                pagination={{ 
-                  pageSize: 10,
+                pagination={{
+                  ...pagination,
                   showSizeChanger: true,
-                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} entries`
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} entries`,
                 }}
+                onChange={handleTableChange}
                 size="middle"
                 bordered
                 className="custom-table"

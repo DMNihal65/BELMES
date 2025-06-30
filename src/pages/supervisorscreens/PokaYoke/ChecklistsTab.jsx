@@ -330,9 +330,10 @@ const ChecklistsTab = () => {
                       <Form.Item
                         {...restField}
                         name={[name, 'expected_value']}
-                        label="Expected Value (optional)"
+                        label="Expected Value"
                         className="w-1/3"
                         tooltip="For numerical items, you can specify expected values like '>=50' or '18-25'"
+                        rules={[{ required: true, message: 'Please enter the expected value' }]}
                       >
                         <Input placeholder="e.g., >=50, 18-25" />
                       </Form.Item>
@@ -406,9 +407,10 @@ const ChecklistsTab = () => {
             
             <Form.Item
               name="expected_value"
-              label="Expected Value (optional)"
+              label="Expected Value"
               className="w-1/3"
               tooltip="For numerical items, you can specify expected values like '>=50' or '18-25'"
+              rules={[{ required: true, message: 'Please enter the expected value' }]}
             >
               <Input placeholder="e.g., >=50, 18-25" />
             </Form.Item>

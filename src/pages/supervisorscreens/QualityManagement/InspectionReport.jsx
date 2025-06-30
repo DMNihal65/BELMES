@@ -51,6 +51,7 @@ const InspectionReport = () => {
   const [loading, setLoading] = useState(false);
   const [reportStructure, setReportStructure] = useState(null);
   const [treeData, setTreeData] = useState([]);
+  const [expandedKeys, setExpandedKeys] = useState({});
   const [reports, setReports] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [refreshingData, setRefreshingData] = useState(false);
@@ -75,29 +76,69 @@ const InspectionReport = () => {
     fetchFolders();
   }, []);
 
-  // Replace fetchReportStructure with fetchFolders
-  const fetchFolders = async () => {
-    try {
-      setLoading(true);
-      const folders = await qualityStore.fetchFolders();
+  // Handle tree selection and load subfolders
+  const handleTreeSelect = async (selectedKeys, { node }) => {
+    if (!selectedKeys.length) return;
+    
+    const selectedKey = selectedKeys[0];
+    setSelectedCategory(selectedKey);
+    
+    if (selectedKey.startsWith('folder-')) {
+      const folderId = selectedKey.split('-')[1];
+      setSelectedFolderId(folderId);
+      setCurrentPage(1);
       
-      // Transform folders into tree data format
-      const formattedTreeData = folders.map(folder => ({
-        title: folder.name,
-        key: `folder-${folder.id}`,
-        icon: <FolderOutlined className="text-blue-500" />,
-        isLeaf: false,
-        selectable: true,
-        children: []
-      }));
-      
-      setTreeData(formattedTreeData);
-      
-    } catch (error) {
-      console.error('Error fetching folders:', error);
-      message.error('Failed to load folders');
-    } finally {
-      setLoading(false);
+      try {
+        setLoading(true);
+        
+        // Fetch subfolders for the selected folder
+        const subfolders = await qualityStore.fetchFolders(parseInt(folderId));
+        
+        // Update the tree data with the new subfolders
+        const updateTreeData = (nodes) => {
+          return nodes.map(n => {
+            if (n.key === selectedKey) {
+              return {
+                ...n,
+                children: [
+                  ...(subfolders.map(folder => ({
+                    title: folder.name,
+                    key: `folder-${folder.id}`,
+                    icon: <FolderOutlined className="text-blue-500" />,
+                    isLeaf: false
+                  }))),
+                  ...(n.children?.filter(child => !child.key.startsWith('folder-')) || [])
+                ].sort((a, b) => a.title.localeCompare(b.title))
+              };
+            }
+            if (n.children) {
+              return {
+                ...n,
+                children: updateTreeData(n.children)
+              };
+            }
+            return n;
+          });
+        };
+        
+        // Update the tree data with the new subfolders
+        setTreeData(prevTreeData => updateTreeData(prevTreeData));
+        
+        // Update expanded keys to show the selected folder as expanded
+        setExpandedKeys(prev => ({
+          ...prev,
+          [selectedKey]: true
+        }));
+        
+        // Fetch documents for the selected folder
+        await fetchDocumentsForFolder(folderId);
+        
+      } catch (error) {
+        console.error('Error loading folder:', error);
+        message.error('Failed to load folder contents');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -176,73 +217,56 @@ const InspectionReport = () => {
     return mapNestedData(data);
   };
 
-  // Handle tree selection
-  const handleTreeSelect = async (selectedKeys, info) => {
-    if (info && info.event) {
-      info.event.preventDefault();
-      info.event.stopPropagation();
+  // Helper function to find a node in the tree by key
+  const findNodeInTree = (node, key) => {
+    if (node.key === key) return true;
+    if (node.children) {
+      return node.children.some(child => findNodeInTree(child, key));
     }
-    
-    if (selectedKeys.length > 0) {
-      const selectedKey = selectedKeys[0];
-      setSelectedCategory(selectedKey);
-      
-      const [itemType, itemId] = selectedKey.split('-');
-      
-      if (itemType === 'folder') {
-        setSelectedFolderId(itemId);
-        setCurrentPage(1); // Reset to first page when selecting new folder
-        
-        try {
-          setLoading(true);
-          console.log('Fetching subfolders for folder ID:', itemId);
-          
-          // Fetch subfolders
-          const subfolders = await qualityStore.fetchFolders(parseInt(itemId));
-          console.log('Subfolders received:', subfolders);
-          
-          // Update the tree data to include the new subfolders
-          const updateTreeData = (nodes) => {
-            return nodes.map(node => {
-              if (node.key === selectedKey) {
-                return {
-                  ...node,
-                  children: subfolders.map(subfolder => ({
-                    title: subfolder.name,
-                    key: `folder-${subfolder.id}`,
-                    icon: <FolderOutlined className="text-blue-500" />,
-                    isLeaf: false,
-                    selectable: true,
-                    children: []
-                  }))
-                };
-              }
-              if (node.children) {
-                return {
-                  ...node,
-                  children: updateTreeData(node.children)
-                };
-              }
-              return node;
-            });
-          };
-          
-          const newTreeData = updateTreeData(treeData);
-          console.log('Updated tree data:', newTreeData);
-          setTreeData(newTreeData);
-          
-          // Also fetch documents for the selected folder
-          await fetchDocumentsForFolder(itemId);
-        } catch (error) {
-          console.error('Error fetching subfolders:', error);
-          message.error('Failed to load subfolders');
-        } finally {
-          setLoading(false);
-        }
+    return false;
+  };
+
+  // Helper to get all parent keys of a node
+  const getAllParentKeys = (nodes, key, parents = []) => {
+    for (const node of nodes) {
+      if (node.key === key) return parents;
+      if (node.children) {
+        const found = getAllParentKeys(node.children, key, [...parents, node.key]);
+        if (found) return found;
       }
     }
-    
-    return false;
+    return null;
+  };
+
+  // Update the useEffect to fetch folders instead of report structure
+  useEffect(() => {
+    fetchFolders();
+  }, []);
+
+  // Replace fetchReportStructure with fetchFolders
+  const fetchFolders = async () => {
+    try {
+      setLoading(true);
+      const folders = await qualityStore.fetchFolders();
+      
+      // Transform folders into tree data format
+      const formattedTreeData = folders.map(folder => ({
+        title: folder.name,
+        key: `folder-${folder.id}`,
+        icon: <FolderOutlined className="text-blue-500" />,
+        isLeaf: false,
+        selectable: true,
+        children: []
+      }));
+      
+      setTreeData(formattedTreeData);
+      
+    } catch (error) {
+      console.error('Error fetching folders:', error);
+      message.error('Failed to load folders');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Add new function to fetch documents for a folder
@@ -897,15 +921,6 @@ const InspectionReport = () => {
     return matchesSearch && matchesType && matchesCategory;
   });
   
-  // Helper function to find a node in the tree by key
-  const findNodeInTree = (node, key) => {
-    if (node.key === key) return true;
-    if (node.children) {
-      return node.children.some(child => findNodeInTree(child, key));
-    }
-    return false;
-  };
-
   const handleLaunchQMS = () => {
     try {
       // Using registered protocol to launch QMS
@@ -927,41 +942,7 @@ const InspectionReport = () => {
       
       <Divider className="my-4" />
       
-      {/* Filters Section */}
-      <Row gutter={[24, 24]} className="mb-6">
-        <Col span={16}>
-          <div className="font-medium mb-2 flex items-center">
-            <FilterOutlined className="mr-2 text-blue-500" />
-            <span>Report Type</span>
-          </div>
-          <Select
-            className="w-full"
-            defaultValue="all"
-            onChange={setSelectedReportType}
-            options={[
-              { value: 'all', label: 'All Reports' },
-              { value: 'METRICS', label: 'Quality Metrics' },
-              { value: 'INSPECTION', label: 'Inspection Reports' },
-              { value: 'NONCONFORMANCE', label: 'Non-conformance' },
-            ]}
-            size="middle"
-          />
-        </Col>
-        <Col span={8}>
-          {/* <div className="font-medium mb-2 flex items-center">
-            <AppstoreOutlined className="mr-2 text-blue-500" />
-            <span>Actions</span>
-          </div> */}
-          {/* <Button 
-            type="primary"
-            icon={<AppstoreOutlined />}
-            onClick={handleLaunchQMS}
-            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 border-none shadow-sm hover:shadow-md transition-all"
-          >
-            Launch QMS
-          </Button> */}
-        </Col>
-      </Row>
+    
 
       {/* Content Section */}
       <Row gutter={24}>
@@ -996,19 +977,35 @@ const InspectionReport = () => {
               <div className="max-h-[60vh] overflow-auto">
                 <Tree
                   treeData={treeData}
-                  defaultExpandAll
+                  expandedKeys={Object.keys(expandedKeys).filter(key => expandedKeys[key])}
                   showIcon
-                  onSelect={handleTreeSelect}
+                  onSelect={(selectedKeys, { node }) => {
+                    if (node.key.startsWith('folder-')) {
+                      handleTreeSelect(selectedKeys, { node });
+                    }
+                  }}
+                  onExpand={(expandedKeys, { node }) => {
+                    setExpandedKeys(prev => ({
+                      ...prev,
+                      [node.key]: expandedKeys.includes(node.key)
+                    }));
+                  }}
                   blockNode
                   className="custom-tree"
                   selectable={true}
-                  onExpand={(expandedKeys, { expanded, node }) => {
-                    // If expanding a node, fetch its subfolders
-                    if (expanded && node.key.startsWith('folder-')) {
-                      const folderId = node.key.split('-')[1];
-                      handleTreeSelect([node.key], { node });
-                    }
-                  }}
+                  titleRender={(nodeData) => (
+                    <span 
+                      className="w-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (nodeData.key.startsWith('folder-')) {
+                          handleTreeSelect([nodeData.key], { node: nodeData });
+                        }
+                      }}
+                    >
+                      {nodeData.title}
+                    </span>
+                  )}
                 />
               </div>
             ) : (
@@ -1050,14 +1047,14 @@ const InspectionReport = () => {
             className="shadow-sm hover:shadow-md transition-shadow duration-300"
             extra={
               <Space>
-                <Input
+                {/* <Input
                   placeholder="Search files..."
                   prefix={<SearchOutlined className="text-gray-400" />}
                   onChange={(e) => setSearchText(e.target.value)}
                   value={searchText}
                   className="rounded-md w-64"
                   allowClear
-                />
+                /> */}
                 {/* <Button 
                   type="primary"
                   icon={<UploadOutlined />}

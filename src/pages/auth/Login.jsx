@@ -157,11 +157,16 @@ const Login = () => {
               size="large"
               loading={isLoading}
             >
-              {(machines || []).map(machine => (
-                <Option key={machine.id} value={machine.id}>
-                   ({machine.work_center.code}) {machine.make}
-                </Option>
-              ))}
+              {(machines || [])
+                .filter(machine => 
+                  !machine.make?.toLowerCase().includes('default') && 
+                  !machine.work_center?.code?.toLowerCase().includes('default')
+                )
+                .map(machine => (
+                  <Option key={machine.id} value={machine.id}>
+                    ({machine.work_center.code}) {machine.make}
+                  </Option>
+                ))}
             </Select>
           </Form.Item>
           <Form.Item

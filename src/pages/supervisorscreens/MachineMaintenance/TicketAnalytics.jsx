@@ -422,16 +422,16 @@ const TicketAnalytics = () => {
                 // rowSelection={rowSelection}
                 dataSource={getFilteredData()}
                 columns={columns}
-                pagination={{
-                  ...pagination,
-                  showSizeChanger: true,
-                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-                  pageSizeOptions: ['5', '10', '20', '50'],
-                  showQuickJumper: true,
-                  position: ['bottomCenter'],
-                  onChange: handleTableChange,
-                  onShowSizeChange: handleTableChange
-                }}
+                // pagination={{
+                //   ...pagination,
+                //   showSizeChanger: true,
+                //   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                //   pageSizeOptions: ['5', '10', '20', '50'],
+                //   showQuickJumper: true,
+                //   position: ['bottomCenter'],
+                //   onChange: handleTableChange,
+                //   onShowSizeChange: handleTableChange
+                // }}
                 style={{
                   '.ant-table-thead > tr > th': {
                     background: '#f0f2f5',

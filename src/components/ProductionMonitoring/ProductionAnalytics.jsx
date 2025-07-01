@@ -819,12 +819,12 @@ function ProductionAnalytics() {
               title="Toggle fullscreen"
             />
             
-            <Button
+            {/* <Button
               icon={<DownloadOutlined />}
               onClick={downloadChart}
               disabled={!chartInstance}
               title="Download chart as image"
-            />
+            /> */}
           </div>
         </div>
 

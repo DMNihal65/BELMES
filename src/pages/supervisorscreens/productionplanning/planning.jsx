@@ -111,10 +111,7 @@ const Planning = () => {
   // Job and part selection states
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedPartNumber, setSelectedPartNumber] = useState(null);
-  const [selectedProductionOrder, setSelectedProductionOrder] = useState(() => {
-    // Try to load from localStorage on mount
-    return localStorage.getItem('selectedProductionOrder') || null;
-  });
+  const [selectedProductionOrder, setSelectedProductionOrder] = useState(null);
   const [selectedProjectName, setSelectedProjectName] = useState(null);
   const [selectedPartDescription, setSelectedPartDescription] = useState(null);
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
@@ -157,7 +154,6 @@ const Planning = () => {
   const [editableFields, setEditableFields] = useState({
     partNumber: '',
     location: '',
-    rmName: '',
     rmSize: '',
     heatNo: '',
     rmQty: '',
@@ -246,6 +242,16 @@ const Planning = () => {
 useEffect(() => {
   loadInventoryItems();
   loadSubcategories();
+}, []);
+
+
+
+useEffect(() => {
+  const savedPartNumber = localStorage.getItem('selectedPartNumber');
+  if (savedPartNumber) {
+    setSelectedPartNumber(savedPartNumber);
+    handleJobSelect(savedPartNumber);
+  }
 }, []);
 
 const loadInventoryItems = async () => {
@@ -637,12 +643,6 @@ const loadInventoryItems = async () => {
   };
 
   const handleJobSelect = async (partNumber) => {
-    // Save to localStorage
-    if (partNumber) {
-      localStorage.setItem('selectedProductionOrder', partNumber);
-    } else {
-      localStorage.removeItem('selectedProductionOrder');
-    }
     try {
       console.log('Job selected:', partNumber);
       setLoading(true);
@@ -1299,28 +1299,24 @@ const loadInventoryItems = async () => {
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Part Description</td>
-                    <td className="p-4" colSpan="3">{selectedJob.part_description || 'N/A'}</td>
+                    <td className="p-4" colSpan="3">{selectedJob.part_description || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Dept. / Project</td>
-                    <td className="p-4" colSpan="3">{selectedJob.project?.name || 'N/A'}</td>
+                    <td className="p-4" colSpan="3">{selectedJob.project?.name || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">PO No.</td>
-                    <td className="p-4">{selectedJob.production_order || 'N/A'}</td>
+                    <td className="p-4">{selectedJob.production_order || ''}</td>
                     <td className="font-bold p-4 bg-blue-50">No. of OP</td>
-                    <td className="p-4">{selectedJob.total_operations || 'N/A'}</td>
+                    <td className="p-4">{selectedJob.total_operations || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Batch</td>
-                    <td className="p-4"></td>
+                    <td className="p-4"> </td>
                     <td className="font-bold p-4 bg-blue-50">Qty</td>
-                    <td className="p-4">{selectedJob.required_quantity || 'N/A'}</td>
+                    <td className="p-4">{selectedJob.required_quantity || ''}</td>
                   </tr>
-                  {/* <tr className="border-2 border-gray-300">
-                    <td className="font-bold p-4 bg-blue-50">Heat No.</td>
-                    <td className="p-4" colSpan="3"></td>
-                  </tr> */}
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Heat No.</td>
                     <td className="p-4" colSpan="3"></td>
@@ -2485,7 +2481,7 @@ const loadInventoryItems = async () => {
       // Generate QR code
       const qrString = [
         `RM Part No: ${material.child_part_number || 'N/A'}`,
-        `RM Part Description: ${material.description || 'N/A'}`,
+        `RM Part Desc: ${material.description || material.material_name || 'N/A'}`,
         `RM Qty: ${material.quantity || 'N/A'}`,
         `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
         `Order No.: ${selectedJob.production_order || 'N/A'}`,
@@ -2712,7 +2708,7 @@ const loadInventoryItems = async () => {
     const material = selectedJob.raw_materials?.[0] || {};
     const qrString = [
       `RM Part No: ${material.child_part_number || 'N/A'}`,
-      `RM Part Description: ${material.description || 'N/A'}`,
+      `RM Part Name: ${material.description || material.material_name || 'N/A'}`,
       `RM Qty: ${material.quantity || 'N/A'}`,
       `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
       `Order No.: ${selectedJob.production_order || 'N/A'}`,
@@ -2748,54 +2744,50 @@ const loadInventoryItems = async () => {
         colSpan: 4,
         styles: {
           fontStyle: 'bold',
-          font: 'NotoSansCondensed',
+          font: 'helvetica',
           halign: 'center',
           fontSize: 11,
           minCellHeight: headerHeight
         }
       }],
       [
-        { content: 'Job Part No.', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.partNumber || 'N/A', styles: { font: 'NotoSansCondensed' } },
-        { content: 'Location', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.location || 'N/A', styles: { font: 'NotoSansCondensed' } }
+        { content: 'Job Part No.', styles: { fontStyle: 'bold' }},
+        { content: selectedJob.part_number || '' },
+        { content: 'Location', styles: { fontStyle: 'bold' }},
+        { content: material.location || '' }
       ],
       [
-        { content: 'RM Name', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmName || 'N/A', colSpan: 3, styles: { font: 'NotoSansCondensed' } }
+        { content: 'RM Size', styles: { fontStyle: 'bold' }},
+        { content: material.size || '', colSpan: 3 }
       ],
       [
-        { content: 'RM Size', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmSize || 'N/A', colSpan: 3, styles: { font: 'NotoSansCondensed' } }
+        { content: 'Heat No.', styles: { fontStyle: 'bold' }},
+        { content: material.gr_number || '' },
+        { content: 'RM Qty', styles: { fontStyle: 'bold', halign: 'right' }},
+        { content: material.quantity || '' }
       ],
       [
-        { content: 'Heat No.', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.heatNo || 'N/A', styles: { font: 'NotoSansCondensed' } },
-        { content: 'RM Qty', styles: { fontStyle: 'bold', halign: 'right', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmQty || 'N/A', styles: { font: 'NotoSansCondensed' } }
+        { content: 'RM Part No.', styles: { fontStyle: 'bold' }},
+        { content: material.child_part_number || '' },
+        { content: 'Rev', styles: { fontStyle: 'bold', halign: 'right' }},
+        { content: material.revision || '' }
       ],
       [
-        { content: 'RM Part No.', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmPartNo || 'N/A', styles: { font: 'NotoSansCondensed' } },
-        { content: 'Rev', styles: { fontStyle: 'bold', halign: 'right', font: 'NotoSansCondensed' }},
-        { content: editableFields.revision || 'N/A', styles: { font: 'NotoSansCondensed' } }
+        { content: 'RM Part Desc', styles: { fontStyle: 'bold' }},
+        { content: material.description || material.material_name || '', colSpan: 2 },
+        { content: '', rowSpan: 4 }
       ],
       [
-        { content: 'RM Part Name', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.rmPartName || 'N/A', colSpan: 2, styles: { font: 'NotoSansCondensed' } },
-        { content: '', rowSpan: 4, styles: { font: 'NotoSansCondensed' } }
+        { content: 'Dept', styles: { fontStyle: 'bold' }},
+        { content: selectedJob.department || '', colSpan: 2 }
       ],
       [
-        { content: 'Dept', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.department || 'N/A', colSpan: 2, styles: { font: 'NotoSansCondensed' } }
+        { content: 'Order No.', styles: { fontStyle: 'bold' }},
+        { content: selectedJob.production_order || '', colSpan: 2 }
       ],
       [
-        { content: 'Order No.', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.orderNo || 'N/A', colSpan: 2, styles: { font: 'NotoSansCondensed' } }
-      ],
-      [
-        { content: 'Order Qty', styles: { fontStyle: 'bold', font: 'NotoSansCondensed' }},
-        { content: editableFields.orderQty || 'N/A', colSpan: 2, styles: { font: 'NotoSansCondensed' } }
+        { content: 'Order Qty', styles: { fontStyle: 'bold' }},
+        { content: selectedJob.launched_quantity || '', colSpan: 2 }
       ]
     ];
 
@@ -2811,7 +2803,7 @@ const loadInventoryItems = async () => {
         cellPadding: 1, // ~0.1 mm
         lineColor: [0, 0, 0],
         lineWidth: 0.2,
-        font: 'NotoSansCondensed',
+        font: 'helvetica',
         halign: 'left',
         valign: 'middle',
         minCellHeight: dataRowHeight,
@@ -3034,33 +3026,6 @@ const loadInventoryItems = async () => {
     fetchCompletionStatus();
   }, [selectedJob]);
 
-  useEffect(() => {
-    if (isRawMaterialModalVisible && selectedJob) {
-      const material = selectedJob.raw_materials?.[0] || {};
-      setEditableFields({
-        partNumber: selectedJob.part_number || '',
-        location: material.location || '',
-        rmName: material.material_name || '',
-        rmSize: material.size || '',
-        heatNo: material.gr_number || '',
-        rmQty: material.quantity || '',
-        rmPartNo: material.child_part_number || '',
-        revision: material.revision || '',
-        rmPartName: material.description || material.material_name || '',
-        department: selectedJob.department || '',
-        orderNo: selectedJob.production_order || '',
-        orderQty: selectedJob.launched_quantity || ''
-      });
-    }
-  }, [isRawMaterialModalVisible, selectedJob]);
-
-  // On mount, if selectedProductionOrder is set (from localStorage), auto-select it
-  useEffect(() => {
-    if (selectedProductionOrder) {
-      handleJobSelect(selectedProductionOrder);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   
   return (
     <div className="space-y-6 p-6">
@@ -3073,10 +3038,14 @@ const loadInventoryItems = async () => {
   className="job-select"
   showSearch
   style={{ width: '100%', maxWidth: 300 }}
+  value={selectedPartNumber}
+  onChange={(value) => {
+    setSelectedPartNumber(value);
+    localStorage.setItem('selectedPartNumber', value);
+    handleJobSelect(value);
+  }}
   placeholder="Select Production Order"
   optionFilterProp="label"
-  value={selectedProductionOrder}  // Changed from selectedOrderNumber
-  onChange={handleJobSelect}
   filterOption={(input, option) =>
     option.label.toLowerCase().includes(input.toLowerCase())
   }
@@ -3173,7 +3142,7 @@ const loadInventoryItems = async () => {
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Launched Quantity</span>}>
                       {selectedJob.launched_quantity}
                     </Descriptions.Item>
-                    <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Total Operations</span>}>
+                    <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Total Operations (Active + Inactive WC)</span>}>
                       {selectedJob.total_operations}
                     </Descriptions.Item>
                     {/* <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Start Date</span>}>
@@ -4619,12 +4588,12 @@ const loadInventoryItems = async () => {
         {selectedJob ? (() => {
           const material = selectedJob.raw_materials?.[0] || {};
           const qrString = [
-            `RM Part No: ${material.child_part_number || 'N/A'}`,
-            `RM Part Description: ${material.description || 'N/A'}`,
-            `RM Qty: ${material.quantity || 'N/A'}`,
-            `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
-            `Order No.: ${selectedJob.production_order || 'N/A'}`,
-            `Order Qty: ${selectedJob.launched_quantity || 'N/A'}`
+            `RM Part No: ${material.child_part_number || ''}`,
+            `RM Part Desc: ${material.description || material.material_name || ''}`,
+            `RM Qty: ${material.quantity || ''}`,
+            `Job Part No.: ${selectedJob.part_number || ''}`,
+            `Order No.: ${selectedJob.production_order || ''}`,
+            `Order Qty: ${selectedJob.launched_quantity || ''}`
           ].filter(Boolean).join('\n');
 
           // Table data structure matching the PDF layout
@@ -4646,46 +4615,46 @@ const loadInventoryItems = async () => {
             // Data rows
             [
               { content: 'Job Part No.', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: selectedJob.part_number || 'N/A', styles: { padding: '4px 8px' }},
+              { content: selectedJob.part_number || '', styles: { padding: '4px 8px' }},
               { content: 'Location', styles: { fontWeight: 'bold', textAlign: 'right', padding: '4px 8px' }},
-              { content: material.location || 'N/A', styles: { padding: '4px 8px' }}
+              { content: material.location || '', styles: { padding: '4px 8px' }}
             ],
             [
               { content: 'RM Name', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: material.material_name || 'N/A', colSpan: 3, styles: { padding: '4px 8px' }}
+              { content: material.material_name || '', colSpan: 3, styles: { padding: '4px 8px' }}
             ],
             [
               { content: 'RM Size', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: material.size || 'N/A', colSpan: 3, styles: { padding: '4px 8px' }}
+              { content: material.size || '', colSpan: 3, styles: { padding: '4px 8px' }}
             ],
             [
               { content: 'Heat No.', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: material.gr_number || 'N/A', styles: { padding: '4px 8px' }},
+              { content: material.gr_number || '', styles: { padding: '4px 8px' }},
               { content: 'RM Qty', styles: { fontWeight: 'bold', textAlign: 'right', padding: '4px 8px' }},
-              { content: material.quantity || 'N/A', styles: { padding: '4px 8px' }}
+              { content: material.quantity || '', styles: { padding: '4px 8px' }}
             ],
             [
               { content: 'Part No.', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: material.child_part_number || 'N/A', styles: { padding: '4px 8px' }},
+              { content: material.child_part_number || '', styles: { padding: '4px 8px' }},
               { content: 'Rev', styles: { fontWeight: 'bold', textAlign: 'right', padding: '4px 8px' }},
-              { content: material.revision || 'N/A', styles: { padding: '4px 8px' }}
+              { content: material.revision || '', styles: { padding: '4px 8px' }}
             ],
             [
               { content: 'Part Name', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: selectedJob.part_description || 'N/A', colSpan: 2, styles: { padding: '4px 8px' }},
+              { content: selectedJob.part_description || '', colSpan: 2, styles: { padding: '4px 8px' }},
               { content: '', rowSpan: 4, styles: { position: 'relative', padding: 0 }}
             ],
             [
               { content: 'Dept', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: selectedJob.department || 'N/A', colSpan: 2, styles: { padding: '4px 8px' }}
+              { content: selectedJob.department || '', colSpan: 2, styles: { padding: '4px 8px' }}
             ],
             [
               { content: 'Order No.', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: selectedJob.production_order || 'N/A', colSpan: 2, styles: { padding: '4px 8px' }}
+              { content: selectedJob.production_order || '', colSpan: 2, styles: { padding: '4px 8px' }}
             ],
             [
               { content: 'Order Qty', styles: { fontWeight: 'bold', padding: '4px 8px' }},
-              { content: selectedJob.launched_quantity || 'N/A', colSpan: 2, styles: { padding: '4px 8px' }}
+              { content: selectedJob.launched_quantity || '', colSpan: 2, styles: { padding: '4px 8px' }}
             ]
           ];
 
@@ -4719,9 +4688,9 @@ const loadInventoryItems = async () => {
                       
                       {/* Data Rows */}
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Job Part No.</td>
-                        <td className="p-1 border-r border-gray-600">{selectedJob.part_number || 'N/A'}</td>
-                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Location:</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Job Part No.</td>
+                        <td className="p-1 border-r border-gray-600">{selectedJob.part_number || ''}</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">Location</td>
                         <td className="p-1">{material.location || ''}</td>
                       </tr>
                       
@@ -4731,27 +4700,27 @@ const loadInventoryItems = async () => {
                       </tr> */}
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Size</td>
-                        <td colSpan={3} className="p-1" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{material.size || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Size</td>
+                        <td colSpan={3} className="p-1">{material.size || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Heat No.</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Heat No.</td>
                         <td className="p-1 border-r border-gray-600">{material.gr_number || ''}</td>
-                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Qty</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">RM Qty</td>
                         <td className="p-1">{material.quantity || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Part No.</td>
-                        <td className="p-1 border-r border-gray-600">{material.child_part_number || 'N/A'}</td>
-                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Rev</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Part No.</td>
+                        <td className="p-1 border-r border-gray-600">{material.child_part_number || ''}</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">Rev</td>
                         <td className="p-1">{material.revision || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>RM Part description</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{material.description || material.material_name || 'N/A'}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Part Desc</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600">{material.description || material.material_name || ''}</td>
                         <td rowSpan={4} className="border-l-2 border-gray-800 p-1" style={{ width: '220px' }}>
                           <div className="flex flex-col h-full">
                             <div className="flex-1 flex items-center justify-start pl-2">
@@ -4768,18 +4737,18 @@ const loadInventoryItems = async () => {
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Dept</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{selectedJob.department || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Dept</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.department || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Order No.</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{selectedJob.production_order || 'N/A'}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Order No.</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.production_order || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>Order Qty</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600" style={{ fontFamily: 'Noto Sans Condensed, sans-serif' }}>{selectedJob.launched_quantity || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Order Qty</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.launched_quantity || ''}</td>
                       </tr>
                     </tbody>
                   </table>

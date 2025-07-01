@@ -398,7 +398,7 @@ export default function MachineMaintenance() {
                   </Dropdown>
                 </Form.Item>
 
-                <Button
+                {/* <Button
                   onClick={() => {
                     setFilterMachine('');
                     setFilterStatus('');
@@ -408,7 +408,7 @@ export default function MachineMaintenance() {
                   icon={<ReloadOutlined />}
                 >
                   Reset Filters
-                </Button>
+                </Button> */}
               </Space>
             </div>
           </Col>

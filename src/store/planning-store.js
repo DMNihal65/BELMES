@@ -110,7 +110,7 @@ const usePlanningStore = create((set) => ({
         ...data,
         orders: data.orders.map(order => ({
           ...order,
-          operations: order.operations?.map(op => ({
+          operations: order.operations?.filter(op => op.boolean === true).map(op => ({
             ...op,
             key: op.id.toString(),
             production_order: order.production_order // Map the production_order from the order level

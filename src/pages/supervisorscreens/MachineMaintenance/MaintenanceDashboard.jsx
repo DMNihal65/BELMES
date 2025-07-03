@@ -25,9 +25,9 @@ export default function MaintenanceDashboard() {
         </TabPane> */}
         <TabPane 
           tab={
-            <Badge count={totalNotifications} offset={[10, 0]}>
+         
               <span>Maintenance Logs</span>
-            </Badge>
+           
           } 
           key="2"
         >

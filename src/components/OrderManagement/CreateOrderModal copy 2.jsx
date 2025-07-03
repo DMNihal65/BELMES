@@ -826,14 +826,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
         ...orderData,
         raw_materials: rawMaterials, // Include the edited raw materials
         operations: operations, // Include the edited operations
-        mppFile,
-        mppDocName,
-        mppDescription,
-        mppVersion,
-        drawingFile,
-        drawingDocName,
-        drawingDescription,
-        drawingVersion
+        mppFormData,
+        drawingFormData
       });
 
       if (result.fileUploadErrors) {
@@ -958,14 +952,8 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
             ...latestValues,
             raw_materials: rawMaterials, // Include the edited raw materials
             operations: operations, // Include the edited operations
-            mppFile,
-            mppDocName,
-            mppDescription,
-            mppVersion,
-            drawingFile,
-            drawingDocName,
-            drawingDescription,
-            drawingVersion
+            mppFormData,
+            drawingFormData
           });
 
           console.log('Manual order creation result:', result);

@@ -2419,9 +2419,9 @@ const loadInventoryItems = async () => {
     try {
       const material = selectedJob.raw_materials?.[0] || {};
       
-      // Create a new PDF document
+      // Create a new PDF document with landscape orientation for better layout
       const doc = new jsPDF({
-        orientation: 'portrait',
+        orientation: 'landscape',
         unit: 'mm',
         format: 'a5',
         compress: true
@@ -2429,58 +2429,93 @@ const loadInventoryItems = async () => {
       
       // Set document properties
       doc.setProperties({
-        title: `Job Number Tag - ${selectedJob.production_order || 'N/A'}`,
-        subject: 'Job Number Tag',
+        title: `FAB/C - RM Traceability Card - ${selectedJob.production_order || 'N/A'}`,
+        subject: 'FAB/C - RM Traceability Card',
         author: 'BELMES',
-        keywords: 'job, number, tag, production',
+        keywords: 'traceability, job, production, FAB/C, RM',
         creator: 'BELMES'
       });
       
       // Add border
-      doc.rect(5, 5, doc.internal.pageSize.getWidth() - 10, doc.internal.pageSize.getHeight() - 10);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
       
-      // Add header
+      // Add header with BEL logo if available
+      try {
+        const img = new Image();
+        img.src = belLogo;
+        await new Promise(resolve => { img.onload = resolve; });
+        doc.addImage(img, 'PNG', 10, 8, 20, 10);
+      } catch (e) {
+        console.error('Error adding BEL logo to PDF', e);
+      }
+      
+      // Add title
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('FAB/C - RM Traceability Card', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+      doc.text('FAB/C - RM TRACEABILITY CARD', pageWidth / 2, 15, { align: 'center' });
       
-      // Set up styles
+      // Draw a line under the title
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(20, 18, pageWidth - 20, 18);
+      
+      // Set up styles - make all text bold
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('helvetica', 'bold');
       
-      // Add job details
-      let y = 25;
+      // Add job details in a table-like format
+      let y = 30;
+      const labelX = 20;
+      const valueX = 60;
+      const rowHeight = 7;
       
-      const addRow = (label, value, x = 20, width = 80) => {
-        doc.setFont('helvetica', 'bold');
-        doc.text(String(label), x, y);
-        doc.setFont('helvetica', 'normal');
+      const addRow = (label, value) => {
+        // Draw cell background for label
+        doc.setFillColor(240, 240, 240);
+        doc.rect(labelX - 2, y - 4, 40, rowHeight, 'F');
+        
+        // Draw cell border for label
+        doc.rect(labelX - 2, y - 4, 40, rowHeight);
+        doc.text(label, labelX, y);
+        
+        // Draw cell background for value
+        doc.setFillColor(255, 255, 255);
+        doc.rect(valueX - 2, y - 4, 50, rowHeight, 'F');
+        
+        // Draw cell border for value
+        doc.rect(valueX - 2, y - 4, 50, rowHeight);
+        
+        // Add value text
         const displayValue = value !== undefined && value !== null ? String(value) : 'N/A';
-        doc.text(displayValue, x + 30, y);
-        y += 5;
+        doc.text(displayValue, valueX, y);
+        
+        y += rowHeight;
       };
       
-      // Add job details
-      addRow('Job Part No.:', selectedJob.part_number);
-      addRow('RM Name:', material.material_name);
-      addRow('RM Size:', material.size);
-      addRow('Heat No.:', material.gr_number);
-      addRow('RM Qty:', material.quantity);
-      addRow('Part No.:', material.child_part_number);
-      addRow('Rev:', material.revision);
-      addRow('Part Name:', selectedJob.part_description);
-      addRow('Dept:', selectedJob.department);
-      addRow('Order No.:', selectedJob.production_order);
-      addRow('Order Qty:', selectedJob.launched_quantity);
+      // Add job details in two columns
+      addRow('Job Part No.:', selectedJob.part_number || 'N/A');
+      addRow('RM Name:', material.material_name || 'N/A');
+      addRow('RM Size:', material.size || 'N/A');
+      addRow('Heat No.:', material.gr_number || 'N/A');
+      addRow('RM Qty:', material.quantity ? `${material.quantity} ${material.unit || ''}`.trim() : 'N/A');
+      addRow('Part No.:', material.child_part_number || 'N/A');
+      addRow('Rev:', material.revision || 'N/A');
+      addRow('Part Name:', selectedJob.part_description || 'N/A');
+      addRow('Dept:', selectedJob.department || 'N/A');
+      addRow('Order No.:', selectedJob.production_order || 'N/A');
+      addRow('Order Qty:', selectedJob.launched_quantity || 'N/A');
       
-      // Generate QR code
+      // Generate QR code with job information
       const qrString = [
-        `RM Part No: ${material.child_part_number || 'N/A'}`,
-        `RM Part Description: ${material.description || 'N/A'}`,
-        `RM Qty: ${material.quantity || 'N/A'}`,
         `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
+        `Part Name: ${selectedJob.part_description || 'N/A'}`,
         `Order No.: ${selectedJob.production_order || 'N/A'}`,
-        `Order Qty: ${selectedJob.launched_quantity || 'N/A'}`
+        `RM Part No.: ${material.child_part_number || 'N/A'}`,
+        `RM Name: ${material.material_name || 'N/A'}`,
+        `Heat No.: ${material.gr_number || 'N/A'}`,
+        `Date: ${new Date().toLocaleDateString()}`
       ].filter(Boolean).join('\n');
       
       // Add QR code to PDF
@@ -2491,16 +2526,31 @@ const loadInventoryItems = async () => {
           width: 80
         });
         
-        // Add QR code to the right side
-        doc.addImage(qrDataUrl, 'JPEG', 120, 30, 60, 60);
+        // Add QR code to the right side with a border
+        const qrSize = 50;
+        const qrX = pageWidth - qrSize - 25;
+        const qrY = 25;
+        
+        // Add border around QR code
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        doc.rect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 15);
+        
+        // Add QR code
+        doc.addImage(qrDataUrl, 'JPEG', qrX, qrY, qrSize, qrSize);
+        
+        // Add label below QR code
+        doc.setFontSize(8);
+        doc.text('Scan for Details', qrX + qrSize/2, qrY + qrSize + 8, { align: 'center' });
       } catch (error) {
         console.error('Error generating QR code:', error);
       }
       
       // Add footer
       doc.setFontSize(8);
-      doc.text('Generated by BELMES', 20, doc.internal.pageSize.getHeight() - 10);
-      doc.text(new Date().toLocaleString(), doc.internal.pageSize.getWidth() - 20, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.text('Generated by BELMES', 20, pageHeight - 10);
+      doc.text(new Date().toLocaleString(), pageWidth - 20, pageHeight - 10, { align: 'right' });
       
       // Return the PDF as a blob
       return doc.output('blob');

@@ -224,9 +224,9 @@ const Notifications = () => {
         <Tabs activeKey={activeTab} onChange={handleTabChange}>
           <TabPane 
             tab={
-              <Badge count={totalMachineNotifications} offset={[10, 0]}>
+             
                 <span>Machine Status</span>
-              </Badge>
+             
             } 
             key="machine"
           >
@@ -235,20 +235,20 @@ const Notifications = () => {
               dataSource={sortedMachineNotifications}
               rowKey={(record) => `${record.machine_make}-${record.updated_at}`}
               loading={loading && activeTab === 'machine'}
-              pagination={{
-                current: currentPage,
-                pageSize: notificationsLimit === -1 ? undefined : pageSize,
-                total: totalMachineNotifications,
-                showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total) => `Total ${total} notifications`,
-                position: ['bottomCenter'],
-                onChange: (page) => {
-                  setCurrentPage(page);
-                  // Fetch new data when page changes
-                  fetchMachineNotifications();
-                }
-              }}
+              // pagination={{
+              //   current: currentPage,
+              //   pageSize: notificationsLimit === -1 ? undefined : pageSize,
+              //   total: totalMachineNotifications,
+              //   showSizeChanger: true,
+              //   showQuickJumper: true,
+              //   showTotal: (total) => `Total ${total} notifications`,
+              //   position: ['bottomCenter'],
+              //   onChange: (page) => {
+              //     setCurrentPage(page);
+              //     // Fetch new data when page changes
+              //     fetchMachineNotifications();
+              //   }
+              // }}
               onChange={handleTableChange}
               size="middle"
               bordered
@@ -256,9 +256,9 @@ const Notifications = () => {
           </TabPane>
           <TabPane 
             tab={
-              <Badge count={totalComponentNotifications} offset={[10, 0]}>
+         
                 <span>Component Status</span>
-              </Badge>
+        
             } 
             key="component"
           >
@@ -267,20 +267,20 @@ const Notifications = () => {
               dataSource={sortedComponentNotifications}
               rowKey={(record) => `${record.part_number}-${record.updated_at}`}
               loading={loading && activeTab === 'component'}
-              pagination={{
-                current: currentPage,
-                pageSize: notificationsLimit === -1 ? undefined : pageSize,
-                total: totalComponentNotifications,
-                showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total) => `Total ${total} notifications`,
-                position: ['bottomCenter'],
-                onChange: (page) => {
-                  setCurrentPage(page);
-                  // Fetch new data when page changes
-                  fetchComponentNotifications();
-                }
-              }}
+              // pagination={{
+              //   current: currentPage,
+              //   pageSize: notificationsLimit === -1 ? undefined : pageSize,
+              //   total: totalComponentNotifications,
+              //   showSizeChanger: true,
+              //   showQuickJumper: true,
+              //   showTotal: (total) => `Total ${total} notifications`,
+              //   position: ['bottomCenter'],
+              //   onChange: (page) => {
+              //     setCurrentPage(page);
+              //     // Fetch new data when page changes
+              //     fetchComponentNotifications();
+              //   }
+              // }}
               onChange={handleTableChange}
               size="middle"
               bordered

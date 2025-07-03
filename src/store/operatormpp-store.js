@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
-const API_BASE_URL = 'http://172.18.7.88:4494/api/v1/planning';
-const API_PLANNING_BASE_URL = 'http://172.18.7.88:4494/api/v1/planning';
+const API_BASE_URL = 'http://172.18.7.88:4461/api/v1/planning';
+const API_PLANNING_BASE_URL = 'http://172.18.7.88:4461/api/v1/planning';
 
 const DEFAULT_PART_NUMBER = '213511100114';
 
@@ -159,7 +159,7 @@ const useOperatorMppStore = create((set, get) => ({
   fetchMachineOperations: async (machineId) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:4494/api/v1/operator/machines/${machineId}/operations`);
+      const response = await fetch(`http://172.18.7.88:4461/api/v1/operator/machines/${machineId}/operations`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -186,7 +186,7 @@ const useOperatorMppStore = create((set, get) => ({
   activateJob: async (machineId, operationId) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.88:4494/api/v1/logs/machine-raw-live/', {
+      const response = await fetch('http://172.18.7.88:4461/api/v1/logs/machine-raw-live/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +229,7 @@ const useOperatorMppStore = create((set, get) => ({
     try {
       console.log('Activating order:', orderData);
       
-      const activateResponse = await fetch(`http://172.18.7.88:4494/api/v1/operator/machines/${machineId}/operations`, {
+      const activateResponse = await fetch(`http://172.18.7.88:4461/api/v1/operator/machines/${machineId}/operations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -248,7 +248,7 @@ const useOperatorMppStore = create((set, get) => ({
       // Prevent order changes while operation is active
       set({ isOrderChangeAllowed: false });
 
-      const getResponse = await fetch(`http://172.18.7.88:4494/api/v1/operator/machines/${machineId}/operations`);
+      const getResponse = await fetch(`http://172.18.7.88:4461/api/v1/operator/machines/${machineId}/operations`);
       const updatedData = await getResponse.json();
 
       if (!getResponse.ok) {
@@ -283,7 +283,7 @@ const useOperatorMppStore = create((set, get) => ({
   deactivateOrder: async (machineId) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`http://172.18.7.88:4494/api/v1/operator/machines/${machineId}/operations/deactivate`, {
+      const response = await fetch(`http://172.18.7.88:4461/api/v1/operator/machines/${machineId}/operations/deactivate`, {
         method: 'POST'
       });
 
@@ -378,7 +378,7 @@ const useOperatorMppStore = create((set, get) => ({
       console.log('Operator store: Preparing to send data to API:', logData);
       
       // Use the exact URL provided
-      const apiUrl = 'http://172.18.7.88:4494/api/v1/logs/operator-log';
+      const apiUrl = 'http://172.18.7.88:4461/api/v1/logs/operator-log';
       console.log('Using API URL:', apiUrl);
       
       const response = await fetch(apiUrl, {

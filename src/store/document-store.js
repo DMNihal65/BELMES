@@ -129,12 +129,15 @@ const useDocumentStore = create((set, get) => ({
   isLoadingOrders: false,
   machines: [],
   isLoadingMachines: false,
+  analytics: null,
+  isLoadingAnalytics: false,
+  analyticsError: null,
 
   // Fetch document types
   fetchDocTypes: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await makeApiRequest('http://172.18.7.88:4494/api/v1/document-management/document-types/');
+      const response = await makeApiRequest('http://172.18.7.88:4461/api/v1/document-management/document-types/');
       const data = await response.json();
       
       set({ 
@@ -157,8 +160,8 @@ const useDocumentStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const url = parentId 
-        ? `http://172.18.7.88:4494/api/v1/document-management/folders/?parent_id=${parentId}`
-        : 'http://172.18.7.88:4494/api/v1/document-management/folders/';
+        ? `http://172.18.7.88:4461/api/v1/document-management/folders/?parent_id=${parentId}`
+        : 'http://172.18.7.88:4461/api/v1/document-management/folders/';
 
       const response = await makeApiRequest(url);
       const data = await response.json();
@@ -213,7 +216,7 @@ const useDocumentStore = create((set, get) => ({
   // Fetch part numbers
   fetchPartNumbers: async () => {
     try {
-      const response = await makeApiRequest('http://172.18.7.88:4494/api/v1/planning/all_orders');
+      const response = await makeApiRequest('http://172.18.7.88:4461/api/v1/planning/all_orders');
       const data = await response.json();
       set({ partNumbers: data, error: null });
       return data;
@@ -239,7 +242,7 @@ const useDocumentStore = create((set, get) => ({
         console.log(pair[0] + ': ' + pair[1]);
       }
 
-      const response = await fetch('http://172.18.7.88:4494/api/v1/document-management/documents/upload/', {
+      const response = await fetch('http://172.18.7.88:4461/api/v1/document-management/documents/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -262,7 +265,7 @@ const useDocumentStore = create((set, get) => ({
   },
 
   // Fetch folder documents
-  fetchFolderDocuments: async (folderId, page = 1, pageSize = 10) => {
+  fetchFolderDocuments: async (folderId) => {
     set({ isLoading: true, error: null });
     try {
       if (!folderId) {
@@ -270,15 +273,16 @@ const useDocumentStore = create((set, get) => ({
         return { items: [], total: 0 };
       }
 
+      // Fetch all documents for the folder (no pagination)
       const response = await makeApiRequest(
-        `http://172.18.7.88:4494/api/v1/document-management/documents/?folder_id=${folderId}&page=${page}&page_size=${100}`
+        `http://172.18.7.88:4461/api/v1/document-management/documents/?folder_id=${folderId}`
       );
 
       const data = await response.json();
-      
+      // If the API returns an array, use it directly; if it returns {items: []}, use items
+      const items = Array.isArray(data) ? data : (data.items || []);
       // Filter active documents and format them
-      const activeDocuments = data.items.filter(doc => doc.is_active);
-      
+      const activeDocuments = items.filter(doc => doc.is_active);
       // Format the documents data with error handling for version fetching
       const formattedDocuments = await Promise.all(activeDocuments.map(async doc => {
         try {
@@ -383,7 +387,7 @@ const useDocumentStore = create((set, get) => ({
   // Update folder
   updateFolder: async (folderId, updateData) => {
     try {
-      const response = await makeApiRequest(`http://172.18.7.88:4494/api/v1/documents/folders/${folderId}`, {
+      const response = await makeApiRequest(`http://172.18.7.88:4461/api/v1/documents/folders/${folderId}`, {
         method: 'PUT',
         body: JSON.stringify({
           folder_name: updateData.folder_name,
@@ -409,7 +413,7 @@ const useDocumentStore = create((set, get) => ({
   // Create document type
   createDocType: async (docTypeData) => {
     try {
-      const response = await makeApiRequest('http://172.18.7.88:4494/api/v1/document-management/document-types/', {
+      const response = await makeApiRequest('http://172.18.7.88:4461/api/v1/document-management/document-types/', {
         method: 'POST',
         body: JSON.stringify({
           name: docTypeData.name,
@@ -442,7 +446,7 @@ const useDocumentStore = create((set, get) => ({
         return { items: [], total: 0 };
       }
 
-      let url = `http://172.18.7.88:4494/api/v1/document-management/documents/search/?query=${encodeURIComponent(query)}`;
+      let url = `http://172.18.7.88:4461/api/v1/document-management/documents/search/?query=${encodeURIComponent(query)}`;
       if (docTypeId) url += `&doc_type_id=${docTypeId}`;
       if (folderId) url += `&folder_id=${folderId}`;
 
@@ -497,7 +501,7 @@ const useDocumentStore = create((set, get) => ({
         return { items: [], total: 0 };
       }
 
-      let url = `http://172.18.7.88:4494/api/v1/document-management/documents/by-part-number/${encodeURIComponent(partNumber)}`;
+      let url = `http://172.18.7.88:4461/api/v1/document-management/documents/by-part-number/${encodeURIComponent(partNumber)}`;
       if (docTypeId) {
         url += `?doc_type_id=${docTypeId}`;
       }
@@ -542,8 +546,8 @@ const useDocumentStore = create((set, get) => ({
 
       // Construct URL based on whether versionId is provided
       const url = versionId 
-        ? `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
-        : `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/download-latest`;
+        ? `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/download-latest`;
 
       const response = await fetch(url, {
         headers: {
@@ -572,7 +576,7 @@ const useDocumentStore = create((set, get) => ({
   fetchDocumentVersions: async (documentId) => {
     try {
       const response = await makeApiRequest(
-        `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/versions`
+        `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/versions`
       );
 
       const data = await response.json();
@@ -588,7 +592,7 @@ const useDocumentStore = create((set, get) => ({
   // Add this new method for deleting folders
   deleteFolder: async (folderId) => {
     try {
-      const response = await makeApiRequest(`http://172.18.7.88:4494/api/v1/document-management/folders/${folderId}`, {
+      const response = await makeApiRequest(`http://172.18.7.88:4461/api/v1/document-management/folders/${folderId}`, {
         method: 'DELETE'
       });
 
@@ -612,7 +616,7 @@ const useDocumentStore = create((set, get) => ({
   // Add copyDocument method
   copyDocument: async (copyData) => {
     try {
-      const response = await makeApiRequest(`http://172.18.7.88:4494/api/v1/documents/${copyData.document_id}/copy`, {
+      const response = await makeApiRequest(`http://172.18.7.88:4461/api/v1/documents/${copyData.document_id}/copy`, {
         method: 'POST',
         body: JSON.stringify({
           new_folder_id: copyData.new_folder_id,
@@ -656,7 +660,7 @@ const useDocumentStore = create((set, get) => ({
       formData.append('metadata', '{}');
 
       const response = await fetch(
-        `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/versions`,
+        `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/versions`,
         {
           method: 'POST',
           headers: {
@@ -697,7 +701,7 @@ const useDocumentStore = create((set, get) => ({
       formData.append('metadata', JSON.stringify(metadata));
 
       const response = await fetch(
-        `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/version/${versionId}`,
+        `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/version/${versionId}`,
         {
           method: 'PUT',
           headers: {
@@ -743,7 +747,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/versions/${versionId}`, {
+      const response = await fetch(`http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/versions/${versionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -775,7 +779,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.18.7.88:4494/api/v1/documents/${documentId}/download-count`, {
+      const response = await fetch(`http://172.18.7.88:4461/api/v1/documents/${documentId}/download-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -825,7 +829,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.18.7.88:4494/api/v1/documents/${documentId}/view-count`, {
+      const response = await fetch(`http://172.18.7.88:4461/api/v1/documents/${documentId}/view-count`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -872,7 +876,7 @@ const useDocumentStore = create((set, get) => ({
 
       console.log('Creating folder with data:', requestData); // Debug log
 
-      const response = await fetch('http://172.18.7.88:4494/api/v1/document-management/folders/', {
+      const response = await fetch('http://172.18.7.88:4461/api/v1/document-management/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -909,8 +913,8 @@ const useDocumentStore = create((set, get) => ({
       }
 
       const url = versionId 
-        ? `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
-        : `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/download-latest`;
+        ? `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/download-latest`;
 
       const response = await fetch(url, {
         headers: {
@@ -944,7 +948,7 @@ const useDocumentStore = create((set, get) => ({
         return { items: [], total: 0 };
       }
 
-      let url = `http://172.18.7.88:4494/api/v1/document-management/documents/by-production-order/${productionOrderId}`;
+      let url = `http://172.18.7.88:4461/api/v1/document-management/documents/by-production-order/${productionOrderId}`;
       if (docTypeId) {
         url += `?doc_type_id=${docTypeId}`;
       }
@@ -987,7 +991,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch('http://172.18.7.88:4494/api/v1/planning/all_orders', {
+      const response = await fetch('http://172.18.7.88:4461/api/v1/planning/all_orders', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -1022,8 +1026,8 @@ const useDocumentStore = create((set, get) => ({
       }
       
       const url = versionId 
-        ? `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
-        : `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/download-latest`;
+        ? `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`
+        : `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/download-latest`;
 
       const response = await fetch(url, {
         headers: {
@@ -1083,7 +1087,7 @@ const useDocumentStore = create((set, get) => ({
       }
 
       // Download specific version
-      const url = `http://172.18.7.88:4494/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
+      const url = `http://172.18.7.88:4461/api/v1/document-management/documents/${documentId}/download?version_id=${versionId}`;
 
       const response = await fetch(url, {
         headers: {
@@ -1142,7 +1146,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch('http://172.18.7.88:4494/api/v1/document-management/machine-documents/upload/', {
+      const response = await fetch('http://172.18.7.88:4461/api/v1/document-management/machine-documents/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1177,7 +1181,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch('http://172.18.7.88:4494/api/v1/master-order/machines/', {
+      const response = await fetch('http://172.18.7.88:4461/api/v1/master-order/machines/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -1211,7 +1215,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.18.7.88:4494/api/v1/document-management/document-versions/${versionId}`, {
+      const response = await fetch(`http://172.18.7.88:4461/api/v1/document-management/document-versions/${versionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1244,7 +1248,7 @@ const useDocumentStore = create((set, get) => ({
         throw new Error('No authentication token found. Please log in again.');
       }
 
-      const response = await fetch(`http://172.18.7.88:4494/api/v1/document-management/document-types/${docTypeId}?force=${force}`, {
+      const response = await fetch(`http://172.18.7.88:4461/api/v1/document-management/document-types/${docTypeId}?force=${force}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1277,7 +1281,7 @@ const useDocumentStore = create((set, get) => ({
   fetchMetrics: async () => {
     set({ isLoadingMetrics: true, metricsError: null });
     try {
-      const response = await makeApiRequest('http://172.18.7.88:4494/api/v1/document-management/metrics/');
+      const response = await makeApiRequest('http://172.18.7.88:4461/api/v1/document-management/metrics/');
       const data = await response.json();
       set({ metrics: data, isLoadingMetrics: false, metricsError: null });
       return data;
@@ -1300,6 +1304,27 @@ const useDocumentStore = create((set, get) => ({
 
   // Clear documents
   clearDocuments: () => set({ documents: [], totalDocuments: 0 }),
+
+  fetchAnalytics: async () => {
+    set({ isLoadingAnalytics: true, analyticsError: null });
+    try {
+      const token = getAuthToken();
+      if (!token) throw new Error('No authentication token found. Please log in again.');
+      const response = await fetch('http://172.18.7.88:4461/api/v1/document-management/documents/analytics', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch analytics');
+      const data = await response.json();
+      set({ analytics: data, isLoadingAnalytics: false, analyticsError: null });
+      return data;
+    } catch (error) {
+      set({ analyticsError: error.message, isLoadingAnalytics: false });
+      throw error;
+    }
+  },
 }));
 
 export default useDocumentStore;

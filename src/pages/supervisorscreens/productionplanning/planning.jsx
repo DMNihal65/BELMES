@@ -806,16 +806,16 @@ const loadInventoryItems = async () => {
       doc.setDrawColor(0, 0, 0);
       doc.line(10, 25, 200, 25);
 
-      // Define the job details table data
+      // Define the job details table data with increased font size and bold text
       const tableData = [
         [
           {
             content: 'Part Number',
-            styles: { fontStyle: 'bold', cellWidth: 40 }
+            styles: { fontStyle: 'bold', cellWidth: 40, fontSize: 11, font: 'helvetica', halign: 'left' }
           },
           {
             content: selectedJob.part_number || 'N/A',
-            styles: { cellWidth: 100 }
+            styles: { cellWidth: 100, fontSize: 11, font: 'helvetica', halign: 'left', fontStyle: 'bold' }
           }
         ],
         [
@@ -910,28 +910,40 @@ const loadInventoryItems = async () => {
         ]
       ];
 
-      // Generate the job details table with adjusted width
+      // Generate the job details table with adjusted width and improved styling
       autoTable(doc, {
-        startY: 30,
+        startY: 35,
         head: [],
         body: tableData,
         theme: 'plain',
         styles: {
-          fontSize: 10,
-          cellPadding: 4,
+          fontSize: 11,
+          cellPadding: 5,
           lineColor: [0, 0, 0],
-          lineWidth: 0.1,
-          font: 'NotoSansCondensed',
-          textColor: [0, 0, 0]
+          lineWidth: 0.2,
+          font: 'helvetica',
+          textColor: [0, 0, 0],
+          fontStyle: 'normal',
+          lineColor: [0, 0, 0],
+          lineWidth: 0.3
         },
         headStyles: {
           fillColor: [255, 255, 255],
           textColor: [0, 0, 0],
-          fontStyle: 'bold'
+          fontStyle: 'bold',
+          fontSize: 12
         },
         columnStyles: {
-          0: { cellWidth: 40 },
-          1: { cellWidth: 100 }
+          0: { 
+            cellWidth: 40,
+            fontStyle: 'bold',
+            fontSize: 11
+          },
+          1: { 
+            cellWidth: 100,
+            fontStyle: 'bold',
+            fontSize: 11
+          }
         },
         margin: { right: 90 }, // Increased right margin to make space for QR codes
         didDrawCell: function(data) {
@@ -940,8 +952,6 @@ const loadInventoryItems = async () => {
           doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
         }
       });
-
-
 
       // Generate and add QR codes
       try {
@@ -969,25 +979,25 @@ const loadInventoryItems = async () => {
       }
 
       // Add Operation Status header with better styling
-      doc.setFontSize(12);
-      doc.setFont('NotoSansCondensed', 'bold');
-      doc.text('Operation Status', 105, doc.lastAutoTable.finalY + 15, { align: 'center' });
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('OPERATION STATUS', 105, doc.lastAutoTable.finalY + 15, { align: 'center' });
 
-      // Create operations table headers
+      // Create operations table headers with improved styling
       const operationsHeader = [
         [
-          { content: 'No.', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'Dates', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'Ava. Hrs', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'Act. Hrs', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'Acpt. Qty', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'In-Ch', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'No.', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'Dates', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'Ava. Hrs', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'Act. Hrs', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'Acpt. Qty', styles: { halign: 'center', fontStyle: 'bold' } },
-          { content: 'In-Ch', styles: { halign: 'center', fontStyle: 'bold' } }
+          { content: 'NO.', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Dates', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Avail. Hrs', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Act. Hrs', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Accept Qty', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Inch', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'No.', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Dates', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Avail. Hrs', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Act. Hrs', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Accept Qty', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } },
+          { content: 'Inch', styles: { halign: 'center', fontStyle: 'bold', fontSize: 9 } }
         ]
       ];
 
@@ -1014,19 +1024,19 @@ const loadInventoryItems = async () => {
         
         const row = [
           // Left side operation
-          { content: leftOp ? leftOp.operation_number.toString().padStart(2, '0') : '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
+          { content: leftOp ? leftOp.operation_number.toString().padStart(2, '0') : '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
           // Right side operation
-          { content: rightOp ? rightOp.operation_number.toString().padStart(2, '0') : '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } },
-          { content: '', styles: { halign: 'center' } }
+          { content: rightOp ? rightOp.operation_number.toString().padStart(2, '0') : '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } },
+          { content: '', styles: { halign: 'center', fontStyle: 'bold', fontSize: 10 } }
         ];
         operationsRows.push(row);
       }
@@ -1038,7 +1048,11 @@ const loadInventoryItems = async () => {
         body: operationsRows,
         theme: 'grid',
         styles: {
-          fontSize: 9,
+          fontSize: 10,
+          fontStyle: 'bold',
+          textColor: [0, 0, 0],
+          lineColor: [0, 0, 0],
+          lineWidth: 0.2,
           cellPadding: 2,
           lineColor: [0, 0, 0],
           lineWidth: 0.1,
@@ -1293,37 +1307,37 @@ const loadInventoryItems = async () => {
                 <tbody>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 w-1/4 bg-blue-50">Part Number</td>
-                    <td className="p-4 w-1/4 border-r-2">{selectedJob.part_number}</td>
+                    <td className="p-4 w-1/4 border-r-2 font-bold">{selectedJob.part_number}</td>
                     <td className="font-bold p-4 w-1/4 bg-blue-50">Rev</td>
-                    <td className="p-4">B</td>
+                    <td className="p-4 font-bold">B</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Part Description</td>
-                    <td className="p-4" colSpan="3">{selectedJob.part_description || ''}</td>
+                    <td className="p-4 font-bold" colSpan="3">{selectedJob.part_description || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Dept. / Project</td>
-                    <td className="p-4" colSpan="3">{selectedJob.project?.name || ''}</td>
+                    <td className="p-4 font-bold" colSpan="3">{selectedJob.project?.name || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">PO No.</td>
-                    <td className="p-4">{selectedJob.production_order || ''}</td>
+                    <td className="p-4 font-bold">{selectedJob.production_order || ''}</td>
                     <td className="font-bold p-4 bg-blue-50">No. of OP</td>
-                    <td className="p-4">{selectedJob.total_operations || ''}</td>
+                    <td className="p-4 font-bold">{selectedJob.total_operations || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Batch</td>
-                    <td className="p-4"> </td>
+                    <td className="p-4 font-bold"> </td>
                     <td className="font-bold p-4 bg-blue-50">Qty</td>
-                    <td className="p-4">{selectedJob.required_quantity || ''}</td>
+                    <td className="p-4 font-bold">{selectedJob.required_quantity || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Heat No.</td>
-                    <td className="p-4" colSpan="3"></td>
+                    <td className="p-4 font-bold" colSpan="3"></td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">RM Reference</td>
-                    <td className="p-4" colSpan="3">{selectedJob.rm_reference || ''}</td>
+                    <td className="p-4 font-bold" colSpan="3">{selectedJob.rm_reference || ''}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1373,8 +1387,8 @@ const loadInventoryItems = async () => {
                   </thead>
                   <tbody>
                     {leftColumnOps.map(op => (
-                      <tr key={op.operation_number} className="hover:bg-gray-50">
-                        <td className="border-2 border-gray-300 p-3 text-center font-medium">{op.operation_number}</td>
+                      <tr key={op.operation_number} className="hover:bg-gray-50 font-bold">
+                        <td className="border-2 border-gray-300 p-3 text-center font-medium font-bold">{op.operation_number}</td>
                         <td className="border-2 border-gray-300 p-3"></td>
                         <td className="border-2 border-gray-300 p-3"></td>
                         <td className="border-2 border-gray-300 p-3"></td>
@@ -2449,42 +2463,49 @@ const loadInventoryItems = async () => {
       doc.setFont('helvetica', 'bold');
       doc.text('FAB/C - RM Traceability Card', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
       
-      // Set up styles
+      // Set up styles - make all text bold
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
       
       // Add job details
       let y = 25;
+      const x = 20;
       
-      const addRow = (label, value, x = 20, width = 80) => {
+      // Function to add a row with label and value (both in bold)
+      const addRow = (label, value) => {
+        // Set font to bold explicitly before each text operation
         doc.setFont('helvetica', 'bold');
+        
+        // Add label
         doc.text(String(label), x, y);
-        doc.setFont('helvetica', 'normal');
+        
+        // Add value
         const displayValue = value !== undefined && value !== null ? String(value) : 'N/A';
-        doc.text(displayValue, x + 30, y);
+        doc.text(displayValue, x + 40, y);
+        
         y += 5;
       };
       
-      // Add job details
-      addRow('Job Part No.:', selectedJob.part_number);
-      addRow('RM Name:', material.material_name);
+      // Add job details with exact labels as specified
+      addRow('Job Part No:', selectedJob.part_number);
+      addRow('Location:', material.location);
       addRow('RM Size:', material.size);
-      addRow('Heat No.:', material.gr_number);
+      addRow('Heat No:', material.gr_number);
       addRow('RM Qty:', material.quantity);
-      addRow('Part No.:', material.child_part_number);
+      addRow('RM Part No:', material.child_part_number);
       addRow('Rev:', material.revision);
-      addRow('Part Name:', selectedJob.part_description);
+      addRow('RM Part Desc:', material.description || material.material_name);
       addRow('Dept:', selectedJob.department);
-      addRow('Order No.:', selectedJob.production_order);
+      addRow('Order No:', selectedJob.production_order);
       addRow('Order Qty:', selectedJob.launched_quantity);
       
-      // Generate QR code
+      // Generate QR code with consistent bold text
       const qrString = [
+        `Job Part No: ${selectedJob.part_number || 'N/A'}`,
         `RM Part No: ${material.child_part_number || 'N/A'}`,
         `RM Part Desc: ${material.description || material.material_name || 'N/A'}`,
         `RM Qty: ${material.quantity || 'N/A'}`,
-        `Job Part No.: ${selectedJob.part_number || 'N/A'}`,
-        `Order No.: ${selectedJob.production_order || 'N/A'}`,
+        `Order No: ${selectedJob.production_order || 'N/A'}`,
         `Order Qty: ${selectedJob.launched_quantity || 'N/A'}`
       ].filter(Boolean).join('\n');
       
@@ -2933,7 +2954,7 @@ const loadInventoryItems = async () => {
             <table className="w-full text-sm">
               <tbody>
                 <tr>
-                  <td className="font-semibold p-2 w-1/4">Job Part No.</td>
+                  <td className="font-semibold p-2 w-1/4">Job Part No</td>
                   <td className="p-2 border-b border-gray-200">{selectedJob.part_number || 'N/A'}</td>
                   <td className="font-semibold p-2 w-1/4">Location</td>
                   <td className="p-2 border-b border-gray-200">{material.location || 'N/A'}</td>
@@ -4688,39 +4709,39 @@ const loadInventoryItems = async () => {
                       
                       {/* Data Rows */}
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">Job Part No.</td>
-                        <td className="p-1 border-r border-gray-600">{selectedJob.part_number || ''}</td>
-                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">Location</td>
-                        <td className="p-1">{material.location || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600" >Job Part No:</td>
+                        <td className="p-1 border-r border-gray-600 font-semibold">{selectedJob.part_number || ''}</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">Location:</td>
+                        <td className="p-1 font-semibold">{material.location || ''}</td>
                       </tr>
                       
                       {/* <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">RM Name</td>
-                        <td colSpan={3} className="p-1">{material.material_name || 'N/A'}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Name:</td>
+                        <td colSpan={3} className="p-1 font-semibold">{material.material_name || 'N/A'}</td>
                       </tr> */}
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">RM Size</td>
-                        <td colSpan={3} className="p-1">{material.size || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Size:</td>
+                        <td colSpan={3} className="p-1 font-semibold">{material.size || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">Heat No.</td>
-                        <td className="p-1 border-r border-gray-600">{material.gr_number || ''}</td>
-                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">RM Qty</td>
-                        <td className="p-1">{material.quantity || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Heat No:</td>
+                        <td className="p-1 border-r border-gray-600 font-semibold">{material.gr_number || ''}</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">RM Qty:</td>
+                        <td className="p-1 font-semibold">{material.quantity || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">RM Part No.</td>
-                        <td className="p-1 border-r border-gray-600">{material.child_part_number || ''}</td>
-                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">Rev</td>
-                        <td className="p-1">{material.revision || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Part No:</td>
+                        <td className="p-1 border-r border-gray-600 font-semibold">{material.child_part_number || ''}</td>
+                        <td className="font-semibold p-1 text-right pr-2 border-r border-gray-600">Rev:</td>
+                        <td className="p-1 font-semibold">{material.revision || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">RM Part Desc</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600">{material.description || material.material_name || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">RM Part Desc:</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600 font-semibold">{material.description || material.material_name || ''}</td>
                         <td rowSpan={4} className="border-l-2 border-gray-800 p-1" style={{ width: '220px' }}>
                           <div className="flex flex-col h-full">
                             <div className="flex-1 flex items-center justify-start pl-2">
@@ -4737,18 +4758,18 @@ const loadInventoryItems = async () => {
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">Dept</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.department || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Dept:</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600 font-semibold">{selectedJob.department || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">Order No.</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.production_order || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Order No:</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600 font-semibold">{selectedJob.production_order || ''}</td>
                       </tr>
                       
                       <tr className="border-b border-gray-800">
-                        <td className="font-semibold p-1 border-r border-gray-600">Order Qty</td>
-                        <td colSpan={2} className="p-1 border-r border-gray-600">{selectedJob.launched_quantity || ''}</td>
+                        <td className="font-semibold p-1 border-r border-gray-600">Order Qty:</td>
+                        <td colSpan={2} className="p-1 border-r border-gray-600 font-semibold">{selectedJob.launched_quantity || ''}</td>
                       </tr>
                     </tbody>
                   </table>

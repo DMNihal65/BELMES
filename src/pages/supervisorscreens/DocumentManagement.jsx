@@ -642,16 +642,16 @@ const DocumentManagement = () => {
         );
       },
     },
-    {
-      title: 'Status',
-      dataIndex: 'is_active',
-      key: 'status',
-      render: (isActive) => (
-        <Tag color={isActive ? 'success' : 'default'}>
-          {isActive ? 'ACTIVE' : 'INACTIVE'}
-        </Tag>
-      ),
-    },
+    // {
+    //   title: 'Status',
+    //   dataIndex: 'is_active',
+    //   key: 'status',
+    //   render: (isActive) => (
+    //     <Tag color={isActive ? 'success' : 'default'}>
+    //       {isActive ? 'ACTIVE' : 'INACTIVE'}
+    //     </Tag>
+    //   ),
+    // },
     {
       title: 'Modified',
       dataIndex: 'created_at',
@@ -767,7 +767,11 @@ const DocumentManagement = () => {
     machines, // Add this
     isLoadingMachines, // Add this
     error, // Add error state
-    clearError // Add clear error function
+    clearError, // Add clear error function
+    analytics,
+    isLoadingAnalytics,
+    analyticsError,
+    fetchAnalytics,
   } = useDocumentStore();
   const [contextMenu, setContextMenu] = useState({
     visible: false,
@@ -2351,14 +2355,9 @@ const DocumentManagement = () => {
         loading={isLoading}
         pagination={{
           total: totalDocuments,
-          pageSize: 5,
+          pageSize: 8,
           showSizeChanger: false,
           showTotal: (total) => `Total ${total} items`,
-          onChange: (page, pageSize) => {
-            if (selectedFolder && selectedFolder !== 'all') {
-              fetchFolderDocuments(selectedFolder, page, pageSize);
-            }
-          },
           pageSizeOptions: [],
           hideOnSinglePage: true
         }}
@@ -2753,6 +2752,115 @@ const DocumentManagement = () => {
     setSelectedVersions([]);
   };
 
+  // Fetch analytics on mount
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  // Helper to format bytes
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Render analytics cards
+  const renderAnalyticsCards = () => {
+    if (isLoadingAnalytics) return <div>Loading analytics...</div>;
+    if (analyticsError) return <div style={{color: 'red'}}>Error: {analyticsError}</div>;
+    if (!analytics) return null;
+    return (
+      <div className="grid grid-cols-7 gap-2 mb-2">
+        <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+          <div className="flex items-center gap-2">
+            <FileOutlined className="text-blue-500" />
+            <div>
+              <div className="text-2xl font-semibold">{analytics.total_documents}</div>
+              <div className="text-sm text-gray-600">Total Documents</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+          <div className="flex items-center gap-2">
+            <CloudDownloadOutlined className="text-green-500" />
+            <div>
+              <div className="text-2xl font-semibold">{analytics.total_downloads}</div>
+              <div className="text-sm text-gray-600">Downloads</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+          <div className="flex items-center gap-2">
+            <DatabaseOutlined className="text-purple-500" />
+            <div>
+              <div className="text-2xl font-semibold">{formatBytes(analytics.total_storage)}</div>
+              <div className="text-sm text-gray-600">Storage Used</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all">
+          <div className="flex items-center gap-2">
+            <HistoryOutlined className="text-cyan-500" />
+            <div>
+              <div className="text-2xl font-semibold">{analytics.total_versions}</div>
+              <div className="text-sm text-gray-600">Total Versions</div>
+            </div>
+          </div>
+        </div>
+        {/* Document Types Dropdown */}
+        <Dropdown
+          overlay={
+            <Card className="w-64 shadow-lg">
+              <div className="text-sm font-medium mb-2 text-gray-700">
+                Documents by Type
+              </div>
+              <div className="space-y-2 max-h-64 overflow-auto">
+                {Object.entries(analytics.documents_by_type || {}).map(([type, count]) => (
+                  <div 
+                    key={type}
+                    className="flex items-center justify-between p-2 bg-sky-50 rounded-md"
+                  >
+                    <span className="text-sm text-gray-600 truncate flex-1" title={type}>
+                      {type}
+                    </span>
+                    <Badge 
+                      count={count} 
+                      className="ml-2"
+                      style={{ 
+                        backgroundColor: '#0ea5e9',
+                        fontSize: '11px'
+                      }} 
+                    />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          }
+          trigger={['click']}
+          placement="bottomRight"
+        >
+          <div className="bg-sky-500/10 hover:bg-sky-500/20 rounded-lg p-2.5 transition-all cursor-pointer">
+            <div className="flex items-center gap-2">
+              <div className="bg-sky-500 text-white rounded-md p-1.5">
+                <FileTextOutlined className="text-sm" />
+              </div>
+              <div>
+                <div className="text-sky-900 text-lg font-medium leading-tight">
+                  {Object.keys(analytics.documents_by_type || {}).length}
+                </div>
+                <div className="text-sky-700 text-xs flex items-center gap-1">
+                  Doc Types <DownOutlined className="text-xs" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Dropdown>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="bg-white rounded-lg shadow-sm mb-4 p-4">
@@ -2776,12 +2884,7 @@ const DocumentManagement = () => {
             </div>
           </div>
         </div>
-        
-        {/* <MetricsCards 
-          documents={documents}
-          folders={folders}
-          documentTypes={documentTypes}
-        /> */}
+        {renderAnalyticsCards()}
       </div>
 
       <Card bordered={false} className="shadow-sm" bodyStyle={{ padding: '16px' }}>

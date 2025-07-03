@@ -412,7 +412,7 @@ const MachineDashboard = () => {
           
           
           {/* Production metrics */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${statusInfo.color}25` }}>
                 <BarChart2 size={20} style={{ color: statusInfo.color }} />
@@ -432,17 +432,17 @@ const MachineDashboard = () => {
                 <div className="text-xl font-bold">{required_quantity}</div>
               </div>
             </div>
-          </div>
+          </div> */}
           
           {/* Idle Timer Alert */}
-          {hasIdleTimer && (
+          {/* {hasIdleTimer && (
             <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center gap-2">
               <Clock size={18} className="text-amber-500" />
               <span className="font-medium text-amber-700">
                 Idle for: <span className="font-bold">{formatDuration(machineTimers[machine.machine_id].duration)}</span>
               </span>
             </div>
-          )}
+          )} */}
           
           {/* Program and Operation Info */}
           <div className="space-y-3 mt-4">
@@ -670,11 +670,11 @@ const MachineDashboard = () => {
             <Tag color={statusInfo.color} className="ml-auto flex items-center gap-1 rounded-full px-3">
               {statusInfo.icon}
               <span>{statusInfo.label}</span>
-              {hasIdleTimer && (
+              {/* {hasIdleTimer && (
                 <span className="ml-1 text-xs">
                   ({formatDuration(machineTimers[selectedMachine.machine_id].duration)})
                 </span>
-              )}
+              )} */}
             </Tag>
           </div>
         }
@@ -689,61 +689,9 @@ const MachineDashboard = () => {
           {/* Main Information Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Status Card */}
-            <Card className="shadow-sm bg-gradient-to-br from-gray-50 to-white">
-              <div className="flex flex-col items-center text-center p-2">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2`}
-                  style={{ backgroundColor: `${statusInfo.color}20` }}>
-                  <div className="text-2xl" style={{ color: statusInfo.color }}>
-                    {statusInfo.icon}
-                  </div>
-                </div>
-                <div className="text-sm font-medium text-gray-500">Status</div>
-                <div className="text-xl font-bold" style={{ color: statusInfo.color }}>
-                  {statusInfo.label}
-                </div>
-                {hasIdleTimer && (
-                  <div className="text-sm text-gray-500 mt-1">
-                    Idle for {formatDuration(machineTimers[selectedMachine.machine_id].duration)}
-                  </div>
-                )}
-              </div>
-            </Card>
             
-            {/* Production Stats */}
-            <Card className="shadow-sm bg-gradient-to-br from-blue-50 to-white">
-              <div className="flex flex-col items-center text-center p-2">
-                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-2">
-                  <BarChart2 size={24} className="text-blue-500" />
-                </div>
-                <div className="text-sm font-medium text-gray-500">Parts Count</div>
-                <div className="text-xl font-bold text-blue-600">
-                  {part_count} / {required_quantity}
-                </div>
-                {parseInt(required_quantity) > 0 && (
-                  <Progress 
-                    percent={Math.round((parseInt(part_count) || 0) / parseInt(required_quantity) * 100)} 
-                    size="small" 
-                    className="w-full mt-2"
-                  />
-                )}
-              </div>
-            </Card>
-            
-            {/* Machine Information */}
-            <Card className="shadow-sm bg-gradient-to-br from-gray-50 to-white">
-              <div className="flex flex-col items-center text-center p-2">
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
-                  <Server size={24} className="text-gray-500" />
-                </div>
-                <div className="text-sm font-medium text-gray-500">Machine ID</div>
-                <div className="text-xl font-bold text-gray-700">
-                  {selectedMachine.machine_id}
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  Last Updated: {dayjs(selectedMachine.last_updated).format('HH:mm:ss')}
-                </div>
-              </div>
-            </Card>
+           
+           
           </div>
           
           {/* Production Details */}
@@ -798,27 +746,7 @@ const MachineDashboard = () => {
                 </div>
               </div>
               
-              {/* Quantities */}
-              <div>
-                <div className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
-                  <Disc size={14} />
-                  <span>Quantities</span>
-                </div>
-                <div className="flex gap-4">
-                  <div>
-                    <span className="text-xs text-gray-500">Required</span>
-                    <div className="font-medium">{required_quantity}</div>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500">Launched</span>
-                    <div className="font-medium">{launched_quantity}</div>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500">Completed</span>
-                    <div className="font-medium">{part_count}</div>
-                  </div>
-                </div>
-              </div>
+             
               
               {/* Active Program */}
               <div className="col-span-2">

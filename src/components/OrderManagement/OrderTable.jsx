@@ -312,13 +312,13 @@ const OrderTable = ({ orders, onRefresh }) => {
             <Input />
           </Form.Item>
 
-          <Form.Item
+          {/* <Form.Item
             label="Required Quantity"
             name="required_quantity"
             rules={[{ required: true, message: 'Please input the required quantity!' }]}
           >
             <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
+          </Form.Item> */}
           <Form.Item
             label="Launched Quantity"
             name="launched_quantity"
@@ -342,14 +342,14 @@ const OrderTable = ({ orders, onRefresh }) => {
           >
             <Input />
           </Form.Item>
-
+{/* 
           <Form.Item
             name="project"
             label="Project Name"
             rules={[{ required: true, message: 'Please enter project name' }]}
           >
             <Input />
-          </Form.Item>
+          </Form.Item> */}
         </Form>
       </Modal>
     </>

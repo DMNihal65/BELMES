@@ -91,7 +91,7 @@ const PdcInfo = ({ productionOrder }) => {
   if (pdcInfo.status === 'active' && pdcInfo.pdc) {
     return (
       <Tooltip title={`Data source: ${pdcInfo.data_source || 'Unknown'}`}>
-        <span className="text-blue-600 font-medium">{moment(pdcInfo.pdc).format('MM/DD/YYYY')}</span>
+        <span className="text-blue-600 font-medium">{moment(pdcInfo.pdc).format('DD/MM/YYYY')}</span>
       </Tooltip>
     );
   }

@@ -1467,7 +1467,22 @@ const CreateOrderModal = ({ visible, onCancel, onCreate, onRefresh, initialData 
               label="Unit of Measure"
               rules={[{ required: true, message: 'Please enter Unit of Measure' }]}
             >
-              <Input placeholder="Enter unit (e.g., kg, pcs, m)" />
+              <Input 
+                placeholder="Enter unit (e.g., kg, pcs, m)"
+                onChange={e => {
+                  // Remove all digits from the input
+                  const value = e.target.value.replace(/[0-9]/g, '');
+                  // Set the value in the form
+                  form.setFieldsValue({ raw_material_unit_name: value });
+                }}
+                // Optionally, prevent pasting numbers
+                onPaste={e => {
+                  const paste = (e.clipboardData || window.clipboardData).getData('text');
+                  if (/[0-9]/.test(paste)) {
+                    e.preventDefault();
+                  }
+                }}
+              />
             </Form.Item>
           </Col>
         </Row>

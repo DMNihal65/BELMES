@@ -38,8 +38,8 @@ export default function MachineMaintenance() {
       current: 1,
       pageSize: 10,
       showSizeChanger: true,
-      showQuickJumper: true,
-      showTotal: (total) => `Total ${total} items`,
+      // showQuickJumper: true,
+      // showTotal: (total) => `Total ${total} items`,
     },
   });
   const [currentStatus, setCurrentStatus] = useState('');

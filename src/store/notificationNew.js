@@ -5,13 +5,13 @@ import { Wrench, Package } from 'lucide-react';
 
 
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.18.7.88:4493/api/v1';
+const API_BASE_URL = 'http://172.18.7.88:4494/api/v1';
 const API_ENDPOINTS = {
   // GET endpoints for notifications
   machineNotifications: `${API_BASE_URL}/newlogsmachine-status-logs`,
   materialNotifications: `${API_BASE_URL}/newlogsraw_material_status_logs`,
-  instrumentCalibrationHttp: `${API_BASE_URL}/newlogs/instrument-calibration-logs?skip=0&limit=100`,
-  machineCalibrationHttp: `${API_BASE_URL}/newlogs/machine-calibration-logs?skip=0&limit=100`,
+  instrumentCalibrationHttp: `${API_BASE_URL}/newlogs/instrument-calibration-logs`,
+  machineCalibrationHttp: `${API_BASE_URL}/newlogs/machine-calibration-logs`,
   
   // POST endpoints for acknowledgments
   machineAcknowledge: `${API_BASE_URL}/newlogs/machine-status-logs/acknowledge`,

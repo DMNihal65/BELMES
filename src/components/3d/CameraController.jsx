@@ -197,7 +197,7 @@ const CameraController = ({
       {/* Floating Reset View Button */}
       <Html position={[0, 0, 0]} zIndexRange={[1000, 0]} style={{ pointerEvents: 'auto' }}>
         <div style={{ position: 'fixed', top: 24, right: 32, zIndex: 1000 }}>
-          <button
+          {/* <button
             onClick={handleResetView}
             style={{
               background: '#1e293b',
@@ -218,7 +218,7 @@ const CameraController = ({
             disabled={resetRequested}
           >
             ⟳ Reset View
-          </button>
+          </button> */}
         </div>
       </Html>
     </>

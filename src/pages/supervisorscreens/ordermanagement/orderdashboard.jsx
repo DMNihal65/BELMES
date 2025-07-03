@@ -404,12 +404,12 @@ const OrderDashboard = () => {
       width: 120,
       render: (_, record) => (
         <div className="flex items-center">
-          <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
+          {/* <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
             <div 
               className="bg-blue-600 h-2.5 rounded-full" 
               style={{ width: `${record.completion_percentage}%` }}
             ></div>
-          </div>
+          </div> */}
           <span className="text-sm">{record.completion_percentage}%</span>
         </div>
       ),

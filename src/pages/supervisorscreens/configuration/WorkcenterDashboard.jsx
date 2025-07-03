@@ -789,7 +789,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.88:4493/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.88:4494/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1567,45 +1567,8 @@ const Workcenter = () => {
                           `${isEditing(record) ? 'bg-blue-50' : 'hover:bg-gray-50'}`
                         }
                         loading={isLoading}
-                        pagination={{
-                          current: currentPage,
-                          pageSize: 10,
-                          total: searchText ? filteredData.length : data.length,
-                          showSizeChanger: false,
-                          showQuickJumper: false,
-                          position: ['bottomCenter'],
-                          showTotal: (total, range) => (
-                            <span className="text-gray-600">
-                              Showing {range[0]}-{range[1]} of {total} items
-                            </span>
-                          ),
-                          onChange: (page) => {
-                            setCurrentPage(page);
-                            setEditingKey('');
-                          }
-                        }}
-                        scroll={{ 
-                          x: 'max-content',
-                          y: 'calc(100vh - 460px)'
-                        }}
-                        sticky
-                        bordered
-                        className="ant-table-striped"
-                        size="middle"
-                        rowKey={(record) => `${record.work_center_id}_${record.sequential_id}`}
-                        defaultSortField="work_center_id"
-                        defaultSortOrder="ascend"
-                        onChange={(pagination, filters, sorter) => {
-                          handleTableChange(pagination, filters, sorter);
-                          if (!sorter.field) {
-                            const sortedData = [...data].sort((a, b) => {
-                              const valueA = String(a.work_center_id || '');
-                              const valueB = String(b.work_center_id || '');
-                              return valueA.localeCompare(valueB);
-                            });
-                            setData(sortedData);
-                          }
-                        }}
+                        pagination={{ pageSize: 10 }}
+scroll={{ x: 'max-content' }}
                       />
                     </Form>
                   </div>

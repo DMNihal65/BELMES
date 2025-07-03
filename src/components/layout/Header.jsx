@@ -77,12 +77,6 @@ function Header() {
   // Handle logout
   const handleLogout = () => {
     logout();
-
-    // Manually remove specific localStorage items
-    localStorage.removeItem('allMachinesEnergyData');
-    localStorage.removeItem('allMachinesEnergyData_timestamp');
-    localStorage.removeItem('machineData');
-
     navigate('/login');
   };
   
@@ -107,11 +101,22 @@ function Header() {
     await fetchNotifications(true);
   };
 
-  // For dropdown display, limit to top 5 most recent
-  const limitedNotifications = notifications.slice(0, 5);
+  // Normalize notifications: flatten record_data if present and use table_name as type
+  const normalizedNotifications = notifications.map(n => {
+    if (n.table_name && n.record_data) {
+      return {
+        ...n,
+        ...n.record_data,
+        notificationType: n.table_name, // Use table_name as type
+        original: n,
+      };
+    }
+    return n;
+  });
+  const limitedNotifications = normalizedNotifications.slice(0, 5);
   
   // Count unread
-  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+  const unreadNotificationsCount = normalizedNotifications.filter(n => !n.read).length;
 
   // Profile menu items
   const profileMenuItems = [
@@ -203,13 +208,10 @@ function Header() {
           </div>
         ) : notifications.length > 0 ? (
           <List
-            dataSource={notifications.map(n => ({
-              ...n,
-              record_data: n.record_data || {}
-            }))}
+            dataSource={limitedNotifications}
             renderItem={item => (
               <List.Item 
-                key={item._uniqueId}
+                key={item._uniqueId || item.id}
                 style={{
                   padding: '12px 16px',
                   backgroundColor: item.read ? '#fff' : '#f9f9f9',
@@ -235,18 +237,16 @@ function Header() {
                   }}>
                     {getNotificationIcon(item.notificationType)}
                   </div>
-                  
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <Tag color={item.notificationType === 'machine' ? 'blue' : 'green'} style={{ margin: 0, fontSize: '11px' }}>
-                        {item.table_name || 'Notification'}
+                      <Tag color={getNotificationTagColor(item.notificationType)} style={{ margin: 0, fontSize: '11px' }}>
+                        {item.notificationType || 'Notification'}
                       </Tag>
                       <Text type="secondary" style={{ fontSize: '11px' }}>
-                        {formatDate(item.updated_at || item.timestamp || item.created_at)}
+                        {formatDate(item.updated_at || item.completed_at || item.timestamp || item.created_at)}
                       </Text>
                     </div>
-                    
                     <Text strong style={{ 
                       display: 'block',
                       fontSize: '13px',
@@ -257,7 +257,6 @@ function Header() {
                     }}>
                       {getNotificationTitle(item)}
                     </Text>
-                    
                     <Text style={{ 
                       fontSize: '12px', 
                       color: '#666',
@@ -265,22 +264,20 @@ function Header() {
                       whiteSpace: 'normal',
                       wordBreak: 'break-word'
                     }}>
-                      {item.description || 'No description available'}
+                      {getNotificationDescription(item)}
                     </Text>
-                    
                     {item.status_name && (
                       <Text type="secondary" style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>
                         Status: {item.status_name}
                       </Text>
                     )}
-                    
                     {!item.read && (
                       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                         <Button 
                           type="link" 
                           size="small"
-                          onClick={(e) => handleMarkAsRead(item._uniqueId, e)}
-                          loading={markingAsRead && processingNotificationId === item._uniqueId}
+                          onClick={(e) => handleMarkAsRead(item._uniqueId || item.id, e)}
+                          loading={markingAsRead && processingNotificationId === (item._uniqueId || item.id)}
                           disabled={markingAsRead}
                           style={{ 
                             padding: '0 8px',
@@ -290,7 +287,7 @@ function Header() {
                             color: '#1890ff'
                           }}
                         >
-                          {markingAsRead && processingNotificationId === item._uniqueId ? 'Marking...' : 'Mark as Read'}
+                          {markingAsRead && processingNotificationId === (item._uniqueId || item.id) ? 'Marking...' : 'Mark as Read'}
                         </Button>
                       </div>
                     )}
@@ -334,7 +331,6 @@ function Header() {
   // Helper function to get the notification icon
   const getNotificationIcon = (type) => {
     const iconProps = { size: 16, style: { color: '#fff' } };
-    
     switch (type) {
       case 'machine':
         return <Wrench {...iconProps} />;
@@ -343,8 +339,24 @@ function Header() {
       case 'instrumentCalibration':
       case 'machineCalibration':
         return <Ruler {...iconProps} />;
+      case 'PokaYokeCompletedLog':
+        return <ToolFilled {...iconProps} />;
       default:
         return <Bell {...iconProps} />;
+    }
+  };
+
+  // Helper function to get the notification tag color
+  const getNotificationTagColor = (type) => {
+    switch (type) {
+      case 'machine':
+        return 'blue';
+      case 'material':
+        return 'green';
+      case 'PokaYokeCompletedLog':
+        return 'purple';
+      default:
+        return 'default';
     }
   };
 
@@ -359,40 +371,54 @@ function Header() {
         return '#722ed1'; // Purple
       case 'machineCalibration':
         return '#fa8c16'; // Orange
+      case 'PokaYokeCompletedLog':
+        return '#722ed1'; // Purple
       default:
         return '#8c8c8c'; // Gray
     }
   };
 
-  // Helper function to get the title for a notification
+  // Generalized helper function to get the title for a notification
   const getNotificationTitle = (notification) => {
-    switch (notification.notificationType) {
-      case 'machine':
-        return `Machine ${notification.machine_make || ''} #${notification.machine_id || ''}`;
-      case 'material':
-        return `Material #${notification.part_number || ''}`;
-      case 'instrumentCalibration':
-        return `Instrument: ${notification.item_name || notification.trade_name || notification.bel_part_number || 'Unknown'}`;
-      case 'machineCalibration':
-        return `${notification.machine_name || notification.machine_make || ''} #${notification.machine_id || ''}`;
-      default:
-        return 'Unknown Notification';
+    // Try to use the most relevant field for each type
+    if (notification.notificationType === 'PokaYokeCompletedLog') {
+      return `Poka Yoke Checklist: ${notification.checklist_name || ''} (Order: ${notification.production_order || ''})`;
     }
+    if (notification.notificationType === 'RawMaterialStatusLog') {
+      return `Material #${notification.part_number || notification.material_id || ''}`;
+    }
+    if (notification.notificationType === 'MachineStatusLog') {
+      return `Machine ${notification.machine_make || ''} #${notification.machine_id || ''}`;
+    }
+    // Fallback: use part_number, checklist_name, machine_make, or just the type
+    return (
+      notification.part_number ||
+      notification.checklist_name ||
+      notification.machine_make ||
+      notification.notificationType ||
+      'Notification'
+    );
   };
 
-  // Helper function to get the description for a notification
+  // Generalized helper function to get the description for a notification
   const getNotificationDescription = (notification) => {
-    switch (notification.notificationType) {
-      case 'machine':
-      case 'material':
-        return notification.description || 'No description';
-      case 'instrumentCalibration':
-        return `Due: ${notification.calibration_due_date || 'Unknown'} | Last: ${formatDate(notification.last_calibration) || 'N/A'}`;
-      case 'machineCalibration':
-        return `Calibration due on: ${notification.calibration_due_date || 'Unknown date'}`;
-      default:
-        return 'No details available';
+    // Prefer description if present
+    if (notification.description) return notification.description;
+    // For PokaYokeCompletedLog, show pass/fail and comments
+    if (notification.notificationType === 'PokaYokeCompletedLog') {
+      const passFail = notification.all_items_passed === true ? 'All items passed' : 'Some items failed';
+      return `Completed at: ${formatDate(notification.completed_at)} | ${passFail}${notification.comments ? ' | Comments: ' + notification.comments : ''}`;
     }
+    // For RawMaterialStatusLog, show status
+    if (notification.notificationType === 'RawMaterialStatusLog') {
+      return notification.status_name ? `Status: ${notification.status_name}` : '';
+    }
+    // For MachineStatusLog, show status
+    if (notification.notificationType === 'MachineStatusLog') {
+      return notification.status_name ? `Status: ${notification.status_name}` : '';
+    }
+    // Fallback: show nothing
+    return '';
   };
 
   // Helper function to get the button color for a notification type
@@ -410,8 +436,6 @@ function Header() {
         return '#1890ff'; // Default blue
     }
   };
-
-
 
   // Helper function to get color based on status and type
   const getStatusColor = (status, type) => {

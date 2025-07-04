@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert, message, Switch } from 'antd';
-import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, PlusCircleOutlined, CloseOutlined, DatabaseOutlined, UserOutlined, ClockCircleOutlined, LoadingOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, PlusCircleOutlined, CloseOutlined, DatabaseOutlined, UserOutlined, ClockCircleOutlined, LoadingOutlined, LinkOutlined } from '@ant-design/icons';
 import { Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -270,7 +270,29 @@ function InspectionResult() {
             setIsOperationModalVisible(true);
           }
         } else {
-          message.warning('No final inspection data available');
+          Modal.info({
+            title: 'Final Inspection Not Available',
+            content: (
+              <div>
+                <p>No final inspection data is available.</p>
+                <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                  <Button 
+                    type="primary" 
+                    onClick={() => {
+                      handleLaunchQMS();
+                      Modal.destroyAll();
+                    }}
+                    icon={<LinkOutlined />}
+                    loading={isLaunching}
+                  >
+                    Open QMS Software
+                  </Button>
+                </div>
+              </div>
+            ),
+            okText: 'Close',
+            width: 400
+          });
         }
       } catch (error) {
         console.error('Error fetching final inspection data:', error);

@@ -30,7 +30,8 @@ import {
   DownloadOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import moment from 'moment';
 import InspectionReport from './InspectionReport';
@@ -1353,8 +1354,25 @@ const QualityInspectionDetails = ({
     if (!hasFinalInspection) {
       Modal.info({
         title: 'Final Inspection Not Available',
-        content: 'Final inspection has not been done yet.',
-        okText: 'OK'
+        content: (
+          <div>
+            <p>Final inspection has not been done yet.</p>
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <Button 
+                type="primary" 
+                onClick={() => {
+                  handleLaunchQMS();
+                  Modal.destroyAll();
+                }}
+                icon={<LinkOutlined />}
+              >
+                Open QMS Software
+              </Button>
+            </div>
+          </div>
+        ),
+        okText: 'Close',
+        width: 400
       });
       return;
     }

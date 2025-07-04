@@ -354,11 +354,11 @@ const TicketAnalytics = () => {
         bodyStyle={{ padding: '20px', position: 'relative' }}
       >
         <div className="absolute top-0 right-0 w-24 h-24 opacity-10 rotate-12 transform translate-x-8 -translate-y-8">
-          <img src={failureData.imagePath} alt="Failure Icon" className="text-7xl" />
+          <WarningOutlined className="text-7xl text-rose-600" />
         </div>
         <Statistic 
           title={<span className="text-rose-800 font-medium text-base flex items-center gap-2">
-            <img src={failureData.imagePath} alt="Failure Icon" className="text-rose-600" /> Total Failures
+            <WarningOutlined className="text-rose-600" /> Total Failures
           </span>} 
           value={totalFailures} 
           valueStyle={{ color: '#b91c1c', fontWeight: 700, fontSize: '28px' }}

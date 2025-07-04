@@ -618,14 +618,22 @@ const loadInventoryItems = async () => {
     const status = getJobStatus(productionOrder);
     console.log(`Rendering status button for ${productionOrder}: Current status is ${status}`);
     
+    // Check if launched_quantity is 0
+    const isDisabled = selectedJob?.launched_quantity === 0;
+    
     return (
       <Button
         type={status === 'active' ? 'primary' : 'default'}
         onClick={() => handleStatusChange(productionOrder, status)}
         loading={updatingStatus}
-        style={status === 'active' ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : {}}
+        disabled={isDisabled || updatingStatus}
+        style={{
+          ...(status === 'active' ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : {}),
+          ...(isDisabled ? { cursor: 'not-allowed', opacity: 0.7 } : {})
+        }}
       >
         {status === 'active' ? 'Active' : 'Inactive'}
+        {isDisabled && ' (No Quantity)'}
       </Button>
     );
   };

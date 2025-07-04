@@ -21,7 +21,8 @@ const timelineStyles = {
   },
   '.vis-item': {
     borderRadius: '4px',
-    borderWidth: '1px',
+    borderWidth: '2px',
+    borderStyle: 'solid',
     fontSize: '12px',
     color: '#fff',
     height: '34px !important',
@@ -338,6 +339,24 @@ const DynamicSchedulingGraph = () => {
       return true;
     };
 
+    // Helper function to generate colors based on production order
+    const generateColors = (productionOrder) => {
+      // Create a hash from production order to get consistent colors
+      let hash = 0;
+      for (let i = 0; i < productionOrder.length; i++) {
+        hash = productionOrder.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      
+      // Generate shade variation from hash (0-100)
+      const shadeVariation = Math.abs(hash) % 40; // 0-39 range
+      
+      return {
+        planned: `hsl(210, 70%, ${60 + shadeVariation}%)`,      // Blue shades (60-99%)
+        actual: `hsl(120, 70%, ${45 + shadeVariation}%)`,       // Green shades (45-84%)  
+        rescheduled: `hsl(0, 70%, ${30 + shadeVariation}%)`     // Red shades (30-69%)
+      };
+    };
+
     // Add scheduled operations (Planned) with filters
     scheduleData.scheduled_operations.forEach((op, index) => {
       if (filterOperation(op, 'planned')) {
@@ -345,6 +364,8 @@ const DynamicSchedulingGraph = () => {
         const machineId = Object.entries(machineNameToId).find(([key]) => key.includes(op.machine))?.[1];
         if (machineId) {
           const machineFullName = machineMapping[machineId];
+          const colors = generateColors(op.production_order);
+          
           items.add({
             id: `planned-${index}`,
             group: `${machineFullName}-planned`,
@@ -352,6 +373,7 @@ const DynamicSchedulingGraph = () => {
             end: new Date(op.end_time),
             content: '',
             className: 'planned-bar',
+            style: `background-color: ${colors.planned} !important; border-color: #ffffff !important;`,
             title: `
               <div>
                 <strong>Planned Operation</strong><br/>
@@ -375,6 +397,8 @@ const DynamicSchedulingGraph = () => {
         const machineId = Object.entries(machineNameToId).find(([key]) => key.includes(log.machine_name))?.[1];
         if (machineId) {
           const machineFullName = machineMapping[machineId];
+          const colors = generateColors(log.production_order);
+          
           items.add({
             id: `actual-${index}`,
             group: `${machineFullName}-actual`,
@@ -382,6 +406,7 @@ const DynamicSchedulingGraph = () => {
             end: new Date(log.end_time),
             content: '',
             className: 'actual-bar',
+            style: `background-color: ${colors.actual} !important; border-color: #ffffff !important;`,
             title: `
               <div>
                 <strong>Actual Production</strong><br/>
@@ -410,6 +435,8 @@ const DynamicSchedulingGraph = () => {
                  pdc.production_order === reschedule.production_order
         );
 
+        const colors = generateColors(reschedule.production_order);
+
         items.add({
           id: `rescheduled-${index}`,
           group: `${machineFullName}-rescheduled`,
@@ -417,6 +444,7 @@ const DynamicSchedulingGraph = () => {
           end: new Date(reschedule.end_time),
           content: '',
           className: 'rescheduled-bar',
+                      style: `background-color: ${colors.rescheduled} !important; border-color: #ffffff !important;`,
           title: `
             <div>
               <strong>Rescheduled Operation</strong><br/>
@@ -496,21 +524,28 @@ const DynamicSchedulingGraph = () => {
     const style = document.createElement('style');
     style.textContent = `
       .planned-bar {
-        background-color: #1890ff !important;
-        border-color: #1890ff !important;
+        border-color: #ffffff !important;
+        border-width: 1px !important;
+        border-style: solid !important;
+        box-shadow: none !important;
       }
       .actual-bar {
-        background-color: #52c41a !important;
-        border-color: #52c41a !important;
+        border-color: #ffffff !important;
+        border-width: 1px !important;
+        border-style: solid !important;
+        box-shadow: none !important;
       }
       .rescheduled-bar {
-        background-color: #f5222d !important;
-        border-color: #f5222d !important;
+        border-color: #ffffff !important;
+        border-width: 1px !important;
+        border-style: solid !important;
+        box-shadow: none !important;
       }
       .vis-item {
         height: 20px;
-        border-width: 1px;
-        border-radius: 2px;
+        border-width: 2px !important;
+        border-radius: 4px !important;
+        border-style: solid !important;
       }
       .vis-nested-group {
         background-color: #f5f5f5;

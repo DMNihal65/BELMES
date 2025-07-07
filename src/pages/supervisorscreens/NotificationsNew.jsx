@@ -147,7 +147,7 @@ const NotificationsNew = () => {
       
       // Handle both machine and material notifications
       if (notification.notificationType === 'material') {
-        const response = await fetch('http://172.18.7.88:4461/api/v1/newlogs/raw_material_status_logs/acknowledge', {
+        const response = await fetch('http://172.18.7.88:4463/api/v1/newlogs/raw_material_status_logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ const NotificationsNew = () => {
         setLastAcknowledgedId(notification.id);
         setLastAcknowledgedType('material');
       } else if (notification.notificationType === 'machine') {
-        const response = await fetch('http://172.18.7.88:4461/api/v1/newlogs/machine-status-logs/acknowledge', {
+        const response = await fetch('http://172.18.7.88:4463/api/v1/newlogs/machine-status-logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1330,13 +1330,13 @@ const NotificationsNew = () => {
               dataSource={getFilteredNotifications()}
               columns={getColumns()}
               rowKey={(record) => record._uniqueId || `${record.notificationType}-${record.id || record.machine_id || record.part_number}-${record.updated_at || record.timestamp}`}
-              pagination={{ 
-                pageSize: 10,
-                showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50'],
-                showTotal: (total) => `Total ${total} notification${total !== 1 ? 's' : ''}`,
-                style: { marginTop: '16px' }
-              }}
+              // pagination={{ 
+              //   pageSize: 10,
+              //   showSizeChanger: true,
+              //   pageSizeOptions: ['10', '20', '50'],
+              //   showTotal: (total) => `Total ${total} notification${total !== 1 ? 's' : ''}`,
+              //   style: { marginTop: '16px' }
+              // }}
               rowClassName={(record) => 
                 !record.is_acknowledged 
                   ? 'unread-row' 

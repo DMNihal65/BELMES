@@ -803,18 +803,7 @@ const FactoryScene = ({
   return (
     <div className={`relative h-full w-full ${className}`}>
       {/* Quality controls */}
-      <div className="absolute top-4 left-4 z-10 flex items-center">
-        <span className="text-xs text-white bg-black/50 px-2 py-1 rounded-l">Quality:</span>
-        {["low", "medium", "high"].map((q) => (
-          <button 
-            key={q}
-            className={`px-2 py-1 text-xs ${quality === q ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'} ${q === "low" ? "" : ""} ${q === "high" ? "rounded-r" : ""}`}
-            onClick={() => setQuality(q)}
-          >
-            {q.charAt(0).toUpperCase() + q.slice(1)}
-          </button>
-        ))}
-      </div>
+      
 
       {isLoading ? (
         <div className="h-full w-full flex items-center justify-center bg-gray-800">
@@ -823,16 +812,16 @@ const FactoryScene = ({
       ) : (
         <WebGLErrorBoundary onError={handleCreationError}>
           <Canvas
-            shadows={quality !== 'low'}
+            shadows={quality !== 'high'}
             dpr={getPixelRatio()}
             gl={{ 
-              antialias: quality !== 'low',
+              antialias: quality !== 'high',
               toneMapping: THREE.ACESFilmicToneMapping,
               toneMappingExposure: 1.0,
               alpha: true,
               stencil: false,
               depth: true,
-              precision: quality === 'low' ? 'lowp' : 'mediump',
+              precision: quality === 'high' ? 'lowp' : 'mediump',
               powerPreference: 'low-power',
               failIfMajorPerformanceCaveat: false
             }}
@@ -846,7 +835,7 @@ const FactoryScene = ({
             <CameraController 
               selectedMachine={selectedMachine} 
               view={cameraView}
-              enableTransitions={quality !== 'low'} 
+              enableTransitions={quality !== 'high'} 
             />
             
             <Suspense fallback={null}>
@@ -857,7 +846,7 @@ const FactoryScene = ({
               <Factory3DLighting quality={quality} />
               
               {/* Environment */}
-              {quality !== 'low' && (
+              {quality !== 'high' && (
                 <Environment
                   files="/warehouse.hdr"
                   background={false}

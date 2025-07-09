@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Tag, Badge, Button, Space, Tooltip, Modal, message } from 'antd';
-import { EyeOutlined, MenuOutlined, SwapOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Table, Tag, Badge, Button, Space, Tooltip, Modal, message, Switch, Spin } from 'antd';
+import { EyeOutlined, MenuOutlined, SwapOutlined, SwapRightOutlined } from '@ant-design/icons';
 import {
   DndContext,
   closestCenter,
@@ -21,7 +21,6 @@ import Row from './Row';
 
 const ReorderableTable = ({ orders = [] }) => {
   const [localOrders, setLocalOrders] = useState([]);
-  const { swapOrderPriority } = useOrderStore();
   const [swapConfirmation, setSwapConfirmation] = useState({
     visible: false,
     order1: null,
@@ -29,21 +28,73 @@ const ReorderableTable = ({ orders = [] }) => {
     position1: null,
     position2: null
   });
+  const [showScheduled, setShowScheduled] = useState(true); // Set to true by default
+  const [scheduledOrders, setScheduledOrders] = useState([]);
+  const [isLoadingScheduled, setIsLoadingScheduled] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+  });
+  const { swapOrderPriority, fetchScheduledOrders } = useOrderStore();
 
+  // Fetch scheduled orders when the component mounts or when showScheduled changes
   useEffect(() => {
-    if (!Array.isArray(orders) || localOrders.length > 0) {
-      return;
+    const loadScheduledOrders = async () => {
+      try {
+        if (showScheduled) {
+          setIsLoadingScheduled(true);
+          const scheduled = await fetchScheduledOrders();
+          console.log('Fetched scheduled orders:', scheduled);
+          setScheduledOrders(scheduled);
+        }
+      } catch (error) {
+        console.error('Error loading scheduled orders:', error);
+        message.error('Failed to load scheduled orders');
+      } finally {
+        setIsLoadingScheduled(false);
+      }
+    };
+
+    loadScheduledOrders();
+  }, [fetchScheduledOrders, showScheduled]);
+
+  // Filter and sort orders based on the toggle state
+  useEffect(() => {
+    if (!Array.isArray(orders)) return;
+
+    let filteredOrders = [...orders];
+    
+    // Filter for scheduled orders if the toggle is on
+    if (showScheduled && scheduledOrders.length > 0) {
+      // Create a set of scheduled production order numbers for quick lookup
+      const scheduledOrderNumbers = new Set(
+        scheduledOrders
+          .map(order => order.production_order?.toString())
+          .filter(Boolean) // Remove any undefined/null values
+      );
+      
+      console.log('Scheduled order numbers:', Array.from(scheduledOrderNumbers));
+      
+      // Filter orders to only include those that are in the scheduled orders list
+      filteredOrders = filteredOrders.filter(order => {
+        const orderNumber = order.production_order?.toString() || order.id?.toString();
+        const isScheduled = scheduledOrderNumbers.has(orderNumber);
+        console.log(`Order ${orderNumber} - Scheduled: ${isScheduled}`);
+        return isScheduled;
+      });
+      
+      console.log('Filtered orders:', filteredOrders);
     }
 
-    // Sort orders by priority only on initial load
-    const sortedOrders = [...orders].sort((a, b) => {
+    // Sort by priority
+    const sortedOrders = [...filteredOrders].sort((a, b) => {
       const priorityA = a.project?.priority || a.priority || 999;
       const priorityB = b.project?.priority || b.priority || 999;
       return priorityA - priorityB;
     });
 
     setLocalOrders(sortedOrders);
-  }, [orders]);
+  }, [orders, showScheduled, scheduledOrders]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -246,7 +297,23 @@ const ReorderableTable = ({ orders = [] }) => {
   };
 
   return (
-    <>
+    <div className="w-full">
+      <div className="flex justify-between items-center mb-4">
+        <div className="text-lg font-semibold text-gray-700">
+          {showScheduled ? 'Scheduled Orders' : 'All Orders'}
+        </div>
+        <Space>
+          {isLoadingScheduled && <Spin size="small" />}
+          <span className="text-sm font-medium text-gray-600">Show Scheduled</span>
+          <Switch 
+            checked={showScheduled}
+            onChange={setShowScheduled}
+            checkedChildren="Yes"
+            unCheckedChildren="No"
+            className={showScheduled ? 'bg-blue-500' : 'bg-gray-300'}
+          />
+        </Space>
+      </div>
       <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
         <DndContext
           sensors={sensors}
@@ -267,7 +334,32 @@ const ReorderableTable = ({ orders = [] }) => {
               columns={columns}
               dataSource={localOrders}
               rowKey={record => record.id || record.production_order}
-              pagination={false}
+              pagination={{
+                ...pagination,
+                showSizeChanger: true,
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} orders`,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                onShowSizeChange: (current, size) => {
+                  setPagination({
+                    ...pagination,
+                    current: 1, // Reset to first page when changing page size
+                    pageSize: size,
+                  });
+                },
+                onChange: (page, pageSize) => {
+                  setPagination({
+                    ...pagination,
+                    current: page,
+                    pageSize: pageSize,
+                  });
+                },
+              }}
+              loading={isLoadingScheduled}
+              locale={{
+                emptyText: showScheduled 
+                  ? 'No scheduled orders found' 
+                  : 'No orders available'
+              }}
               rowClassName={(record) => {
                 const priority = record.project?.priority;
                 if (priority === 1) return 'bg-red-50';
@@ -342,7 +434,7 @@ const ReorderableTable = ({ orders = [] }) => {
           This action will update the priority of these orders while maintaining the priority of all other orders.
         </div>
       </Modal>
-    </>
+    </div>
   );
 };
 

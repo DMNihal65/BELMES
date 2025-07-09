@@ -107,7 +107,7 @@ const getTimeAxisStep = (viewType) => {
   switch (viewType) {
     case 'year': return 1;  // Step for year: 1 month
     case 'month': return 1; // Step for month: 1 day
-    case 'week': return 4;  // Step for week: 4 hours
+    case 'week': return 6;  // Step for week: 4 hours
     case 'day': return 1;   // Step for day: 1 hour (changed from 15)
     default: return 1;      // Default step: 1 hour
   }
@@ -543,11 +543,11 @@ const Scheduling = () => {
           hiddenDates: [
             {
               start: '1970-01-01 00:00:00',
-              end: '1970-01-01 09:00:00',
+              end: '1970-01-01 06:00:00',
               repeat: 'daily'
             },
             {
-              start: '1970-01-01 17:00:00',
+              start: '1970-01-01 22:00:00',
               end: '1970-01-01 23:59:59',
               repeat: 'daily'
             }
@@ -713,7 +713,7 @@ const Scheduling = () => {
   useEffect(() => {
     const fetchPartDescriptions = async () => {
       try {
-        const response = await fetch('http://172.16.0.203:8002/api/v1/planning/all_orders');
+        const response = await fetch('http://172.18.7.88:1919/api/v1/planning/all_orders');
         const data = await response.json();
         
         // Create a mapping of part numbers to their descriptions
@@ -1513,26 +1513,26 @@ const getTimeRange = (viewType, dateRange, selectedComponents, selectedMachines,
   // Set the visible window based on date range or view type
   if (dateRange && dateRange[0] && dateRange[1]) {
     // Use date range for visible window
-    start = dateRange[0].clone().hour(9).minute(0).second(0).toDate();
-    end = dateRange[1].clone().hour(17).minute(0).second(0).toDate();
+    start = dateRange[0].clone().hour(6).minute(0).second(0).toDate();
+    end = dateRange[1].clone().hour(22).minute(0).second(0).toDate();
   } else {
     // Use view type for visible window
     switch (viewType) {
       case 'year':
-        start = now.clone().startOf('year').hour(9).minute(0).second(0).toDate();
-        end = now.clone().endOf('year').hour(17).minute(0).second(0).toDate();
+        start = now.clone().startOf('year').hour(6).minute(0).second(0).toDate();
+        end = now.clone().endOf('year').hour(22).minute(0).second(0).toDate();
         break;
       case 'month':
-        start = now.clone().startOf('month').hour(9).minute(0).second(0).toDate();
-        end = now.clone().endOf('month').hour(17).minute(0).second(0).toDate();
+        start = now.clone().startOf('month').hour(6).minute(0).second(0).toDate();
+        end = now.clone().endOf('month').hour(22).minute(0).second(0).toDate();
         break;
       case 'week':
-        start = now.clone().startOf('week').hour(9).minute(0).second(0).toDate();
-        end = now.clone().endOf('week').hour(17).minute(0).second(0).toDate();
+        start = now.clone().startOf('week').hour(6).minute(0).second(0).toDate();
+        end = now.clone().endOf('week').hour(22).minute(0).second(0).toDate();
         break;
       default: // day
-        start = now.clone().startOf('day').hour(9).minute(0).second(0).toDate();
-        end = now.clone().endOf('day').hour(17).minute(0).second(0).toDate();
+        start = now.clone().startOf('day').hour(6).minute(0).second(0).toDate();
+        end = now.clone().endOf('day').hour(22).minute(0).second(0).toDate();
     }
   }
 
@@ -1558,4 +1558,5 @@ export default Scheduling;
 
 
 
-
+//////////////////adding 6am to 10pm
+////////////////////testing..........

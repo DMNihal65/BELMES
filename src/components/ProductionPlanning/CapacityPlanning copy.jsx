@@ -439,7 +439,7 @@ const CapacityPlanning = () => {
                     <span style="display: inline-block; width: 10px; height: 10px; background: ${availableColor}; margin-right: 8px; border-radius: 50%;"></span>
                     <span style="color: #6b7280;">Available Hours:</span>
                   </div>
-                  <span style="font-weight: 600; color: #374151;">${availableHours.toFixed(1)}</span>
+                  <span style="font-weight: 600; color: #374151;">${availableHours.toFixed(0)}</span>
                 </div>
                 
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -447,7 +447,7 @@ const CapacityPlanning = () => {
                     <span style="display: inline-block; width: 10px; height: 10px; background: ${utilizedColor}; margin-right: 8px; border-radius: 50%;"></span>
                     <span style="color: #6b7280;">Planned Hours:</span>
                   </div>
-                  <span style="font-weight: 600; color: #374151;">${utilizedHours.toFixed(1)}</span>
+                  <span style="font-weight: 600; color: #374151;">${utilizedHours.toFixed(0)}</span>
                 </div>
                 
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -455,7 +455,7 @@ const CapacityPlanning = () => {
                     <span style="display: inline-block; width: 10px; height: 10px; background: ${remainingColor}; margin-right: 8px; border-radius: 50%;"></span>
                     <span style="color: #6b7280;">Remaining Hours:</span>
                   </div>
-                  <span style="font-weight: 600; color: #374151;">${remainingHours.toFixed(1)}</span>
+                  <span style="font-weight: 600; color: #374151;">${remainingHours.toFixed(0)}</span>
                 </div>
                 
                 <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center;">

@@ -73,7 +73,7 @@ const getTimeAxisStep = (viewType) => {
   switch (viewType) {
     case 'year': return 1;
     case 'month': return 1;
-    case 'week': return 4;
+    case 'week': return 6;
     case 'day': return 1;
     default: return 1;
   }
@@ -84,25 +84,25 @@ const getTimeRange = (viewType, dateRange) => {
   const now = moment();
 
   if (dateRange && dateRange[0] && dateRange[1]) {
-    start = dateRange[0].clone().hour(9).minute(0).second(0).toDate();
-    end = dateRange[1].clone().hour(17).minute(0).second(0).toDate();
+    start = dateRange[0].clone().hour(6).minute(0).second(0).toDate();
+    end = dateRange[1].clone().hour(22).minute(0).second(0).toDate();
   } else {
     switch (viewType) {
       case 'year':
-        start = now.clone().startOf('year').hour(9).minute(0).second(0).toDate();
-        end = now.clone().endOf('year').hour(17).minute(0).second(0).toDate();
+        start = now.clone().startOf('year').hour(6).minute(0).second(0).toDate();
+        end = now.clone().endOf('year').hour(22).minute(0).second(0).toDate();
         break;
       case 'month':
-        start = now.clone().startOf('month').hour(9).minute(0).second(0).toDate();
-        end = now.clone().endOf('month').hour(17).minute(0).second(0).toDate();
+        start = now.clone().startOf('month').hour(6).minute(0).second(0).toDate();
+        end = now.clone().endOf('month').hour(22).minute(0).second(0).toDate();
         break;
       case 'week':
-        start = now.clone().startOf('week').hour(9).minute(0).second(0).toDate();
-        end = now.clone().endOf('week').hour(17).minute(0).second(0).toDate();
+        start = now.clone().startOf('week').hour(6).minute(0).second(0).toDate();
+        end = now.clone().endOf('week').hour(22).minute(0).second(0).toDate();
         break;
       default:
-        start = now.clone().startOf('day').hour(9).minute(0).second(0).toDate();
-        end = now.clone().endOf('day').hour(17).minute(0).second(0).toDate();
+        start = now.clone().startOf('day').hour(6).minute(0).second(0).toDate();
+        end = now.clone().endOf('day').hour(22).minute(0).second(0).toDate();
     }
   }
 
@@ -127,7 +127,7 @@ const DynamicSchedulingGraph = () => {
   // Add new function to fetch part details
   const fetchPartDetails = async () => {
     try {
-      const response = await axios.get('http://172.16.0.203:8002/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.88:1919/api/v1/planning/all_orders');
       setPartDetails(response.data);
     } catch (err) {
       console.error('Error fetching part details:', err);
@@ -506,11 +506,11 @@ const DynamicSchedulingGraph = () => {
         hiddenDates: [
           {
             start: '1970-01-01 00:00:00',
-            end: '1970-01-01 09:00:00',
+            end: '1970-01-01 06:00:00',
             repeat: 'daily'
           },
           {
-            start: '1970-01-01 17:00:00',
+            start: '1970-01-01 22:00:00',
             end: '1970-01-01 23:59:59',
             repeat: 'daily'
           }
@@ -518,6 +518,7 @@ const DynamicSchedulingGraph = () => {
       }
     );
 
+// ... (rest of the code remains the same)
     setTimelineRef(timeline);
 
     // Add custom styles for the bars and timeline
@@ -913,3 +914,9 @@ export default DynamicSchedulingGraph;
 
 
 //////////addcsss
+
+
+/////////////////newwwwwwwwwww
+
+/////////////////newwwwwwwwwww
+/////newwwwwwwwwwwwwwwwwwww

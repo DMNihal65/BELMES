@@ -20,8 +20,8 @@ const calculateUptime = (lastUpdated) => {
   return moment(lastUpdated).fromNow();
 };
 
-const BASE_URL = 'http://172.18.7.88:4463/production_monitoring';
-const WS_URL = 'ws://172.18.7.88:4463/production_monitoring/ws/live-status/';
+const BASE_URL = 'http://172.16.0.203:8002/production_monitoring';
+const WS_URL = 'ws://172.16.0.203:8002/production_monitoring/ws/live-status/';
 
 const useProductionStore = create(
   devtools((set, get) => ({
@@ -188,7 +188,7 @@ const useProductionStore = create(
     // Fetch work centres for filtering machines
     fetchWorkCenters: async () => {
       try {
-        const response = await axios.get('http://172.18.7.88:4463/api/v1/master-order/workcenters/?skip=0&limit=100');
+        const response = await axios.get('http://172.16.0.203:8002/api/v1/master-order/workcenters/?skip=0&limit=100');
         const workcenters = response.data;
         
         // No longer filtering by is_schedulable

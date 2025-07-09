@@ -33,15 +33,7 @@ export default function MachineMaintenance() {
   const [filterMachine, setFilterMachine] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [form] = Form.useForm();
-  const [tableParams, setTableParams] = useState({
-    pagination: {
-      current: 1,
-      pageSize: 10,
-      showSizeChanger: true,
-      // showQuickJumper: true,
-      // showTotal: (total) => `Total ${total} items`,
-    },
-  });
+
   const [currentStatus, setCurrentStatus] = useState('');
 
   useEffect(() => {
@@ -113,13 +105,7 @@ export default function MachineMaintenance() {
     }
   };
 
-  const handleTableChange = (pagination, filters, sorter) => {
-    setTableParams({
-      pagination,
-      filters,
-      sorter,
-    });
-  };
+
 
   const columns = [
     // {
@@ -491,12 +477,7 @@ export default function MachineMaintenance() {
             dataSource={filteredData}
             loading={loading}
             rowKey="machine_id"
-            onChange={handleTableChange}
-            pagination={{
-              ...tableParams.pagination,
-              responsive: true,
-              position: ['bottomCenter'],
-            }}
+            pagination={false}
             size="middle"
             bordered
             scroll={{ x: 'max-content' }}

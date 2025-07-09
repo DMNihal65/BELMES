@@ -3,9 +3,9 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.88:4463/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.88:4463/api/v1/operator';
-const MASTER_ORDER_URL = 'http://172.18.7.88:4463/api/v1/master-order';
+const SUPERVISOR_BASE_URL = 'http://172.16.0.203:8002/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.16.0.203:8002/api/v1/operator';
+const MASTER_ORDER_URL = 'http://172.16.0.203:8002/api/v1/master-order';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -149,35 +149,16 @@ const useMachineMaintenanceStore = create((set, get) => ({
   fetchMachineStatuses: async () => {
     set({ loading: true, error: null });
     try {
-      // First fetch all machines from master-order endpoint
-      const machinesResponse = await axios.get(`${MASTER_ORDER_URL}/all-machines/`);
-      
-      // Filter machines where work_center_boolean is true
-      const workCenterMachines = machinesResponse.data.filter(machine => machine.work_center_boolean);
-      
-      // Get status for each machine from maintenance endpoint
+      // Only fetch from the machine-status endpoint
       const statusResponse = await axios.get(`${SUPERVISOR_BASE_URL}/machine-status/`);
-      
-      // Combine machine data with status data
-      const machinesWithStatus = workCenterMachines.map(machine => {
-        const machineStatus = statusResponse.data.statuses.find(
-          status => status.machine_id === machine.id
-        ) || {
-          status_name: 'OFF', // Default status
-          available_from: new Date().toISOString(),
-          available_to: new Date().toISOString(), // Default available_to
-          description: ''
-        };
-  
-        return {
-          ...machineStatus, // Includes available_from, available_to, status_name, description
-          machine_id: machine.id,
-          machine_make: machine.make, // Use 'make' from master data for machine_make
-          id: machine.id, // Ensure id is present
-          description: machineStatus.description || '' // Ensure description is never undefined or null
-        };
-      });
-  
+      // Map/format as needed for the table
+      const machinesWithStatus = (statusResponse.data.statuses || []).map(machineStatus => ({
+        ...machineStatus,
+        machine_id: machineStatus.machine_id, // Ensure machine_id is present
+        machine_make: machineStatus.machine_make, // Use machine_make from status data
+        id: machineStatus.machine_id, // For consistency
+        description: machineStatus.description || '' // Ensure description is never undefined or null
+      }));
       set({
         machines: machinesWithStatus,
         totalMachines: machinesWithStatus.length,
@@ -238,34 +219,17 @@ const useMachineMaintenanceStore = create((set, get) => ({
         requestData
       );
   
-      // Fetch fresh data from both endpoints
-      const [machinesResponse, statusResponse] = await Promise.all([
-        axios.get(`${MASTER_ORDER_URL}/all-machines/`),
-        axios.get(`${SUPERVISOR_BASE_URL}/machine-status/`)
-      ]);
-  
-      // Filter machines where work_center_boolean is true
-      const workCenterMachines = machinesResponse.data.filter(machine => machine.work_center_boolean);
+      // Fetch fresh data from machine-status endpoint only
+      const statusResponse = await axios.get(`${SUPERVISOR_BASE_URL}/machine-status/`);
       
-      // Combine machine data with status data
-      const machinesWithStatus = workCenterMachines.map(machine => {
-        const machineStatus = statusResponse.data.statuses.find(
-          status => status.machine_id === machine.id
-        ) || {
-          status_name: 'OFF', // Default status
-          available_from: new Date().toISOString(),
-          available_to: new Date().toISOString(), // Default available_to
-          description: ''
-        };
-  
-        return {
-          ...machineStatus, // Includes available_from, available_to, status_name, description
-          machine_id: machine.id,
-          machine_make: machine.make, // Use 'make' from master data for machine_make
-          id: machine.id, // Ensure id is present
-          description: machineStatus.description || '' // Ensure description is never undefined or null
-        };
-      });
+      // Map/format as needed for the table (same logic as fetchMachineStatuses)
+      const machinesWithStatus = (statusResponse.data.statuses || []).map(machineStatus => ({
+        ...machineStatus,
+        machine_id: machineStatus.machine_id, // Ensure machine_id is present
+        machine_make: machineStatus.machine_make, // Use machine_make from status data
+        id: machineStatus.machine_id, // For consistency
+        description: machineStatus.description || '' // Ensure description is never undefined or null
+      }));
   
       set({
         machines: machinesWithStatus,

@@ -927,8 +927,6 @@ const loadInventoryItems = async () => {
         styles: {
           fontSize: 11,
           cellPadding: 5,
-          lineColor: [0, 0, 0],
-          lineWidth: 0.2,
           font: 'helvetica',
           textColor: [0, 0, 0],
           fontStyle: 'normal',
@@ -1060,9 +1058,7 @@ const loadInventoryItems = async () => {
           fontStyle: 'bold',
           textColor: [0, 0, 0],
           lineColor: [0, 0, 0],
-          lineWidth: 0.2,
           cellPadding: 2,
-          lineColor: [0, 0, 0],
           lineWidth: 0.1,
           halign: 'center'
         },

@@ -988,19 +988,35 @@ const InventoryAllData = () => {
       }
       setIsCalibrationModalVisible(true);
     } catch (error) {
-      console.error('Error fetching calibration data:', error);
-      toast.error('Failed to fetch calibration data');
+      console.error('Error showing calibration modal:', error);
+      toast.error('Failed to open calibration form');
     }
   };
 
-  // Modify handleCalibrationSubmit to use store functions
   const handleCalibrationSubmit = async (values) => {
     try {
+      // Format dates to ensure they maintain the selected day and time
+      const lastCalibration = dayjs(values.last_calibration).format('YYYY-MM-DDTHH:mm:ss.SSS[Z]');
+      const nextCalibration = dayjs(values.next_calibration).format('YYYY-MM-DDTHH:mm:ss.SSS[Z]');
+      
+      // Validate dates
+      if (!lastCalibration || !nextCalibration) {
+        throw new Error('Please select both last calibration and next calibration dates');
+      }
+      
+      if (dayjs(nextCalibration).isBefore(dayjs(lastCalibration))) {
+        throw new Error('Next calibration date must be after last calibration date');
+      }
+      
       const formattedData = {
         ...values,
-        last_calibration: values.last_calibration.toISOString(),
-        next_calibration: values.next_calibration.toISOString(),
+        last_calibration: lastCalibration,
+        next_calibration: nextCalibration,
+        // Ensure frequency_days is a number
+        frequency_days: Number(values.frequency_days) || 30,
       };
+
+      console.log('Sending calibration data:', formattedData); // Debug log
 
       let result;
       if (values.id) {
@@ -1018,7 +1034,39 @@ const InventoryAllData = () => {
       setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error saving calibration:', error);
-      toast.error('Failed to save calibration details');
+      
+      // Handle different types of errors
+      let errorMessage = 'Failed to save calibration details';
+      
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        const { data } = error.response;
+        if (data && data.detail) {
+          errorMessage = Array.isArray(data.detail) 
+            ? data.detail.map(err => `${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg}`).join('\n')
+            : data.detail;
+        } else if (data && data.message) {
+          errorMessage = data.message;
+        } else if (data && data.non_field_errors) {
+          errorMessage = Array.isArray(data.non_field_errors) 
+            ? data.non_field_errors.join('\n')
+            : data.non_field_errors;
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        errorMessage = 'No response from server. Please check your connection.';
+      } else if (error.message) {
+        // Something happened in setting up the request that triggered an Error
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage, {
+        autoClose: 10000, // 10 seconds
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+      });
     }
   };
 

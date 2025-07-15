@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import dayjs from 'dayjs';
 import {
   Card,
   Table,
@@ -204,14 +205,34 @@ function Calibration() {
 
   const handleSubmit = async (values) => {
     try {
+      console.log('Form values before processing:', JSON.stringify(values, null, 2));
+      
+      // Format dates to match backend's expected format (YYYY-MM-DDTHH:mm:ss.SSS[Z])
+      const lastCalibration = values.last_calibration ? dayjs(values.last_calibration).format('YYYY-MM-DDTHH:mm:ss.SSS[Z]') : null;
+      const nextCalibration = values.next_calibration ? dayjs(values.next_calibration).format('YYYY-MM-DDTHH:mm:ss.SSS[Z]') : null;
+      
+      // Validate dates
+      if (!lastCalibration || !nextCalibration) {
+        throw new Error('Please select both last calibration and next calibration dates');
+      }
+      
+      if (dayjs(nextCalibration).isBefore(dayjs(lastCalibration))) {
+        throw new Error('Next calibration date must be after last calibration date');
+      }
+      
       const formattedValues = {
         calibration_type: values.calibration_type,
         frequency_days: values.frequency_days,
-        last_calibration: values.last_calibration.toISOString(),
-        next_calibration: values.next_calibration.toISOString(),
+        last_calibration: lastCalibration,
+        next_calibration: nextCalibration,
         remarks: values.remarks || '',
-        inventory_item_id: values.inventory_item_id
+        inventory_item_id: values.inventory_item_id,
+        created_by: 8 // Assuming this is the current user's ID
       };
+      
+      console.log('Formatted payload:', JSON.stringify(formattedValues, null, 2));
+      
+      console.log('Payload being sent to backend:', JSON.stringify(formattedValues, null, 2));
 
       if (editingCalibration) {
         await updateCalibration(editingCalibration.id, formattedValues);
@@ -219,19 +240,45 @@ function Calibration() {
           cal.id === editingCalibration.id ? { ...cal, ...formattedValues } : cal
         );
         useInventoryStore.setState({ calibrations: updatedCalibrations });
-        toast.success('Calibration record updated successfully');
       } else {
         const newCalibration = await addCalibration(formattedValues);
         const updatedCalibrations = [...calibrations, newCalibration];
         useInventoryStore.setState({ calibrations: updatedCalibrations });
-        toast.success('Calibration record added successfully');
       }
       setIsModalVisible(false);
       form.resetFields();
       setEditingCalibration(null);
+      toast.success(editingCalibration ? 'Calibration record updated successfully' : 'Calibration record added successfully');
     } catch (error) {
       console.error('Error saving calibration:', error);
-      toast.error(error.response?.data?.message || 'Failed to save calibration record');
+      
+      // Show detailed error message from backend if available
+      const errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         'Failed to save calibration record';
+      
+      // If the error is an object with field-specific errors
+      if (error.response?.data && typeof error.response.data === 'object') {
+        const errorMsgs = [];
+        for (const [field, errors] of Object.entries(error.response.data)) {
+          if (Array.isArray(errors)) {
+            errorMsgs.push(`${field.charAt(0).toUpperCase() + field.slice(1)}: ${errors.join(', ')}`);
+          } else if (typeof errors === 'string' && field !== 'detail' && field !== 'message') {
+            errorMsgs.push(`${field.charAt(0).toUpperCase() + field.slice(1)}: ${errors}`);
+          }
+        }
+        
+        if (errorMsgs.length > 0) {
+          // Show the first error message in the toast
+          toast.error(errorMsgs[0]);
+          // Log all errors to console
+          console.error('Validation errors:', errorMsgs);
+        } else {
+          toast.error(errorMessage);
+        }
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -1369,9 +1416,10 @@ function Calibration() {
                 rules={[{ required: true, message: 'Please select date' }]}
               >
                 <DatePicker 
-                  showTime 
-                  format="YYYY-MM-DD HH:mm:ss"
-                  style={{ width: '100%' }} 
+                  format="YYYY-MM-DD"
+                  style={{ width: '100%' }}
+                  showTime={false}
+                  placeholder="Select date"
                 />
               </Form.Item>
             </Col>
@@ -1381,10 +1429,11 @@ function Calibration() {
                 label="Next Calibration Date"
                 rules={[{ required: true, message: 'Please select date' }]}
               >
-                <DatePicker 
-                  showTime 
-                  format="YYYY-MM-DD HH:mm:ss"
-                  style={{ width: '100%' }} 
+                <DatePicker  
+                  format="YYYY-MM-DD"
+                  style={{ width: '100%' }}
+                  showTime={false}
+                  placeholder="Select date"
                 />
               </Form.Item>
             </Col>

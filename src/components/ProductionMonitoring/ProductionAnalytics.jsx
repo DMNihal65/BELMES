@@ -72,7 +72,7 @@ function ProductionAnalytics() {
   const fetchWorkCenters = async () => {
     setLoadingWorkCenters(true);
     try {
-      const response = await axios.get('http://172.18.7.88:1920/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await axios.get('http://172.16.0.203:8002/api/v1/master-order/workcenters/?skip=0&limit=100');
       const workCentersData = response.data;
       
       // No longer filtering by is_schedulable
@@ -518,11 +518,15 @@ function ProductionAnalytics() {
           if (!params.data) return '';
           
           const [index, startTime, endTime, status = 'Unknown', machineName = 'Unknown', program = ''] = params.data;
-          
-          const durationHours = dayjs(endTime).diff(dayjs(startTime), 'hour', true);
+
+          // Adjust timestamps to IST (UTC+5:30)
+          const startMoment = dayjs(startTime).add(5.5, 'hour');
+          const endMoment = dayjs(endTime).add(5.5, 'hour');
+
+          const durationHours = endMoment.diff(startMoment, 'hour', true);
           let durationStr = '';
           if (durationHours < 1) {
-            durationStr = `${dayjs(endTime).diff(dayjs(startTime), 'minute')} mins`;
+            durationStr = `${endMoment.diff(startMoment, 'minute')} mins`;
           } else {
             durationStr = `${durationHours.toFixed(1)} hrs`;
           }
@@ -533,8 +537,8 @@ function ProductionAnalytics() {
               <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${statusColors[status] || '#8884d8'}; margin-right: 8px;"></span>
               <strong>Status:</strong> <span style="margin-left: 5px;">${status}</span>
             </div>
-            <div><strong>Start:</strong> ${dayjs(startTime).format('MMM D, YYYY HH:mm')}</div>
-            <div><strong>End:</strong> ${dayjs(endTime).format('MMM D, YYYY HH:mm')}</div>
+            <div><strong>Start:</strong> ${startMoment.format('MMM D, YYYY HH:mm')}</div>
+            <div><strong>End:</strong> ${endMoment.format('MMM D, YYYY HH:mm')}</div>
             <div><strong>Duration:</strong> ${durationStr}</div>
             ${program ? `<div><strong>Program:</strong> ${program}</div>` : ''}
           `;

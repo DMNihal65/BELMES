@@ -187,10 +187,10 @@ const MachineStatusCard = () => {
           </div>
           
         
-          {/* Program & Part Counter in Compact Row */}
+          {/* Program, Part Counter, and Idle Time in Compact Row */}
           <Row gutter={10}>
             {/* Active Program */}
-            <Col span={16}>
+            <Col span={8}>
               <div className="bg-sky-50 p-3 rounded-lg border border-sky-100 h-full">
                 <div className="text-sm text-sky-800 mb-2 font-medium">Active Program</div>
                 <Tooltip title={machineStatus?.active_program || 'No program active'}>
@@ -198,9 +198,16 @@ const MachineStatusCard = () => {
                 </Tooltip>
               </div>
             </Col>
-            
-            {/* Part Counter */}
-            
+            {/* Part Count */}
+            <Col span={8}>
+              <div className="bg-sky-50 p-3 rounded-lg border border-sky-100 h-full flex flex-col justify-between">
+                <div className="text-sm text-sky-800 font-medium">Part Count</div>
+                <div className="text-center">
+                  <div className="text-xl font-bold text-green-600 mt-2">{machineStatus?.part_count !== undefined ? machineStatus.part_count : 'N/A'}</div>
+                </div>
+              </div>
+            </Col>
+            {/* Idle Time */}
             <Col span={8}>
               <div className="bg-sky-50 p-3 rounded-lg border border-sky-100 h-full flex flex-col justify-between">
                 <div className="text-sm text-sky-800 font-medium">Idle Time</div>
@@ -209,7 +216,6 @@ const MachineStatusCard = () => {
                 </div>
               </div>
             </Col>
-            
           </Row>
           
         </div>

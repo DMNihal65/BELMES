@@ -3,9 +3,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { message } from 'antd';
 
 // API endpoints
-const API_BASE_URL = "http://172.16.0.203:8002";
-const MPP_API_BASE_URL = "http://172.16.0.203:8002";
-const WS_URL = "ws://172.16.0.203:8002/production_monitoring/ws/live-status/";
+const API_BASE_URL = "http://172.18.7.89:5467";
+const MPP_API_BASE_URL = "http://172.18.7.89:5467";
+const WS_URL = "ws://172.18.7.89:5467/production_monitoring/ws/live-status/";
 
 // Helper function to get authentication token
 const getAuthToken = () => {
@@ -165,26 +165,13 @@ const useOperatorStore = create((set, get) => ({
         } catch (error) {
           console.error('Error restoring job from localStorage:', error);
         }
-      } else if (get().inProgressJobs.length > 0) {
-        // Use in-progress job as default selection
-        const inProgressJob = get().inProgressJobs[0];
-        
+      } else {
+        // Do NOT auto-select any in-progress job as active
         set({
-          selectedJob: inProgressJob,
-          selectedOperation: inProgressJob,
-          jobSource: 'inprogress'
+          selectedJob: null,
+          selectedOperation: null,
+          jobSource: null
         });
-        
-        // Fetch detailed job data
-        await get().fetchJobDetails(inProgressJob.production_order);
-        
-        // Fetch job documents
-        await get().fetchJobDocuments(inProgressJob.part_number);
-        
-        // Fetch production stats
-        if (inProgressJob?.operation_id) {
-          await get().fetchProductionStats(inProgressJob.operation_id);
-        }
       }
     } catch (error) {
       console.error('Error initializing dashboard:', error);

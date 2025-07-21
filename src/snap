@@ -21,7 +21,7 @@ src/
 └── store/
     └── inventory-store.js
 
-    const BASE_URL = 'http://172.16.0.203:8002/api/v1/api/inventory';
+    const BASE_URL = 'http://172.18.7.89:5467/api/v1/api/inventory';
 
     const getAuthHeaders = () => ({
         headers: {

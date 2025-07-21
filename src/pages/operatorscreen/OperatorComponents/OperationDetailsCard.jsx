@@ -90,17 +90,14 @@ const OperationDetailsCard = () => {
     const selectedOpId = selectedOperation ? (selectedOperation.operation_id || selectedOperation.id) : null;
     
     if (selectedOpId && recordId === selectedOpId) {
-      if (jobSource === 'inprogress') {
+      if (jobSource === 'custom' || jobSource === 'user-selected') {
         return <Tag color="success" className="px-2 py-1 text-base font-medium">Active</Tag>;
       }
       return <Tag color="blue" className="px-2 py-1 text-base font-medium">Selected</Tag>;
     }
     
     // If this is the current active operation in an in-progress job
-    if (jobSource === 'inprogress' && 
-        selectedJob?.operation_id === recordId) {
-      return <Tag color="success" className="px-2 py-1 text-base font-medium">Active</Tag>;
-    }
+    // (Removed: do not show as active just because it's in inprogress)
     
     // Show can_log status if available
     if (record.can_log === false) {
@@ -485,7 +482,7 @@ const OperationDetailsCard = () => {
                       jobSource === 'inprogress' ? "bg-green-500" : "bg-sky-500"
                     }
                   >
-                    {jobSource === 'inprogress' ? 'Active' : 'Activate'}
+                    {jobSource === 'custom' || jobSource === 'user-selected' ? 'Active' : 'Activate'}
                   </Button>
                 </div>
               </div>

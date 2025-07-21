@@ -38,12 +38,11 @@ const CurrentJobCard = () => {
   // Get job source tag
   const getJobSourceTag = () => {
     switch (jobSource) {
-      case 'inprogress':
-        return <Tag color="success">In Progress</Tag>;
+      case 'custom':
+      case 'user-selected':
+        return <Tag color="success">Active</Tag>;
       case 'scheduled':
         return <Tag color="processing">Scheduled</Tag>;
-      case 'custom':
-        return <Tag color="purple">Custom Selected</Tag>;
       default:
         return <Tag>Not Selected</Tag>;
     }

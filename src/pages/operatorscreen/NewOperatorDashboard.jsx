@@ -42,7 +42,8 @@ const NewOperatorDashboard = () => {
     isJobSelectionModalVisible,
     setJobSelectionModalVisible,
     fetchMachineOperations,
-    machineId
+    machineId,
+    closeWebSocket // <-- Add this from the store
   } = useOperatorStore();
 
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleString());
@@ -58,10 +59,18 @@ const NewOperatorDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Initialize dashboard and clean up WebSocket on unmount
   useEffect(() => {
-    // Initialize the dashboard on component mount
+    console.log("NewOperatorDashboard: mount/initializeDashboard");
     initializeDashboard();
-  }, [initializeDashboard]);
+    return () => {
+      console.log("NewOperatorDashboard: unmount/closeWebSocket");
+      // Clean up WebSocket connection when component unmounts
+      if (typeof closeWebSocket === 'function') {
+        closeWebSocket();
+      }
+    };
+  }, []); // Only run on mount/unmount
 
   // Handle manual refresh
   const handleRefresh = async () => {

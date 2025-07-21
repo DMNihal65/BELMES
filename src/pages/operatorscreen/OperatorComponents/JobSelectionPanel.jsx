@@ -533,19 +533,7 @@ const JobSelectionPanel = ({ visible, onClose }) => {
           onChange={setActiveTab}
           className="px-4 pt-4"
         >
-          <TabPane
-            tab={
-              <span className="flex items-center gap-2">
-                <CheckCircle2 size={16} />
-                In Progress
-              </span>
-            }
-            key="inprogress"
-          >
-            <div className="p-4 pt-0">
-              {renderInProgressJobs()}
-            </div>
-          </TabPane>
+          
           
           <TabPane
             tab={

@@ -28,6 +28,20 @@ const VIEW_MODES = {
   }
 };
 
+const MACHINE_COLORS = [
+  '#10B981', // green
+  '#3B82F6', // blue
+  '#F59E42', // orange
+  '#EF4444', // red
+  '#A78BFA', // purple
+  '#FBBF24', // yellow
+  '#6366F1', // indigo
+  '#EC4899', // pink
+  '#22D3EE', // cyan
+  '#6EE7B7', // teal
+  // ...add more if needed
+];
+
 const SimpleGanttChart = ({ 
   data = [],
   machines = [],
@@ -104,12 +118,24 @@ const SimpleGanttChart = ({
       if (data.length === 0) return;
 
       const uniqueMachines = [...new Set(data.map(item => item.machine))].sort();
-      const groups = uniqueMachines.map(machine => ({
-        id: machine,
-        content: `<div class="machine-group">
-          <span class="machine-name">${machine}</span>
-        </div>`
-      }));
+      // Create color dots HTML for all machines
+      const colorDotsHtml = machines.map(m =>
+        `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${machineColorMap[m]};margin-right:2px;"></span>`
+      ).join('');
+      const groups = [];
+      uniqueMachines.forEach(machine => {
+        const singleDot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${machineColorMap[machine]};margin-right:6px;"></span>`;
+        groups.push(
+          {
+            id: `${machine}-scheduled`,
+            content: `<div class="machine-group">${colorDotsHtml}<span class="machine-name" style="color: ${machineColorMap[machine]}; font-weight: 600; margin-left: 8px;">${machine} (Scheduled)</span></div>`
+          },
+          {
+            id: `${machine}-production`,
+            content: `<div class="machine-group">${colorDotsHtml}<span class="machine-name" style="color: ${machineColorMap[machine]}; font-weight: 600; margin-left: 8px;">${machine} (Production)</span></div>`
+          }
+        );
+      });
 
       const items = data.map((item, index) => {
         const startTime = dayjs(item.start_time).toDate();
@@ -117,7 +143,7 @@ const SimpleGanttChart = ({
 
         return {
           id: item.id || `item-${index}`,
-          group: item.machine,
+          group: `${item.machine}-${item.type}`,
           content: `
             <div class="timeline-item ${item.type}-item">
               <div class="item-content">
@@ -142,6 +168,7 @@ const SimpleGanttChart = ({
           `,
           start: startTime,
           end: endTime,
+          subgroup: item.type, // 'scheduled' or 'production'
           className: `${item.type}-item`
         };
       });
@@ -161,6 +188,12 @@ const SimpleGanttChart = ({
           scale: VIEW_MODES[viewMode].scale, 
           step: VIEW_MODES[viewMode].step 
         },
+        subgroupOrder: (a, b) => {
+          // Always put 'scheduled' above 'production'
+          if (a.subgroup === 'scheduled' && b.subgroup === 'production') return -1;
+          if (a.subgroup === 'production' && b.subgroup === 'scheduled') return 1;
+          return 0;
+        },
         tooltip: {
           followMouse: true,
           overflowMethod: 'cap'
@@ -178,6 +211,11 @@ const SimpleGanttChart = ({
   const handleZoomOut = () => timelineRef.current?.zoomOut(0.5);
   const handleFit = () => timelineRef.current?.fit();
 
+  const machineColorMap = {};
+  machines.forEach((machine, idx) => {
+    machineColorMap[machine] = MACHINE_COLORS[idx % MACHINE_COLORS.length];
+  });
+
   return (
     <div className="gantt-chart">
       <div className="gantt-controls">
@@ -186,10 +224,27 @@ const SimpleGanttChart = ({
             <Select
               value={selectedMachine}
               onChange={onMachineChange}
-              style={{ width: 200 }}
+              style={{ width: 300 }}
               options={[
                 { value: 'all', label: 'All Machines' },
-                ...machines.map(m => ({ value: m, label: m }))
+                ...machines.map((m, idx) => ({
+                  value: m,
+                  label: (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          backgroundColor: machineColorMap[m],
+                          marginRight: 6,
+                        }}
+                      />
+                      <span style={{ color: machineColorMap[m], fontWeight: 500 }}>{m}</span>
+                    </span>
+                  ),
+                }))
               ]}
               placeholder="Select Machine"
               disabled={isLoading}
@@ -311,7 +366,19 @@ const SimpleGanttChart = ({
           <Spin size="large" tip="Loading data..." />
         </div>
       ) : data.length > 0 ? (
-        <div ref={containerRef} className="timeline-container" />
+        <>
+          {selectedMachine && selectedMachine !== 'all' && (
+            <div style={{
+              fontWeight: 600,
+              fontSize: 18,
+              margin: '16px 0 0 8px',
+              color: machineColorMap[selectedMachine]
+            }}>
+              {selectedMachine}
+            </div>
+          )}
+          <div ref={containerRef} className="timeline-container" />
+        </>
       ) : (
         <Empty description="No data available" className="py-20" />
       )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Select, Card, Spin, Alert, Row, Col, Typography, Descriptions, Table, Tag, Progress, Button, Statistic, Space } from 'antd';
+import { Select, Card, Spin, Alert, Row, Col, Typography, Descriptions, Table, Tag, Progress, Button, Statistic, Space, Modal, Form, InputNumber, DatePicker, Input, message } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
@@ -12,6 +12,10 @@ const OrderTracking = () => {
   const [operationStatus, setOperationStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateOperation, setUpdateOperation] = useState(null);
+  const [updateForm] = Form.useForm();
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -28,6 +32,19 @@ const OrderTracking = () => {
 
   useEffect(() => {
     fetchOrders();
+  }, []);
+
+  // fetch active users for operator dropdown
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await axios.get('http://172.18.7.91:8008/api/v1/auth/api/v1/auth/users-get?active_only=true');
+        setUsers(res.data);
+      } catch (err) {
+        console.error('Failed to fetch users', err);
+      }
+    };
+    fetchUsers();
   }, []);
 
   const handleOrderSelect = async (value) => {
@@ -53,6 +70,39 @@ const OrderTracking = () => {
     setLoading(false);
   };
 
+  const openUpdateModal = (record) => {
+    setUpdateOperation(record);
+    updateForm.resetFields();
+    setShowUpdateModal(true);
+  };
+
+  const handleUpdateSubmit = async () => {
+    try {
+      const values = await updateForm.validateFields();
+      const payload = {
+        operation_id: updateOperation.operation_id || updateOperation.id,
+        operator_id: values.operator_id,
+        quantity_completed: values.quantity_completed,
+        quantity_rejected: values.quantity_rejected,
+        start_time: values.start_time.toISOString(),
+        end_time: values.end_time.toISOString(),
+        notes: values.notes || '',
+        machine_id: values.machine_id || null,
+      };
+      await axios.post('http://172.18.7.89:5467/api/v1/operatorlogs2/operator-log', payload);
+      message.success('Quantity updated successfully');
+      setShowUpdateModal(false);
+      // refresh
+      if (selectedOrder) {
+        handleOrderSelect(selectedOrder.production_order);
+      }
+    } catch (err) {
+      if (err?.errorFields) return; // validation errors
+      console.error(err);
+      message.error(err.message || 'Failed to update');
+    }
+  };
+
   const columns = [
     { title: 'Operation No', dataIndex: 'operation_number', key: 'operation_number', sorter: (a, b) => a.operation_number - b.operation_number, },
     { title: 'Description', dataIndex: 'description', key: 'description' },
@@ -70,6 +120,16 @@ const OrderTracking = () => {
     { title: 'Completed Qty', dataIndex: 'completed_quantity', key: 'completed_quantity' },
     { title: 'Rejected Qty', dataIndex: 'rejected_quantity', key: 'rejected_quantity' },
     { title: 'Required Qty', dataIndex: 'required_quantity', key: 'required_quantity' },
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_, record) =>
+        record.completed_quantity < record.required_quantity ? (
+          <Button type="link" size="small" onClick={() => openUpdateModal(record)}>
+            Update
+          </Button>
+        ) : null,
+    },
   ];
 
   // Aggregated statistics for quick insight
@@ -77,9 +137,9 @@ const OrderTracking = () => {
   const completedOps = operationStatus?.operations?.filter(op => op.is_complete).length || 0;
   const overallPercent = operationStatus ? (operationStatus.completion_percentage ?? Math.round((completedOps / totalOps) * 100)) : 0;
 
-  return (
+  return (<>
     <div style={{ padding: '24px' }}>
-      <Title level={2}>Order Tracking</Title>
+      <Title level={2}>Order Tracking (BETA)</Title>
       <Card
         style={{ marginBottom: 24 }}
         title="Select Production Order"
@@ -149,8 +209,45 @@ const OrderTracking = () => {
           </Card>
         )}
       </Spin>
+    {/* Update Quantity Modal */}
+      <Modal
+        title="Update Quantity"
+        open={showUpdateModal}
+        onOk={handleUpdateSubmit}
+        onCancel={() => setShowUpdateModal(false)}
+        okText="Submit"
+        destroyOnClose
+      >
+        <Form form={updateForm} layout="vertical">
+          <Form.Item name="operator_id" label="Operator" rules={[{ required: true, message: 'Please select operator' }]}> 
+            <Select placeholder="Select operator">
+              {users.map(u => (
+                <Select.Option key={u.id} value={u.id}>{u.username}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="quantity_completed" label="Quantity Completed" rules={[{ required: true, type: 'number', min: 1 }]}> 
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="quantity_rejected" label="Quantity Rejected" rules={[{ required: true, type: 'number', min: 0 }]}> 
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="start_time" label="Start Time" rules={[{ required: true }]}> 
+            <DatePicker showTime style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="end_time" label="End Time" rules={[{ required: true }]}> 
+            <DatePicker showTime style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="machine_id" label="Machine ID (optional)"> 
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="notes" label="Notes">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
-  );
+  </> );
 };
 
 export default OrderTracking;

@@ -201,9 +201,19 @@ function Sidebar() {
           label: 'OEE Overview',
         },
         {
+          key: '/supervisor/production-monitoring/oee-overview',
+          icon: <Gauge size={18} />,
+          label: 'OEE Overview',
+        },
+        {
           key: '/supervisor/production-monitoring/analytics',
           icon: <LineChart size={18} />,
           label: 'Analytics',
+        },
+        {
+          key: '/supervisor/production-monitoring/order-tracking',
+          icon: <LineChart size={18} />,
+          label: 'Order Tracking',
         },
         {
           key: '/supervisor/pokayoke',
@@ -428,6 +438,11 @@ function Sidebar() {
           key: '/admin/production-monitoring/analytics',
           icon: <LineChart size={18} />,
           label: 'Analytics',
+        },
+        {
+          key: '/admin/production-monitoring/order-tracking',
+          icon: <LineChart size={18} />,
+          label: 'Order Tracking',
         },
         {
           key: '/supervisor/pokayoke',

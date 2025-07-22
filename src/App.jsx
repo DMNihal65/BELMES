@@ -78,6 +78,7 @@ const App = () => {
             <Route path="production-monitoring/production-vs-actual" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/order-analysis" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/oee-overview" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-tracking" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/analytics" element={<ProductionMonitoring />} />
 
             <Route path="machine_availability" element={<MachineMaintenance />}/> 
@@ -123,6 +124,7 @@ const App = () => {
             <Route path="production-monitoring/order-analysis" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/oee-overview" element={<ProductionMonitoring />} />
             <Route path="production-monitoring/analytics" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-tracking" element={<ProductionMonitoring />} />
 
             <Route path="machine_availability" element={<MachineMaintenance />}/> 
             <Route path="documents" element={<DocumentManagement />} />

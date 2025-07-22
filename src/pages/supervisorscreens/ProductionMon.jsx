@@ -7,6 +7,7 @@ import ProductionAnalytics from '../../components/ProductionMonitoring/Productio
 import OEEDashboard from '../../components/ProductionMonitoring/OEEDashboard';
 import ProductionOrderAnalysis from '../../components/ProductionMonitoring/ProductionOrderAnalysis';
 import useProductionStore from '../../store/productionStore';
+import OrderTracking from '../../components/ProductionMonitoring/OrderTracking';
 
 const { Content } = Layout;
 
@@ -36,6 +37,8 @@ const ProductionMon = () => {
         return <ProductionAnalytics />;
       case '/supervisor/production-monitoring/oee-overview':
         return <OEEDashboard />;
+        case '/supervisor/production-monitoring/order-tracking':
+        return <OrderTracking />;
       
         case '/admin/production-monitoring/dashboard':
           return <MachineDashboard />;
@@ -47,6 +50,8 @@ const ProductionMon = () => {
           return <ProductionAnalytics />;
         case '/admin/production-monitoring/oee-overview':
           return <OEEDashboard />;
+          case '/admin/production-monitoring/order-tracking':
+            return <OrderTracking />;
       default:
         return <MachineDashboard />; // Default to machine dashboard
     }

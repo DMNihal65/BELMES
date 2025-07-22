@@ -79,6 +79,11 @@ const useOperatorStore = create((set, get) => ({
   selectedJob: null,
   selectedOperation: null,
   jobSource: null, // 'inprogress', 'scheduled', or 'custom'
+
+  setSelectedJob: (job) => set({ selectedJob: job }),
+  setSelectedOperation: (operation) => set({ selectedOperation: operation }),
+  setJobSource: (source) => set({ jobSource: source }),
+
   
   // Job lists
   availableJobs: [],
@@ -111,9 +116,24 @@ const useOperatorStore = create((set, get) => ({
   
   // Initialize dashboard
   initializeDashboard: async () => {
-    set({ isInitializing: true, error: null });
+    set({ 
+      isInitializing: true, 
+      error: null,
+      // Reset all job-related state on initialization
+      selectedJob: null,
+      selectedOperation: null,
+      jobSource: null,
+      inProgressJobs: [],
+      scheduledJobs: [],
+      availableJobs: []
+    });
     
     try {
+      // Clear any stale job data first
+      localStorage.removeItem('jobSource');
+      localStorage.removeItem('currentJobData');
+      localStorage.removeItem('activeOperation');
+      
       // 1. Get machine ID from localStorage
       const storedMachine = localStorage.getItem('currentMachine');
       if (!storedMachine) {
@@ -135,44 +155,13 @@ const useOperatorStore = create((set, get) => ({
       // 3. Fetch machine operations
       await get().fetchMachineOperations(machineId);
       
-      // 4. Check if there's a previously selected job in localStorage
-      const jobSource = localStorage.getItem('jobSource');
-      const storedJobData = localStorage.getItem('currentJobData');
-      const storedOperation = localStorage.getItem('activeOperation');
+      // 4. Reset selection state
+      set({
+        selectedJob: null,
+        selectedOperation: null,
+        jobSource: null
+      });
       
-      if (jobSource === 'user-selected' && storedJobData && storedOperation) {
-        // Restore previously selected job
-        try {
-          const parsedJobData = JSON.parse(storedJobData);
-          const parsedOperation = JSON.parse(storedOperation);
-          
-          set({
-            selectedJob: parsedJobData,
-            selectedOperation: parsedOperation,
-            jobSource: 'custom'
-          });
-          
-          // Fetch detailed job data
-          await get().fetchJobDetails(parsedJobData.production_order);
-          
-          // Fetch job documents
-          await get().fetchJobDocuments(parsedJobData.part_number);
-          
-          // Fetch production stats
-          if (parsedOperation?.id) {
-            await get().fetchProductionStats(parsedOperation.id);
-          }
-        } catch (error) {
-          console.error('Error restoring job from localStorage:', error);
-        }
-      } else {
-        // Do NOT auto-select any in-progress job as active
-        set({
-          selectedJob: null,
-          selectedOperation: null,
-          jobSource: null
-        });
-      }
     } catch (error) {
       console.error('Error initializing dashboard:', error);
       set({ error: error.message });
@@ -338,16 +327,24 @@ const useOperatorStore = create((set, get) => ({
   fetchJobDetails: async (productionOrder) => {
     try {
       set({ isLoadingJobs: true });
-      
-      const response = await fetch(`${MPP_API_BASE_URL}/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`, {
+
+      const currentMachine = JSON.parse(localStorage.getItem('currentMachine'));
+      const work_center_id = currentMachine?.work_center_id;      
+
+      const response = await fetch(`${MPP_API_BASE_URL}/api/v1/operatorlogs2/production-order-operations-status/${work_center_id}/${productionOrder}`, {
         headers: createAuthHeaders()
       });
+
+      const jobDetails = await response.json();
+      
       
       if (!response.ok) {
-        throw new Error('Failed to fetch job details');
-      }
+            const errorMessage =
+            jobDetails?.detail || 'Failed to fetch job details';
+            throw new Error(errorMessage);
+          }
       
-      const jobDetails = await response.json();
+
       
       if (jobDetails && jobDetails.operations) {
         // Filter operations where work_center_schedulable is true
@@ -429,17 +426,6 @@ const useOperatorStore = create((set, get) => ({
         throw new Error('Machine ID not found');
       }
       
-      // Check if there's an active job that needs to be deactivated first
-      const hasActiveJob = get().inProgressJobs.length > 0;
-      
-      if (hasActiveJob) {
-        const deactivateResult = await get().deactivateJob();
-        
-        if (!deactivateResult.success) {
-          throw new Error('Failed to deactivate current job');
-        }
-      }
-      
       // Activate the new job
       const activateResponse = await fetch(`${API_BASE_URL}/api/v1/logs/machine-raw-live/`, {
         method: 'POST',
@@ -481,35 +467,44 @@ const useOperatorStore = create((set, get) => ({
       set({ isActivatingJob: false, jobActionType: null });
     }
   },
+
   
   // Deactivate current job
   deactivateJob: async () => {
     try {
+      console.log('deactivateJob called'); // Debug log
       set({ isDeactivatingJob: true, jobActionType: 'deactivate' });
-      
+  
       const machineId = get().machineId;
-      
+      console.log('Machine ID:', machineId); // Debug log
+  
       if (!machineId) {
         throw new Error('Machine ID not found');
       }
-      
+  
       // Find the active operation ID
       let operationId = 0;
-      
-      // First check if there's an active operation in inProgressJobs
-      if (get().inProgressJobs.length > 0) {
-        operationId = get().inProgressJobs[0].operation_id;
-      } 
-      // If selectedOperation exists
-      else if (get().selectedOperation) {
-        operationId = get().selectedOperation.operation_id || get().selectedOperation.id;
+  
+      const activeOperation = localStorage.getItem('activeOperation');
+      if (activeOperation) {
+      try {
+        const parsedOperation = JSON.parse(activeOperation);
+        operationId = parsedOperation.operation_id || parsedOperation.id;
+        console.log('Operation ID from localStorage:', operationId);
+      } catch (error) {
+        console.error('Error parsing activeOperation from localStorage:', error);
+        throw new Error('Invalid operation data in localStorage');
       }
-      
+    }
+  
+      // If no active operation, just return success
       if (!operationId) {
-        throw new Error('No active operation found to deactivate');
+        console.log('No operationId found, returning success'); // Debug log
+        return { success: true };
       }
-      
-      // Deactivate the job
+  
+      // Deactivate the job in the database
+      console.log('Sending deactivate request:', { machine_id: machineId, operation_id: operationId }); // Debug log
       const response = await fetch(`${API_BASE_URL}/api/v1/logs/machine-raw-live-deactive/`, {
         method: 'POST',
         headers: createAuthHeaders(),
@@ -518,28 +513,41 @@ const useOperatorStore = create((set, get) => ({
           operation_id: operationId
         })
       });
-      
+  
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Deactivate API failed:', errorData); // Debug log
         throw new Error(errorData.detail?.message || errorData.detail || 'Failed to deactivate job');
       }
-      
-      const responseData = await response.json();
-      
-      message.success('Job deactivated successfully');
-      
-      // Reset the job source
+  
+      // Database update successful, now clear localStorage
+      console.log('Deactivate API successful, clearing localStorage'); // Debug log
       localStorage.removeItem('jobSource');
-      
+      localStorage.removeItem('currentJobData');
+      localStorage.removeItem('activeOperation');
+  
+      // Reset all job-related state
+      set({
+        selectedJob: null,
+        selectedOperation: null,
+        jobSource: null,
+        inProgressJobs: []
+      });
+  
+      console.log('shashank Job deactivated successfully'); // Existing log
+      message.success('Job deactivated successfully');
+  
       // Refresh machine operations
+      console.log('Refreshing machine operations'); // Debug log
       await get().fetchMachineOperations(machineId, true);
-      
+  
       return { success: true };
     } catch (error) {
-      console.error('Error deactivating job:', error);
+      console.error('Error deactivating job:', error); // Existing log
       message.error(`Failed to deactivate job: ${error.message}`);
       return { success: false, error: error.message };
     } finally {
+      console.log('deactivateJob completed'); // Debug log
       set({ isDeactivatingJob: false, jobActionType: null });
     }
   },

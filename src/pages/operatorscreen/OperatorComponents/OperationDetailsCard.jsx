@@ -190,6 +190,10 @@ const OperationDetailsCard = () => {
       render: (_, record) => {
         const recordId = record.operation_id || record.id;
         const selectedOpId = selectedOperation ? (selectedOperation.operation_id || selectedOperation.id) : null;
+        const isSelectable = !(
+          record.completed_quantity === record.required_quantity || 
+          record.can_log === false
+        );
         
         return (
           <Space size="middle" wrap>
@@ -200,6 +204,7 @@ const OperationDetailsCard = () => {
               onClick={() => selectOperation(record)}
               size="middle"
               className={selectedOpId && recordId === selectedOpId ? "bg-sky-50" : ""}
+              disabled={!isSelectable} // Disable if not selectable
             >
               View
             </Button>
@@ -209,6 +214,7 @@ const OperationDetailsCard = () => {
               onClick={() => handleViewMpp(record)}
               size="middle"
               className="border-sky-300 text-sky-600"
+              disabled={!isSelectable} // Disable if not selectable
             >
               MPP
             </Button>
@@ -217,10 +223,10 @@ const OperationDetailsCard = () => {
               icon={<Zap size={16} />}
               onClick={() => showActivateConfirmation(record)}
               disabled={
+                !isSelectable ||
                 (jobSource === 'inprogress' && 
-                selectedOpId && 
-                recordId === selectedOpId) ||
-                record.can_log === false
+                  selectedOpId && 
+                  recordId === selectedOpId)
               }
               size="middle"
               className={
@@ -505,10 +511,24 @@ const OperationDetailsCard = () => {
               className="operations-table"
               size="large"
               scroll={{ y: 350 }}
-              onRow={(record) => ({
-                onClick: () => selectOperation(record),
-                className: 'cursor-pointer hover:bg-gray-50'
-              })}
+              onRow={(record) => {
+                // Check if the row is selectable
+                const isSelectable = !(
+                  record.completed_quantity === record.required_quantity || 
+                  record.can_log === false
+                );
+            
+                return {
+                  onClick: () => {
+                    if (isSelectable) {
+                      selectOperation(record); // Only select if the conditions are not met
+                    }
+                  },
+                  className: isSelectable 
+                    ? 'cursor-pointer hover:bg-gray-50' 
+                    : 'cursor-not-allowed bg-gray-100', // Visual feedback for non-selectable rows
+                };
+              }}
             />
           </>
         )}
@@ -580,6 +600,15 @@ const OperationDetailsCard = () => {
         
         .operations-table .operation-row.bg-sky-50 {
           background-color: #f0f9ff;
+        }
+        
+        .operations-table .operation-row.cursor-not-allowed {
+          background-color: #f5f5f5 !important; /* Slightly darker gray for disabled rows */
+          opacity: 0.7; /* Reduce opacity to indicate disabled state */
+        }
+        
+        .operations-table .operation-row.cursor-not-allowed:hover {
+          background-color: #f5f5f5 !important; /* Prevent hover effect on disabled rows */
         }
         
         .operations-table .ant-table-row:hover {

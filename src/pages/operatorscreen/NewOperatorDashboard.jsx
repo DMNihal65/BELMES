@@ -50,6 +50,7 @@ const NewOperatorDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [showPokaYoke, setShowPokaYoke] = useState(false);
+  const [showError, setShowError] = useState(false);
 
   // Update clock
   useEffect(() => {
@@ -58,6 +59,18 @@ const NewOperatorDashboard = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (error) {
+      setShowError(true);
+      const timer = setTimeout(() => {
+        setShowError(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+  
+
 
   // Initialize dashboard and clean up WebSocket on unmount
   useEffect(() => {
@@ -213,7 +226,7 @@ const NewOperatorDashboard = () => {
 
       {/* Main Dashboard Content */}
       <Content className="p-3 overflow-auto">
-        {error && (
+        { showError && error && (
           <div className="mb-3">
             <Card className="bg-red-50 border-red-200 shadow-sm">
               <div className="flex items-center gap-2 text-red-700">

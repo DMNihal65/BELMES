@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Drawer, Tabs, List, Card, Button, Empty, Spin, Tag, 
-  Radio, Select, Space, Alert, Modal, Tooltip 
+  Radio, Select, Space, Alert, Modal, Tooltip, message
 } from 'antd';
 import { 
   CheckCircle2,  Clock, Calendar, 
@@ -33,7 +33,7 @@ const JobSelectionPanel = ({ visible, onClose }) => {
     machineId
   } = useOperatorStore();
 
-  const [activeTab, setActiveTab] = useState('inprogress');
+  const [activeTab, setActiveTab] = useState('custom');
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmationAction, setConfirmationAction] = useState(null);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -41,18 +41,10 @@ const JobSelectionPanel = ({ visible, onClose }) => {
   const [filterKeyword, setFilterKeyword] = useState('');
   const [filterPriority, setFilterPriority] = useState(null);
 
-  // Initialize the component
-  useEffect(() => {
-    // Set inprogress tab as active if there are in-progress jobs
-    if (inProgressJobs && inProgressJobs.length > 0) {
-      setActiveTab('inprogress');
-    } else if (scheduledJobs && scheduledJobs.length > 0) {
-      setActiveTab('scheduled');
-    }
-    
-    // Initialize filtered jobs list
-    setFilteredJobs(availableJobs);
-  }, [inProgressJobs, scheduledJobs, availableJobs]);
+useEffect(() => {
+  setActiveTab('custom'); // Always open on custom jobs tab
+  setFilteredJobs(availableJobs); // Still update available jobs filter
+}, [availableJobs]);
 
   // Filter jobs when filter criteria change
   useEffect(() => {
@@ -87,213 +79,55 @@ const JobSelectionPanel = ({ visible, onClose }) => {
 
   // Handle job activation
   const handleActivateJob = () => {
-    if (!selectedOperation) return;
-    
-    const operationId = selectedOperation.operation_id || selectedOperation.id;
-    
-    if (operationId) {
-      setShowConfirmationModal(true);
-      setConfirmationAction('activate');
+    if (!selectedOperation) {
+      message.warning('Please select an operation first');
+      return;
     }
+    
+    if (inProgressJobs && inProgressJobs.length > 0) {
+      message.warning('Please deactivate the current job first');
+      return;
+    }
+
+    setShowConfirmationModal(true);
+    setConfirmationAction('activate');
   };
 
   // Handle job deactivation
   const handleDeactivateJob = () => {
+    if (!inProgressJobs || inProgressJobs.length === 0) {
+      message.warning('No active job to deactivate');
+      return;
+    }
+
     setShowConfirmationModal(true);
     setConfirmationAction('deactivate');
   };
 
   // Confirm action
   const handleConfirmAction = async () => {
-    if (confirmationAction === 'activate' && selectedOperation) {
-      const operationId = selectedOperation.operation_id || selectedOperation.id;
-      await activateJob(operationId);
-    } else if (confirmationAction === 'deactivate') {
-      await deactivateJob();
+    try {
+      if (confirmationAction === 'activate' && selectedOperation) {
+        const operationId = selectedOperation.operation_id || selectedOperation.id;
+        const result = await activateJob(operationId);
+        if (result.success) {
+          message.success('Job activated successfully');
+          onClose();
+        }
+      } else if (confirmationAction === 'deactivate') {
+        const result = await deactivateJob();
+        if (result.success) {
+          message.success('Job deactivated successfully');
+          onClose();
+        }
+      }
+    } catch (error) {
+      message.error(error.message || 'Operation failed');
+    } finally {
+      setShowConfirmationModal(false);
     }
-    
-    setShowConfirmationModal(false);
   };
 
-  // Render in-progress jobs
-  const renderInProgressJobs = () => {
-    if (isLoadingJobs) {
-      return (
-        <div className="flex justify-center items-center py-12">
-          <Spin size="large" tip="Loading in-progress jobs..." />
-        </div>
-      );
-    }
-
-    if (!inProgressJobs || inProgressJobs.length === 0) {
-      return (
-        <Empty 
-          description="No jobs currently in progress" 
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
-      );
-    }
-
-    return (
-      <List
-        dataSource={inProgressJobs}
-        renderItem={(job) => (
-          <List.Item>
-            <Card 
-              className="w-full cursor-pointer hover:shadow-md transition-all"
-              onClick={() => {
-                selectJob(job);
-                if (job.operation_id) {
-                  handleSelectOperation({
-                    id: job.operation_id,
-                    operation_number: job.operation_number,
-                    operation_description: job.description,
-                    work_center: job.work_center
-                  });
-                }
-                if (job.production_order) {
-                  fetchJobDetails(job.production_order);
-                }
-              }}
-              style={{ borderLeft: selectedJob?.part_number === job.part_number ? '4px solid #1890ff' : 'none' }}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <div className="text-lg font-semibold">{job.part_number}</div>
-                  <div className="text-gray-500">{job.part_description}</div>
-                </div>
-                <Tag color="success" className="flex items-center gap-1">
-                  <Clock size={12} />
-                  <span>In Progress</span>
-                </Tag>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div>
-                  <div className="text-xs text-gray-500">Production Order</div>
-                  <div className="font-medium">{job.production_order}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Operation</div>
-                  <div className="font-medium">OP{job.operation_number}</div>
-                </div>
-              </div>
-              
-              <div className="text-xs text-gray-500 mb-1">Operation Description</div>
-              <div className="text-sm">{job.description}</div>
-              
-              {job.schedule_info && (
-                <div className="mt-3 grid grid-cols-2 gap-2 bg-gray-50 p-2 rounded">
-                  <div>
-                    <div className="text-xs text-gray-500">Start</div>
-                    <div className="text-xs">
-                      {new Date(job.schedule_info.planned_start_time).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">End</div>
-                    <div className="text-xs">
-                      {new Date(job.schedule_info.planned_end_time).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </List.Item>
-        )}
-      />
-    );
-  };
-
-  // Render scheduled jobs
-  const renderScheduledJobs = () => {
-    if (isLoadingJobs) {
-      return (
-        <div className="flex justify-center items-center py-12">
-          <Spin size="large" tip="Loading scheduled jobs..." />
-        </div>
-      );
-    }
-
-    if (!scheduledJobs || scheduledJobs.length === 0) {
-      return (
-        <Empty 
-          description="No scheduled jobs found" 
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
-      );
-    }
-
-    return (
-      <List
-        dataSource={scheduledJobs}
-        renderItem={(job) => (
-          <List.Item>
-            <Card 
-              className="w-full cursor-pointer hover:shadow-md transition-all"
-              onClick={() => {
-                selectJob(job);
-                if (job.operation_id) {
-                  handleSelectOperation({
-                    id: job.operation_id,
-                    operation_number: job.operation_number,
-                    operation_description: job.description,
-                    work_center: job.work_center
-                  });
-                }
-                if (job.production_order) {
-                  fetchJobDetails(job.production_order);
-                }
-              }}
-              style={{ borderLeft: selectedJob?.part_number === job.part_number ? '4px solid #1890ff' : 'none' }}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <div className="text-lg font-semibold">{job.part_number}</div>
-                  <div className="text-gray-500">{job.part_description}</div>
-                </div>
-                <Tag color="processing" className="flex items-center gap-1">
-                  <Calendar size={12} />
-                  <span>Scheduled</span>
-                </Tag>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div>
-                  <div className="text-xs text-gray-500">Production Order</div>
-                  <div className="font-medium">{job.production_order}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Operation</div>
-                  <div className="font-medium">OP{job.operation_number}</div>
-                </div>
-              </div>
-              
-              <div className="text-xs text-gray-500 mb-1">Operation Description</div>
-              <div className="text-sm">{job.description}</div>
-              
-              {job.schedule_info && (
-                <div className="mt-3 grid grid-cols-2 gap-2 bg-gray-50 p-2 rounded">
-                  <div>
-                    <div className="text-xs text-gray-500">Start</div>
-                    <div className="text-xs">
-                      {new Date(job.schedule_info.planned_start_time).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">End</div>
-                    <div className="text-xs">
-                      {new Date(job.schedule_info.planned_end_time).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </List.Item>
-        )}
-      />
-    );
-  };
 
   // Render custom jobs
   const renderCustomJobs = () => {
@@ -304,7 +138,7 @@ const JobSelectionPanel = ({ visible, onClose }) => {
         </div>
       );
     }
-
+  
     if (!filteredJobs || filteredJobs.length === 0) {
       return (
         <Empty 
@@ -313,12 +147,24 @@ const JobSelectionPanel = ({ visible, onClose }) => {
         />
       );
     }
+  
+    // Create a Set of production_order values from scheduledJobs
+    const scheduledProductionOrders = new Set(scheduledJobs.map(job => job.production_order));
+  
+    // Sort filteredJobs to show scheduled jobs first
+    const sortedJobs = [...filteredJobs].sort((a, b) => {
+      const aIsScheduled = scheduledProductionOrders.has(a.production_order);
+      const bIsScheduled = scheduledProductionOrders.has(b.production_order);
+      return bIsScheduled - aIsScheduled; // true (1) comes before false (0)
+    });
 
+    const isJobSelectionDisabled = !!localStorage.getItem('currentJobData');
+  
     return (
       <>
         <div className="mb-4 flex justify-between items-center">
           <div className="text-sm font-medium">
-            {filteredJobs.length} jobs available
+            {sortedJobs.length} jobs available
           </div>
           <Button 
             icon={<ListFilter size={16} />} 
@@ -329,7 +175,7 @@ const JobSelectionPanel = ({ visible, onClose }) => {
             Filter
           </Button>
         </div>
-
+  
         {showFilterPanel && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-2 gap-3">
@@ -366,64 +212,88 @@ const JobSelectionPanel = ({ visible, onClose }) => {
             </div>
           </div>
         )}
-
+  
         <List
           grid={{ gutter: 16, column: 1 }}
-          dataSource={filteredJobs}
-          renderItem={(job) => (
-            <List.Item>
-              <Card 
-                className="w-full cursor-pointer hover:shadow-md transition-all"
-                onClick={() => {
-                  selectJob(job);
-                  if (job.production_order) {
-                    fetchJobDetails(job.production_order);
-                  }
-                }}
-                style={{ borderLeft: selectedJob?.id === job.id ? '4px solid #1890ff' : 'none' }}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <div className="text-lg font-semibold">{job.part_number}</div>
-                    <div className="text-gray-500">{job.part_description}</div>
+          dataSource={sortedJobs}
+          renderItem={(job) => {
+            // Check if the job's production_order is in scheduledJobs
+            const isScheduled = scheduledProductionOrders.has(job.production_order);
+  
+            return (
+              <List.Item>
+                  <Card 
+                  className={`w-full ${isJobSelectionDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-md transition-all'}`}
+                  onClick={() => {
+                    if (isJobSelectionDisabled) {
+                      message.warning('Cannot select a job while another job is active. Please deactivate the current job first.');
+                      return;
+                    }
+                    selectJob(job);
+                    if (job.production_order) {
+                      fetchJobDetails(job.production_order);
+                    }
+                  }}
+                  style={{
+                    borderLeft: selectedJob?.id === job.id
+                      ? '4px solid #1890ff'
+                      : isScheduled
+                        ? '4px solid #52c41a' // Green border for scheduled jobs
+                        : 'none',
+                    backgroundColor: isScheduled ? '#f6ffed' : 'white' // Light green background for scheduled jobs
+                  }}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="text-lg font-semibold">{job.part_number}</div>
+                      <div className="text-gray-500">{job.part_description}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isScheduled && (
+                        <Tag color="green" className="flex items-center gap-1">
+                          <Calendar size={12} />
+                          <span>Scheduled</span>
+                        </Tag>
+                      )}
+                      <Tag color={job.project?.priority <= 2 ? 'error' : 'blue'} className="flex items-center gap-1">
+                        <Bookmark size={12} />
+                        <span>Priority {job.project?.priority || 'N/A'}</span>
+                      </Tag>
+                    </div>
                   </div>
-                  <Tag color={job.project?.priority <= 2 ? 'error' : 'blue'} className="flex items-center gap-1">
-                    <Bookmark size={12} />
-                    <span>Priority {job.project?.priority || 'N/A'}</span>
-                  </Tag>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 mb-2">
-                  <div>
-                    <div className="text-xs text-gray-500">Production Order</div>
-                    <div className="font-medium">{job.production_order}</div>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <div className="text-xs text-gray-500">Production Order</div>
+                      <div className="font-medium">{job.production_order}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Total Operations</div>
+                      <div className="font-medium">{job.total_operations}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Total Operations</div>
-                    <div className="font-medium">{job.total_operations}</div>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <div className="text-xs text-gray-500">Required</div>
+                      <div className="font-medium">{job.required_quantity}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Launched</div>
+                      <div className="font-medium">{job.launched_quantity}</div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 mb-2">
-                  <div>
-                    <div className="text-xs text-gray-500">Required</div>
-                    <div className="font-medium">{job.required_quantity}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Launched</div>
-                    <div className="font-medium">{job.launched_quantity}</div>
-                  </div>
-                </div>
-                
-                {job.project?.delivery_date && (
-                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                    <Clock size={12} />
-                    <span>Delivery: {new Date(job.project.delivery_date).toLocaleDateString()}</span>
-                  </div>
-                )}
-              </Card>
-            </List.Item>
-          )}
+                  
+                  {job.project?.delivery_date && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                      <Clock size={12} />
+                      <span>Delivery: {new Date(job.project.delivery_date).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </Card>
+              </List.Item>
+            );
+          }}
         />
       </>
     );
@@ -504,25 +374,15 @@ const JobSelectionPanel = ({ visible, onClose }) => {
                 Cancel
               </Button>
               
-              {inProgressJobs && inProgressJobs.length > 0 && (
-                <Button 
-                  type="primary" 
-                  danger
-                  onClick={handleDeactivateJob}
-                  loading={isDeactivatingJob}
-                  disabled={!inProgressJobs || inProgressJobs.length === 0}
-                >
-                  Deactivate Job
-                </Button>
-              )}
-              
-              <Button
-                type="primary"
-                onClick={handleActivateJob}
-                disabled={!selectedOperation}
-                loading={isActivatingJob}
+              <Button 
+                type="primary" 
+                danger
+                onClick={handleDeactivateJob}
+                loading={isDeactivatingJob}
+                disabled={!localStorage.getItem('currentJobData')} // disable if localStorage item is not present
+                style={{ display: 'inline-flex' }}
               >
-                Activate Job
+                Deactivate Job
               </Button>
             </Space>
           </div>
@@ -534,26 +394,11 @@ const JobSelectionPanel = ({ visible, onClose }) => {
           className="px-4 pt-4"
         >
           
-          
-          <TabPane
-            tab={
-              <span className="flex items-center gap-2">
-                <ClockCircleFilled size={16} />
-                Scheduled
-              </span>
-            }
-            key="scheduled"
-          >
-            <div className="p-4 pt-0">
-              {renderScheduledJobs()}
-            </div>
-          </TabPane>
-          
           <TabPane
             tab={
               <span className="flex items-center gap-2">
                 <LayoutGrid size={16} />
-                Custom Jobs
+                Jobs
               </span>
             }
             key="custom"

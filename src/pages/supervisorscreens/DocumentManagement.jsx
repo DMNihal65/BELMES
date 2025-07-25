@@ -704,6 +704,14 @@ const DocumentManagement = () => {
                 >
                   Versions
                 </Menu.Item>
+                <Menu.Item 
+                  key="delete" 
+                  icon={<DeleteOutlined />}
+                  danger
+                  onClick={() => handleDeleteDocument(record)}
+                >
+                  Delete
+                </Menu.Item>
               </Menu>
             }
           >
@@ -744,6 +752,7 @@ const DocumentManagement = () => {
     downloadDocument,
     fetchDocumentVersions,
     deleteDocumentVersion, // Add this
+    deleteDocument, // Add document deletion function
     folders,
     columns,
     filteredDocuments,
@@ -797,6 +806,36 @@ const DocumentManagement = () => {
 
   // Add new state for versions
   const [documentVersions, setDocumentVersions] = useState({});
+  
+  // Add function to handle document deletion
+  const handleDeleteDocument = (document) => {
+    // Check if document has multiple versions
+    const hasMultipleVersions = document.versions && document.versions.length > 1;
+    
+    Modal.confirm({
+      title: 'Delete Document',
+      content: hasMultipleVersions 
+        ? 'This document has multiple versions. Deleting it will remove all versions. Are you sure you want to delete this document?' 
+        : 'Are you sure you want to delete this document?',
+      okText: 'Yes',
+      okType: 'danger',
+      cancelText: 'No',
+      onOk: async () => {
+        try {
+          await retryOperation(() => deleteDocument(document.id));
+          message.success('Document deleted successfully');
+          // Refresh the document list
+          if (selectedFolder === 'all') {
+            await retryOperation(() => searchDocuments(searchText));
+          } else {
+            await retryOperation(() => fetchFolderDocuments(selectedFolder));
+          }
+        } catch (error) {
+          message.error(`Failed to delete document: ${error.message}`);
+        }
+      },
+    });
+  };
 
   // Add new state for version management
   const [versionModalVisible, setVersionModalVisible] = useState(false);

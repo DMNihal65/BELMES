@@ -297,9 +297,9 @@ const InventoryAllData = () => {
               <Space>
                 <FileExcelOutlined /> {/* Changed from SettingOutlined to FileExcelOutlined */}
                 <span>{sub.name}</span>
-                <Tooltip title="Dynamic Fields">
+                <Tooltip title="Items Count">
                   <Tag color="green">
-                    {Object.keys(sub.dynamic_fields || {}).length}
+                    {items.filter(item => item.subcategory_id === sub.id).length}
                   </Tag>
                 </Tooltip>
               </Space>
@@ -2239,4 +2239,4 @@ const InventoryAllData = () => {
   );
 };
 
-export default InventoryAllData; 
+export default InventoryAllData;

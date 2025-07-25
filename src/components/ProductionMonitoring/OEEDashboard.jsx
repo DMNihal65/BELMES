@@ -18,7 +18,7 @@ import dayjs from 'dayjs';
 import { InfoCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
-const { RangePicker } = DatePicker;
+// const { RangePicker } = DatePicker;
 const { Option } = Select;
 const { TabPane } = Tabs;
 const { Search: SearchInput } = Input;
@@ -85,156 +85,279 @@ const OEEDashboard = () => {
     }
   }, [oeeData.selectedMachine, allMachinesOEE]);
   
-  // Fetch overall OEE analytics
   const fetchOverallOEEAnalytics = async () => {
-    setIsLoadingOverallOEE(true);
-    try {
-      const [startDate, endDate] = oeeData.dateRange;
-      const formattedStartDate = dayjs(startDate).format('YYYY-MM-DD');
-      const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
-      
-      const params = new URLSearchParams();
-      params.append('start_date', formattedStartDate);
-      params.append('end_date', formattedEndDate);
-      
-      if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
-        params.append('shift', oeeData.selectedShift);
-      }
-      
-      const response = await axios.get(
-        `http://172.18.7.91:8008/production_monitoring/overall-oee-analytics/?${params.toString()}`
-      );
-      
-      setOverallOEEData(response.data);
-    } catch (error) {
-      console.error('Error fetching overall OEE analytics:', error);
-    } finally {
-      setIsLoadingOverallOEE(false);
-    }
-  };
-  
-  // Load shift summary data
-  const loadShiftSummaryData = async () => {
-    setIsLoadingShiftSummary(true);
-    try {
-      const [startDate, endDate] = oeeData.dateRange;
-      const formattedStartDate = dayjs(startDate).format('YYYY-MM-DD');
-      const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
-      
-      const params = new URLSearchParams();
-      params.append('start_date', formattedStartDate);
-      params.append('end_date', formattedEndDate);
-      
-      if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
-        params.append('shift', oeeData.selectedShift);
-      }
-      
-      if (oeeData.selectedMachine !== null && oeeData.selectedMachine !== 'all') {
-        params.append('machine_id', oeeData.selectedMachine);
-      }
-      
-      const response = await axios.get(
-        `http://172.18.7.91:8008/production_monitoring/detailed-shift-summary/?${params.toString()}`
-      );
-      
-      // Transform data for table
-      const tableData = response.data.map((item, index) => ({
-        key: index,
-        date: item.date,
-        shift: item.shift,
-        machine: item.machine_name,
-        machineId: item.machine_id,
-        productionTime: item.production_time,
-        idleTime: item.idle_time,
-        offTime: item.off_time,
-        totalParts: item.total_parts,
-        goodParts: item.good_parts,
-        badParts: item.bad_parts,
-        availability: item.oee_metrics?.availability || 0,
-        performance: item.oee_metrics?.performance || 0,
-        quality: item.oee_metrics?.quality || 0,
-        oee: item.oee_metrics?.oee || 0
-      }));
-      
-      setShiftSummaryData(tableData);
-    } catch (error) {
-      console.error('Error loading shift summary data:', error);
-    } finally {
-      setIsLoadingShiftSummary(false);
-    }
-  };
-  
-  // Fetch OEE data for all machines
-  const fetchAllMachinesOEE = async () => {
-    setIsLoadingMachines(true);
-    try {
-      const [startDate, endDate] = oeeData.dateRange;
-      const formattedStartDate = dayjs(startDate).format('YYYY-MM-DD');
-      const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
-      
-      // Get all machine IDs
-      const machineIds = machines.map(m => m.machine_id);
-      
-      // Fetch data for each machine
-      const promises = machineIds.map(id => 
-        axios.get(`http://172.18.7.91:8008/production_monitoring/machine-oee-analysis/${id}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`)
-      );
-      
-      const results = await Promise.allSettled(promises);
-      const machineData = results
-        .filter(result => result.status === 'fulfilled')
-        .map(result => result.value.data);
-      
-      setAllMachinesOEE(machineData);
-      setFilteredMachines(machineData);
-    } catch (error) {
-      console.error('Error fetching all machines OEE:', error);
-    } finally {
-      setIsLoadingMachines(false);
-    }
-  };
-  
-  // Show trend modal and fetch data
-  const showTrendModal = async (machineId) => {
-    setSelectedMachineForTrend(machineId);
-    const machine = allMachinesOEE.find(m => m.machine_id === machineId);
-    setSelectedMachineData(machine);
-    setTrendModalVisible(true);
-    setTrendModalLoading(true);
+  setIsLoadingOverallOEE(true);
+  try {
+    const selectedDate = dayjs(oeeData.dateRange).format('YYYY-MM-DD');
     
-    try {
-      const [startDate, endDate] = oeeData.dateRange;
-      const formattedStartDate = dayjs(startDate).format('YYYY-MM-DD');
-      const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
-      
-      const response = await axios.get(
-        `http://172.18.7.91:8008/production_monitoring/machine-oee-analysis/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
-      );
-      
-      if (response.data && response.data.oee_trends) {
-        // Transform data for chart
-        const chartData = response.data.oee_trends.flatMap(trend => [
-          { date: trend.date, type: 'OEE', value: trend.oee },
-          { date: trend.date, type: 'Availability', value: trend.availability },
-          { date: trend.date, type: 'Performance', value: trend.performance },
-          { date: trend.date, type: 'Quality', value: trend.quality }
-        ]);
-        
-        setTrendData(chartData);
-      }
-    } catch (error) {
-      console.error('Error fetching trend data:', error);
-    } finally {
-      setTrendModalLoading(false);
+    const params = new URLSearchParams();
+    params.append('date', selectedDate);
+    
+    if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
+      params.append('shift', oeeData.selectedShift);
+    } else {
+      params.append('shift', 'all');
     }
-  };
+    
+    const response = await axios.get(
+      `http://172.18.7.89:5467/production_monitoring/overall-oee-analytics/?${params.toString()}`
+    );
+    
+    setOverallOEEData(response.data);
+  } catch (error) {
+    console.error('Error fetching overall OEE analytics:', error);
+  } finally {
+    setIsLoadingOverallOEE(false);
+  }
+};
+
+
+  // // Load shift summary data
+  // const loadShiftSummaryData = async () => {
+  //   setIsLoadingShiftSummary(true);
+  //   try {
+  //     const [startDate, endDate] = oeeData.dateRange;
+  //     const formattedStartDate = dayjs(startDate).format('YYYY-MM-DD');
+  //     const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
+      
+  //     const params = new URLSearchParams();
+  //     params.append('start_date', formattedStartDate);
+  //     params.append('end_date', formattedEndDate);
+      
+  //     if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
+  //       params.append('shift', oeeData.selectedShift);
+  //     }
+      
+  //     if (oeeData.selectedMachine !== null && oeeData.selectedMachine !== 'all') {
+  //       params.append('machine_id', oeeData.selectedMachine);
+  //     }
+      
+  //     const response = await axios.get(
+  //       `http://172.18.7.89:5467/production_monitoring/detailed-shift-summary/?${params.toString()}`
+  //     );
+      
+  //     // Transform data for table
+  //     const tableData = response.data.map((item, index) => ({
+  //       key: index,
+  //       date: item.date,
+  //       shift: item.shift,
+  //       machine: item.machine_name,
+  //       machineId: item.machine_id,
+  //       productionTime: item.production_time,
+  //       idleTime: item.idle_time,
+  //       offTime: item.off_time,
+  //       totalParts: item.total_parts,
+  //       goodParts: item.good_parts,
+  //       badParts: item.bad_parts,
+  //       availability: item.oee_metrics?.availability || 0,
+  //       performance: item.oee_metrics?.performance || 0,
+  //       quality: item.oee_metrics?.quality || 0,
+  //       oee: item.oee_metrics?.oee || 0
+  //     }));
+      
+  //     setShiftSummaryData(tableData);
+  //   } catch (error) {
+  //     console.error('Error loading shift summary data:', error);
+  //   } finally {
+  //     setIsLoadingShiftSummary(false);
+  //   }
+  // };
+
+  const loadShiftSummaryData = async () => {
+  setIsLoadingShiftSummary(true);
+  try {
+    const selectedDate = dayjs(oeeData.dateRange).format('YYYY-MM-DD');
+    
+    const params = new URLSearchParams();
+    params.append('date', selectedDate);
+    
+    if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
+      params.append('shift', oeeData.selectedShift);
+    } else {
+      params.append('shift', 'all');
+    }
+    
+    if (oeeData.selectedMachine !== null && oeeData.selectedMachine !== 'all') {
+      params.append('machine_id', oeeData.selectedMachine);
+    }
+    
+    const response = await axios.get(
+      `http://172.18.7.89:5467/production_monitoring/detailed-shift-summary/?${params.toString()}`
+    );
+    
+    // Transform data for table (rest remains same)
+    const tableData = response.data.map((item, index) => ({
+      key: index,
+      date: item.date,
+      shift: item.shift,
+      machine: item.machine_name,
+      machineId: item.machine_id,
+      productionTime: item.production_time,
+      idleTime: item.idle_time,
+      offTime: item.off_time,
+      totalParts: item.total_parts,
+      goodParts: item.good_parts,
+      badParts: item.bad_parts,
+      availability: item.oee_metrics?.availability || 0,
+      performance: item.oee_metrics?.performance || 0,
+      quality: item.oee_metrics?.quality || 0,
+      oee: item.oee_metrics?.oee || 0
+    }));
+    
+    setShiftSummaryData(tableData);
+  } catch (error) {
+    console.error('Error loading shift summary data:', error);
+  } finally {
+    setIsLoadingShiftSummary(false);
+  }
+};
+  
+  // // Fetch OEE data for all machines
+  // const fetchAllMachinesOEE = async () => {
+  //   setIsLoadingMachines(true);
+  //   try {
+  //     const [startDate, endDate] = oeeData.dateRange;
+  //     const formattedStartDate = dayjs(startDate).format('YYYY-MM-DD');
+  //     const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
+      
+  //     // Get all machine IDs
+  //     const machineIds = machines.map(m => m.machine_id);
+      
+  //     // Fetch data for each machine
+  //     const promises = machineIds.map(id => 
+  //       axios.get(`http://172.18.7.89:5467/production_monitoring/machine-oee-analysis/${id}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`)
+  //     );
+      
+  //     const results = await Promise.allSettled(promises);
+  //     const machineData = results
+  //       .filter(result => result.status === 'fulfilled')
+  //       .map(result => result.value.data);
+      
+  //     setAllMachinesOEE(machineData);
+  //     setFilteredMachines(machineData);
+  //   } catch (error) {
+  //     console.error('Error fetching all machines OEE:', error);
+  //   } finally {
+  //     setIsLoadingMachines(false);
+  //   }
+  // };
+  const fetchAllMachinesOEE = async () => {
+  setIsLoadingMachines(true);
+  try {
+    const selectedDate = dayjs(oeeData.dateRange).format('YYYY-MM-DD');
+    
+    // Get all machine IDs
+    const machineIds = machines.map(m => m.machine_id);
+    
+    // Fetch data for each machine
+    const promises = machineIds.map(id => {
+      const params = new URLSearchParams();
+      params.append('date', selectedDate);
+      
+      if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
+        params.append('shift', oeeData.selectedShift);
+      } else {
+        params.append('shift', 'all');
+      }
+      
+      return axios.get(`http://172.18.7.89:5467/production_monitoring/machine-oee-analysis/${id}?${params.toString()}`);
+    });
+    
+    const results = await Promise.allSettled(promises);
+    const machineData = results
+      .filter(result => result.status === 'fulfilled')
+      .map(result => result.value.data);
+    
+    setAllMachinesOEE(machineData);
+    setFilteredMachines(machineData);
+  } catch (error) {
+    console.error('Error fetching all machines OEE:', error);
+  } finally {
+    setIsLoadingMachines(false);
+  }
+};
+  // Show trend modal and fetch data
+  // const showTrendModal = async (machineId) => {
+  //   setSelectedMachineForTrend(machineId);
+  //   const machine = allMachinesOEE.find(m => m.machine_id === machineId);
+  //   setSelectedMachineData(machine);
+  //   setTrendModalVisible(true);
+  //   setTrendModalLoading(true);
+    
+  //   try {
+  //     const [startDate, endDate] = oeeData.dateRange;
+  //     const formattedStartDate = dayjs(startDate).format('YYYY-MM-DD');
+  //     const formattedEndDate = dayjs(endDate).format('YYYY-MM-DD');
+      
+  //     const response = await axios.get(
+  //       `http://172.18.7.89:5467/production_monitoring/machine-oee-analysis/${machineId}?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+  //     );
+      
+  //     if (response.data && response.data.oee_trends) {
+  //       // Transform data for chart
+  //       const chartData = response.data.oee_trends.flatMap(trend => [
+  //         { date: trend.date, type: 'OEE', value: trend.oee },
+  //         { date: trend.date, type: 'Availability', value: trend.availability },
+  //         { date: trend.date, type: 'Performance', value: trend.performance },
+  //         { date: trend.date, type: 'Quality', value: trend.quality }
+  //       ]);
+        
+  //       setTrendData(chartData);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching trend data:', error);
+  //   } finally {
+  //     setTrendModalLoading(false);
+  //   }
+  // };
+
+  const showTrendModal = async (machineId) => {
+  setSelectedMachineForTrend(machineId);
+  const machine = allMachinesOEE.find(m => m.machine_id === machineId);
+  setSelectedMachineData(machine);
+  setTrendModalVisible(true);
+  setTrendModalLoading(true);
+  
+  try {
+    const selectedDate = dayjs(oeeData.dateRange).format('YYYY-MM-DD');
+    
+    const params = new URLSearchParams();
+    params.append('date', selectedDate);
+    
+    if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
+      params.append('shift', oeeData.selectedShift);
+    } else {
+      params.append('shift', 'all');
+    }
+    
+    const response = await axios.get(
+      `http://172.18.7.89:5467/production_monitoring/machine-oee-analysis/${machineId}?${params.toString()}`
+    );
+    
+    if (response.data && response.data.oee_trends) {
+      // Transform data for chart
+      const chartData = response.data.oee_trends.flatMap(trend => [
+        { date: trend.date, type: 'OEE', value: trend.oee },
+        { date: trend.date, type: 'Availability', value: trend.availability },
+        { date: trend.date, type: 'Performance', value: trend.performance },
+        { date: trend.date, type: 'Quality', value: trend.quality }
+      ]);
+      
+      setTrendData(chartData);
+    }
+  } catch (error) {
+    console.error('Error fetching trend data:', error);
+  } finally {
+    setTrendModalLoading(false);
+  }
+};
   
   // Handle date range change
-  const handleDateRangeChange = (dates) => {
-    if (dates && dates.length === 2) {
-      setOEEDateRange(dates);
-    }
-  };
+  const handleDateChange = (date) => {
+  if (date) {
+    setOEEDateRange(date);
+  }
+};
   
   // Handle machine selection change
   const handleMachineChange = (value) => {
@@ -442,13 +565,14 @@ const OEEDashboard = () => {
           
           <div className="flex flex-wrap items-center gap-3">
           <Space>
-              <span className="text-gray-500">Date Range:</span>
-            <RangePicker
-                value={oeeData.dateRange}
-                onChange={handleDateRangeChange}
-                allowClear={false}
-            />
-          </Space>
+  <span className="text-gray-500">Date:</span>
+  <DatePicker
+    value={oeeData.dateRange}
+    onChange={handleDateChange}
+    allowClear={false}
+    format="YYYY-MM-DD"
+  />
+</Space>
             
             <Space>
               <span className="text-gray-500">Shift:</span>
@@ -716,13 +840,13 @@ const OEEDashboard = () => {
                     </div>
                     <div className="flex flex-col items-end">
                       {/* {getStatusBadge(machine.average_oee)} */}
-                      {/* <div className="text-2xl font-bold mt-1" style={{ 
+                      <div className="text-2xl font-bold mt-1" style={{ 
                         color: machine.average_oee >= 85 ? '#10b981' : 
                               machine.average_oee >= 60 ? '#f59e0b' : '#ef4444' 
                       }}>
                         {machine.average_oee.toFixed(1)}%
-                      </div> */}
-                      {/* <div className="text-xs text-gray-500">OEE Score</div> */}
+                      </div>
+                      <div className="text-xs text-gray-500">OEE Score</div>
                     </div>
                   </div>
                   

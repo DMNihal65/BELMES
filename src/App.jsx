@@ -56,7 +56,7 @@ const App = () => {
   return (
     <ConfigProvider>
       {/* basename="/belmes" this should be added in the deployment mode ISNIDE BROWSER ROUTER*/}
-      <BrowserRouter   >
+      <BrowserRouter  >
         <Routes>
           <Route path="/login" element={<Login />} />
 

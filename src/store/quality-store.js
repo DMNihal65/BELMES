@@ -4,7 +4,7 @@ class QualityStore {
   constructor() {
     // Create axios instance with better configuration
     this.api = axios.create({
-      baseURL: 'http://172.18.7.91:8008/api/v1',
+      baseURL: 'http://172.18.7.89:5467/api/v1',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',

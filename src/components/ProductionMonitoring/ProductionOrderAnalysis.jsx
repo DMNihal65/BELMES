@@ -37,7 +37,7 @@ const ProductionOrderAnalysis = () => {
       }
 
       const response = await axios.get(
-        `http://172.18.7.91:8008/production_monitoring/order-production-analysis/${orderNumber}?${params.toString()}`
+        `http://172.18.7.89:5467/production_monitoring/order-production-analysis/${orderNumber}?${params.toString()}`
       );
       setData(response.data);
     } catch (err) {

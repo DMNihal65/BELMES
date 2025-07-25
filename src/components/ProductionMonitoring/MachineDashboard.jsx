@@ -27,7 +27,6 @@ dayjs.extend(relativeTime);
 const { TabPane } = Tabs;
 const { Search: SearchInput } = Input;
 const { Text, Title } = Typography;
-const { RangePicker } = DatePicker;
 
 const MachineDashboard = () => {
   const { 
@@ -50,9 +49,8 @@ const MachineDashboard = () => {
   const [alertsCount, setAlertsCount] = useState(3); // Mock alerts count
   const [sortOrder, setSortOrder] = useState('status');
   const [machineTimers, setMachineTimers] = useState({});
-  const [dateRange, setDateRange] = useState([dayjs().subtract(7, 'days'), dayjs()]); // Default to last 7 days
-  const [selectedDatePreset, setSelectedDatePreset] = useState('week');
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  // Set date range to today only (from 00:00 to 23:59:59)
+  const [dateRange, setDateRange] = useState([dayjs().startOf('day'), dayjs().endOf('day')]);
   
   // OEE refresh interval ref
   const oeeRefreshIntervalRef = useRef(null);
@@ -151,34 +149,7 @@ const MachineDashboard = () => {
     return matchesStatus && matchesSearch;
   });
 
-  // Date range presets
-  const datePresets = [
-    { label: 'Last Week', value: 'week', range: [dayjs().subtract(7, 'days'), dayjs()] },
-    { label: 'Last Month', value: 'month', range: [dayjs().subtract(30, 'days'), dayjs()] },
-  ];
-
-  // Handle date range change
-  const handleDateRangeChange = (dates) => {
-    if (dates) {
-      setDateRange(dates);
-      fetchOverallOEEMetrics(dates[0], dates[1]);
-    }
-  };
-
-  // Handle preset selection
-  const handlePresetChange = (preset) => {
-    setSelectedDatePreset(preset);
-    if (preset === 'custom') {
-      setShowDatePicker(true);
-    } else {
-      setShowDatePicker(false);
-      const selectedPreset = datePresets.find(p => p.value === preset);
-      if (selectedPreset) {
-        setDateRange(selectedPreset.range);
-        fetchOverallOEEMetrics(selectedPreset.range[0], selectedPreset.range[1]);
-      }
-    }
-  };
+  // No date range presets or handlers needed as we're using today's date only
 
   // Get machine data in a stable order that won't change positions
   const stableSortedMachines = useMemo(() => {
@@ -239,7 +210,8 @@ const MachineDashboard = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     initializeWebSocket();
-    fetchOverallOEEMetrics(dateRange[0], dateRange[1]);
+    // Refresh with today's date range
+    fetchOverallOEEMetrics(dayjs().startOf('day'), dayjs().endOf('day'));
     
     setTimeout(() => {
       setRefreshing(false);
@@ -249,11 +221,13 @@ const MachineDashboard = () => {
   // Initialize WebSocket and OEE metrics on component mount
   useEffect(() => {
     initializeWebSocket();
-    fetchOverallOEEMetrics(dateRange[0], dateRange[1]);
+    // Fetch OEE metrics for today only
+    fetchOverallOEEMetrics(dayjs().startOf('day'), dayjs().endOf('day'));
     
     // Set up 5-minute interval for OEE metrics refresh
     oeeRefreshIntervalRef.current = setInterval(() => {
-      fetchOverallOEEMetrics(dateRange[0], dateRange[1]);
+      // Always fetch today's data in the interval
+      fetchOverallOEEMetrics(dayjs().startOf('day'), dayjs().endOf('day'));
     }, 5 * 60 * 1000); // 5 minutes
     
     return () => {
@@ -261,7 +235,7 @@ const MachineDashboard = () => {
         clearInterval(oeeRefreshIntervalRef.current);
       }
     };
-  }, [dateRange]);
+  }, []); // No dependency on dateRange anymore
 
   // Update machine idle timers
   useEffect(() => {
@@ -892,30 +866,9 @@ const MachineDashboard = () => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Activity size={20} className="text-blue-500" />
-                  <span className="font-bold text-gray-800">Overall Efficiency</span>
+                  <span className="font-bold text-gray-800">Today's Overall Efficiency</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  {/* Date Range Selection */}
-                  <Space size="middle">
-                    <Select
-                      value={selectedDatePreset}
-                      onChange={handlePresetChange}
-                      style={{ width: 130 }}
-                      options={[
-                        { value: 'week', label: 'One Week' },
-                        { value: 'month', label: 'Last Month' },
-                        { value: 'custom', label: 'Custom Range' }
-                      ]}
-                    />
-                    
-                    <RangePicker
-                      value={dateRange}
-                      onChange={handleDateRangeChange}
-                      allowClear={false}
-                      style={{ display: selectedDatePreset === 'custom' ? 'inline-flex' : 'none' }}
-                    />
-                  </Space>
-                  
                   <Tooltip title="Last updated">
                     <div className="text-xs text-gray-500 flex items-center">
                       <Clock size={14} className="mr-1 text-blue-400" />

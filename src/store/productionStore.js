@@ -20,8 +20,8 @@ const calculateUptime = (lastUpdated) => {
   return moment(lastUpdated).fromNow();
 };
 
-const BASE_URL = 'http://172.18.7.91:8008/production_monitoring';
-const WS_URL = 'ws://172.18.7.91:8008/production_monitoring/ws/live-status/';
+const BASE_URL = 'http://172.18.7.89:5467/production_monitoring';
+const WS_URL = 'ws://172.18.7.89:5467/production_monitoring/ws/live-status/';
 
 const useProductionStore = create(
   devtools((set, get) => ({
@@ -58,15 +58,15 @@ const useProductionStore = create(
     },
 
     // OEE Dashboard state
-    oeeData: {
-      shiftSummary: [],
-      machineAnalysis: null,
-      isLoading: false,
-      error: null,
-      dateRange: [dayjs().subtract(7, 'days'), dayjs()],
-      selectedMachine: null,
-      selectedShift: null
-    },
+oeeData: {
+  shiftSummary: [],
+  machineAnalysis: null,
+  isLoading: false,
+  error: null,
+  dateRange: dayjs(), // Single date instead of array
+  selectedMachine: null,
+  selectedShift: null
+},
 
     // WebSocket connection with reconnection logic
     initializeWebSocket: () => {
@@ -188,7 +188,7 @@ const useProductionStore = create(
     // Fetch work centres for filtering machines
     fetchWorkCenters: async () => {
       try {
-        const response = await axios.get('http://172.18.7.91:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
+        const response = await axios.get('http://172.18.7.89:5467/api/v1/master-order/workcenters/?skip=0&limit=100');
         const workcenters = response.data;
         
         // No longer filtering by is_schedulable
@@ -434,117 +434,119 @@ const useProductionStore = create(
       get().fetchDailyProduction(startDate, endDate);
     },
 
-    // Fetch shift summary data
-    fetchShiftSummary: async () => {
-      const { oeeData } = get();
-      const [startDate, endDate] = oeeData.dateRange;
-      
-      set(state => ({
-        oeeData: {
-          ...state.oeeData,
-          isLoading: true,
-          error: null
-        }
-      }));
+  fetchShiftSummary: async () => {
+  const { oeeData } = get();
+  const selectedDate = dayjs(oeeData.dateRange).format('YYYY-MM-DD');
+  
+  set(state => ({
+    oeeData: {
+      ...state.oeeData,
+      isLoading: true,
+      error: null
+    }
+  }));
 
-      try {
-        const params = new URLSearchParams();
-        params.append('start_date', dayjs(startDate).format('YYYY-MM-DD'));
-        params.append('end_date', dayjs(endDate).format('YYYY-MM-DD'));
-        
-        if (oeeData.selectedShift !== null) {
-          params.append('shift', oeeData.selectedShift);
-        }
-        
-        if (oeeData.selectedMachine !== null) {
-          params.append('machine_id', oeeData.selectedMachine);
-        }
+  try {
+    const params = new URLSearchParams();
+    params.append('date', selectedDate);
+    
+    if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
+      params.append('shift', oeeData.selectedShift);
+    } else {
+      params.append('shift', 'all');
+    }
+    
+    if (oeeData.selectedMachine !== null && oeeData.selectedMachine !== 'all') {
+      params.append('machine_id', oeeData.selectedMachine);
+    }
 
-        const response = await axios.get(
-          `${BASE_URL}/detailed-shift-summary/?${params.toString()}`
-        );
+    const response = await axios.get(
+      `${BASE_URL}/detailed-shift-summary/?${params.toString()}`
+    );
 
-        set(state => ({
-          oeeData: {
-            ...state.oeeData,
-            shiftSummary: response.data,
-            isLoading: false
-          }
-        }));
-      } catch (error) {
-        console.error('Error fetching shift summary:', error);
-        set(state => ({
-          oeeData: {
-            ...state.oeeData,
-            error: 'Failed to fetch shift summary data',
-            isLoading: false
-          }
-        }));
+    set(state => ({
+      oeeData: {
+        ...state.oeeData,
+        shiftSummary: response.data,
+        isLoading: false
       }
-    },
+    }));
+  } catch (error) {
+    console.error('Error fetching shift summary:', error);
+    set(state => ({
+      oeeData: {
+        ...state.oeeData,
+        error: 'Failed to fetch shift summary data',
+        isLoading: false
+      }
+    }));
+  }
+},
 
-    // Fetch machine OEE analysis
-    fetchMachineOEEAnalysis: async (machineId) => {
-      const { oeeData } = get();
-      const [startDate, endDate] = oeeData.dateRange;
-      
-      set(state => ({
-        oeeData: {
-          ...state.oeeData,
-          isLoading: true,
-          error: null
-        }
-      }));
 
-      try {
-        const params = new URLSearchParams();
-        params.append('start_date', dayjs(startDate).format('YYYY-MM-DD'));
-        params.append('end_date', dayjs(endDate).format('YYYY-MM-DD'));
-        
-        if (oeeData.selectedShift !== null) {
-          params.append('shift', oeeData.selectedShift);
-        }
+ fetchMachineOEEAnalysis: async (machineId) => {
+  const { oeeData } = get();
+  const selectedDate = dayjs(oeeData.dateRange).format('YYYY-MM-DD');
+  
+  set(state => ({
+    oeeData: {
+      ...state.oeeData,
+      isLoading: true,
+      error: null
+    }
+  }));
 
-        const response = await axios.get(
-          `${BASE_URL}/machine-oee-analysis/${machineId}?${params.toString()}`
-        );
+  try {
+    const params = new URLSearchParams();
+    params.append('date', selectedDate);
+    
+    if (oeeData.selectedShift !== null && oeeData.selectedShift !== 'all') {
+      params.append('shift', oeeData.selectedShift);
+    } else {
+      params.append('shift', 'all');
+    }
 
-        set(state => ({
-          oeeData: {
-            ...state.oeeData,
-            machineAnalysis: response.data,
-            isLoading: false
-          }
-        }));
-      } catch (error) {
-        console.error('Error fetching machine OEE analysis:', error);
-        set(state => ({
-          oeeData: {
-            ...state.oeeData,
-            error: 'Failed to fetch machine OEE analysis',
-            isLoading: false
-          }
+    const response = await axios.get(
+      `${BASE_URL}/machine-oee-analysis/${machineId}?${params.toString()}`
+    );
+
+    set(state => ({
+      oeeData: {
+        ...state.oeeData,
+        machineAnalysis: response.data,
+        isLoading: false
+      }
+    }));
+  } catch (error) {
+    console.error('Error fetching machine OEE analysis:', error);
+    set(state => ({
+      oeeData: {
+        ...state.oeeData,
+        error: 'Failed to fetch machine OEE analysis',
+        isLoading: false
+      }
         }));
       }
     },
 
     // Update OEE date range
-    setOEEDateRange: (range) => {
-      set(state => ({
-        oeeData: {
-          ...state.oeeData,
-          dateRange: range
-        }
-      }));
+setOEEDateRange: (date) => {
+  set(state => ({
+    oeeData: {
+      ...state.oeeData,
+      dateRange: date // Single date
+    }
+  }));
       
       // Fetch updated data
       get().fetchShiftSummary();
       
       // If a machine is selected, fetch its analysis too
+      // If a machine is selected, fetch its analysis too
       if (get().oeeData.selectedMachine) {
-        get().fetchMachineOEEAnalysis(get().oeeData.selectedMachine);
-      }
-    },
+    get().fetchMachineOEEAnalysis(get().oeeData.selectedMachine);
+  }
+},
 
     // Set selected machine for OEE
     setOEESelectedMachine: (machineId) => {

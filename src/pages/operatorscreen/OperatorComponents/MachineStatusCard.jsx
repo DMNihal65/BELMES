@@ -7,10 +7,14 @@ import MachineIssueModal from '../../operatorscreens/MachineIssueModal';
 
 // DMG Mori machine image for all types
 const machineImages = {
-  default: '/dmg.png',
-  milling: '/dmg.png',
-  turning: '/dmg.png',
-  grinding: '/dmg.png'
+  'CTX Beta 1250TC4A': '/CNCM-CTX BETA 1250TC4A.png',
+  'DMU 60eVo Linear': '/CNCM-DMU 60eVo Linear.png',
+  'DMU-60MB 5 AXIS': '/CNCM-DMU-60MB 5 AXIS.png',
+  'DMU-60T': '/CNCM-DMU-60T.png',
+  'Makino': '/Makino.png',
+  'Robofil 240': '/Robofil 240.png',
+  'VCP800W Duro': '/VCP800W Duro.png',
+  default: '/dmg.png'
 };
 
 const MachineStatusCard = () => {
@@ -97,9 +101,23 @@ const MachineStatusCard = () => {
   
   // Get machine image
   const getMachineImage = () => {
-    const type = getMachineType();
-    return machineImages[type] || machineImages.default;
+    try {
+      const storedMachine = localStorage.getItem('currentMachine');
+      if (!storedMachine) return machineImages.default;
+  
+      const parsedMachine = JSON.parse(storedMachine);
+      const make = parsedMachine?.make?.trim();
+  
+      if (make && machineImages.hasOwnProperty(make)) {
+        return machineImages[make];
+      }
+    } catch (error) {
+      console.error("Failed to parse currentMachine from localStorage", error);
+    }
+  
+    return machineImages.default;
   };
+  
 
   // Background color based on status
   const getStatusBackgroundColor = (status) => {

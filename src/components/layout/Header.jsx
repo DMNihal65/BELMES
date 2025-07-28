@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import belLogo from '../../assets/bel.png';
 import { useEffect, useState } from 'react';
 import { ToolFilled } from '@ant-design/icons';
+import useOperatorStore from '../../store/operator-store';
+
 
 const { Header: AntHeader } = Layout;
 const { Text } = Typography;
@@ -20,7 +22,7 @@ function Header() {
   const [acknowledging, setAcknowledging] = useState(false);
   const [processingNotificationId, setProcessingNotificationId] = useState(null);
   const [markingAsRead, setMarkingAsRead] = useState(false);
-  
+
   const { 
     notifications, 
     unreadCount, 
@@ -76,8 +78,13 @@ function Header() {
 
   // Handle logout
   const handleLogout = () => {
+    const resetStore = useOperatorStore.getState().resetStore;
     logout();
+    resetStore();
     navigate('/login');
+    localStorage.removeItem('jobSource');
+    localStorage.removeItem('currentJobData');
+    localStorage.removeItem('activeOperation');
   };
   
   // Handle acknowledging a single notification

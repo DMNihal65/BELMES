@@ -12,6 +12,7 @@ import {
 import useHelpSupportStore from '../../store/help-support-store';
 import { format } from 'date-fns';
 import useAuthStore from '../../store/auth-store';
+import CommonDocuments from '../supervisorscreens/CommonDocuments';
 
 const { Title, Text } = Typography;
 
@@ -247,6 +248,7 @@ function HelpAndSupport() {
        
         </div>
       </div>
+      <CommonDocuments/>
     </div>
   );
 }

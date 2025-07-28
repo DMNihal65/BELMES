@@ -95,10 +95,6 @@ useEffect(() => {
 
   // Handle job deactivation
   const handleDeactivateJob = () => {
-    if (!inProgressJobs || inProgressJobs.length === 0) {
-      message.warning('No active job to deactivate');
-      return;
-    }
 
     setShowConfirmationModal(true);
     setConfirmationAction('deactivate');
@@ -479,7 +475,7 @@ useEffect(() => {
                     <div className="flex items-center gap-2">
                       <AlertTriangle size={16} className="text-red-600" />
                       <span className="text-sm text-red-700">
-                        This will stop the current job tracking.
+                        This will stop the current job tracking. Please Refresh the Page after Deactivation.
                       </span>
                     </div>
                   </div>

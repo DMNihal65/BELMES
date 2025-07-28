@@ -3,9 +3,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { message } from 'antd';
 
 // API endpoints
-const API_BASE_URL = "http://172.18.7.89:5467";
-const MPP_API_BASE_URL = "http://172.18.7.89:5467";
-const WS_URL = "ws://172.18.7.89:5467/production_monitoring/ws/live-status/";
+const API_BASE_URL = "http://172.18.7.91:8008";
+const MPP_API_BASE_URL = "http://172.18.7.91:8008";
+const WS_URL = "ws://172.18.7.91:8008/production_monitoring/ws/live-status/";
 
 // Helper function to get authentication token
 const getAuthToken = () => {
@@ -79,11 +79,6 @@ const useOperatorStore = create((set, get) => ({
   selectedJob: null,
   selectedOperation: null,
   jobSource: null, // 'inprogress', 'scheduled', or 'custom'
-
-  setSelectedJob: (job) => set({ selectedJob: job }),
-  setSelectedOperation: (operation) => set({ selectedOperation: operation }),
-  setJobSource: (source) => set({ jobSource: source }),
-
   
   // Job lists
   availableJobs: [],
@@ -130,9 +125,9 @@ const useOperatorStore = create((set, get) => ({
     
     try {
       // Clear any stale job data first
-      localStorage.removeItem('jobSource');
-      localStorage.removeItem('currentJobData');
-      localStorage.removeItem('activeOperation');
+      // localStorage.removeItem('jobSource');
+      // localStorage.removeItem('currentJobData');
+      // localStorage.removeItem('activeOperation');
       
       // 1. Get machine ID from localStorage
       const storedMachine = localStorage.getItem('currentMachine');
@@ -531,7 +526,23 @@ const useOperatorStore = create((set, get) => ({
         selectedJob: null,
         selectedOperation: null,
         jobSource: null,
-        inProgressJobs: []
+        inProgressJobs: [],
+        scheduledJobs: [],
+        availableJobs: [],
+        jobDetails: null,
+        jobDocuments: null,
+        rawMaterials: null,
+        productionStats: null,
+        selectedJob: null,
+        selectedOperation: null,
+        availableOperations: [],
+        jobSource: null,
+        operationMppData: null,
+        jobDocuments: null,
+        rawMaterials: null,
+        productionStats: null,
+        isLoadingOperations: false,
+        isLoadingMppData: false
       });
   
       console.log('shashank Job deactivated successfully'); // Existing log
@@ -853,7 +864,27 @@ const useOperatorStore = create((set, get) => ({
     } finally {
       set({ isLoadingRawMaterials: false });
     }
-  }
+  } , 
+
+    resetStore: () => {
+      set({
+        selectedJob: null,
+        selectedOperation: null,
+        jobSource: null,
+        inProgressJobs: [],
+        scheduledJobs: [],
+        availableJobs: [],
+        jobDetails: null,
+        jobDocuments: null,
+        rawMaterials: null,
+        productionStats: null,
+        availableOperations: [],
+        operationMppData: null,
+        isLoadingOperations: false,
+        isLoadingMppData: false
+      });
+    }
+    
 }));
 
 export default useOperatorStore;  

@@ -1250,59 +1250,7 @@ const loadInventoryItems = async () => {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {/* Total Jobs Card */}
-            <div className="bg-blue-600 text-white p-4 rounded-lg shadow-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm opacity-90">Total Jobs</p>
-                  <p className="text-2xl font-bold">24</p>
-                </div>
-                <div className="bg-blue-500 p-3 rounded-full">
-                  <ScheduleOutlined className="text-xl" />
-                </div>
-              </div>
-            </div>
-
-            {/* In Progress Card */}
-            <div className="bg-yellow-500 text-white p-4 rounded-lg shadow-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm opacity-90">In Progress</p>
-                  <p className="text-2xl font-bold">18</p>
-                </div>
-                <div className="bg-yellow-400 p-3 rounded-full">
-                  <Hourglass className="text-xl" />
-                </div>
-              </div>
-            </div>
-
-            {/* Completed Card */}
-            <div className="bg-green-500 text-white p-4 rounded-lg shadow-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm opacity-90">Completed</p>
-                  <p className="text-2xl font-bold">6</p>
-                </div>
-                <div className="bg-green-400 p-3 rounded-full">
-                  <CheckCircle className="text-xl" />
-                </div>
-              </div>
-            </div>
-
-            {/* Pending PDC Card */}
-            <div className="bg-orange-500 text-white p-4 rounded-lg shadow-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm opacity-90">Pending PDC</p>
-                  <p className="text-2xl font-bold">3</p>
-                </div>
-                <div className="bg-orange-400 p-3 rounded-full">
-                  <CalendarCheck className="text-xl" />
-                </div>
-              </div>
-            </div>
-          </div>
+          
 
           {/* Job Details Section with QR Codes */}
           <div className="flex justify-between gap-8 relative z-10">

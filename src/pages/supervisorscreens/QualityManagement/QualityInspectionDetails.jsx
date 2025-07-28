@@ -18,7 +18,8 @@ import {
   Tabs,
   Empty,
   Switch,
-  Progress
+  Progress,
+  InputNumber
 } from 'antd';
 import { 
   EyeOutlined, 
@@ -73,6 +74,8 @@ const QualityInspectionDetails = ({
   const [retryCount, setRetryCount] = useState(0);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedMeasurement, setSelectedMeasurement] = useState(null);
+  const [qtyFilter, setQtyFilter] = useState(1);
+  const [loadingQty, setLoadingQty] = useState(false);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
 
@@ -220,21 +223,10 @@ const QualityInspectionDetails = ({
 
   const summaryColumns = [
     {
-      title: 'Order ID',
-      dataIndex: 'order_id',
-      key: 'order_id',
-      width: '15%',
-      render: (text) => (
-        <Tag color="blue" className="text-md px-3 py-1">
-          {text}
-        </Tag>
-      )
-    },
-    {
       title: 'Production Order',
       dataIndex: 'production_order',
       key: 'production_order',
-      width: '20%',
+      width: '25%',
       render: (text) => (
         <Typography.Text strong>
           {text}
@@ -245,12 +237,12 @@ const QualityInspectionDetails = ({
       title: 'Part Number',
       dataIndex: 'part_number',
       key: 'part_number',
-      width: '20%'
+      width: '25%'
     },
     {
       title: 'Operations',
       key: 'operations',
-      width: '45%',
+      width: '50%',
       render: (_, record) => (
         <Space wrap size="middle">
           {(record.operations || []).map(op => {
@@ -556,14 +548,16 @@ const QualityInspectionDetails = ({
     const [activeFilter, setActiveFilter] = useState('all');
     // Add state for filtered data
     const [filteredData, setFilteredData] = useState([]);
+    // Add state for quantity filter
+    const [qtyFilter, setQtyFilter] = useState(1);
     
     // Function to handle filter changes
-    const handleFilterChange = (filter) => {
+    const handleFilterChange = (filter, qty = qtyFilter) => {
       setActiveFilter(filter);
-      
       const allData = prepareInspectionData();
       let filtered = [];
-      
+      let qtyVal = qty;
+      if (qtyVal === null || qtyVal === undefined || qtyVal === '') qtyVal = '';
       if (filter === 'all') {
         filtered = allData;
       } else if (filter === 'out-of-tolerance') {
@@ -571,18 +565,72 @@ const QualityInspectionDetails = ({
       } else if (filter === 'within-tolerance') {
         filtered = allData.filter(item => item.isWithinTolerance);
       }
-      
+      // Apply qty filter if set
+      if (qtyVal !== '' && !isNaN(qtyVal)) {
+        filtered = filtered.filter(item => Number(item.quantity_no) === Number(qtyVal));
+      }
       setFilteredData(filtered);
     };
-    
+    // Handle qty change
+    const handleQtyChange = async (value) => {
+      setQtyFilter(value);
+      if (!isMeasuredDataModalVisible || !selectedOperation) return;
+      setMeasuredData({ inspection_data: [] }); // Clear table immediately
+      setLoadingQty(true);
+      try {
+        if (inspectionDetails?.order_id && selectedOperation) {
+          const response = await qualityStore.fetchStageInspectionByOperation(
+            inspectionDetails.order_id,
+            selectedOperation,
+            value
+          );
+          if (response && response.length > 0) {
+            const transformedData = {
+              inspection_data: [{
+                operation_number: selectedOperation,
+                inspections: response.map(item => ({
+                  ...item,
+                  is_done: item.is_done || false
+                }))
+              }]
+            };
+            setMeasuredData(transformedData);
+          } else {
+            // Always clear the table first
+            setMeasuredData({ inspection_data: [] });
+            // Destroy any previous messages and show a new one
+            message.destroy('qtyNoData');
+            message.info({
+              content: `No measurements found for quantity ${value}.`,
+              key: 'qtyNoData',
+              duration: 2
+            });
+          }
+        }
+      } catch (error) {
+        setMeasuredData({ inspection_data: [] });
+        message.destroy('qtyNoData');
+        message.info({
+          content: `No measurements found for quantity ${value}.`,
+          key: 'qtyNoData',
+          duration: 2
+        });
+      } finally {
+        setLoadingQty(false);
+      }
+    };
     // Initialize filtered data when measured data changes
     useEffect(() => {
       if (measuredData) {
         const data = prepareInspectionData();
-        setFilteredData(data);
+        let filtered = data;
+        if (qtyFilter !== '' && !isNaN(qtyFilter)) {
+          filtered = filtered.filter(item => Number(item.quantity_no) === Number(qtyFilter));
+        }
+        setFilteredData(filtered);
       }
     }, [measuredData]);
-
+    
     // Check if we're viewing final inspection measurements
     const isViewingFinalInspection = measuredData?.inspection_data?.some(
       data => data.operation_number === 999
@@ -706,6 +754,18 @@ const QualityInspectionDetails = ({
             >
               Within Tolerance ({prepareInspectionData().filter(item => item.isWithinTolerance).length})
             </Button>
+            {/* Qty input */}
+            <span style={{ marginLeft: 16, fontWeight: 500 }}>Qty:</span>
+            <InputNumber
+              min={1}
+              max={1000}
+              value={qtyFilter}
+              onChange={handleQtyChange}
+              style={{ width: 80 }}
+              placeholder="Qty"
+              loading={loadingQty}
+              disabled={loadingQty}
+            />
           </div>
           
           {/* Filter count summary */}
@@ -714,257 +774,270 @@ const QualityInspectionDetails = ({
           </Text>
         </div>
 
-        {measuredData && measuredData.inspection_data && measuredData.inspection_data.length > 0 ? (
-          <Table
-            columns={[
-              { 
-                title: 'Operation',
-                dataIndex: 'operation_number',
-                key: 'operation_number',
-                width: 90,
-                fixed: 'left',
-                render: (opNum) => <Tag color="purple" className="op-tag">OP {opNum}</Tag>,
-                filters: measuredData.inspection_data.map(op => ({
-                  text: `OP ${op.operation_number}`,
-                  value: op.operation_number
-                })),
-                onFilter: (value, record) => record.operation_number === value
-              },
-              { 
-                title: 'ID',
-                dataIndex: 'id',
-                key: 'id',
-                width: 70,
-                render: (id) => <Tag color="blue">{id}</Tag>,
-                sorter: (a, b) => a.id - b.id,
-                defaultSortOrder: 'ascend'
-              },
-              { 
-                title: 'Zone',
-                dataIndex: 'zone',
-                key: 'zone',
-                width: 90,
-                render: (zone) => zone || '-'
-              },
-              { 
-                title: 'Type',
-                dataIndex: 'dimension_type',
-                key: 'dimension_type',
-                width: 160,
-                render: (type) => <Tag color="cyan" className="type-tag">{type || 'Unknown'}</Tag>,
-                filters: [...new Set(prepareInspectionData().map(item => item.dimension_type))].map(type => ({
-                  text: type || 'Unknown',
-                  value: type || 'Unknown'
-                })),
-                onFilter: (value, record) => record.dimension_type === value
-              },
-              { 
-                title: 'Nominal',
-                dataIndex: 'nominal_value',
-                key: 'nominal_value',
-                width: 100,
-                render: (value) => <Text strong className="nominal-value">{value || '-'}</Text>
-              },
-              { 
-                title: 'Tolerance',
-                children: [
-                  { 
-                    title: 'Upper',
-                    dataIndex: 'uppertol',
-                    key: 'uppertol',
-                    width: 80,
-                    render: (value) => <Text type="success">+{value || '0'}</Text>
-                  },
-                  { 
-                    title: 'Lower',
-                    dataIndex: 'lowertol',
-                    key: 'lowertol',
-                    width: 80,
-                    render: (value) => <Text type="danger">{value || '0'}</Text>
-                  }
-                ]
-              },
-              {
-                title: 'Limits',
-                children: [
-                  { 
-                    title: 'Upper Limit',
-                    key: 'upperLimit',
-                    width: 100,
-                    render: (_, record) => {
-                      const nominal = parseFloat(record.nominal_value) || 0;
-                      const upperTol = parseFloat(record.uppertol) || 0;
-                      const upperLimit = (nominal + upperTol).toFixed(4);
-                      return <Text type="success" className="limit-value">{upperLimit}</Text>;
-                    }
-                  },
-                  { 
-                    title: 'Lower Limit',
-                    key: 'lowerLimit',
-                    width: 100,
-                    render: (_, record) => {
-                      const nominal = parseFloat(record.nominal_value) || 0;
-                      const lowerTol = parseFloat(record.lowertol) || 0;
-                      const lowerLimit = (nominal + lowerTol).toFixed(4);
-                      return <Text type="danger" className="limit-value">{lowerLimit}</Text>;
-                    }
-                  }
-                ]
-              },
-              {
-                title: 'Measurements',
-                children: [
-                  { 
-                    title: '#1',
-                    dataIndex: 'measured_1',
-                    key: 'measured_1',
-                    width: 80,
-                    render: (value) => value || '-'
-                  },
-                  { 
-                    title: '#2',
-                    dataIndex: 'measured_2',
-                    key: 'measured_2',
-                    width: 80,
-                    render: (value) => value || '-'
-                  },
-                  { 
-                    title: '#3',
-                    dataIndex: 'measured_3',
-                    key: 'measured_3',
-                    width: 80,
-                    render: (value) => value || '-'
-                  },
-                ]
-              },
-              { 
-                title: 'Mean',
-                dataIndex: 'measured_mean',
-                key: 'measured_mean',
-                width: 110,
-                fixed: 'right',
-                render: (value, record) => {
-                  if (!value) return '-';
-                  
-                  // Convert to number and fix to 4 decimal places
-                  const formattedValue = Number(value).toFixed(4);
-                  
-                  // Check if mean is within tolerance
-                  const nominal = parseFloat(record.nominal_value) || 0;
-                  const upperTol = parseFloat(record.uppertol) || 0;
-                  const lowerTol = parseFloat(record.lowertol) || 0;
-                  const mean = parseFloat(value) || 0;
-                  
-                  const upperLimit = nominal + upperTol;
-                  const lowerLimit = nominal + lowerTol;
-                  
-                  const isWithinTolerance = mean <= upperLimit && mean >= lowerLimit;
-                  
-                  return (
-                    <div className="flex items-center">
-                      <Text 
-                        strong 
-                        className={`mean-value ${isWithinTolerance ? 'text-green-600' : 'text-red-600'}`}
-                      >
-                        {formattedValue}
-                      </Text>
-                      {isWithinTolerance ? 
-                        <CheckCircleOutlined className="ml-1 text-green-500" /> : 
-                        <CloseCircleOutlined className="ml-1 text-red-500" />
-                      }
-                    </div>
-                  );
-                },
-                sorter: (a, b) => {
-                  const meanA = parseFloat(a.measured_mean) || 0;
-                  const meanB = parseFloat(b.measured_mean) || 0;
-                  return meanA - meanB;
-                }
-              },
-              { 
-                title: 'Instrument',
-                dataIndex: 'measured_instrument',
-                key: 'measured_instrument',
-                width: 120,
-                render: (value) => value || '-'
-              },
-              {
-                title: 'Qty',
-                dataIndex: 'quantity_no',
-                key: 'quantity_no',
-                width: 60,
-                render: (value) => <Tag color="orange">{value || '1'}</Tag>
-              },
-              {
-                title: 'Date',
-                dataIndex: 'created_at',
-                key: 'created_at',
-                width: 130,
-                render: (value) => value ? moment(value).format('DD-MM-YYYY HH:mm') : '-'
-              },
-              { 
-                title: 'Operator',
-                dataIndex: 'operator',
-                key: 'operator',
-                width: 100,
-                render: (operator) => operator?.username || '-'
-              }
-            ]}
-            dataSource={filteredData}
-            pagination={{ 
-              pageSize: 10,
-              // showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50'],
-              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
-            }}
-            size="small"
-            scroll={{ x: 1800, y: 500 }}
-            bordered
-            rowClassName={(record) => {
-              return record.isWithinTolerance ? 'bg-green-50 in-tolerance-row' : 'bg-red-50 out-of-tolerance-row';
-            }}
-            summary={pageData => {
-              const totalItems = pageData.length;
-              const withinToleranceItems = pageData.filter(item => item.isWithinTolerance).length;
-              const outOfToleranceItems = totalItems - withinToleranceItems;
-              
-              return (
-                <Table.Summary fixed>
-                  <Table.Summary.Row className="summary-row">
-                    <Table.Summary.Cell index={0} colSpan={6}>
-                      <Text strong>Summary:</Text>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={1} colSpan={11}>
-                      <Space size="large">
-                        <span><Text strong>{totalItems}</Text> total measurements</span>
-                        <span><Text type="success" strong>{withinToleranceItems}</Text> within tolerance</span>
-                        <span><Text type="danger" strong>{outOfToleranceItems}</Text> out of tolerance</span>
-                        <span><Text type="secondary">{totalItems > 0 ? ((withinToleranceItems/totalItems) * 100).toFixed(1) : '0'}%</Text> pass rate</span>
-                      </Space>
-                    </Table.Summary.Cell>
-                  </Table.Summary.Row>
-                </Table.Summary>
-              );
-            }}
-          />
+        {loadingQty ? (
+          <div className="flex justify-center items-center p-12">
+            <Spin size="large" tip="Loading measurement data..." />
+          </div>
         ) : (
-          <Empty 
-            description={
-              <div className="text-center">
-                <p className="text-lg font-medium text-gray-600">No measurement data available</p>
-                <p className="text-sm text-gray-400">No data has been recorded for this inspection yet</p>
-                <Button 
-                  type="primary" 
-                  className="mt-4"
-                  onClick={() => setIsQmsModalVisible(true)}
-                >
-                  Open QMS Software
-                </Button>
-              </div>
-            }
-            image={Empty.PRESENTED_IMAGE_SIMPLE} 
-            className="py-10"
-          />
+          measuredData && measuredData.inspection_data && measuredData.inspection_data.length > 0 ? (
+            <Table
+              columns={[
+                { 
+                  title: 'Sl. No',
+                  key: 'slno',
+                  width: 70,
+                  render: (text, record, index) => index + 1,
+                  fixed: 'left',
+                },
+                { 
+                  title: 'Operation',
+                  dataIndex: 'operation_number',
+                  key: 'operation_number',
+                  width: 90,
+                  fixed: 'left',
+                  render: (opNum) => <Tag color="purple" className="op-tag">OP {opNum}</Tag>,
+                  filters: measuredData.inspection_data.map(op => ({
+                    text: `OP ${op.operation_number}`,
+                    value: op.operation_number
+                  })),
+                  onFilter: (value, record) => record.operation_number === value
+                },
+                // { 
+                //   title: 'ID',
+                //   dataIndex: 'id',
+                //   key: 'id',
+                //   width: 70,
+                //   render: (id) => <Tag color="blue">{id}</Tag>,
+                //   sorter: (a, b) => a.id - b.id,
+                //   defaultSortOrder: 'ascend'
+                // },
+                { 
+                  title: 'Zone',
+                  dataIndex: 'zone',
+                  key: 'zone',
+                  width: 90,
+                  render: (zone) => zone || '-'
+                },
+                { 
+                  title: 'Type',
+                  dataIndex: 'dimension_type',
+                  key: 'dimension_type',
+                  width: 160,
+                  render: (type) => <Tag color="cyan" className="type-tag">{type || 'Unknown'}</Tag>,
+                  filters: [...new Set(prepareInspectionData().map(item => item.dimension_type))].map(type => ({
+                    text: type || 'Unknown',
+                    value: type || 'Unknown'
+                  })),
+                  onFilter: (value, record) => record.dimension_type === value
+                },
+                { 
+                  title: 'Nominal',
+                  dataIndex: 'nominal_value',
+                  key: 'nominal_value',
+                  width: 100,
+                  render: (value) => <Text strong className="nominal-value">{value || '-'}</Text>
+                },
+                { 
+                  title: 'Tolerance',
+                  children: [
+                    { 
+                      title: 'Upper',
+                      dataIndex: 'uppertol',
+                      key: 'uppertol',
+                      width: 80,
+                      render: (value) => <Text type="success">+{value || '0'}</Text>
+                    },
+                    { 
+                      title: 'Lower',
+                      dataIndex: 'lowertol',
+                      key: 'lowertol',
+                      width: 80,
+                      render: (value) => <Text type="danger">{value || '0'}</Text>
+                    }
+                  ]
+                },
+                {
+                  title: 'Limits',
+                  children: [
+                    { 
+                      title: 'Upper Limit',
+                      key: 'upperLimit',
+                      width: 100,
+                      render: (_, record) => {
+                        const nominal = parseFloat(record.nominal_value) || 0;
+                        const upperTol = parseFloat(record.uppertol) || 0;
+                        const upperLimit = (nominal + upperTol).toFixed(4);
+                        return <Text type="success" className="limit-value">{upperLimit}</Text>;
+                      }
+                    },
+                    { 
+                      title: 'Lower Limit',
+                      key: 'lowerLimit',
+                      width: 100,
+                      render: (_, record) => {
+                        const nominal = parseFloat(record.nominal_value) || 0;
+                        const lowerTol = parseFloat(record.lowertol) || 0;
+                        const lowerLimit = (nominal + lowerTol).toFixed(4);
+                        return <Text type="danger" className="limit-value">{lowerLimit}</Text>;
+                      }
+                    }
+                  ]
+                },
+                {
+                  title: 'Measurements',
+                  children: [
+                    { 
+                      title: '#1',
+                      dataIndex: 'measured_1',
+                      key: 'measured_1',
+                      width: 80,
+                      render: (value) => value || '-'
+                    },
+                    { 
+                      title: '#2',
+                      dataIndex: 'measured_2',
+                      key: 'measured_2',
+                      width: 80,
+                      render: (value) => value || '-'
+                    },
+                    { 
+                      title: '#3',
+                      dataIndex: 'measured_3',
+                      key: 'measured_3',
+                      width: 80,
+                      render: (value) => value || '-'
+                    },
+                  ]
+                },
+                { 
+                  title: 'Mean',
+                  dataIndex: 'measured_mean',
+                  key: 'measured_mean',
+                  width: 110,
+                  fixed: 'right',
+                  render: (value, record) => {
+                    if (!value) return '-';
+                    
+                    // Convert to number and fix to 4 decimal places
+                    const formattedValue = Number(value).toFixed(4);
+                    
+                    // Check if mean is within tolerance
+                    const nominal = parseFloat(record.nominal_value) || 0;
+                    const upperTol = parseFloat(record.uppertol) || 0;
+                    const lowerTol = parseFloat(record.lowertol) || 0;
+                    const mean = parseFloat(value) || 0;
+                    
+                    const upperLimit = nominal + upperTol;
+                    const lowerLimit = nominal + lowerTol;
+                    
+                    const isWithinTolerance = mean <= upperLimit && mean >= lowerLimit;
+                    
+                    return (
+                      <div className="flex items-center">
+                        <Text 
+                          strong 
+                          className={`mean-value ${isWithinTolerance ? 'text-green-600' : 'text-red-600'}`}
+                        >
+                          {formattedValue}
+                        </Text>
+                        {isWithinTolerance ? 
+                          <CheckCircleOutlined className="ml-1 text-green-500" /> : 
+                          <CloseCircleOutlined className="ml-1 text-red-500" />
+                        }
+                      </div>
+                    );
+                  },
+                  sorter: (a, b) => {
+                    const meanA = parseFloat(a.measured_mean) || 0;
+                    const meanB = parseFloat(b.measured_mean) || 0;
+                    return meanA - meanB;
+                  }
+                },
+                { 
+                  title: 'Instrument',
+                  dataIndex: 'measured_instrument',
+                  key: 'measured_instrument',
+                  width: 120,
+                  render: (value) => value || '-'
+                },
+                // {
+                //   title: 'Qty',
+                //   dataIndex: 'quantity_no',
+                //   key: 'quantity_no',
+                //   width: 60,
+                //   render: (value) => <Tag color="orange">{value || '1'}</Tag>
+                // },
+                {
+                  title: 'Date',
+                  dataIndex: 'created_at',
+                  key: 'created_at',
+                  width: 130,
+                  render: (value) => value ? moment(value).format('DD-MM-YYYY HH:mm') : '-'
+                },
+                { 
+                  title: 'Operator',
+                  dataIndex: 'operator',
+                  key: 'operator',
+                  width: 100,
+                  render: (operator) => operator?.username || '-'
+                }
+              ]}
+              dataSource={filteredData}
+              pagination={{ 
+                pageSize: 10,
+                // showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50'],
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
+              }}
+              size="small"
+              scroll={{ x: 1800, y: 500 }}
+              bordered
+              rowClassName={(record) => {
+                return record.isWithinTolerance ? 'bg-green-50 in-tolerance-row' : 'bg-red-50 out-of-tolerance-row';
+              }}
+              summary={pageData => {
+                const totalItems = pageData.length;
+                const withinToleranceItems = pageData.filter(item => item.isWithinTolerance).length;
+                const outOfToleranceItems = totalItems - withinToleranceItems;
+                
+                return (
+                  <Table.Summary fixed>
+                    <Table.Summary.Row className="summary-row">
+                      <Table.Summary.Cell index={0} colSpan={6}>
+                        <Text strong>Summary:</Text>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={1} colSpan={11}>
+                        <Space size="large">
+                          <span><Text strong>{totalItems}</Text> total measurements</span>
+                          <span><Text type="success" strong>{withinToleranceItems}</Text> within tolerance</span>
+                          <span><Text type="danger" strong>{outOfToleranceItems}</Text> out of tolerance</span>
+                          <span><Text type="secondary">{totalItems > 0 ? ((withinToleranceItems/totalItems) * 100).toFixed(1) : '0'}%</Text> pass rate</span>
+                        </Space>
+                      </Table.Summary.Cell>
+                    </Table.Summary.Row>
+                  </Table.Summary>
+                );
+              }}
+            />
+          ) : (
+            <Empty 
+              description={
+                <div className="text-center">
+                  <p className="text-lg font-medium text-gray-600">No measurement data available</p>
+                  <p className="text-sm text-gray-400">No data has been recorded for this inspection yet</p>
+                  <Button 
+                    type="primary" 
+                    className="mt-4"
+                    onClick={() => setIsQmsModalVisible(true)}
+                  >
+                    Open QMS Software
+                  </Button>
+                </div>
+              }
+              image={Empty.PRESENTED_IMAGE_SIMPLE} 
+              className="py-10"
+            />
+          )
         )}
       </Modal>
     );
@@ -1075,7 +1148,6 @@ const QualityInspectionDetails = ({
 
   // Function to handle approving all measurements
   const handleApproveAll = async () => {
-    // First check if already approved
     if (ftpApprovalStatus?.is_completed) {
       Modal.info({
         title: 'Already Approved',
@@ -1086,8 +1158,9 @@ const QualityInspectionDetails = ({
     }
 
     const orderId = inspectionDetails?.order_id;
-    const ipid = inspectionDetails?.operation_groups?.[0]?.ipid;
-    
+    // FIX: Get IPID for the selected operation
+    const ipid = inspectionDetails?.operation_groups?.find(group => group.op_no === selectedOperation)?.ipid;
+
     if (!orderId || !ipid) {
       message.error('Order ID or IPID not found.');
       return;
@@ -1098,11 +1171,11 @@ const QualityInspectionDetails = ({
       await qualityStore.approveAllMeasurements(orderId, ipid);
       message.success('All measurements approved');
       setAllApproved(true);
-      
+
       // Update FTP status after approval
       const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
       setFtpApprovalStatus(ftpStatus);
-      
+
       Modal.success({
         title: 'Approval Successful',
         content: 'All measurements have been approved successfully.',
@@ -1442,7 +1515,7 @@ const QualityInspectionDetails = ({
     }
 
     const orderId = inspectionDetails?.order_id;
-    const ipid = inspectionDetails?.operation_groups?.[0]?.ipid;
+    const ipid = inspectionDetails?.operation_groups?.find(group => group.op_no === selectedOperation)?.ipid;
     
     if (!orderId || !ipid) {
       message.error('Order ID or IPID not found.');
@@ -1821,10 +1894,10 @@ const QualityInspectionDetails = ({
                   <Col span={24}>
                     <Row gutter={[16, 8]}>
                       <Col span={8}>
-                        <div className="flex flex-col">
+                        {/* <div className="flex flex-col">
                           <Text type="secondary" className="text-xs">Order ID</Text>
                           <Text strong className="text-base">{inspectionDetails?.order_id || '-'}</Text>
-                        </div>
+                        </div> */}
                       </Col>
                       <Col span={8}>
                         <div className="flex flex-col">
@@ -2309,6 +2382,22 @@ const QualityInspectionDetails = ({
     <>
       <style>{styles}</style>
       <div className="p-4">
+        {/* Header row with Select and QMS button */}
+        <div className="flex justify-between items-center mb-4">
+          {/* Left: Select Part Number/Production Order (assume this is a prop or component) */}
+          <div>
+            {/* You may need to replace this with your actual select component/logic */}
+            {/* Example: <Select ... /> */}
+          </div>
+          {/* Right: Open QMS Software button */}
+          <Button
+            type="primary"
+            icon={<LinkOutlined />}
+            onClick={handleLaunchQMS}
+          >
+            Open QMS Software
+          </Button>
+        </div>
         <Tabs 
           defaultActiveKey="details" 
           type="card"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert, message, Switch } from 'antd';
+import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert, message, Switch, InputNumber } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, PlusCircleOutlined, CloseOutlined, DatabaseOutlined, UserOutlined, ClockCircleOutlined, LoadingOutlined, LinkOutlined } from '@ant-design/icons';
 import { Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -35,6 +35,7 @@ function InspectionResult() {
   const [isMeasuredDataModalVisible, setIsMeasuredDataModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState('current');
   const [currentOperationData, setCurrentOperationData] = useState(null);
+  // Remove qty and loadingQty from parent
 
   useEffect(() => {
     const fetchPartNumbers = async () => {
@@ -546,29 +547,22 @@ function InspectionResult() {
   // Update the columns definition to handle current view
   const columns = useMemo(() => [
     {
-      title: 'Order ID',
-      dataIndex: 'order_id',
-      key: 'order_id',
-      width: '8%',
-      fixed: 'left',
-    },
-    {
       title: 'Production Order',
       dataIndex: 'production_order',
       key: 'production_order',
-      width: '12%',
+      width: '20%',
     },
     {
       title: 'Part Number',
       dataIndex: 'part_number',
       key: 'part_number',
-      width: '12%',
+      width: '20%',
     },
     {
       title: 'Operations',
       dataIndex: 'operations',
       key: 'operations',
-      width: '28%',
+      width: '40%',
       render: (operations, record) => {
         // If in current operation view, only show the active operation
         const opsToShow = viewMode === 'current' ? 
@@ -685,41 +679,36 @@ function InspectionResult() {
     };
     
     // Function to fetch detailed measurements
-    const fetchDetailedMeasurements = async () => {
+    const fetchDetailedMeasurements = async (qtyValue = 1) => {
       try {
         setLoadingDetailedMeasurements(true);
-        
-        // Use the actual order ID from the selected data
+    
         const inspectionId = selectedOrderId;
         if (!inspectionId) {
           throw new Error('No order ID selected');
         }
-        
-        console.log(`Fetching stage inspection for order ID: ${inspectionId}, operation: ${selectedOperation}`);
-        
-        // Call the fetchStageInspectionByOperation method from quality-store.js
-        const response = await qualityStore.fetchStageInspectionByOperation(inspectionId, selectedOperation);
+    
+        console.log(`Fetching stage inspection for order ID: ${inspectionId}, operation: ${selectedOperation}, qty: ${qtyValue}`);
+    
+        // Call fetchStageInspectionByOperation — it throws detailed backend errors
+        const response = await qualityStore.fetchStageInspectionByOperation(inspectionId, selectedOperation, qtyValue);
         console.log('Stage inspection data received:', response);
-
-        // Check FTP approval status
-        const orderId = inspectionId;
+    
+        // Optional: FTP status check
         const ipid = `IPID-${inspectionData?.[0]?.part_number}-${selectedOperation}`;
-        
         if (ipid) {
-          console.log('Checking FTP status for orderId:', orderId, 'ipid:', ipid);
-          
+          console.log('Checking FTP status for orderId:', inspectionId, 'ipid:', ipid);
           try {
-            const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+            const ftpStatus = await qualityStore.checkFTPApprovalStatus(inspectionId, ipid);
             console.log('FTP Status received:', ftpStatus);
             setFtpApprovalStatus(ftpStatus);
-          } catch (error) {
-            console.error('Error checking FTP status:', error);
-            // Remove the error message popup
+          } catch (ftpError) {
+            console.error('Error checking FTP status:', ftpError);
             setFtpApprovalStatus({ is_completed: false });
           }
         }
-        
-        // Transform the response data to match the expected format
+    
+        // Transform backend data for display
         const transformedData = {
           order_id: inspectionId,
           production_order: inspectionData?.[0]?.production_order || '',
@@ -743,17 +732,70 @@ function InspectionResult() {
             }))
           }]
         };
-        
+    
         setDetailedMeasurements(transformedData);
-        setIsDetailedMeasurementsVisible(true);
-        
+        if (!isDetailedMeasurementsVisible) {
+          setIsDetailedMeasurementsVisible(true);
+        }
+    
       } catch (error) {
         console.error('Error fetching stage inspection data:', error);
+        
+        // Use error.message which now includes backend `detail` if available
         message.error(`Failed to load measurements: ${error.message}`);
       } finally {
         setLoadingDetailedMeasurements(false);
       }
     };
+    // Handler for qty change
+    // const handleQtyChange = async (value) => {
+    //   setQty(value);
+    //   setLoadingQty(true);
+    //   try {
+    //     const inspectionId = selectedOrderId;
+    //     if (!inspectionId) return;
+    //     const response = await qualityStore.fetchStageInspectionByOperation(inspectionId, selectedOperation, value);
+    //     if (!response || response.length === 0) {
+    //       Modal.info({
+    //         title: 'No Data',
+    //         content: `No measurements found for quantity ${value}.`,
+    //         okText: 'OK',
+    //       });
+    //       setFilteredData([]);
+    //       return;
+    //     }
+    //     // Prepare flat data for the table directly
+    //     const flatData = response.map((item, idx) => ({
+    //       ...item,
+    //       operation_number: selectedOperation,
+    //       key: `${selectedOperation}-${item.id || idx}`
+    //     }));
+    //     // Apply current filter
+    //     let filtered = [];
+    //     if (activeFilter === 'all') {
+    //       filtered = flatData;
+    //     } else if (activeFilter === 'out-of-tolerance') {
+    //       filtered = flatData.filter(item => {
+    //         const nominal = parseFloat(item.nominal_value) || 0;
+    //         const upperTol = parseFloat(item.uppertol) || 0;
+    //         const lowerTol = parseFloat(item.lowertol) || 0;
+    //         const mean = parseFloat(item.measured_mean) || 0;
+    //         return !(mean <= (nominal + upperTol) && mean >= (nominal + lowerTol));
+    //       });
+    //     } else if (activeFilter === 'within-tolerance') {
+    //       filtered = flatData.filter(item => {
+    //         const nominal = parseFloat(item.nominal_value) || 0;
+    //         const upperTol = parseFloat(item.uppertol) || 0;
+    //         const lowerTol = parseFloat(item.lowertol) || 0;
+    //         const mean = parseFloat(item.measured_mean) || 0;
+    //         return mean <= (nominal + upperTol) && mean >= (nominal + lowerTol);
+    //       });
+    //     }
+    //     setFilteredData(filtered);
+    //   } finally {
+    //     setLoadingQty(false);
+    //   }
+    // };
     
     // Function to filter measurements
     const getFilteredInspections = () => {
@@ -950,7 +992,14 @@ function InspectionResult() {
             </Tag>
           </Tooltip>
         )
-      }
+      },
+      // {
+      //   title: 'Qty',
+      //   dataIndex: 'quantity_no',
+      //   key: 'quantity_no',
+      //   width: '8%',
+      //   render: (value) => <Tag color="orange">{value}</Tag>
+      // }
     ];
     
     // Simplified measurement columns as requested
@@ -1033,26 +1082,183 @@ function InspectionResult() {
 
     // DetailedMeasurementsModal component
     const DetailedMeasurementsModal = () => {
-      // Function to get the measurements for the selected operation
-      const getOperationMeasurements = () => {
-        if (!detailedMeasurements || !detailedMeasurements.inspection_data) {
-          return [];
+      const [qty, setQty] = useState(1);
+      const [loadingQty, setLoadingQty] = useState(false);
+      const [activeFilter, setActiveFilter] = useState('all');
+      const [filteredData, setFilteredData] = useState([]);
+
+      // Reset qty and filter when modal opens (only on first open)
+      useEffect(() => {
+        if (isDetailedMeasurementsVisible) {
+          setQty(1);
+          setActiveFilter('all');
+          setFilteredData([]);
         }
-        
-        // Find the operation data matching the selected operation
-        const operationData = detailedMeasurements.inspection_data.find(
-          data => data.operation_number === parseInt(selectedOperation, 10) || 
-                 data.operation_number === selectedOperation
-        );
-        
-        // Return the inspections if found, otherwise empty array
-        return operationData?.inspections || [];
+      }, [isDetailedMeasurementsVisible]);
+
+      // Prepare flat data for filtering, always using the current qty
+      const prepareInspectionData = () => {
+        if (!detailedMeasurements || !detailedMeasurements.inspection_data) return [];
+        const flatData = [];
+        detailedMeasurements.inspection_data.forEach(operationData => {
+          if (operationData.inspections && operationData.inspections.length > 0) {
+            operationData.inspections.forEach(inspection => {
+              flatData.push({
+                ...inspection,
+                operation_number: operationData.operation_number,
+                key: `${operationData.operation_number}-${inspection.id}`
+              });
+            });
+          }
+        });
+        return flatData;
       };
+
+      // Handle filter changes
+      const handleFilterChange = (filter) => {
+        setActiveFilter(filter);
+        let allData = prepareInspectionData();
+        let filtered = [];
+        if (filter === 'all') {
+          filtered = allData;
+        } else if (filter === 'out-of-tolerance') {
+          filtered = allData.filter(item => {
+            const nominal = parseFloat(item.nominal_value) || 0;
+            const upperTol = parseFloat(item.uppertol) || 0;
+            const lowerTol = parseFloat(item.lowertol) || 0;
+            const mean = parseFloat(item.measured_mean) || 0;
+            return !(mean <= (nominal + upperTol) && mean >= (nominal + lowerTol));
+          });
+        } else if (filter === 'within-tolerance') {
+          filtered = allData.filter(item => {
+            const nominal = parseFloat(item.nominal_value) || 0;
+            const upperTol = parseFloat(item.uppertol) || 0;
+            const lowerTol = parseFloat(item.lowertol) || 0;
+            const mean = parseFloat(item.measured_mean) || 0;
+            return mean <= (nominal + upperTol) && mean >= (nominal + lowerTol);
+          });
+        }
+        setFilteredData(filtered);
+      };
+
+      // Handle Qty change
+      const handleQtyChange = async (value) => {
+        setQty(value);
+        setLoadingQty(true);
+        try {
+          const inspectionId = selectedOrderId;
+          if (!inspectionId) return;
       
-      const measurements = getOperationMeasurements();
+          const response = await qualityStore.fetchStageInspectionByOperation(
+            inspectionId, selectedOperation, value
+          );
       
+          if (!response || response.length === 0) {
+            setFilteredData([]); // Clear table data
+            Modal.info({
+              title: (
+                <Space>
+                  <PlusCircleOutlined className="text-blue-500" />
+                  <span>No Measurements Found</span>
+                </Space>
+              ),
+              content: (
+                <div className="p-4">
+                  <Alert
+                    message="No Measurement Data Available"
+                    description={
+                      <div>
+                        <p>No measurement data is available for Operation {selectedOperation} and Quantity {value}.</p>
+                        <p>Would you like to open the QMS software to create new measurements?</p>
+                        <div className="mt-4">
+                          <Text strong>Details:</Text>
+                          <ul className="mt-2">
+                            <li>Operation Number: {selectedOperation}</li>
+                            <li>Quantity: {value}</li>
+                            <li>Part Number: {inspectionData?.[0]?.part_number || 'N/A'}</li>
+                            <li>Production Order: {inspectionData?.[0]?.production_order || 'N/A'}</li>
+                          </ul>
+                        </div>
+                      </div>
+                    }
+                    type="info"
+                    showIcon
+                    className="mb-4"
+                  />
+                  <div className="text-center mt-4">
+                    <Button 
+                      type="primary"
+                      onClick={() => {
+                        Modal.destroyAll();
+                        handleLaunchQMS();
+                      }}
+                      loading={isLaunching}
+                      icon={<LinkOutlined />}
+                      size="large"
+                    >
+                      Open QMS Software
+                    </Button>
+                  </div>
+                </div>
+              ),
+              okText: 'Close',
+              width: 500,
+              onOk: () => {
+                Modal.destroyAll();
+              }
+            });
+            return;
+          }
+      
+          const flatData = response.map((item, idx) => ({
+            ...item,
+            operation_number: selectedOperation,
+            key: `${selectedOperation}-${item.id || idx}`
+          }));
+      
+          let filtered = [];
+          if (activeFilter === 'all') {
+            filtered = flatData;
+          } else if (activeFilter === 'out-of-tolerance') {
+            filtered = flatData.filter(item => {
+              const nominal = parseFloat(item.nominal_value) || 0;
+              const upperTol = parseFloat(item.uppertol) || 0;
+              const lowerTol = parseFloat(item.lowertol) || 0;
+              const mean = parseFloat(item.measured_mean) || 0;
+              return !(mean <= (nominal + upperTol) && mean >= (nominal + lowerTol));
+            });
+          } else if (activeFilter === 'within-tolerance') {
+            filtered = flatData.filter(item => {
+              const nominal = parseFloat(item.nominal_value) || 0;
+              const upperTol = parseFloat(item.uppertol) || 0;
+              const lowerTol = parseFloat(item.lowertol) || 0;
+              const mean = parseFloat(item.measured_mean) || 0;
+              return mean <= (nominal + upperTol) && mean >= (nominal + lowerTol);
+            });
+          }
+      
+          setFilteredData(filtered);
+      
+        } catch (error) {
+          setFilteredData([]);
+          console.error('Error loading inspection data:', error);
+          message.error(error.message || 'Failed to load inspection data.');
+        } finally {
+          setLoadingQty(false);
+        }
+      };
+
+      // Update filtered data when measured data or filter changes
+      useEffect(() => {
+        handleFilterChange(activeFilter);
+        // eslint-disable-next-line
+      }, [detailedMeasurements]);
+
+      const allData = prepareInspectionData();
+
       return (
         <Modal
+          key="detailed-measurements-modal"
           title={
             <div className="flex items-center gap-3 py-2">
               <div className="bg-blue-50 p-2 rounded-lg">
@@ -1067,14 +1273,14 @@ function InspectionResult() {
             </div>
           }
           open={isDetailedMeasurementsVisible}
-          onCancel={() => setIsDetailedMeasurementsVisible(false)}
+          onCancel={handleCloseModal}
           width={1800}
           style={{ top: 20 }}
           bodyStyle={{ padding: '24px', maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }}
           footer={[
             <Button 
               key="close" 
-              onClick={() => setIsDetailedMeasurementsVisible(false)}
+              onClick={handleCloseModal}
               className="hover:scale-105 transition-transform"
               icon={<CloseOutlined />}
             >
@@ -1083,11 +1289,72 @@ function InspectionResult() {
           ]}
         >
           <div className="p-4">
-            {loadingDetailedMeasurements ? (
+            {/* Filter and Qty controls in a flex row */}
+            <div className="mb-4 flex flex-wrap gap-4 justify-between items-center">
+              <div className="flex gap-2 items-center">
+                <Text strong>Quick Filters:</Text>
+                <Button 
+                  size="small" 
+                  type={activeFilter === 'all' ? "primary" : "default"}
+                  ghost={activeFilter !== 'all'}
+                  className={`filter-btn ${activeFilter === 'all' ? 'active-filter' : ''}`}
+                  onClick={() => handleFilterChange('all')}
+                >
+                  All ({allData.length})
+                </Button>
+                <Button 
+                  size="small"
+                  type={activeFilter === 'out-of-tolerance' ? "danger" : "default"}
+                  danger={activeFilter === 'out-of-tolerance'}
+                  ghost={activeFilter === 'out-of-tolerance'}
+                  className={`filter-btn ${activeFilter === 'out-of-tolerance' ? 'active-filter' : ''}`}
+                  onClick={() => handleFilterChange('out-of-tolerance')}
+                >
+                  Out of Tolerance ({allData.filter(item => {
+                    const nominal = parseFloat(item.nominal_value) || 0;
+                    const upperTol = parseFloat(item.uppertol) || 0;
+                    const lowerTol = parseFloat(item.lowertol) || 0;
+                    const mean = parseFloat(item.measured_mean) || 0;
+                    return !(mean <= (nominal + upperTol) && mean >= (nominal + lowerTol));
+                  }).length})
+                </Button>
+                <Button 
+                  size="small"
+                  className={`filter-btn ${activeFilter === 'within-tolerance' 
+                    ? 'bg-green-100 border-green-300 text-green-700' 
+                    : 'bg-green-50 border-green-200 text-green-600 hover:bg-green-100 hover:border-green-300'}`}
+                  onClick={() => handleFilterChange('within-tolerance')}
+                >
+                  Within Tolerance ({allData.filter(item => {
+                    const nominal = parseFloat(item.nominal_value) || 0;
+                    const upperTol = parseFloat(item.uppertol) || 0;
+                    const lowerTol = parseFloat(item.lowertol) || 0;
+                    const mean = parseFloat(item.measured_mean) || 0;
+                    return mean <= (nominal + upperTol) && mean >= (nominal + lowerTol);
+                  }).length})
+                </Button>
+                {/* Qty input */}
+                <span style={{ marginLeft: 16, fontWeight: 500 }}>Qty:</span>
+                <InputNumber
+                  min={1}
+                  max={1000}
+                  value={qty}
+                  onChange={handleQtyChange}
+                  style={{ width: 80 }}
+                  placeholder="Qty"
+                  loading={loadingQty}
+                />
+              </div>
+              {/* Filter count summary */}
+              <Text type="secondary">
+                Showing {filteredData.length} of {allData.length} measurements
+              </Text>
+            </div>
+            {loadingQty ? (
               <div className="flex justify-center items-center p-12">
                 <Spin size="large" tip="Loading measurement data..." />
               </div>
-            ) : measurements && measurements.length > 0 ? (
+            ) : filteredData && filteredData.length > 0 ? (
               <div>
                 <Alert
                   message={
@@ -1104,7 +1371,7 @@ function InspectionResult() {
                       )}
                       {ftpApprovalStatus?.updated_at && (
                         <Text type="secondary" className="ml-4">
-                          Last Updated: {new Date(ftpApprovalStatus.updated_at).toLocaleString()}
+                          Last Updated: {ftpApprovalStatus.updated_at ? moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY') : ''}
                         </Text>
                       )}
                     </div>
@@ -1113,10 +1380,9 @@ function InspectionResult() {
                   showIcon
                   className="mb-4"
                 />
-                
                 <Table
                   columns={detailedMeasurementColumns}
-                  dataSource={measurements.map(item => ({
+                  dataSource={filteredData.map(item => ({
                     ...item,
                     key: item.id || `${item.zone}-${item.dimension_type}`
                   }))}
@@ -1136,19 +1402,60 @@ function InspectionResult() {
                 />
               </div>
             ) : (
-              <Empty 
-                description={
-                  <div className="text-center">
-                    <p className="text-gray-500 mb-4">No measurements found for Operation {selectedOperation}</p>
-                    {!ftpApprovalStatus?.is_completed && (
-                      <Tag color="warning" icon={<ClockCircleOutlined />}>
-                        Not Yet Approved
-                      </Tag>
-                    )}
+              <div className="text-center">
+                <Empty 
+                  description={
+                    <div className="text-center">
+                      <p className="text-gray-500 mb-4">
+                        No measurements found for Operation {selectedOperation} and Quantity {qty}
+                      </p>
+                      {!ftpApprovalStatus?.is_completed && (
+                        <Tag color="warning" icon={<ClockCircleOutlined />}>
+                          Not Yet Approved
+                        </Tag>
+                      )}
+                    </div>
+                  }
+                  className="my-8"
+                />
+                <div className="mt-6">
+                  {/* <Alert
+                    message="No Measurement Data Available"
+                    description={
+                      <div>
+                        <p>No measurement data is available for Operation {selectedOperation} and Quantity {qty}.</p>
+                        <p>Would you like to open the QMS software to create new measurements?</p>
+                        <div className="mt-4">
+                          <Text strong>Details:</Text>
+                          <ul className="mt-2 text-left">
+                            <li>Operation Number: {selectedOperation}</li>
+                            <li>Quantity: {qty}</li>
+                            <li>Part Number: {detailedMeasurements?.part_number || 'N/A'}</li>
+                            <li>Production Order: {detailedMeasurements?.production_order || 'N/A'}</li>
+                          </ul>
+                        </div>
+                      </div>
+                    }
+                    type="info"
+                    showIcon
+                    className="mb-4"
+                  /> */}
+                  <div className="text-center mt-4">
+                  
                   </div>
-                }
-                className="my-12"
-              />
+
+                  <Button 
+                      type="primary"
+                      onClick={handleLaunchQMS}
+                      loading={isLaunching}
+                      icon={<LinkOutlined />}
+                      size="large"
+                    >
+                      Open QMS Software
+                    </Button>
+
+                </div>
+              </div>
             )}
           </div>
         </Modal>
@@ -1269,12 +1576,13 @@ function InspectionResult() {
                   <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200">
                     <Text strong>Ballooned Drawing</Text>
                     <Space>
+                     
                       {/* New View Measurements button */}
                       <Button 
                         type="primary"
                         icon={<EyeOutlined />}
                         size="small"
-                        onClick={fetchDetailedMeasurements}
+                        onClick={() => fetchDetailedMeasurements(1)}
                         loading={loadingDetailedMeasurements}
                       >
                         View Measurements 
@@ -1324,10 +1632,45 @@ function InspectionResult() {
               </div>
             </div>
           ) : (
-            <Empty 
-              description="No measurement data available for this operation"
-              className="my-12" 
-            />
+            <div className="text-center">
+              <Empty 
+                description="No measurement data available for this operation"
+                className="my-8" 
+              />
+              <div className="mt-6">
+                <Alert
+                  message="No Measurement Data Available"
+                  description={
+                    <div>
+                      <p>No measurement data is available for Operation {selectedOperation}.</p>
+                      <p>Would you like to open the QMS software to create new measurements?</p>
+                      <div className="mt-4">
+                        <Text strong>Details:</Text>
+                        <ul className="mt-2 text-left">
+                          <li>Operation Number: {selectedOperation}</li>
+                          <li>Part Number: {inspectionData?.[0]?.part_number || 'N/A'}</li>
+                          <li>Production Order: {inspectionData?.[0]?.production_order || 'N/A'}</li>
+                        </ul>
+                      </div>
+                    </div>
+                  }
+                  type="info"
+                  showIcon
+                  className="mb-4"
+                />
+                <div className="text-center mt-4">
+                  <Button 
+                    type="primary"
+                    onClick={handleLaunchQMS}
+                    loading={isLaunching}
+                    icon={<LinkOutlined />}
+                    size="large"
+                  >
+                    Open QMS Software
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
         
@@ -1646,6 +1989,13 @@ function InspectionResult() {
       key: currentOperationData.operation_id
     };
   }, [currentOperationData]);
+
+  // When closing the modal, reset qty to 1 and filter to 'all'
+  const handleCloseModal = () => {
+    setIsDetailedMeasurementsVisible(false);
+    setQty(1);
+    setActiveFilter('all');
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">

@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // base: '/belmes/', //For the development mode this code must be commented and not required , but should be uncommented in the depoyment mode becasue it is required
+  base: '/belmes/', //For the development mode this code must be commented and not required , but should be uncommented in the depoyment mode becasue it is required
   plugins: [react()],
   server: {
     // proxy: {

@@ -4,7 +4,7 @@ class QualityStore {
   constructor() {
     // Create axios instance with better configuration
     this.api = axios.create({
-      baseURL: 'http://172.18.7.89:5467/api/v1',
+      baseURL: 'http://172.18.7.91:8008/api/v1',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
@@ -662,7 +662,15 @@ class QualityStore {
         return response.data;
         
       } catch (error) {
-        this.handleError(error, 'Fetching stage inspection');
+        let errorMessage = 'An error occurred while fetching stage inspection.';
+        if (error.response && error.response.data && error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        }
+
+        console.error('Backend error:', errorMessage);
+        
+        // Optionally throw this to be handled in the UI
+        throw new Error(errorMessage);
       }
     });
   }

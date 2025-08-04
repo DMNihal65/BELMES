@@ -401,6 +401,29 @@ const Productivity = ({ onBack }) => {
           >
             View Report
           </Button>
+          {isLive && !isDataLoading && (
+            <div style={{ 
+              background: '#22c55e',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              color: 'white',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              <div style={{ 
+                width: '8px', 
+                height: '8px', 
+                background: 'white',
+                borderRadius: '50%',
+                animation: 'pulse 1.5s infinite'
+              }}></div>
+              <span>Live Data</span>
+            </div>
+          )}
         </Space>
       </div>
 
@@ -505,31 +528,7 @@ const Productivity = ({ onBack }) => {
         </Row>
       )}
       
-      {/* Live indicator */}
-      {isLive && !isDataLoading && (
-        <div style={{ 
-          position: 'fixed', 
-          bottom: '20px', 
-          right: '20px',
-          background: '#22c55e',
-          padding: '8px 16px',
-          borderRadius: '20px',
-          color: 'white',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <div style={{ 
-            width: '8px', 
-            height: '8px', 
-            background: 'white',
-            borderRadius: '50%',
-            animation: 'pulse 1.5s infinite'
-          }}></div>
-          <span>Live Data</span>
-        </div>
-      )}
+
       
       <style jsx>{`
         @keyframes pulse {

@@ -100,7 +100,7 @@ const Workcenter = () => {
       type: record.type,
       make: record.make,
       model: record.model,
-      year_of_installation: record.year_of_installation,
+      year_of_installation: record.year_of_installation ? dayjs(String(record.year_of_installation), 'YYYY') : null,
       cnc_controller: record.cnc_controller,
       cnc_controller_series: record.cnc_controller_series,
       remarks: record.remarks,
@@ -126,7 +126,7 @@ const Workcenter = () => {
         type: row.type?.trim() || '',
         make: row.make?.trim() || '',
         model: row.model?.trim() || '',
-        year_of_installation: row.year_of_installation ? parseInt(row.year_of_installation) : 0,
+        year_of_installation: row.year_of_installation ? row.year_of_installation.year() : 0,
         cnc_controller: row.cnc_controller?.trim() || '',
         cnc_controller_series: row.cnc_controller_series?.trim() || '',
         remarks: row.remarks?.trim() || '',
@@ -418,7 +418,13 @@ const Workcenter = () => {
       editable: true,
       render: (text, record) => isEditing(record) ? (
         <Form.Item name="calibration_due_date" style={{ margin: 0 }}>
-          <DatePicker />
+          <DatePicker 
+            style={{ width: '100%' }}
+            disabledDate={current => {
+              // Only allow dates from tomorrow onwards
+              return current && current < dayjs().endOf('day');
+            }}
+          />
         </Form.Item>
       ) : text ? dayjs(text).format('YYYY-MM-DD') : '-',
       filterSearch: true,
@@ -440,7 +446,13 @@ const Workcenter = () => {
       editable: true,
       render: (text, record) => isEditing(record) ? (
         <Form.Item name="last_maintenance_date" style={{ margin: 0 }}>
-          <DatePicker />
+          <DatePicker 
+            style={{ width: '100%' }}
+            disabledDate={current => {
+              // Only allow previous dates (not today or future)
+              return current && current >= dayjs().startOf('day');
+            }}
+          />
         </Form.Item>
       ) : text ? dayjs(text).format('YYYY-MM-DD') : '-',
       filterSearch: true,
@@ -493,14 +505,14 @@ const Workcenter = () => {
             >
               Edit
             </Button>
-            <Button
+            {/* <Button
               type="link"
               icon={<EyeOutlined />}
               onClick={() => handleView(record)}
               className="text-gray-600 hover:text-gray-700"
             >
               View
-            </Button>
+            </Button> */}
             <Popconfirm
               title="Are you sure you want to delete this machine?"
               onConfirm={() => handleDelete(record)}
@@ -508,7 +520,7 @@ const Workcenter = () => {
               cancelText="No"
             >
               {/* <Button
-                type="link"
+            type="link"
                 icon={<DeleteOutlined />}
                 className="text-red-600 hover:text-red-700"
               >
@@ -517,7 +529,7 @@ const Workcenter = () => {
             </Popconfirm>
           </Space>
         );
-      },
+  },
     },
   ];
 
@@ -567,29 +579,32 @@ const Workcenter = () => {
       const values = await addForm.validateFields();
       console.log('Form values:', values);
       
-      if (!values.workcenterCode || !values.description || !values.operation) {
+      if (!values.workcenterCode || !values.description) {
         toast.error('Please fill in all required fields');
         return;
       }
 
+      // Remove operation from workcenterData
       const workcenterData = {
         code: values.workcenterCode.trim(),
-        plant_id: "PLANT001",
+        plant_id: values.plant_id?.trim() || 'PLANT001', // Add fallback
         description: values.description.trim(),
-        operation: values.operation.trim(),
         is_active: true,
-        is_schedulable:true,
+        is_schedulable: true,
         type: "MACHINE",
-        work_center_name: values.workcenterName?.trim() || values.workcenterCode.trim()
+        work_center_name: values.workcenterName?.trim() || values.workcenterCode.trim(),
+        operation: "" // Add empty operation field to prevent API errors
       };
 
       console.log('Creating workcenter with data:', workcenterData);
       
       await createWorkcenter(workcenterData);
-      
       setIsAddModalVisible(false);
       addForm.resetFields();
       toast.success('Workcenter added successfully');
+      // Refresh the workcenters data immediately
+      await fetchWorkcenters();
+      await fetchWorkcenterConfig();
       
     } catch (error) {
       console.error('Add failed:', error);
@@ -714,6 +729,21 @@ const Workcenter = () => {
       </Form.Item>
 
       <Form.Item
+        name="plant_id"
+        label="Plant ID"
+        rules={[
+          { required: true, message: 'Please enter Plant ID' },
+          { whitespace: true, message: 'Plant ID cannot be empty' },
+          { max: 20, message: 'Plant ID cannot be longer than 20 characters' }
+        ]}
+      >
+        <Input 
+          placeholder="Enter Plant ID" 
+          maxLength={20}
+        />
+      </Form.Item>
+
+      <Form.Item
         name="workcenterName"
         label="Workcenter Name"
         rules={[
@@ -745,7 +775,7 @@ const Workcenter = () => {
         />
       </Form.Item>
 
-      <Form.Item
+      {/* <Form.Item
         name="operation"
         label="Operation"
         rules={[
@@ -760,7 +790,7 @@ const Workcenter = () => {
           maxLength={100}
           showCount
         />
-      </Form.Item>
+      </Form.Item> */}
     </Form>
   );
 
@@ -1223,7 +1253,13 @@ const Workcenter = () => {
                 label="Calibration Due Date"
                 rules={[{ required: true, message: 'Please select Calibration Due Date' }]}
               >
-                <DatePicker style={{ width: '100%' }} />
+                <DatePicker 
+                  style={{ width: '100%' }}
+                  disabledDate={current => {
+                    // Only allow dates from tomorrow onwards
+                    return current && current < dayjs().endOf('day');
+                  }}
+                />
               </Form.Item>
 
               <Form.Item
@@ -1231,7 +1267,13 @@ const Workcenter = () => {
                 label="Last Maintenance Date"
                 rules={[{ required: true, message: 'Please select Last Maintenance Date' }]}
               >
-                <DatePicker style={{ width: '100%' }} />
+                <DatePicker 
+                  style={{ width: '100%' }}
+                  disabledDate={current => {
+                    // Only allow previous dates (not today or future)
+                    return current && current >= dayjs().startOf('day');
+                  }}
+                />
               </Form.Item>
 
               <Form.Item
@@ -1584,7 +1626,7 @@ scroll={{ x: 'max-content' }}
                       columns={configColumns}
                       loading={isLoading}
                       pagination={{
-                        pageSize: 6,
+                        pageSize: 10,
                         showSizeChanger: false,
                         showQuickJumper: false,
                         position: ['bottomCenter'],
@@ -1622,7 +1664,7 @@ scroll={{ x: 'max-content' }}
         </Modal>
 
         <Modal
-          title="Add New Workcenterss"
+          title="Add New Workcenter"
           open={isAddModalVisible}
           onOk={handleAddWorkcenter}
           onCancel={() => {
@@ -1752,6 +1794,13 @@ const EditableCell = ({
                    dataIndex === 'calibration_due_date' || 
                    dataIndex === 'last_maintenance_date' ? (
     <DatePicker style={{ width: '100%' }} />
+  ) : dataIndex === 'year_of_installation' ? (
+    <DatePicker 
+      picker="year"
+      style={{ width: '100%' }}
+      format="YYYY"
+      disabledDate={current => current && current.year() > 2029}
+    />
   ) : (
     <Input />
   );

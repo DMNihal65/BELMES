@@ -451,7 +451,7 @@ const OrderDashboard = () => {
       
       <div className="flex-1 p-4 overflow-hidden flex flex-col bg-sky-100 ">
         {/* Quick Stats Row - Reordered: Total Orders, In Progress, Completed, Priority */}
-        <Row gutter={[16, 16]} className="mb-6  " ref={parent}>
+        <Row gutter={[12, 12]} className="mb-6  " ref={parent}>
           {/* Total Orders Card - 1st */}
           <Col xs={24} sm={12} md={6}>
             <Card 
@@ -633,64 +633,7 @@ const OrderDashboard = () => {
           </Col>
           
           {/* Priority Card - 4th (Last) */}
-          <Col xs={24} sm={12} md={6}>
-            <Card 
-              className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
-              bodyStyle={{ padding: 0 }}
-            >
-              {/* Animated background elements */}
-              <div className="absolute inset-0 opacity-5">
-                <div className="absolute top-4 right-4 w-32 h-32 bg-amber-200 rounded-full blur-2xl animate-pulse"></div>
-                <div className="absolute bottom-4 left-4 w-24 h-24 bg-yellow-200 rounded-full blur-xl animate-pulse delay-1000"></div>
-              </div>
-              
-              {/* Main content container */}
-              <div className="relative p-6 flex items-center justify-between h-32">
-                
-                {/* Left side - Icon and Label */}
-                <div className="flex items-center gap-4 flex-1">
-                  {/* Animated icon container */}
-                  <div className="relative">
-                    <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-yellow-100 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
-                      <Lottie
-                        animationData={priorityAnimation}
-                        style={{ width: 52, height: 52 }}
-                        {...lottieOptions}
-                        loop={true}
-                      />
-                    </div>
-                    {/* Pulse ring effect */}
-                    <div className="absolute inset-0 bg-amber-200 rounded-xl animate-ping opacity-20"></div>
-                  </div>
-                  
-                  {/* Label section */}
-                  <div className="flex flex-col justify-center">
-                    <h3 className="text-amber-800 font-semibold text-xl leading-tight">
-                      Priority
-                    </h3>
-                    <p className="text-amber-600 text-sm font-medium opacity-80">
-                      High Priority Orders
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Right side - Big number display */}
-                <div className="flex flex-col items-end justify-center">
-                  <div className="text-right">
-                    <div className="text-5xl font-bold text-amber-700 leading-none group-hover:text-amber-800 transition-colors duration-300">
-                      {priorityOrdersCount}
-                    </div>
-                    <div className="text-amber-500 text-xs font-medium mt-1 uppercase tracking-wider">
-                      Total
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Bottom accent line */}
-              <div className="h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 group-hover:h-1.5 transition-all duration-300"></div>
-            </Card>
-          </Col>
+          {/*  */}
         </Row>
 
         {/* Main Content Area - Full Width Order Management */}

@@ -1,28 +1,173 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Card, List, Empty, Button, Tag, Tooltip, Spin, Alert, message, Table } from 'antd';
-import { 
-  FileText, Download, Eye, FileArchive, 
-  FileImage, Database, AlertCircle, Info,
-  Package
-} from 'lucide-react';
+import { Tabs, Card, List, Empty, Button, Tag, Table, Spin, Alert, message } from 'antd';
+import { FileText, Download, Eye, FileArchive, FileImage, Database, AlertCircle, Info, Package } from 'lucide-react';
 import useOperatorStore from '../../../store/operator-store';
+import usePlanningStore from '../../../store/planning-store';
 
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.18.7.91:8008";
-const MPP_API_BASE_URL = "http://172.18.7.91:8008";
+const API_BASE_URL = "http://172.18.7.89:5467";
+const MPP_API_BASE_URL = "http://172.18.7.89:5467";
 
 const DocumentsCard = () => {
   const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials } = useOperatorStore();
+  const { fetchToolsByOrderId, fetchCncProgramDetails } = usePlanningStore();
   const [activeTab, setActiveTab] = useState('all');
   const [downloading, setDownloading] = useState(false);
+  const [tools, setTools] = useState([]);
+  const [cncPrograms, setCncPrograms] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [cncLoading, setCncLoading] = useState(false);
+  const [cncError, setCncError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
+  // Table columns for CNC Programs
+  const documentsColumns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      className: 'bg-gray-50',
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      className: 'bg-gray-50',
+    },
+    {
+      title: 'Operation',
+      dataIndex: 'operation_number',
+      key: 'operation_number',
+      className: 'bg-gray-50',
+      render: (operationNumber, record) => {
+        // Log the record to help debugging
+        console.log('Rendering operation for document in table:', record);
+        // Handle different possible data structures from API
+        let opNum = operationNumber ||
+          record.metadata?.operation_number ||
+          record.latest_version?.metadata?.operation_number;
+        // If no operation number found in metadata, try to extract from name
+        if (!opNum && record.name) {
+          const fileNameMatch = record.name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+          if (fileNameMatch) {
+            opNum = fileNameMatch[1] || fileNameMatch[2];
+          }
+        }
+        if (!opNum) return 'N/A';
+        // Try to find matching operation in the job data
+        const operation = selectedJob?.operations?.find(op =>
+          op.operation_number.toString() === opNum.toString()
+        );
+        if (operation) {
+          return `${operation.operation_number} - ${operation.operation_description}`;
+        } else {
+          // If no match found, at least show the operation number
+          return `Operation ${opNum}`;
+        }
+      },
+    },
+    {
+      title: 'Version',
+      dataIndex: ['latest_version', 'version_number'],
+      key: 'version',
+      className: 'bg-gray-50',
+      render: (version) => version || 'N/A',
+    },
+    {
+      title: 'Upload Date',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      className: 'bg-gray-50',
+      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      className: 'bg-gray-50',
+      render: (_, record) => (
+        <div className="flex gap-2">
+          <Button
+            icon={<Download size={16} />}
+            onClick={() => handleDownload(record.id)}
+            loading={downloading}
+            size="small"
+          >
+            Download
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  // Fetch tools using production_order to get id from localStorage
+  useEffect(() => {
+    const fetchTools = async () => {
+      if (selectedJob?.production_order && activeTab === 'toolsAndPrograms') {
+        try {
+          setLoading(true);
+          // Get all_orders from localStorage
+          const allOrders = localStorage.getItem('all_orders');
+          let orderId = null;
+          if (allOrders) {
+            try {
+              const parsedOrders = JSON.parse(allOrders);
+              // Find the order with matching production_order
+              const matchingOrder = parsedOrders.find(
+                order => order.production_order === selectedJob.production_order
+              );
+              orderId = matchingOrder?.id;
+            } catch (error) {
+              console.error('Error parsing all_orders:', error);
+              message.error('Failed to parse orders data');
+            }
+          }
+          if (!orderId) {
+            message.error('Could not find order ID for the selected production order');
+            return;
+          }
+          // Fetch tools using the order ID
+          const toolsData = await fetchToolsByOrderId(orderId);
+          setTools(toolsData);
+        } catch (error) {
+          console.error('Error fetching tools:', error);
+          message.error('Failed to fetch tools');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchTools();
+  }, [selectedJob?.production_order, activeTab, fetchToolsByOrderId]);
+
+  // Fetch raw materials
   useEffect(() => {
     if (selectedJob?.production_order && activeTab === 'tools') {
       fetchRawMaterials(selectedJob.production_order);
     }
-  }, [selectedJob?.production_order, activeTab]);
+  }, [selectedJob?.production_order, activeTab, fetchRawMaterials]);
+
+  // Fetch CNC programs when CNC tab is active
+  useEffect(() => {
+    const fetchCncPrograms = async () => {
+      if (selectedJob?.part_number && activeTab === 'cnc') {
+        try {
+          setCncLoading(true);
+          setCncError(null);
+          const programs = await fetchCncProgramDetails(selectedJob.part_number);
+          setCncPrograms(programs);
+        } catch (error) {
+          console.error('Error fetching CNC programs:', error);
+          setCncError(error.message);
+          message.error('Failed to fetch CNC programs');
+        } finally {
+          setCncLoading(false);
+        }
+      }
+    };
+    fetchCncPrograms();
+  }, [selectedJob?.part_number, activeTab, fetchCncProgramDetails]);
 
   // Handle document preview with authentication
   const handlePreview = async (documentId) => {
@@ -30,7 +175,6 @@ const DocumentsCard = () => {
       // Get authentication token
       const authStorage = localStorage.getItem('auth-storage');
       let authToken = localStorage.getItem('token');
-      
       if (!authToken && authStorage) {
         try {
           const parsedAuthStorage = JSON.parse(authStorage);
@@ -39,33 +183,24 @@ const DocumentsCard = () => {
           console.error('Error parsing auth storage:', error);
         }
       }
-      
       if (!authToken) {
         message.error('Authentication token not found');
         return;
       }
-      
       // Create URL with authentication header
       const previewUrl = `${MPP_API_BASE_URL}/api/v1/document-management/documents/${documentId}/download-latest`;
-      
       // Fetch the preview with auth token
       const response = await fetch(previewUrl, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+        headers: { 'Authorization': `Bearer ${authToken}` },
       });
-      
       if (!response.ok) {
         throw new Error('Failed to load document preview');
       }
-      
       // Get the blob and create a URL
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      
       // Open in a new tab
       window.open(url, '_blank');
-      
     } catch (error) {
       console.error('Preview error:', error);
       message.error('Failed to load document preview');
@@ -75,11 +210,9 @@ const DocumentsCard = () => {
   // Handle document download
   const handleDownload = async (documentId, documentType) => {
     if (downloading) return;
-    
     setDownloading(true);
     try {
       let url;
-      
       if (documentId) {
         // Download by document ID
         url = `${MPP_API_BASE_URL}/api/v1/document-management/documents/${documentId}/download-latest`;
@@ -89,37 +222,27 @@ const DocumentsCard = () => {
       } else {
         throw new Error('Missing document information');
       }
-      
       // Get authentication token from localStorage
       const authToken = localStorage.getItem('token') || JSON.parse(localStorage.getItem('auth-storage'))?.state?.token;
-      
       if (!authToken) {
         throw new Error('Authentication token not found');
       }
-      
       // Fetch the document with auth token
       const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+        headers: { 'Authorization': `Bearer ${authToken}` },
       });
-      
       if (!response.ok) {
         throw new Error('Failed to download document');
       }
-      
       // Get the blob
       const blob = await response.blob();
-      
       // Create download link
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      
       // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers.get('content-disposition');
       let filename = 'document';
-      
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="(.+)"/);
         if (filenameMatch) {
@@ -129,13 +252,11 @@ const DocumentsCard = () => {
         // Use a default name based on document type
         filename = `${selectedJob.part_number}_${documentType || 'document'}.pdf`;
       }
-      
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(downloadUrl);
-      
       message.success('Document downloaded successfully');
     } catch (error) {
       console.error('Error downloading document:', error);
@@ -148,7 +269,6 @@ const DocumentsCard = () => {
   // Get document type icon
   const getDocumentTypeIcon = (doc) => {
     if (!doc) return <FileText />;
-    
     const docType = doc.doc_type_id;
     switch (docType) {
       case 1: // MPP
@@ -165,43 +285,35 @@ const DocumentsCard = () => {
   // Get document type name
   const getDocumentTypeName = (doc) => {
     if (!doc) return 'Unknown';
-    
     const docType = doc.doc_type_id;
     switch (docType) {
-      case 1:
-        return 'MPP';
-      case 2:
-        return 'Engineering Drawing';
-      case 3:
-        return 'CNC Program';
-      default:
-        return 'Other';
+      case 1: return 'MPP';
+      case 2: return 'Engineering Drawing';
+      case 3: return 'CNC Program';
+      default: return 'Other';
     }
   };
 
   // Get file extension
   const getFileExtension = (path) => {
     if (!path) return '';
-    
     const parts = path.split('.');
     if (parts.length > 1) {
       return parts[parts.length - 1].toUpperCase();
     }
-    
     return '';
   };
 
   // Filter documents by type
   const getFilteredDocuments = () => {
     if (!jobDocuments) return [];
-    
     switch (activeTab) {
       case 'mpp':
         return jobDocuments.mpp_document ? [jobDocuments.mpp_document] : [];
       case 'drawing':
         return jobDocuments.engineering_drawing_document ? [jobDocuments.engineering_drawing_document] : [];
       case 'cnc':
-        return jobDocuments.all_documents?.filter(doc => doc.doc_type_id === 3) || [];
+        return cncPrograms || [];
       case 'all':
       default:
         return jobDocuments.all_documents || [];
@@ -243,6 +355,44 @@ const DocumentsCard = () => {
     },
   ];
 
+  const toolsColumns = [
+    {
+      title: 'Tool Name',
+      dataIndex: 'tool_name',
+      key: 'tool_name',
+      className: 'bg-gray-50',
+    },
+    {
+      title: 'BEL Part Number',
+      dataIndex: 'bel_partnumber',
+      key: 'bel_partnumber',
+      className: 'bg-gray-50',
+    },
+    {
+      title: 'Operation',
+      dataIndex: 'operation_id',
+      key: 'operation',
+      className: 'bg-gray-50',
+      render: (operationId) => {
+        const operation = selectedJob?.operations?.find(op => op.id === operationId);
+        return operation ? `${operation.operation_number} - ${operation.operation_description}` : 'N/A';
+      },
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      className: 'bg-gray-50',
+    },
+    {
+      title: 'Quantity',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      className: 'bg-gray-50',
+      align: 'center',
+    },
+  ];
+
   if (isLoadingJobs) {
     return (
       <div className="p-8 flex items-center justify-center">
@@ -254,10 +404,7 @@ const DocumentsCard = () => {
   if (!selectedJob) {
     return (
       <div className="p-8">
-        <Empty 
-          description="No job selected" 
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
+        <Empty description="No job selected" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       </div>
     );
   }
@@ -286,17 +433,15 @@ const DocumentsCard = () => {
           {selectedJob.part_number} - {selectedJob.part_description || selectedJob.material_description}
         </div>
       </div>
-
-      <Tabs 
-        activeKey={activeTab} 
+      <Tabs
+        activeKey={activeTab}
         onChange={setActiveTab}
         className="document-tabs"
       >
         <TabPane
           tab={
             <span className="flex items-center gap-2">
-              <FileText size={16} />
-              All Documents
+              <FileText size={16} /> All Documents
             </span>
           }
           key="all"
@@ -317,16 +462,16 @@ const DocumentsCard = () => {
                     >
                       Download
                     </Button>,
-                    doc.latest_version && (
-                      <Button
-                        type="link"
-                        icon={<Eye size={16} />}
-                        onClick={() => handlePreview(doc.id)}
-                        key="preview"
-                      >
-                        Preview
-                      </Button>
-                    )
+                    // doc.latest_version && (
+                    //   <Button
+                    //     type="link"
+                    //     icon={<Eye size={16} />}
+                    //     onClick={() => handlePreview(doc.id)}
+                    //     key="preview"
+                    //   >
+                    //     Preview
+                    //   </Button>
+                    // ),
                   ]}
                 >
                   <List.Item.Meta
@@ -363,12 +508,10 @@ const DocumentsCard = () => {
             />
           )}
         </TabPane>
-
         <TabPane
           tab={
             <span className="flex items-center gap-2">
-              <Database size={16} />
-              MPP
+              <Database size={16} /> MPP
             </span>
           }
           key="mpp"
@@ -381,8 +524,8 @@ const DocumentsCard = () => {
               showIcon
               icon={<AlertCircle />}
               action={
-                <Button 
-                  size="small" 
+                <Button
+                  size="small"
                   type="text"
                   onClick={() => handleDownload(null, 'MPP')}
                 >
@@ -407,25 +550,23 @@ const DocumentsCard = () => {
                   >
                     Download
                   </Button>
-                  {jobDocuments.mpp_document.latest_version && (
+                  {/* {jobDocuments.mpp_document.latest_version && (
                     <Button
                       icon={<Eye size={16} />}
                       onClick={() => handlePreview(jobDocuments.mpp_document.id)}
                     >
                       Preview
                     </Button>
-                  )}
+                  )} */}
                 </div>
               </div>
             </Card>
           )}
         </TabPane>
-
         <TabPane
           tab={
             <span className="flex items-center gap-2">
-              <FileImage size={16} />
-              Drawing
+              <FileImage size={16} /> Drawing
             </span>
           }
           key="drawing"
@@ -438,8 +579,8 @@ const DocumentsCard = () => {
               showIcon
               icon={<AlertCircle />}
               action={
-                <Button 
-                  size="small" 
+                <Button
+                  size="small"
                   type="text"
                   onClick={() => handleDownload(null, 'ENGINEERING_DRAWING')}
                 >
@@ -464,81 +605,62 @@ const DocumentsCard = () => {
                   >
                     Download
                   </Button>
-                  {jobDocuments.engineering_drawing_document.latest_version && (
+                  {/* {jobDocuments.engineering_drawing_document.latest_version && (
                     <Button
                       icon={<Eye size={16} />}
                       onClick={() => handlePreview(jobDocuments.engineering_drawing_document.id)}
                     >
                       Preview
                     </Button>
-                  )}
+                  )} */}
                 </div>
               </div>
             </Card>
           )}
         </TabPane>
-
         <TabPane
           tab={
             <span className="flex items-center gap-2">
-              <FileArchive size={16} />
-              CNC Programs
+              <FileArchive size={16} /> CNC Programs
             </span>
           }
           key="cnc"
         >
-          {!documents || documents.length === 0 ? (
+          {cncLoading ? (
+            <div className="p-8 flex items-center justify-center">
+              <Spin tip="Loading CNC programs..." />
+            </div>
+          ) : cncError ? (
+            <Alert
+              message="Error Loading CNC Programs"
+              description={cncError}
+              type="error"
+              showIcon
+              icon={<AlertCircle />}
+            />
+          ) : !cncPrograms || cncPrograms.length === 0 ? (
             <Empty description="No CNC programs found" />
           ) : (
-            <List
-              dataSource={documents}
-              renderItem={(doc) => (
-                <List.Item
-                  actions={[
-                    <Button
-                      icon={<Download size={16} />}
-                      onClick={() => handleDownload(doc.id)}
-                      loading={downloading}
-                      key="download"
-                    >
-                      Download
-                    </Button>
-                  ]}
-                >
-                  <List.Item.Meta
-                    avatar={<FileArchive className="text-purple-500" />}
-                    title={
-                      <div className="flex items-center gap-2">
-                        <span>{doc.name}</span>
-                        {doc.latest_version?.metadata?.operation_number && (
-                          <Tag color="blue">
-                            OP{doc.latest_version.metadata.operation_number}
-                          </Tag>
-                        )}
-                      </div>
-                    }
-                    description={
-                      <div>
-                        <div>{doc.description}</div>
-                        {doc.latest_version && doc.latest_version.metadata && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            Program Path: {doc.latest_version.metadata.program_path}
-                          </div>
-                        )}
-                      </div>
-                    }
-                  />
-                </List.Item>
-              )}
+            <Table
+              columns={documentsColumns}
+              dataSource={cncPrograms}
+              rowKey="id"
+              pagination={{
+                current: currentPage,
+                pageSize: 6,
+                showSizeChanger: false,
+                position: ['bottomCenter'],
+                showTotal: (total) => `Total ${total} programs`,
+                onChange: (page) => setCurrentPage(page),
+              }}
+              className="border border-gray-200 rounded-lg"
             />
           )}
         </TabPane>
-
         <TabPane
           tab={
             <span className="flex items-center gap-2">
-              <Package size={16} />
-              Tools
+              <Package size={16} /> Raw Materials
             </span>
           }
           key="tools"
@@ -559,9 +681,39 @@ const DocumentsCard = () => {
             />
           )}
         </TabPane>
+        <TabPane
+          tab={
+            <span className="flex items-center gap-2">
+              <Package size={16} /> Tools
+            </span>
+          }
+          key="toolsAndPrograms"
+        >
+          {loading ? (
+            <div className="p-8 flex items-center justify-center">
+              <Spin tip="Loading tools..." />
+            </div>
+          ) : !tools || tools.length === 0 ? (
+            <Empty description="No tools found" />
+          ) : (
+            <Table
+              columns={toolsColumns}
+              dataSource={tools}
+              pagination={{
+                current: currentPage,
+                pageSize: 6,
+                showSizeChanger: false,
+                position: ['bottomCenter'],
+                showTotal: (total) => `Total ${total} tools`,
+                onChange: (page) => setCurrentPage(page),
+              }}
+              className="border border-gray-200 rounded-lg"
+            />
+          )}
+        </TabPane>
       </Tabs>
     </div>
   );
 };
 
-export default DocumentsCard; 
+export default DocumentsCard;

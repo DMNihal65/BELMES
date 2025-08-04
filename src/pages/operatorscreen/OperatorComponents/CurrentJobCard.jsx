@@ -21,14 +21,50 @@ const CurrentJobCard = () => {
     jobSource
   } = useOperatorStore();
 
+  // Fallback to localStorage if states are empty
+  const getLocalStorageData = () => {
+    let fallbackJob = null;
+    let fallbackOperation = null;
+    let fallbackJobSource = 'custom'; // Default fallback if not found in localStorage
+
+    try {
+      const storedJob = localStorage.getItem('currentJobData');
+      const storedOperation = localStorage.getItem('activeOperation');
+      const storedJobSource = localStorage.getItem('jobSource');
+
+      fallbackJob = storedJob ? JSON.parse(storedJob) : null;
+      fallbackOperation = storedOperation ? JSON.parse(storedOperation) : null;
+      fallbackJobSource = storedJobSource ? JSON.parse(storedJobSource) : 'custom';
+    } catch (error) {
+      console.error('Failed to parse localStorage data:', error);
+    }
+
+    return {
+      selectedJob: selectedJob || fallbackJob,
+      selectedOperation: selectedOperation || fallbackOperation,
+      jobDetails: jobDetails || fallbackJob,
+      isLoadingJobs: isLoadingJobs || false,
+      jobSource: jobSource || fallbackJobSource
+    };
+  };
+
+  const {
+    selectedJob: finalSelectedJob,
+    selectedOperation: finalSelectedOperation,
+    jobDetails: finalJobDetails,
+    isLoadingJobs: finalIsLoadingJobs,
+    jobSource: finalJobSource
+  } = getLocalStorageData();
+
   // Determine card border color based on job source
   const getCardBorderClass = () => {
-    switch (jobSource) {
+    switch (finalJobSource) {
       case 'inprogress':
         return 'border-green-200';
       case 'scheduled':
         return 'border-sky-200';
       case 'custom':
+      case 'user-selected':
         return 'border-purple-200';
       default:
         return 'border-gray-200';
@@ -37,10 +73,9 @@ const CurrentJobCard = () => {
 
   // Get job source tag
   const getJobSourceTag = () => {
-    switch (jobSource) {
+    switch (finalJobSource) {
       case 'custom':
-      case 'user-selected':
-        return <Tag color="success">Active</Tag>;
+      
       case 'scheduled':
         return <Tag color="processing">Scheduled</Tag>;
       default:
@@ -48,7 +83,7 @@ const CurrentJobCard = () => {
     }
   };
 
-  if (isLoadingJobs) {
+  if (finalIsLoadingJobs) {
     return (
       <Card 
         className="status-card h-full shadow-sm"
@@ -67,7 +102,7 @@ const CurrentJobCard = () => {
     );
   }
 
-  if (!selectedJob && !jobDetails) {
+  if (!finalSelectedJob && !finalJobDetails) {
     return (
       <Card 
         className="status-card h-full shadow-sm"
@@ -92,12 +127,12 @@ const CurrentJobCard = () => {
   }
 
   // Use jobDetails as primary source if available, otherwise use selectedJob
-  const job = jobDetails || selectedJob;
-  const operation = selectedOperation;
+  const job = finalJobDetails || finalSelectedJob;
+  const operation = finalSelectedOperation;
 
   return (
     <Card 
-      className={`status-card h-full shadow-sm ${getCardBorderClass()}`}
+      className={`status-card h-full shadow-sm `}
       bodyStyle={{ padding: '12px' }}
       title={
         <div className="flex items-center justify-between">
@@ -105,7 +140,7 @@ const CurrentJobCard = () => {
             <Package className="text-sky-500" size={18} />
             <span className="font-semibold">Current Job</span>
           </div>
-          {getJobSourceTag()}
+          {/* {getJobSourceTag()} */}
         </div>
       }
     >
@@ -142,8 +177,6 @@ const CurrentJobCard = () => {
             </div>
           </Col>
         </Row>
-
-        
 
         {/* Current Operation with References */}
         <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
@@ -208,8 +241,6 @@ const CurrentJobCard = () => {
                     {safeRender(job.project, 'N/A')}
                   </span>
                 </div>
-                
-                
               </div>
             </>
           ) : (
@@ -226,4 +257,4 @@ const CurrentJobCard = () => {
   );
 };
 
-export default CurrentJobCard; 
+export default CurrentJobCard;

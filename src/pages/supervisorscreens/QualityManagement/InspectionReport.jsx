@@ -70,6 +70,7 @@ const InspectionReport = () => {
   const [uploadingFile, setUploadingFile] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [newVersionNumber, setNewVersionNumber] = useState('');
+  const [deletedIds, setDeletedIds] = useState([]);
 
   // Update the useEffect to fetch folders instead of report structure
   useEffect(() => {
@@ -303,9 +304,9 @@ const InspectionReport = () => {
       }));
 
       // Update both reports and filtered reports
-      setReports(transformedData);
-      setFilteredReports(transformedData);
-      setTotalDocuments(data.total || 0);
+      setReports(transformedData.filter(doc => !deletedIds.includes(doc.key)));
+      setFilteredReports(transformedData.filter(doc => !deletedIds.includes(doc.key)));
+      setTotalDocuments(data.total - deletedIds.length);
       
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -540,27 +541,11 @@ const InspectionReport = () => {
           autoClose: 3000,
         });
 
-        // Update the reports list by removing the deleted item
-        setReports(prevReports => {
-          const updatedReports = prevReports.filter(report => report.key !== documentId);
-          console.log('Updated reports after deletion:', updatedReports);
-          return updatedReports;
-        });
-
-        // Update the filtered reports
-        setFilteredReports(prevFiltered => {
-          const updatedFiltered = prevFiltered.filter(report => report.key !== documentId);
-          console.log('Updated filtered reports after deletion:', updatedFiltered);
-          return updatedFiltered;
-        });
-
-        // Update total count
-        setTotalDocuments(prevTotal => prevTotal - 1);
-        
-        // If we're in a folder view, refresh the folder contents
-        if (selectedFolderId) {
-          await fetchDocumentsForFolder(selectedFolderId);
-        }
+        // Remove from state instantly
+        setReports(prev => prev.filter(r => r.key !== documentId));
+        setFilteredReports(prev => prev.filter(r => r.key !== documentId));
+        setTotalDocuments(prev => prev - 1);
+        setDeletedIds(prev => [...prev, documentId]);
         
       } catch (error) {
         console.error('Delete operation failed:', error);
@@ -718,25 +703,25 @@ const InspectionReport = () => {
         </div>
       ),
     },
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
-      width: 120,
-      render: (type) => (
-        <Badge 
-          className="site-badge-count-109" 
-          count={type} 
-          style={{ 
-            backgroundColor: '#1677ff', 
-            padding: '0 10px',
-            borderRadius: '12px',
-            fontSize: '12px',
-            fontWeight: '500'
-          }} 
-        />
-      ),
-    },
+    // {
+    //   title: 'Type',
+    //   dataIndex: 'type',
+    //   key: 'type',
+    //   width: 120,
+    //   render: (type) => (
+    //     <Badge 
+    //       className="site-badge-count-109" 
+    //       count={type} 
+    //       style={{ 
+    //         backgroundColor: '#1677ff', 
+    //         padding: '0 10px',
+    //         borderRadius: '12px',
+    //         fontSize: '12px',
+    //         fontWeight: '500'
+    //       }} 
+    //     />
+    //   ),
+    // },
     {
       title: 'Part No.',
       dataIndex: 'part_number',
@@ -755,12 +740,10 @@ const InspectionReport = () => {
       width: 160,
       render: (date) => {
         if (!date) return '-';
-        const formattedDate = new Date(date).toLocaleString('en-US', {
+        const formattedDate = new Date(date).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+          day: 'numeric'
         });
         return (
           <div className="flex items-center">
@@ -837,7 +820,7 @@ const InspectionReport = () => {
               }}
             />
           </Tooltip>
-          <Tooltip title="Delete report">
+          {/* <Tooltip title="Delete report">
             <Button 
               icon={<DeleteOutlined />} 
               type="text" 
@@ -845,7 +828,7 @@ const InspectionReport = () => {
               className="hover:bg-red-50"
               onClick={() => handleDeleteReport(record)}
             />
-          </Tooltip>
+          </Tooltip> */}
           <Tooltip title={record.key ? "Download PDF" : "No document available"}>
             <Button 
               type="primary"
@@ -1024,7 +1007,7 @@ const InspectionReport = () => {
                 <div className="flex items-center mb-2">
                   <FileTextOutlined className="mr-2 text-blue-500" />
                   <span>Reports List</span>
-                  {filteredReports.length > 0 && (
+                  {/* {filteredReports.length > 0 && (
                     <Badge 
                       count={filteredReports.length} 
                       className="ml-2"
@@ -1033,7 +1016,7 @@ const InspectionReport = () => {
                         boxShadow: '0 0 0 1px #52c41a inset' 
                       }}
                     />
-                  )}
+                  )} */}
                 </div>
                 {currentPath && (
                   <div className="text-sm text-gray-500 flex items-center">

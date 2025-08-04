@@ -1249,8 +1249,7 @@ const loadInventoryItems = async () => {
             </div>
           </div>
 
-          {/* Stats Cards */}
-          
+         
 
           {/* Job Details Section with QR Codes */}
           <div className="flex justify-between gap-8 relative z-10">
@@ -1976,13 +1975,13 @@ const loadInventoryItems = async () => {
               onClick={() => handleViewVersionHistory(record)}
             />
           </Tooltip>
-          <Tooltip title="Update Version">
+          {/* <Tooltip title="Update Version">
             <Button
               type="link"
               icon={<UploadOutlined />}
               onClick={() => handleUpdateVersion(record)}
             />
-          </Tooltip>
+          </Tooltip> */}
         </Space>
       ),
     },
@@ -3272,7 +3271,18 @@ const loadInventoryItems = async () => {
                           </Text>
                           <Button
                             type="primary"
-                            onClick={() => setIsAddToolModalVisible(true)}
+                            onClick={() => {
+                              setIsAddToolModalVisible(true);
+                              // Reset form when opening modal
+                              addToolForm.resetFields();
+                              setSelectedSubcategoryName('');
+                              setSelectedPartNumber('');
+                              setSelectedPartDescription('');
+                              // Reset the Cascader component
+                              addToolForm.setFieldsValue({
+                                'select_tool': undefined
+                              });
+                            }}
                             icon={<PlusOutlined />}
                             className="bg-blue-500 hover:bg-blue-600"
                           >
@@ -3568,6 +3578,10 @@ const loadInventoryItems = async () => {
                     setSelectedSubcategoryName('');
                     setSelectedPartNumber('');
                     setSelectedPartDescription('');
+                    // Reset the Cascader component by setting its value to undefined
+                    addToolForm.setFieldsValue({
+                      'select_tool': undefined
+                    });
                   }}
                   confirmLoading={loading}
                 >
@@ -3580,6 +3594,7 @@ const loadInventoryItems = async () => {
 
                     
                   <Form.Item
+                    name="select_tool"
                     label="Select Tool"
                     rules={[{ required: true, message: 'Please select an inventory item' }]}
                   >
@@ -3706,9 +3721,40 @@ const loadInventoryItems = async () => {
                     <Form.Item
                       name="quantity"
                       label="Quantity"
-                      rules={[{ required: true, message: 'Please enter quantity' }]}
+                      rules={[
+                        { required: true, message: 'Please enter quantity' },
+                        { 
+                          pattern: /^[1-9]\d*$/, 
+                          message: 'Please enter a valid positive number' 
+                        },
+                        {
+                          validator: (_, value) => {
+                            if (value && value <= 0) {
+                              return Promise.reject(new Error('Quantity must be greater than 0'));
+                            }
+                            return Promise.resolve();
+                          }
+                        }
+                      ]}
                     >
-                      <InputNumber min={1} style={{ width: '100%' }} />
+                      <InputNumber 
+                        min={1} 
+                        style={{ width: '100%' }}
+                        placeholder="Enter quantity"
+                        onKeyPress={(e) => {
+                          // Only allow numeric keys, backspace, delete, arrow keys
+                          const allowedKeys = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+                          if (!allowedKeys.includes(e.key)) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onChange={(value) => {
+                          // Ensure only positive integers
+                          if (value && value <= 0) {
+                            return;
+                          }
+                        }}
+                      />
                     </Form.Item>
                     {/* <Form.Item
                       name="operation_id"
@@ -3773,9 +3819,40 @@ const loadInventoryItems = async () => {
                     <Form.Item
                       name="quantity"
                       label="Quantity"
-                      rules={[{ required: true, message: 'Please enter quantity' }]}
+                      rules={[
+                        { required: true, message: 'Please enter quantity' },
+                        { 
+                          pattern: /^[1-9]\d*$/, 
+                          message: 'Please enter a valid positive number' 
+                        },
+                        {
+                          validator: (_, value) => {
+                            if (value && value <= 0) {
+                              return Promise.reject(new Error('Quantity must be greater than 0'));
+                            }
+                            return Promise.resolve();
+                          }
+                        }
+                      ]}
                     >
-                      <InputNumber min={1} style={{ width: '100%' }} />
+                      <InputNumber 
+                        min={1} 
+                        style={{ width: '100%' }}
+                        placeholder="Enter quantity"
+                        onKeyPress={(e) => {
+                          // Only allow numeric keys, backspace, delete, arrow keys
+                          const allowedKeys = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+                          if (!allowedKeys.includes(e.key)) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onChange={(value) => {
+                          // Ensure only positive integers
+                          if (value && value <= 0) {
+                            return;
+                          }
+                        }}
+                      />
                     </Form.Item>
                     <Form.Item
                       name="operation_id"
@@ -4442,12 +4519,31 @@ const loadInventoryItems = async () => {
           <Form.Item
             name="version_number"
             label="Version Number"
-            rules={[{ required: true, message: 'Please enter version number' }]}
+            rules={[
+              { required: true, message: 'Please enter version number' },
+              { 
+                pattern: /^\d+$/, 
+                message: 'Please enter only numerical digits' 
+              }
+            ]}
           >
             <Input
               placeholder="Enter version number"
               value={versionNumber}
-              onChange={(e) => setVersionNumber(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Only allow numbers
+                if (/^\d*$/.test(value)) {
+                  setVersionNumber(value);
+                }
+              }}
+              onKeyPress={(e) => {
+                // Only allow numeric keys, backspace, delete, arrow keys
+                const allowedKeys = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+                if (!allowedKeys.includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
 
@@ -4739,21 +4835,3 @@ const loadInventoryItems = async () => {
 };
 
 export default Planning;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

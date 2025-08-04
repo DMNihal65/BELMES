@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Card, Progress, DatePicker, InputNumber, Button, Input, Tooltip, Statistic, Spin, Row, Col, Steps, Badge } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Progress, InputNumber, Button, Input, Tooltip, Statistic, Spin, Row, Col, Steps, Badge } from 'antd';
 import { Activity, Clock, AlertCircle, CheckCircle2, ArrowRight, Target, BarChart3, CalendarClock } from 'lucide-react';
 import useOperatorStore from '../../../store/operator-store';
-import moment from 'moment';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
-const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 const { Step } = Steps;
 
@@ -16,8 +16,16 @@ const ProductionCard = () => {
     fetchProductionStats
   } = useOperatorStore();
 
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
+  // From Date states
+  const [fromDate, setFromDate] = useState(null);
+  const [fromHour, setFromHour] = useState("");
+  const [fromMinute, setFromMinute] = useState("");
+
+  // To Date states
+  const [toDate, setToDate] = useState(null);
+  const [toHour, setToHour] = useState("");
+  const [toMinute, setToMinute] = useState("");
+
   const [quantityCompleted, setQuantityCompleted] = useState(0);
   const [quantityRejected, setQuantityRejected] = useState(0);
   const [notes, setNotes] = useState('');
@@ -25,26 +33,89 @@ const ProductionCard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Calculate hours between start and end dates
-  const calculateHours = (start, end) => {
-    if (!start || !end) return 0;
-    return moment(end).diff(moment(start), 'hours', true).toFixed(2);
+  const now = new Date();
+
+  // Allowed hours for a given date
+  const allowedHours = (date) => {
+    if (!date) return [];
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) return [...Array(now.getHours() + 1).keys()];
+    return [...Array(24).keys()];
   };
 
-  // Handle date range change
-  const handleDateRangeChange = (dates) => {
-    if (dates && dates.length === 2) {
-      setStartDate(dates[0]);
-      setEndDate(dates[1]);
-      setTotalHours(calculateHours(dates[0], dates[1]));
+  // Allowed minutes for a given date and hour
+  const allowedMinutes = (date, hour) => {
+    if (!date || hour === "") return [];
+    const isToday = date.toDateString() === now.toDateString();
+    const hourNum = Number(hour);
+    if (isToday && hourNum === now.getHours()) {
+      return [...Array(now.getMinutes() + 1).keys()];
+    }
+    return [...Array(60).keys()];
+  };
+
+  // Reset invalid minutes on hour or date change (From)
+  useEffect(() => {
+    if (fromMinute === "") return;
+    if (!allowedMinutes(fromDate, fromHour).includes(Number(fromMinute))) {
+      setFromMinute("");
+    }
+  }, [fromDate, fromHour]);
+
+  // Reset invalid minutes on hour or date change (To)
+  useEffect(() => {
+    if (toMinute === "") return;
+    if (!allowedMinutes(toDate, toHour).includes(Number(toMinute))) {
+      setToMinute("");
+    }
+  }, [toDate, toHour]);
+
+  // Reset time fields if dates change
+  useEffect(() => {
+    setFromHour("");
+    setFromMinute("");
+  }, [fromDate]);
+
+  useEffect(() => {
+    setToHour("");
+    setToMinute("");
+  }, [toDate]);
+
+  // Calculate hours between dates
+  const calculateHours = () => {
+    if (
+      !fromDate ||
+      fromHour === "" ||
+      fromMinute === "" ||
+      !toDate ||
+      toHour === "" ||
+      toMinute === ""
+    ) return 0;
+
+    const from = new Date(fromDate);
+    from.setHours(Number(fromHour), Number(fromMinute), 0, 0);
+
+    const to = new Date(toDate);
+    to.setHours(Number(toHour), Number(toMinute), 0, 0);
+
+    const diffInMs = to.getTime() - from.getTime();
+    const diffInHours = diffInMs / (1000 * 60 * 60);
+    return diffInHours.toFixed(2);
+  };
+
+  // Update total hours and step when dates/times change
+  useEffect(() => {
+    const hours = calculateHours();
+    setTotalHours(hours);
+    
+    if (hours > 0) {
       setCurrentStep(1);
+    } else if (fromDate && toDate && fromHour !== "" && toHour !== "") {
+      setCurrentStep(0);
     } else {
-      setStartDate(null);
-      setEndDate(null);
-      setTotalHours(0);
       setCurrentStep(0);
     }
-  };
+  }, [fromDate, fromHour, fromMinute, toDate, toHour, toMinute]);
 
   // Handle quantity change
   const handleQuantityChange = (completed, rejected) => {
@@ -56,18 +127,55 @@ const ProductionCard = () => {
     }
   };
 
+  // Validate that From datetime <= To datetime and both <= now
+  const isValidRange = () => {
+    if (
+      !fromDate ||
+      fromHour === "" ||
+      fromMinute === "" ||
+      !toDate ||
+      toHour === "" ||
+      toMinute === ""
+    )
+      return false;
+
+    const from = new Date(fromDate);
+    from.setHours(Number(fromHour), Number(fromMinute), 0, 0);
+
+    const to = new Date(toDate);
+    to.setHours(Number(toHour), Number(toMinute), 0, 0);
+
+    return from <= to && to <= now && from <= now;
+  };
+
+  // Convert local time to IST and then to ISO string
+  const convertToIST = (date) => {
+    // Create a new date object
+    const istDate = new Date(date);
+    // Add 5 hours and 30 minutes (IST offset)
+    istDate.setHours(istDate.getHours() + 5);
+    istDate.setMinutes(istDate.getMinutes() + 30);
+    return istDate.toISOString();
+  };
+
   // Handle form submission
   const handleSubmit = async () => {
-    if (!startDate || !endDate) {
+    if (!isValidRange()) {
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      const from = new Date(fromDate);
+      from.setHours(Number(fromHour), Number(fromMinute), 0, 0);
+
+      const to = new Date(toDate);
+      to.setHours(Number(toHour), Number(toMinute), 0, 0);
+
       const logData = {
-        start_time: startDate.toISOString(),
-        end_time: endDate.toISOString(),
+        start_time: convertToIST(from),
+        end_time: convertToIST(to),
         quantity_completed: parseInt(quantityCompleted) || 0,
         quantity_rejected: parseInt(quantityRejected) || 0,
         notes: notes
@@ -77,8 +185,12 @@ const ProductionCard = () => {
 
       if (result.success) {
         // Reset form
-        setStartDate(null);
-        setEndDate(null);
+        setFromDate(null);
+        setFromHour("");
+        setFromMinute("");
+        setToDate(null);
+        setToHour("");
+        setToMinute("");
         setQuantityCompleted(0);
         setQuantityRejected(0);
         setNotes('');
@@ -168,7 +280,6 @@ const ProductionCard = () => {
               />
             ) : (
               <div className="py-3 flex justify-center">
-                <Spin tip="Loading..." />
               </div>
             )}
           </Col>
@@ -228,18 +339,91 @@ const ProductionCard = () => {
               ]}
             />
 
+            {/* From Date */}
             <div className="mb-2">
-              <RangePicker
-                showTime
-                format="YYYY-MM-DD HH:mm"
-                placeholder={['Start', 'End']}
-                onChange={handleDateRangeChange}
-                value={startDate && endDate ? [startDate, endDate] : null}
-                className="w-full text-xs"
-                size="small"
-                allowClear
+              <div className="text-xs text-gray-600 mb-1">From Date & Time</div>
+              <div className="flex gap-2">
+                <DatePicker
+                selected={fromDate}
+                onChange={setFromDate}
+                maxDate={now}
+                placeholderText="Select From Date"
+                dateFormat="MMMM d, yyyy"
+                className="flex-1 text-xs p-1 border border-gray-300 rounded"
                 disabled={!selectedOperation}
               />
+                <select
+                  value={fromHour}
+                  onChange={(e) => setFromHour(e.target.value)}
+                  disabled={!fromDate || !selectedOperation}
+                  className="w-20 text-xs p-1 border border-gray-300 rounded"
+                >
+                  <option value="">Hour</option>
+                  {allowedHours(fromDate).map((h) => (
+                    <option key={h} value={h}>
+                      {h.toString().padStart(2, "0")}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={fromMinute}
+                  onChange={(e) => setFromMinute(e.target.value)}
+                  disabled={!fromHour || !selectedOperation}
+                  className="w-20 text-xs p-1 border border-gray-300 rounded"
+                >
+                  <option value="">Minute</option>
+                  {allowedMinutes(fromDate, fromHour).map((m) => (
+                    <option key={m} value={m}>
+                      {m.toString().padStart(2, "0")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* To Date */}
+            <div className="mb-2">
+              <div className="text-xs text-gray-600 mb-1">To Date & Time</div>
+              <div className="flex gap-2">
+              <DatePicker
+                selected={toDate}
+                onChange={setToDate}
+                maxDate={now}
+                minDate={fromDate}
+                placeholderText="Select To Date"
+                dateFormat="MMMM d, yyyy"
+                className="flex-1 text-xs p-1 border border-gray-300 rounded"
+                disabled={!fromDate || !selectedOperation}
+              />
+                <select
+                  value={toHour}
+                  onChange={(e) => setToHour(e.target.value)}
+                  disabled={!toDate || !selectedOperation}
+                  className="w-20 text-xs p-1 border border-gray-300 rounded"
+                >
+                  <option value="">Hour</option>
+                  {allowedHours(toDate).map((h) => (
+                    <option key={h} value={h}>
+                      {h.toString().padStart(2, "0")}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={toMinute}
+                  onChange={(e) => setToMinute(e.target.value)}
+                  disabled={!toHour || !selectedOperation}
+                  className="w-20 text-xs p-1 border border-gray-300 rounded"
+                >
+                  <option value="">Minute</option>
+                  {allowedMinutes(toDate, toHour).map((m) => (
+                    <option key={m} value={m}>
+                      {m.toString().padStart(2, "0")}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {totalHours > 0 && (
@@ -292,8 +476,7 @@ const ProductionCard = () => {
               loading={isSubmitting}
               disabled={
                 !selectedOperation ||
-                !startDate || 
-                !endDate || 
+                !isValidRange() || 
                 (quantityCompleted <= 0 && quantityRejected <= 0)
               }
               className="bg-sky-500"
@@ -317,4 +500,4 @@ const ProductionCard = () => {
   );
 };
 
-export default ProductionCard; 
+export default ProductionCard;

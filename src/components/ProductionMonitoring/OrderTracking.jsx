@@ -20,6 +20,9 @@ const OrderTracking = () => {
   const fetchOrders = async () => {
     setLoading(true);
     setError(null);
+    // Clear selected order when refreshing
+    setSelectedOrder(null);
+    setOperationStatus(null);
     try {
       const response = await axios.get('http://172.18.7.91:8008/api/v1/planning/all_orders');
       setOrders(response.data);
@@ -147,6 +150,7 @@ const OrderTracking = () => {
 
         <Spin spinning={loading && !orders.length}>
           <Select
+            key={selectedOrder ? 'selected' : 'empty'}
             showSearch
             style={{ width: '100%' }}
             placeholder="Select a Production Order or Part Number"
@@ -156,6 +160,7 @@ const OrderTracking = () => {
               option.children.toLowerCase().includes(input.toLowerCase())
             }
             disabled={loading}
+            value={selectedOrder ? selectedOrder.production_order : undefined}
           >
             {orders.map(order => (
               <Select.Option key={order.id} value={order.production_order}>

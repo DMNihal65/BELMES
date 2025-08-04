@@ -193,7 +193,6 @@ const NewOperatorDashboard = () => {
           <Badge status={machineStatus?.status === 'PRODUCTION' ? 'success' : machineStatus?.status === 'IDLE' ? 'warning' : 'error'} />
           <div className="text-xs flex flex-col items-end">
             <span className="text-gray-700 font-medium">{currentTime}</span>
-            <span className="text-gray-500">Machine ID: {machineIdFromStorage}</span>
           </div>
           
           
@@ -202,7 +201,7 @@ const NewOperatorDashboard = () => {
             <Button 
               type="primary" 
               className="bg-sky-500 hover:bg-sky-600 flex items-center"
-              size="small"
+              size="large"
               icon={<Package size={14} />}
               onClick={() => setJobSelectionModalVisible(true)}
             >
@@ -210,7 +209,7 @@ const NewOperatorDashboard = () => {
             </Button>
           </Tooltip>
           
-          <Tooltip title="Refresh Dashboard">
+          {/* <Tooltip title="Refresh Dashboard">
             <Button 
               icon={<RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />} 
               onClick={handleRefresh}
@@ -218,9 +217,9 @@ const NewOperatorDashboard = () => {
               type="text"
               className="text-sky-500"
             />
-          </Tooltip>
+          </Tooltip> */}
           
-          {userMenu}
+          {/* {userMenu} */}
         </div>
       </div>
 
@@ -268,16 +267,16 @@ const NewOperatorDashboard = () => {
                 type="card"
                 className="dashboard-tabs"
                 tabBarStyle={{ marginBottom: 0, paddingLeft: 8, paddingRight: 8, paddingTop: 8 }}
-                tabBarExtraContent={
-                  <div className="text-xs text-gray-500 px-3">
-                    {selectedJob ? (
-                      <div className="flex items-center">
-                        <Package size={14} className="mr-1" />
-                        <span>{selectedJob.part_number} · {selectedOperation?.operation_description || 'No operation selected'}</span>
-                      </div>
-                    ) : 'No job selected'}
-                  </div>
-                }
+                // tabBarExtraContent={
+                //   <div className="text-xs text-gray-500 px-3">
+                //     {selectedJob ? (
+                //       <div className="flex items-center">
+                //         <Package size={14} className="mr-1" />
+                //         <span>{selectedJob.part_number} · {selectedOperation?.operation_description || 'No operation selected'}</span>
+                //       </div>
+                //     ) : 'No job selected'}
+                //   </div>
+                // }
               >
                 <TabPane 
                   tab={<span className="flex items-center gap-1"><ClipboardList size={14} />Operations</span>} 

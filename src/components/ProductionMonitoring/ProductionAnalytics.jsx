@@ -72,7 +72,7 @@ function ProductionAnalytics() {
   const fetchWorkCenters = async () => {
     setLoadingWorkCenters(true);
     try {
-      const response = await axios.get('http://172.18.7.91:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await axios.get('http://172.18.7.89:5467/api/v1/master-order/workcenters/?skip=0&limit=100');
       const workCentersData = response.data;
       
       // No longer filtering by is_schedulable
@@ -104,7 +104,7 @@ function ProductionAnalytics() {
     } else if (analyticsData.machineTimelines?.length > 0 && selectedMachines.length === 0) {
       setSelectedMachines(analyticsData.machineTimelines.map(m => m.machine_name));
     }
-  }, [analyticsData.timelineData, analyticsData.machineTimelines]);
+  }, [analyticsData.timelineData, analyticsData.machineTimelines, selectedMachines.length]);
 
   const handleDateRangeChange = (range) => {
     if (range) {
@@ -116,6 +116,13 @@ function ProductionAnalytics() {
     const [startDate, endDate] = analyticsData.dateRange;
     fetchMachineStatusTimeline(startDate, endDate);
     fetchDailyProduction(startDate, endDate);
+  };
+
+  const refreshMachineList = () => {
+    // Reset selected machines to show all machines
+    setSelectedMachines([]);
+    // Fetch work centers again
+    fetchWorkCenters();
   };
 
   const toggleFullscreen = () => {
@@ -503,7 +510,7 @@ function ProductionAnalytics() {
           item.end_time > max ? item.end_time : max, filteredTimelineData[0].end_time) : 
         null
     };
-    
+
     // Prepare the data for ECharts
     return {
       tooltip: {
@@ -608,7 +615,7 @@ function ProductionAnalytics() {
         min: timeRange.start,
         max: timeRange.end,
         axisLabel: {
-          formatter: (value) => dayjs(value).format('MM-DD HH:mm'),
+          formatter: (value) => dayjs(value).add(5.5, 'hour').format('MM-DD HH:mm'),
           hideOverlap: true,
         },
         axisLine: { lineStyle: { color: '#ccc' } },
@@ -807,12 +814,7 @@ function ProductionAnalytics() {
               disabledDate={current => current && current > dayjs().endOf('day')}
             />
             
-            <Button 
-              icon={<ReloadOutlined />} 
-              onClick={refreshData}
-              loading={analyticsData.isLoading}
-              title="Refresh data"
-            />
+            {/*  */}
             
             <Button
               icon={<FullscreenOutlined />}
@@ -908,7 +910,7 @@ function ProductionAnalytics() {
                     />
                     <Button
                       icon={<ReloadOutlined />}
-                      onClick={() => fetchWorkCenters()}
+                      onClick={refreshMachineList}
                       size="small"
                       loading={loadingWorkCenters}
                       title="Refresh machine list"
@@ -994,4 +996,4 @@ function ProductionAnalytics() {
   );
 }
 
-export default ProductionAnalytics; 
+export default ProductionAnalytics;

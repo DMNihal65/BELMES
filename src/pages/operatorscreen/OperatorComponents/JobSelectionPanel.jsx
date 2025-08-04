@@ -459,7 +459,7 @@ useEffect(() => {
               ) : (
                 <>
                   <p className="font-medium">
-                    Are you sure you want to deactivate the current job?
+                    Are you sure you want to deactivate the current job? 
                   </p>
                   {inProgressJobs && inProgressJobs.length > 0 && (
                     <div className="mt-2 bg-gray-50 p-3 rounded-lg">
@@ -475,7 +475,7 @@ useEffect(() => {
                     <div className="flex items-center gap-2">
                       <AlertTriangle size={16} className="text-red-600" />
                       <span className="text-sm text-red-700">
-                        This will stop the current job tracking. Please Refresh the Page after Deactivation.
+                        This will stop the current job tracking.
                       </span>
                     </div>
                   </div>

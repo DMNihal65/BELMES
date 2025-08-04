@@ -378,6 +378,22 @@ fetchMachinePerformanceMetrics: async () => {
     throw error;
   }
 },
+
+// Fetch all machines for calibration
+fetchAllMachines: async () => {
+  set({ loading: true, error: null });
+  try {
+    const response = await axios.get('http://172.18.7.91:8008/api/v1/master-order/all-machines/');
+    set({ loading: false });
+    return response.data;
+  } catch (error) {
+    set({ 
+      error: error.response?.data?.detail || error.message, 
+      loading: false 
+    });
+    throw error;
+  }
+},
   
 }));
 

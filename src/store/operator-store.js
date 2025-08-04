@@ -3,9 +3,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { message } from 'antd';
 
 // API endpoints
-const API_BASE_URL = "http://172.18.7.91:8008";
-const MPP_API_BASE_URL = "http://172.18.7.91:8008";
-const WS_URL = "ws://172.18.7.91:8008/production_monitoring/ws/live-status/";
+const API_BASE_URL = "http://172.18.7.89:5467";
+const MPP_API_BASE_URL = "http://172.18.7.89:5467";
+const WS_URL = "ws://172.18.7.89:5467/production_monitoring/ws/live-status/";
 
 // Helper function to get authentication token
 const getAuthToken = () => {
@@ -304,6 +304,8 @@ const useOperatorStore = create((set, get) => ({
       }
       
       const data = await response.json();
+
+      localStorage.setItem('all_orders', JSON.stringify(data));
       // Transform job data using helper function
       const formattedJobs = data.map(job => createJobDataFromOrderResponse(job));
       set({ availableJobs: formattedJobs });
@@ -343,15 +345,18 @@ const useOperatorStore = create((set, get) => ({
       
       if (jobDetails && jobDetails.operations) {
         // Filter operations where work_center_schedulable is true
-        const schedulableOperations = jobDetails.operations.filter(op => op.work_center_schedulable);
-        
+        const currentMachine = JSON.parse(localStorage.getItem('currentMachine'));
+        const schedulableOperations = jobDetails.operations.filter(op => 
+          op.work_center_schedulable && op.machine_id === currentMachine.id
+        );        
         // Sort operations by operation number
-        const sortedOperations = [...schedulableOperations].sort((a, b) => 
+        const sortedOperations = [...schedulableOperations].sort((a, b) =>
           a.operation_number - b.operation_number
         );
         
         set({ availableOperations: sortedOperations });
         set({ jobDetails });
+        
         return { success: true, data: jobDetails };
       } else {
         throw new Error('No job details found for this production order');
@@ -437,9 +442,10 @@ const useOperatorStore = create((set, get) => ({
       }
       
       const activateData = await activateResponse.json();
+      set({ jobSource: 'inprogress' });
       
       // Mark this as a user-selected job in localStorage
-      localStorage.setItem('jobSource', 'user-selected');
+      localStorage.setItem('jobSource', 'inprogress');
       
       // Store the job data and operation in localStorage
       localStorage.setItem('currentJobData', JSON.stringify(get().selectedJob));

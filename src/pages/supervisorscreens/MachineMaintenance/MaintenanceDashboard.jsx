@@ -1,11 +1,13 @@
 import React from 'react';
 import { Tabs, Badge } from 'antd';
-import {BarChartOutlined, AlertOutlined} from '@ant-design/icons'
+import {BarChartOutlined, AlertOutlined, CalendarOutlined} from '@ant-design/icons'
 import MachineMaintenance from './MachineMaintenance';
 import Notifications from './Notifications';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import DowntimeTickets from './DowntimeTickets';
 import TicketAnalytics from './TicketAnalytics';
+import MachineCalibrationDueDates from './MachineCalibrationDueDates';
+
 
 const { TabPane } = Tabs;
 
@@ -63,8 +65,20 @@ export default function MaintenanceDashboard() {
             key="1"
           >
             <DowntimeTickets />
+            
           </TabPane>
           </Tabs>
+        </TabPane>
+        <TabPane 
+          tab={
+            <span className="flex items-center gap-1">
+              {/* <CalendarOutlined /> */}
+              Calibration Due
+            </span>
+          } 
+          key="5"
+        >
+          <MachineCalibrationDueDates />
         </TabPane>
       </Tabs>
     </div>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Table, Tag, Button, Empty, Tooltip, Space, Modal, Spin, Tabs, Row, Col } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Table, Tag, Button, Empty, Tooltip, Space, Modal, Spin, Row, Col, message } from 'antd';
 import { 
   ClipboardList, 
   Zap, 
@@ -24,49 +24,185 @@ const OperationDetailsCard = () => {
     jobSource,
     fetchOperationMpp,
     downloadDocument,
-    isLoadingMppData
+    isLoadingMppData,
+    scheduledJobs,
   } = useOperatorStore();
+
+  // Local state to hold data from localStorage when store states are empty
+  const [localAvailableOperations, setLocalAvailableOperations] = useState([]);
+  const [localSelectedOperation, setLocalSelectedOperation] = useState(null);
+  const [localSelectedJob, setLocalSelectedJob] = useState(null);
+  const [localJobSource, setLocalJobSource] = useState(null);
+  const [localScheduledJobs, setLocalScheduledJobs] = useState([]);
 
   const [activateModalVisible, setActivateModalVisible] = useState(false);
   const [operationToActivate, setOperationToActivate] = useState(null);
-  
-  // MPP Modal state
   const [mppModalVisible, setMppModalVisible] = useState(false);
   const [mppData, setMppData] = useState(null);
   const [currentOperationForMpp, setCurrentOperationForMpp] = useState(null);
 
+  // Function to fetch and update local state from localStorage
+  const updateFromLocalStorage = () => {
+    // Fetch currentJobData from localStorage
+    const currentJobData = localStorage.getItem('currentJobData');
+    if (!selectedJob) {
+      if (currentJobData) {
+        try {
+          const parsedJobData = JSON.parse(currentJobData);
+          setLocalSelectedJob(parsedJobData);
+        } catch (error) {
+          console.error('Error parsing currentJobData from localStorage:', error);
+          setLocalSelectedJob(null); // Reset if parsing fails
+        }
+      } else {
+        setLocalSelectedJob(null); // Reset if not in localStorage
+      }
+    }
+
+    // Fetch activeOperation from localStorage
+    const activeOperationData = localStorage.getItem('activeOperation');
+    if (!selectedOperation) {
+      if (activeOperationData) {
+        try {
+          const parsedOperationData = JSON.parse(activeOperationData);
+          setLocalSelectedOperation(parsedOperationData);
+          // Add activeOperation to localAvailableOperations to avoid empty table
+          setLocalAvailableOperations([parsedOperationData]);
+        } catch (error) {
+          console.error('Error parsing activeOperation from localStorage:', error);
+          setLocalSelectedOperation(null); // Reset if parsing fails
+          setLocalAvailableOperations([]); // Reset operations
+        }
+      } else {
+        setLocalSelectedOperation(null); // Reset if not in localStorage
+        setLocalAvailableOperations([]); // Reset operations
+      }
+    }
+
+    // Fetch jobSource from localStorage
+    const storedJobSource = localStorage.getItem('jobSource');
+    if (!jobSource) {
+      if (storedJobSource) {
+        setLocalJobSource(storedJobSource);
+      } else {
+        setLocalJobSource(null); // Reset if not in localStorage
+      }
+    }
+
+    // Fetch scheduledJobs from localStorage
+    const storedScheduledJobs = localStorage.getItem('scheduledJobs');
+    if (!scheduledJobs || scheduledJobs.length === 0) {
+      if (storedScheduledJobs) {
+        try {
+          const parsedScheduledJobs = JSON.parse(storedScheduledJobs);
+          setLocalScheduledJobs(parsedScheduledJobs);
+        } catch (error) {
+          console.error('Error parsing scheduledJobs from localStorage:', error);
+          setLocalScheduledJobs([]); // Reset if parsing fails
+        }
+      } else if (currentJobData) {
+        // Assume job is scheduled if currentJobData exists
+        try {
+          const parsedJobData = JSON.parse(currentJobData);
+          if (parsedJobData?.production_order) {
+            setLocalScheduledJobs([{ production_order: parsedJobData.production_order }]);
+          } else {
+            setLocalScheduledJobs([]); // Reset if no production_order
+          }
+        } catch (error) {
+          setLocalScheduledJobs([]); // Reset if parsing fails
+        }
+      } else {
+        setLocalScheduledJobs([]); // Reset if not in localStorage
+      }
+    }
+  };
+
+  // Fetch data from localStorage on mount and when localStorage changes
+  useEffect(() => {
+    updateFromLocalStorage();
+
+    // Listen for storage events to detect localStorage changes
+    const handleStorageChange = (event) => {
+      if (
+        event.key === 'currentJobData' ||
+        event.key === 'activeOperation' ||
+        event.key === 'jobSource' ||
+        event.key === 'scheduledJobs' ||
+        event.key === null // localStorage.clear()
+      ) {
+        updateFromLocalStorage();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [selectedJob, selectedOperation, jobSource, scheduledJobs]);
+
+  // Determine which data to use (store or local)
+  const effectiveSelectedJob = selectedJob || localSelectedJob;
+  const effectiveSelectedOperation = selectedOperation || localSelectedOperation;
+  const effectiveAvailableOperations = availableOperations?.length > 0 ? availableOperations : localAvailableOperations;
+  const effectiveJobSource = jobSource || localJobSource;
+  const effectiveScheduledJobs = scheduledJobs?.length > 0 ? scheduledJobs : localScheduledJobs;
+
+  const isJobScheduled = effectiveSelectedJob
+    ? effectiveScheduledJobs?.some(
+        (job) => job.production_order === effectiveSelectedJob.production_order
+      )
+    : false;
+
   // Show confirmation modal before activating
   const showActivateConfirmation = (operation) => {
+    if (!isJobScheduled) {
+      message.warning('Cannot activate operation: Job is not scheduled.');
+      return;
+    }
     setOperationToActivate(operation);
     setActivateModalVisible(true);
   };
 
+  const [isActivating, setIsActivating] = useState(false);
   // Handle activation confirmation
-  const handleActivate = async () => {
-    if (!operationToActivate) return;
-    
-    // Use operation_id if available, otherwise use id
-    const operationId = operationToActivate.operation_id || operationToActivate.id;
-    
-    if (!operationId) {
-      console.error('No valid operation ID found for activation');
-      return;
-    }
-    
-    await activateJob(operationId);
-    setActivateModalVisible(false);
-  };
+const handleActivate = async () => {
+  if (!operationToActivate) return;
   
+  const operationId = operationToActivate.operation_id || operationToActivate.id;
+  
+  if (!operationId) {
+    console.error('No valid operation ID found for activation');
+    return;
+  }
+  setIsActivating(true);
+  
+try {
+    const result = await activateJob(operationId);
+
+    if (result.success) {
+      // Only close modal if activation was successful
+      setIsActivating(false);
+
+      setActivateModalVisible(false);
+    }
+  } catch (error) {
+    console.error('Error activating job:', error);
+    message.error(`Failed to activate operation: ${error.message}`);
+  }
+};
+
   // Handle viewing MPP for an operation
   const handleViewMpp = async (operation) => {
-    if (!selectedJob || !selectedJob.part_number || !operation) return;
+    if (!effectiveSelectedJob || !effectiveSelectedJob.part_number || !operation) return;
     
     setMppModalVisible(true);
     setCurrentOperationForMpp(operation);
     setMppData(null);
     
     try {
-      const result = await fetchOperationMpp(selectedJob.part_number, operation.operation_number);
+      const result = await fetchOperationMpp(effectiveSelectedJob.part_number, operation.operation_number);
       if (result.success) {
         setMppData(result.data);
       } else {
@@ -77,7 +213,7 @@ const OperationDetailsCard = () => {
       setMppData({ error: 'Failed to load MPP data' });
     }
   };
-  
+
   // Handle document download
   const handleDownloadDocument = (documentId) => {
     if (!documentId) return;
@@ -87,19 +223,15 @@ const OperationDetailsCard = () => {
   // Get operation status tag
   const getOperationStatusTag = (record) => {
     const recordId = record.operation_id || record.id;
-    const selectedOpId = selectedOperation ? (selectedOperation.operation_id || selectedOperation.id) : null;
+    const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
     
     if (selectedOpId && recordId === selectedOpId) {
-      if (jobSource === 'custom' || jobSource === 'user-selected') {
+      if (effectiveJobSource === 'inprogress') {
         return <Tag color="success" className="px-2 py-1 text-base font-medium">Active</Tag>;
       }
       return <Tag color="blue" className="px-2 py-1 text-base font-medium">Selected</Tag>;
     }
     
-    // If this is the current active operation in an in-progress job
-    // (Removed: do not show as active just because it's in inprogress)
-    
-    // Show can_log status if available
     if (record.can_log === false) {
       return <Tag color="warning" className="px-2 py-1 text-base font-medium">Cannot Log</Tag>;
     }
@@ -110,7 +242,7 @@ const OperationDetailsCard = () => {
   // Get row class name
   const getRowClassName = (record) => {
     const recordId = record.operation_id || record.id;
-    const selectedOpId = selectedOperation ? (selectedOperation.operation_id || selectedOperation.id) : null;
+    const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
     
     if (selectedOpId && recordId === selectedOpId) {
       return 'operation-row bg-sky-50 border-l-4 border-sky-500';
@@ -138,7 +270,7 @@ const OperationDetailsCard = () => {
           <div className="font-medium text-base">
             {text || record.description}
           </div>
-          <div className="text-sm text-gray-500 mt-1">{record.work_center}</div>
+          <div className="text-sm text-gray-500 mt-1">{record.work_center || record.work_center_name}</div>
         </div>
       )
     },
@@ -189,51 +321,52 @@ const OperationDetailsCard = () => {
       width: 200,
       render: (_, record) => {
         const recordId = record.operation_id || record.id;
-        const selectedOpId = selectedOperation ? (selectedOperation.operation_id || selectedOperation.id) : null;
+        const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
         const isSelectable = !(
-          record.completed_quantity === record.required_quantity || 
+          record.completed_quantity === record.required_quantity ||
           record.can_log === false
         );
-        
+
         return (
           <Space size="middle" wrap>
-            <Button 
+            {/* <Button
               type="primary"
-              ghost 
-              icon={<Eye size={16} />} 
+              ghost
+              icon={<Eye size={16} />}
               onClick={() => selectOperation(record)}
               size="middle"
               className={selectedOpId && recordId === selectedOpId ? "bg-sky-50" : ""}
-              disabled={!isSelectable} // Disable if not selectable
+              disabled={!isJobScheduled || !isSelectable}
             >
               View
-            </Button>
+            </Button> */}
             <Button
               type="default"
               icon={<FileText size={16} />}
               onClick={() => handleViewMpp(record)}
               size="middle"
               className="border-sky-300 text-sky-600"
-              disabled={!isSelectable} // Disable if not selectable
+              disabled={!isJobScheduled || !isSelectable}
             >
               MPP
             </Button>
-            <Button 
+            <Button
               type="primary"
               icon={<Zap size={16} />}
               onClick={() => showActivateConfirmation(record)}
               disabled={
+                !isJobScheduled ||
                 !isSelectable ||
-                (jobSource === 'inprogress' && 
-                  selectedOpId && 
+                (effectiveJobSource === 'inprogress' &&
+                  selectedOpId &&
                   recordId === selectedOpId)
               }
               size="middle"
               className={
-                jobSource === 'inprogress' && 
-                selectedOpId && 
-                recordId === selectedOpId 
-                  ? "bg-green-500" 
+                effectiveJobSource === 'inprogress' &&
+                selectedOpId &&
+                recordId === selectedOpId
+                  ? "bg-green-500"
                   : "bg-sky-500"
               }
             >
@@ -241,7 +374,7 @@ const OperationDetailsCard = () => {
             </Button>
           </Space>
         );
-      }
+      },
     }
   ];
 
@@ -389,7 +522,7 @@ const OperationDetailsCard = () => {
             <Spin size="large" />
             <span className="ml-2 text-gray-500">Loading operation sequence...</span>
           </div>
-        ) : !availableOperations || availableOperations.length === 0 ? (
+        ) : !effectiveAvailableOperations || effectiveAvailableOperations.length === 0 ? (
           <Empty 
             description={
               <div>
@@ -400,26 +533,25 @@ const OperationDetailsCard = () => {
           />
         ) : (
           <>
-            {/* Current operation summary if one is selected */}
-            {selectedOperation && (
+            {effectiveSelectedOperation && (
               <div className="bg-sky-50 p-4 rounded-lg border border-sky-100 mb-4">
                 <div className="flex justify-between items-center mb-2">
                   <div className="flex items-center gap-2">
                     <div className="bg-sky-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">
-                      {selectedOperation.operation_number}
+                      {effectiveSelectedOperation.operation_number}
                     </div>
                     <div className="text-lg font-bold text-sky-900">
-                      {selectedOperation.operation_description || selectedOperation.description}
+                      {effectiveSelectedOperation.operation_description || effectiveSelectedOperation.description}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {jobSource === 'inprogress' ? (
+                    {effectiveJobSource === 'inprogress' ? (
                       <Tag color="success" className="px-3 py-1 text-base">Active</Tag>
                     ) : (
                       <Tag color="processing" className="px-3 py-1 text-base">Selected</Tag>
                     )}
-                    {selectedOperation.can_log === false && (
-                      <Tooltip title={selectedOperation.validation_reason || "Cannot log production"}>
+                    {effectiveSelectedOperation.can_log === false && (
+                      <Tooltip title={effectiveSelectedOperation.validation_reason || "Cannot log production"}>
                         <Tag color="warning" className="px-3 py-1 text-base">Cannot Log</Tag>
                       </Tooltip>
                     )}
@@ -432,16 +564,8 @@ const OperationDetailsCard = () => {
                       <div className="text-xs text-gray-500">Parts Information</div>
                       <div className="flex flex-col">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Completed:</span>
-                          <span className="font-medium text-green-600">{selectedOperation.completed_quantity || 0}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Remaining:</span>
-                          <span className="font-medium text-orange-500">{selectedOperation.remaining_quantity || 0}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
                           <span className="text-sm text-gray-600">Required:</span>
-                          <span className="font-medium">{selectedOperation.required_quantity || 0}</span>
+                          <span className="font-medium">{effectiveSelectedOperation.required_quantity || 0}</span>
                         </div>
                       </div>
                     </div>
@@ -451,7 +575,7 @@ const OperationDetailsCard = () => {
                       <div className="text-xs text-gray-500">Setup Time</div>
                       <div className="flex items-center gap-2">
                         <Clock size={16} className="text-sky-500" />
-                        <div className="font-medium">{selectedOperation.setup_time} hrs</div>
+                        <div className="font-medium">{effectiveSelectedOperation.setup_time} hrs</div>
                       </div>
                     </div>
                   </Col>
@@ -460,51 +584,24 @@ const OperationDetailsCard = () => {
                       <div className="text-xs text-gray-500">Cycle Time</div>
                       <div className="flex items-center gap-2">
                         <Zap size={16} className="text-sky-500" />
-                        <div className="font-medium">{selectedOperation.ideal_cycle_time} hrs</div>
+                        <div className="font-medium">{effectiveSelectedOperation.ideal_cycle_time} hrs</div>
                       </div>
                     </div>
                   </Col>
                 </Row>
-
-                <div className="flex gap-2 mt-4 justify-end">
-                  <Button
-                    type="default"
-                    icon={<FileText size={16} />}
-                    onClick={() => handleViewMpp(selectedOperation)}
-                    className="border-sky-300 text-sky-600"
-                  >
-                    View MPP
-                  </Button>
-                  <Button 
-                    type="primary"
-                    icon={<Zap size={16} />}
-                    onClick={() => showActivateConfirmation(selectedOperation)}
-                    disabled={
-                      (jobSource === 'inprogress' && 
-                      selectedOperation === selectedOperation) ||
-                      selectedOperation.can_log === false
-                    }
-                    className={
-                      jobSource === 'inprogress' ? "bg-green-500" : "bg-sky-500"
-                    }
-                  >
-                    {jobSource === 'custom' || jobSource === 'user-selected' ? 'Active' : 'Activate'}
-                  </Button>
-                </div>
               </div>
             )}
 
-            {/* Operations table with highlighted active operation */}
             <div className="mb-2 flex justify-between items-center">
               <div className="text-lg font-semibold text-sky-800">Operation Sequence</div>
               <div className="text-sm text-gray-500">
-                {availableOperations.length} operations
+                {effectiveAvailableOperations.length} operations
               </div>
             </div>
             
             <Table 
               columns={columns}
-              dataSource={availableOperations}
+              dataSource={effectiveAvailableOperations}
               rowClassName={getRowClassName}
               pagination={false}
               rowKey={(record) => record.operation_id || record.id}
@@ -512,21 +609,24 @@ const OperationDetailsCard = () => {
               size="large"
               scroll={{ y: 350 }}
               onRow={(record) => {
-                // Check if the row is selectable
                 const isSelectable = !(
-                  record.completed_quantity === record.required_quantity || 
+                  record.completed_quantity === record.required_quantity ||
                   record.can_log === false
                 );
-            
+
                 return {
                   onClick: () => {
+                    if (!isJobScheduled) {
+                      message.warning('Cannot select operation: Job is not scheduled.');
+                      return;
+                    }
                     if (isSelectable) {
-                      selectOperation(record); // Only select if the conditions are not met
+                      selectOperation(record);
                     }
                   },
-                  className: isSelectable 
-                    ? 'cursor-pointer hover:bg-gray-50' 
-                    : 'cursor-not-allowed bg-gray-100', // Visual feedback for non-selectable rows
+                  className: isJobScheduled && isSelectable
+                    ? 'cursor-pointer hover:bg-gray-50'
+                    : 'cursor-not-allowed bg-gray-100',
                 };
               }}
             />
@@ -534,7 +634,6 @@ const OperationDetailsCard = () => {
         )}
       </div>
 
-      {/* Activate Operation Confirmation Modal */}
       <Modal
         title={
           <div className="flex items-center gap-2">
@@ -546,17 +645,21 @@ const OperationDetailsCard = () => {
         onOk={handleActivate}
         onCancel={() => setActivateModalVisible(false)}
         okText="Activate"
+        loading={isActivating}
         cancelText="Cancel"
-        okButtonProps={{ 
-          className: "bg-sky-500",
-          size: "large",
-          icon: <CheckCircle2 size={16} />
+        okButtonProps={{
+          className: 'bg-sky-500',
+          size: 'large',
+          icon: <CheckCircle2 size={16} />,
+          disabled: !isJobScheduled,
         }}
-        cancelButtonProps={{ size: "large" }}
+        cancelButtonProps={{ size: 'large' }}
       >
         <div className="py-4">
           <p>Are you sure you want to activate the following operation?</p>
-          
+          {!isJobScheduled && (
+            <p className="text-red-500 mt-2">This job is not scheduled and cannot be activated.</p>
+          )}
           {operationToActivate && (
             <div className="bg-sky-50 p-3 rounded-lg border border-sky-100 mt-4">
               <div className="font-bold text-lg">
@@ -570,7 +673,6 @@ const OperationDetailsCard = () => {
         </div>
       </Modal>
 
-      {/* MPP Document Modal */}
       <Modal
         title={
           <div className="flex items-center gap-2">
@@ -588,7 +690,6 @@ const OperationDetailsCard = () => {
         {renderMppContent()}
       </Modal>
 
-      {/* Add custom CSS for the operations table */}
       <style jsx global>{`
         .operations-table .ant-table-cell {
           padding: 16px 12px;
@@ -603,12 +704,12 @@ const OperationDetailsCard = () => {
         }
         
         .operations-table .operation-row.cursor-not-allowed {
-          background-color: #f5f5f5 !important; /* Slightly darker gray for disabled rows */
-          opacity: 0.7; /* Reduce opacity to indicate disabled state */
+          background-color: #f5f5f5 !important;
+          opacity: 0.7;
         }
         
         .operations-table .operation-row.cursor-not-allowed:hover {
-          background-color: #f5f5f5 !important; /* Prevent hover effect on disabled rows */
+          background-color: #f5f5f5 !important;
         }
         
         .operations-table .ant-table-row:hover {
@@ -619,4 +720,4 @@ const OperationDetailsCard = () => {
   );
 };
 
-export default OperationDetailsCard; 
+export default OperationDetailsCard;

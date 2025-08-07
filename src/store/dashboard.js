@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 const WEBSOCKET_URL = 'ws://172.18.7.89:5467/production_monitoring/ws/live-status/';
-const OEE_API_URL = 'http://172.18.7.89:5467/production_monitoring/machine-oee-analysis';
+const OEE_API_URL = 'http://172.18.7.91:8008/production_monitoring/machine-oee-analysis';
 
 const useDashboardStore = create((set, get) => ({
   machineData: [],
@@ -14,14 +14,11 @@ const useDashboardStore = create((set, get) => ({
   fetchOEEData: async (machineId) => {
     try {
       const today = new Date();
-      const weekAgo = new Date(today);
-      weekAgo.setDate(today.getDate() - 7);
-
-      const startDate = weekAgo.toISOString().split('T')[0];
-      const endDate = today.toISOString().split('T')[0];
+      const currentShift = getCurrentShift(today);
+      const formattedDate = today.toISOString().split('T')[0];
 
       const response = await fetch(
-        `${OEE_API_URL}/${machineId}?start_date=${startDate}&end_date=${endDate}`
+        `${OEE_API_URL}/${machineId}?date=${formattedDate}&shift=${currentShift}`
       );
 
       if (!response.ok) {
@@ -221,4 +218,11 @@ const calculateOEE = (machineData) => {
   return Math.floor(Math.random() * (75 - 60 + 1) + 60); // Random value between 60-75 for OFF machines
 };
 
-export default useDashboardStore; 
+const getCurrentShift = (date) => {
+  const hours = date.getHours();
+  if (hours >= 6 && hours < 14) return 1; // First shift: 6 AM - 2 PM
+  if (hours >= 14 && hours < 22) return 2; // Second shift: 2 PM - 10 PM
+  return 3; // Third shift: 10 PM - 6 AM
+};
+
+export default useDashboardStore;

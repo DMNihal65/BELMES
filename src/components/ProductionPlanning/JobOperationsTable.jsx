@@ -176,7 +176,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       try {
         // Fetch IPID structure using the new endpoint
         const { fetchIpidStructure } = usePlanningStore.getState();
-        const ipidStructure = await fetchIpidStructure(currentProductionOrder);
+        const ipidStructure = await fetchIpidStructure(partNumber);
         
         if (!ipidStructure || !ipidStructure.structure || !ipidStructure.structure.subfolders) {
           console.log('No IPID structure found for production order:', currentProductionOrder);
@@ -619,7 +619,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     try {
       // Fetch IPID structure using the new endpoint
       const { fetchIpidStructure } = usePlanningStore.getState();
-      const ipidStructure = await fetchIpidStructure(productionOrder);
+      const ipidStructure = await fetchIpidStructure(partNumber);
       
       if (!ipidStructure || !ipidStructure.structure || !ipidStructure.structure.subfolders) {
         console.log('No IPID structure found for production order:', productionOrder);
@@ -646,7 +646,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
     try {
       // Fetch IPID structure using the new endpoint
       const { fetchIpidStructure } = usePlanningStore.getState();
-      const ipidStructure = await fetchIpidStructure(productionOrder);
+      const ipidStructure = await fetchIpidStructure(partNumber);
       
       if (!ipidStructure || !ipidStructure.structure || !ipidStructure.structure.subfolders) {
         console.log('No IPID structure found for production order:', productionOrder);
@@ -754,6 +754,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       const formData = new FormData();
       formData.append('file', file);
       formData.append('production_order', currentProductionOrder);
+      formData.append('part_number', partNumber);
       formData.append('operation_number', selectedOperation.operation_number);
       formData.append('document_name', values.documentName);
       formData.append('description', values.description || '');

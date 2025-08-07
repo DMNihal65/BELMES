@@ -3,9 +3,9 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.7.91:8008/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.7.91:8008/api/v1/operator';
-const MASTER_ORDER_URL = 'http://172.18.7.91:8008/api/v1/master-order';
+const SUPERVISOR_BASE_URL = 'http://172.18.7.89:5467/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.18.7.89:5467/api/v1/operator';
+const MASTER_ORDER_URL = 'http://172.18.7.89:5467/api/v1/master-order';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -39,6 +39,13 @@ const useMachineMaintenanceStore = create((set, get) => ({
   totalMachineNotifications: 0,
   totalComponentNotifications: 0,
   notificationsLimit: 10,
+
+
+  machineIssues: [],
+  totalMachineIssues: 0,
+
+  machineCalibrationLogs: [],
+  totalMachineCalibrationLogs: 0,
 
   // Operator: Fetch all machine statuses
   fetchOperatorMachineStatuses: async () => {
@@ -379,13 +386,36 @@ fetchMachinePerformanceMetrics: async () => {
   }
 },
 
-// Fetch all machines for calibration
-fetchAllMachines: async () => {
+
+fetchOeeIssues: async () => {
   set({ loading: true, error: null });
   try {
-    const response = await axios.get('http://172.18.7.91:8008/api/v1/master-order/all-machines/');
-    set({ loading: false });
-    return response.data;
+    const response = await axios.get(`${OPERATOR_BASE_URL}/issues/`);
+    set({
+      machineIssues: response.data.issues,
+      totalMachineIssues: response.data.issues.length,
+      loading: false
+    });
+  } catch (error) {
+    set({ 
+      error: error.response?.data?.detail || error.message, 
+      loading: false 
+    });
+    throw error;
+  }
+},
+
+
+// Operator: Fetch machine calibration logs
+fetchMachineCalibrationLogs: async (skip = 0) => {
+  set({ loading: true, error: null });
+  try {
+    const response = await axios.get(`http://172.18.7.89:5467/api/v1/newlogs/machine-calibration-logs?skip=${skip}`);
+    set({
+      machineCalibrationLogs: response.data,
+      totalMachineCalibrationLogs: response.data.length,
+      loading: false
+    });
   } catch (error) {
     set({ 
       error: error.response?.data?.detail || error.message, 

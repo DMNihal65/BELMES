@@ -406,6 +406,26 @@ fetchOeeIssues: async () => {
 },
 
 
+// Fetch all machines for calibration
+
+fetchAllMachines: async () => {
+
+  set({ loading: true, error: null });
+
+  try {
+
+    const response = await axios.get('http://172.18.7.89:5467/api/v1/master-order/all-machines/');
+
+    set({ loading: false });
+
+    return response.data;
+  
+  }
+  catch{
+    console.log("Error Fetching Machines")
+  }
+},
+
 // Operator: Fetch machine calibration logs
 fetchMachineCalibrationLogs: async (skip = 0) => {
   set({ loading: true, error: null });

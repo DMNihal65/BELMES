@@ -239,13 +239,13 @@ class QualityStore {
     });
   }
 
-  async fetchBalloonedDrawing(productionOrder, operationId) {
+  async fetchBalloonedDrawing(partNumber, operationId) {
     return this.retryRequest(async () => {
       try {
-        console.log(`Fetching ballooned drawing for Production Order: ${productionOrder}, Operation: ${operationId}`);
+        console.log(`Fetching ballooned drawing for Part: ${partNumber}, Operation: ${operationId}`);
         
         const response = await this.api.get(
-          `/document-management/ballooned-drawing/download/${productionOrder}/${operationId}`,
+          `/document-management/ballooned-drawing/download/${partNumber}/${operationId}`,
           { responseType: 'blob' }
         );
         
@@ -254,7 +254,7 @@ class QualityStore {
         
         return {
           url: url,
-          fileName: `drawing_${productionOrder}_${operationId}.pdf`
+          fileName: `drawing_${partNumber}_${operationId}.pdf`
         };
       } catch (error) {
         this.handleError(error, 'Fetching ballooned drawing');
@@ -680,16 +680,3 @@ class QualityStore {
 }
 
 export const qualityStore = new QualityStore();
-
-
-
-
-
-
-
-
-
-
-
-
-

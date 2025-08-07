@@ -6,6 +6,7 @@ import Notifications from './Notifications';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import DowntimeTickets from './DowntimeTickets';
 import TicketAnalytics from './TicketAnalytics';
+import MachineCalibrationDueDates from './MachineCalibrationDueDates';
 
 const { TabPane } = Tabs;
 
@@ -178,8 +179,11 @@ export default function MaintenanceDashboard() {
           <OEEIssues />
         </TabPane>
 
-        <TabPane tab="Machine Calibration" key="6">
+        {/* <TabPane tab="Machine Calibration" key="6">
           <MachineCalibration />
+        </TabPane> */}
+        <TabPane tab="Machine Calibration Due" key="7">
+          <MachineCalibrationDueDates />
         </TabPane>
       </Tabs>
     </div>

@@ -26,8 +26,8 @@ const API_CONFIG = {
     getDocumentsByPartNumber: (partNumber) => `/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
     updateProjectPriorities: '/api/v1/planning/projects/priority',
 
-    allCompletionRecords: 'http://172.18.100.67:7879/api/v1/scheduling/all-completion-records',
-    orderCompletionRecord: (orderId) => `http://172.18.100.67:7879/api/v1/scheduling/order-completion-record/${orderId}`
+    allCompletionRecords: 'http://172.18.7.89:5467/api/v1/scheduling/all-completion-records',
+    orderCompletionRecord: (orderId) => `http://172.18.7.89:5467/api/v1/scheduling/order-completion-record/${orderId}`
   }
 };
 

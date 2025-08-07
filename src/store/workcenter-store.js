@@ -84,8 +84,9 @@ const useWorkcenterStore = create((set, get) => ({
       const data = await response.json();
       console.log('Fetched workcenters:', data);
 
-      // Ensure data is an array and filter by work_center_boolean
-      const workcentersArray = Array.isArray(data) ? data.filter(item => item.work_center_boolean === true) : [];
+  // Ensure data is an array - show all workcenters regardless of schedulable status
+
+      const workcentersArray = Array.isArray(data) ? data : [];
 
       // Extract unique workcenter codes and their details
       const uniqueWorkcenters = [...new Map(workcentersArray.map(item => 

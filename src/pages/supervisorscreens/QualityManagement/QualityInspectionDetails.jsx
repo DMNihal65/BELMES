@@ -101,7 +101,7 @@ const QualityInspectionDetails = ({
         duration: 0 // Keep the message until we explicitly destroy it
       });
       
-      const data = await qualityStore.fetchBalloonedDrawing(productionOrder, operationNo);
+      const data = await qualityStore.fetchBalloonedDrawing(inspectionDetails.part_number, operationNo);
       setDrawingData(data);
       
       // Show success message
@@ -150,7 +150,7 @@ const QualityInspectionDetails = ({
         });
         
         const data = await qualityStore.fetchBalloonedDrawing(
-          inspectionDetails.production_order, 
+          inspectionDetails.part_number, 
           op
         );
         
@@ -459,10 +459,11 @@ const QualityInspectionDetails = ({
       // Show loading indicator
       message.loading({ content: 'Loading measured data...', key: 'measuredDataLoading' });
       
-      // Fetch inspection data using the new endpoint
+      // Fetch inspection data using the new endpoint with quantity 1 by default
       const response = await qualityStore.fetchStageInspectionByOperation(
         inspectionDetails.order_id,
-        selectedOperation
+        selectedOperation,
+        1 // Default to quantity 1
       );
       
       // Get the IPID for the selected operation
@@ -630,6 +631,16 @@ const QualityInspectionDetails = ({
         setFilteredData(filtered);
       }
     }, [measuredData]);
+
+    // Reset quantity to 1 and fetch data when modal opens
+    useEffect(() => {
+      if (isMeasuredDataModalVisible && selectedOperation) {
+        // Always reset to quantity 1 when modal opens
+        setQtyFilter(1);
+        // Fetch data for quantity 1
+        handleQtyChange(1);
+      }
+    }, [isMeasuredDataModalVisible, selectedOperation]);
     
     // Check if we're viewing final inspection measurements
     const isViewingFinalInspection = measuredData?.inspection_data?.some(
@@ -645,9 +656,17 @@ const QualityInspectionDetails = ({
           </div>
         }
         visible={isMeasuredDataModalVisible}
-        onCancel={() => setIsMeasuredDataModalVisible(false)}
+        onCancel={() => {
+          setIsMeasuredDataModalVisible(false);
+          // Clear the measured data when modal closes to ensure fresh start next time
+          setMeasuredData(null);
+        }}
         footer={[
-          <Button key="close" onClick={() => setIsMeasuredDataModalVisible(false)}>
+          <Button key="close" onClick={() => {
+            setIsMeasuredDataModalVisible(false);
+            // Clear the measured data when modal closes to ensure fresh start next time
+            setMeasuredData(null);
+          }}>
             Close
           </Button>
         ]}
@@ -662,12 +681,12 @@ const QualityInspectionDetails = ({
           <Row gutter={16} align="middle">
             <Col span={24}>
               <Row gutter={[16, 8]}>
-                <Col span={8}>
+                {/* <Col span={8}>
                   <div className="flex flex-col">
                     <Text type="secondary" className="text-xs">Order ID</Text>
                     <Text strong className="text-base">{inspectionDetails?.order_id || '-'}</Text>
                   </div>
-                </Col>
+                </Col> */}
                 <Col span={8}>
                   <div className="flex flex-col">
                     <Text type="secondary" className="text-xs">Production Order</Text>
@@ -730,7 +749,9 @@ const QualityInspectionDetails = ({
               size="small" 
               type={activeFilter === 'all' ? "primary" : "default"}
               ghost={activeFilter !== 'all'}
-              className={`filter-btn ${activeFilter === 'all' ? 'active-filter' : ''}`}
+              className={`filter-btn ${activeFilter === 'all' 
+                ? 'bg-blue-100 border-blue-300 text-blue-700' 
+                : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100 hover:border-blue-300'}`}
               onClick={() => handleFilterChange('all')}
             >
               All ({prepareInspectionData().length})
@@ -1557,7 +1578,7 @@ const QualityInspectionDetails = ({
         return;
       }
       
-      const data = await qualityStore.fetchBalloonedDrawing(productionOrder, operationId);
+      const data = await qualityStore.fetchBalloonedDrawing(inspectionDetails.part_number, operationId);
       if (data && data.url) {
         setFinalInspectionDrawing(data);
       } else {

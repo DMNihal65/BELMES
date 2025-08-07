@@ -33,7 +33,7 @@ function InspectionResult() {
   const [ftpApprovalStatus, setFtpApprovalStatus] = useState(null);
   const [measuredData, setMeasuredData] = useState(null);
   const [isMeasuredDataModalVisible, setIsMeasuredDataModalVisible] = useState(false);
-  const [viewMode, setViewMode] = useState('current');
+  const [viewMode, setViewMode] = useState('current'); // Default to current operation view
   const [currentOperationData, setCurrentOperationData] = useState(null);
   // Remove qty and loadingQty from parent
 
@@ -99,6 +99,12 @@ function InspectionResult() {
           };
           
           setCurrentOperationData(formattedData);
+          
+          // Automatically set the selected part number to the current job's part number
+          if (currentJob.part_number) {
+            setSelectedPartNumber(currentJob.part_number);
+            setSelectedOrderId(currentJob.order_id || activeOp.operation_id);
+          }
         } else {
           console.log('No current job or active operation found in localStorage');
         }
@@ -108,7 +114,7 @@ function InspectionResult() {
     };
 
     loadCurrentOperation();
-  }, [selectedPartNumber]);
+  }, []); // Remove selectedPartNumber dependency to load on page load
 
   const handlePartNumberChange = async (value) => {
     try {
@@ -556,13 +562,30 @@ function InspectionResult() {
       title: 'Part Number',
       dataIndex: 'part_number',
       key: 'part_number',
-      width: '20%',
+      width: '15%',
+    },
+    {
+      title: 'Description',
+      dataIndex: 'active_operation',
+      key: 'description',
+      width: '25%',
+      render: (activeOperation, record) => {
+        if (viewMode === 'current' && activeOperation) {
+          return activeOperation.description || 'No description available';
+        }
+        // For all operations view, show the first operation's description or a general description
+        if (record.operations && record.operations.length > 0) {
+          const firstOp = record.operations[0];
+          return firstOp.description || 'No description available';
+        }
+        return 'No description available';
+      }
     },
     {
       title: 'Operations',
       dataIndex: 'operations',
       key: 'operations',
-      width: '40%',
+      width: '30%',
       render: (operations, record) => {
         // If in current operation view, only show the active operation
         const opsToShow = viewMode === 'current' ? 
@@ -596,31 +619,31 @@ function InspectionResult() {
         );
       }
     },
-    {
-      title: 'Final Inspection',
-      dataIndex: 'inspection_data',
-      key: 'inspection_data',
-      width: '20%',
-      fixed: 'right',
-      render: (inspectionData, record) => {
-        // Check if there's any final inspection data (operation 999)
-        const hasFinalInspection = record.inspection_data?.some(
-          data => data.operation_number === 999 && data.inspections && data.inspections.length > 0
-        );
+    // {
+    //   title: 'Final Inspection',
+    //   dataIndex: 'inspection_data',
+    //   key: 'inspection_data',
+    //   width: '20%',
+    //   fixed: 'right',
+    //   render: (inspectionData, record) => {
+    //     // Check if there's any final inspection data (operation 999)
+    //     const hasFinalInspection = record.inspection_data?.some(
+    //       data => data.operation_number === 999 && data.inspections && data.inspections.length > 0
+    //     );
         
-        return (
-          <Button
-            type={hasFinalInspection ? 'primary' : 'default'}
-            size="small"
-            icon={hasFinalInspection ? <CheckCircleOutlined /> : <EyeOutlined />}
-            onClick={() => handleOperationClick('final', record)}
-            className={`hover:scale-105 transition-transform ${hasFinalInspection ? 'bg-green-500 border-green-500 hover:bg-green-600 hover:border-green-600' : ''}`}
-          >
-            {hasFinalInspection ? 'View Final Inspection' : 'No Final Data'}
-          </Button>
-        );
-      },
-    }
+    //     return (
+    //       <Button
+    //         type={hasFinalInspection ? 'primary' : 'default'}
+    //         size="small"
+    //         icon={hasFinalInspection ? <CheckCircleOutlined /> : <EyeOutlined />}
+    //         onClick={() => handleOperationClick('final', record)}
+    //         className={`hover:scale-105 transition-transform ${hasFinalInspection ? 'bg-green-500 border-green-500 hover:bg-green-600 hover:border-green-600' : ''}`}
+    //       >
+    //         {hasFinalInspection ? 'View Final Inspection' : 'No Final Data'}
+    //       </Button>
+    //     );
+    //   },
+    // }
   ], [viewMode]); // Add viewMode to dependencies
 
   // Handle export to Excel
@@ -2042,16 +2065,16 @@ function InspectionResult() {
             title={
               <div className="flex justify-between items-center">
                 <Space size="middle">
-                  <span className="text-lg font-semibold">Inspection History</span>
+                  <span className="text-lg font-semibold">Current Operation</span>
                   {loading && <Spin size="small" />}
                 </Space>
-                <Switch
+                {/* <Switch
                   checkedChildren="Current Operation"
                   unCheckedChildren="All Operations"
                   onChange={handleViewModeChange}
                   defaultChecked
                   className="custom-switch"
-                />
+                /> */}
               </div>
             }
             className="shadow-sm border-0 rounded-lg"

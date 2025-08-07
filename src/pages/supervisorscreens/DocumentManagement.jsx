@@ -2562,7 +2562,7 @@ const DocumentManagement = () => {
             showSearch
             optionFilterProp="children"
             filterOption={(input, option) =>
-              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              to.string(option.children).toLowerCase().indexOf(input.toLowerCase()) >= 0
             }
           >
             {machines.map(machine => (
@@ -2578,16 +2578,17 @@ const DocumentManagement = () => {
           label="Document Name"
           rules={[{ required: true, message: 'Please enter the document name' }]}
         >
-          <Input />
+          <Input maxLength ={30} />
         </Form.Item>
 
-        <Form.Item
+       <Form.Item
           name="document_type"
-          label="Document Type"
+          label="Folder Name"
           rules={[{ required: true, message: 'Please enter the document type' }]}
         >
-          <Input />
+          <Input maxLength ={30} />
         </Form.Item>
+
 
         <Form.Item
           name="description"

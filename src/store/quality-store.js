@@ -662,15 +662,7 @@ class QualityStore {
         return response.data;
         
       } catch (error) {
-        let errorMessage = 'An error occurred while fetching stage inspection.';
-        if (error.response && error.response.data && error.response.data.detail) {
-          errorMessage = error.response.data.detail;
-        }
-
-        console.error('Backend error:', errorMessage);
-        
-        // Optionally throw this to be handled in the UI
-        throw new Error(errorMessage);
+        this.handleError(error, 'Fetching stage inspection');
       }
     });
   }

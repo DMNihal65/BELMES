@@ -54,6 +54,7 @@ const Workcenter = () => {
   const [selectedMachineDetails, setSelectedMachineDetails] = useState([]);
   const [workcenterOptions, setWorkcenterOptions] = useState([]);
   const [editingConfigKey, setEditingConfigKey] = useState('');
+  const [originalConfigData, setOriginalConfigData] = useState(null);
 
   const { 
     fetchWorkcenters, 
@@ -1378,16 +1379,26 @@ const Workcenter = () => {
 
   const handleConfigEdit = (record) => {
     setEditingConfigKey(record.id);
+    // Store the original data for this record
+    setOriginalConfigData(record);
   };
 
   const handleConfigCancel = () => {
+    // Restore the original data if it exists
+    if (originalConfigData) {
+      setConfigData(configData.map(item => 
+        item.id === originalConfigData.id ? originalConfigData : item
+      ));
+    }
     setEditingConfigKey('');
+    setOriginalConfigData(null);
   };
 
   const handleConfigSave = async (record) => {
     try {
       await updateWorkcenterSchedulable(record.id, record.is_schedulable);
       setEditingConfigKey('');
+      setOriginalConfigData(null);
       toast.success('Workcenter status updated successfully');
     } catch (error) {
       console.error('Error saving config:', error);

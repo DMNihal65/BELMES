@@ -11,7 +11,7 @@ const API_BASE_URL = "http://172.18.7.89:5467";
 const MPP_API_BASE_URL = "http://172.18.7.89:5467";
 
 const DocumentsCard = () => {
-  const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials } = useOperatorStore();
+  const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials, fetchJobDocuments, selectJob } = useOperatorStore();
   const { fetchToolsByOrderId, fetchCncProgramDetails } = usePlanningStore();
   const [activeTab, setActiveTab] = useState('all');
   const [downloading, setDownloading] = useState(false);
@@ -22,84 +22,43 @@ const DocumentsCard = () => {
   const [cncError, setCncError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Table columns for CNC Programs
-  const documentsColumns = [
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
-      className: 'bg-gray-50',
-    },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-      className: 'bg-gray-50',
-    },
-    {
-      title: 'Operation',
-      dataIndex: 'operation_number',
-      key: 'operation_number',
-      className: 'bg-gray-50',
-      render: (operationNumber, record) => {
-        // Log the record to help debugging
-        console.log('Rendering operation for document in table:', record);
-        // Handle different possible data structures from API
-        let opNum = operationNumber ||
-          record.metadata?.operation_number ||
-          record.latest_version?.metadata?.operation_number;
-        // If no operation number found in metadata, try to extract from name
-        if (!opNum && record.name) {
-          const fileNameMatch = record.name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
-          if (fileNameMatch) {
-            opNum = fileNameMatch[1] || fileNameMatch[2];
+  // Hydrate selectedJob from localStorage on mount if not set
+  useEffect(() => {
+    const hydrateSelectedJob = () => {
+      if (!selectedJob) {
+        const currentJobData = localStorage.getItem('currentJobData');
+        if (currentJobData) {
+          const parsedJobData = JSON.parse(currentJobData);
+          selectJob(parsedJobData); // Use selectJob to set selectedJob in the store
+        }
+      }
+    };
+    hydrateSelectedJob();
+  }, [selectedJob, selectJob]);
+
+  // Fetch job documents if selectedJob exists and jobDocuments is empty
+  useEffect(() => {
+    const fetchDocumentsIfEmpty = async () => {
+      if (selectedJob && (!jobDocuments || !jobDocuments.all_documents || jobDocuments.all_documents.length === 0)) {
+        try {
+          const partNumber = selectedJob.part_number;
+          if (partNumber) {
+            const result = await fetchJobDocuments(partNumber);
+            if (!result.success) {
+              message.error(`Failed to fetch job documents: ${result.error}`);
+            }
+          } else {
+            message.error('Part number not found in selectedJob');
           }
+        } catch (error) {
+          console.error('Error fetching job documents:', error);
+          message.error('Failed to fetch job documents');
         }
-        if (!opNum) return 'N/A';
-        // Try to find matching operation in the job data
-        const operation = selectedJob?.operations?.find(op =>
-          op.operation_number.toString() === opNum.toString()
-        );
-        if (operation) {
-          return `${operation.operation_number} - ${operation.operation_description}`;
-        } else {
-          // If no match found, at least show the operation number
-          return `Operation ${opNum}`;
-        }
-      },
-    },
-    {
-      title: 'Version',
-      dataIndex: ['latest_version', 'version_number'],
-      key: 'version',
-      className: 'bg-gray-50',
-      render: (version) => version || 'N/A',
-    },
-    {
-      title: 'Upload Date',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      className: 'bg-gray-50',
-      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A',
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      className: 'bg-gray-50',
-      render: (_, record) => (
-        <div className="flex gap-2">
-          <Button
-            icon={<Download size={16} />}
-            onClick={() => handleDownload(record.id)}
-            loading={downloading}
-            size="small"
-          >
-            Download
-          </Button>
-        </div>
-      ),
-    },
-  ];
+      }
+    };
+
+    fetchDocumentsIfEmpty();
+  }, [jobDocuments, fetchJobDocuments, selectedJob]);
 
   // Fetch tools using production_order to get id from localStorage
   useEffect(() => {
@@ -107,13 +66,11 @@ const DocumentsCard = () => {
       if (selectedJob?.production_order && activeTab === 'toolsAndPrograms') {
         try {
           setLoading(true);
-          // Get all_orders from localStorage
           const allOrders = localStorage.getItem('all_orders');
           let orderId = null;
           if (allOrders) {
             try {
               const parsedOrders = JSON.parse(allOrders);
-              // Find the order with matching production_order
               const matchingOrder = parsedOrders.find(
                 order => order.production_order === selectedJob.production_order
               );
@@ -127,7 +84,6 @@ const DocumentsCard = () => {
             message.error('Could not find order ID for the selected production order');
             return;
           }
-          // Fetch tools using the order ID
           const toolsData = await fetchToolsByOrderId(orderId);
           setTools(toolsData);
         } catch (error) {
@@ -172,7 +128,6 @@ const DocumentsCard = () => {
   // Handle document preview with authentication
   const handlePreview = async (documentId) => {
     try {
-      // Get authentication token
       const authStorage = localStorage.getItem('auth-storage');
       let authToken = localStorage.getItem('token');
       if (!authToken && authStorage) {
@@ -187,19 +142,15 @@ const DocumentsCard = () => {
         message.error('Authentication token not found');
         return;
       }
-      // Create URL with authentication header
       const previewUrl = `${MPP_API_BASE_URL}/api/v1/document-management/documents/${documentId}/download-latest`;
-      // Fetch the preview with auth token
       const response = await fetch(previewUrl, {
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
       if (!response.ok) {
         throw new Error('Failed to load document preview');
       }
-      // Get the blob and create a URL
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      // Open in a new tab
       window.open(url, '_blank');
     } catch (error) {
       console.error('Preview error:', error);
@@ -214,33 +165,26 @@ const DocumentsCard = () => {
     try {
       let url;
       if (documentId) {
-        // Download by document ID
         url = `${MPP_API_BASE_URL}/api/v1/document-management/documents/${documentId}/download-latest`;
       } else if (documentType && selectedJob?.part_number) {
-        // Download by document type and part number
         url = `${MPP_API_BASE_URL}/api/v1/document-management/documents/download-latest/${selectedJob.part_number}/${documentType}`;
       } else {
         throw new Error('Missing document information');
       }
-      // Get authentication token from localStorage
       const authToken = localStorage.getItem('token') || JSON.parse(localStorage.getItem('auth-storage'))?.state?.token;
       if (!authToken) {
         throw new Error('Authentication token not found');
       }
-      // Fetch the document with auth token
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
       if (!response.ok) {
-        throw new Error('Failed to download document');
+        throw new Error('Document not Available');
       }
-      // Get the blob
       const blob = await response.blob();
-      // Create download link
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers.get('content-disposition');
       let filename = 'document';
       if (contentDisposition) {
@@ -249,7 +193,6 @@ const DocumentsCard = () => {
           filename = filenameMatch[1];
         }
       } else {
-        // Use a default name based on document type
         filename = `${selectedJob.part_number}_${documentType || 'document'}.pdf`;
       }
       a.download = filename;
@@ -259,8 +202,8 @@ const DocumentsCard = () => {
       window.URL.revokeObjectURL(downloadUrl);
       message.success('Document downloaded successfully');
     } catch (error) {
-      console.error('Error downloading document:', error);
-      message.error(`Failed to download document: ${error.message}`);
+      console.error('Document Not Available:', error);
+      message.error(`Document Not Available: ${error.message}`);
     } finally {
       setDownloading(false);
     }
@@ -271,14 +214,10 @@ const DocumentsCard = () => {
     if (!doc) return <FileText />;
     const docType = doc.doc_type_id;
     switch (docType) {
-      case 1: // MPP
-        return <Database className="text-blue-500" />;
-      case 2: // Engineering Drawing
-        return <FileImage className="text-green-500" />;
-      case 3: // CNC Program
-        return <FileArchive className="text-purple-500" />;
-      default:
-        return <FileText className="text-gray-500" />;
+      case 1: return <Database className="text-blue-500" />;
+      case 2: return <FileImage className="text-green-500" />;
+      case 3: return <FileArchive className="text-purple-500" />;
+      default: return <FileText className="text-gray-500" />;
     }
   };
 
@@ -319,6 +258,79 @@ const DocumentsCard = () => {
         return jobDocuments.all_documents || [];
     }
   };
+
+  const documentsColumns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      className: 'bg-gray-50',
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      className: 'bg-gray-50',
+    },
+    {
+      title: 'Operation',
+      dataIndex: 'operation_number',
+      key: 'operation_number',
+      className: 'bg-gray-50',
+      render: (operationNumber, record) => {
+        console.log('Rendering operation for document in table:', record);
+        let opNum = operationNumber ||
+          record.metadata?.operation_number ||
+          record.latest_version?.metadata?.operation_number;
+        if (!opNum && record.name) {
+          const fileNameMatch = record.name.match(/OP[_\s]?(\d+)|Operation[_\s]?(\d+)/i);
+          if (fileNameMatch) {
+            opNum = fileNameMatch[1] || fileNameMatch[2];
+          }
+        }
+        if (!opNum) return 'N/A';
+        const operation = selectedJob?.operations?.find(op =>
+          op.operation_number.toString() === opNum.toString()
+        );
+        if (operation) {
+          return `${operation.operation_number} - ${operation.operation_description}`;
+        } else {
+          return `Operation ${opNum}`;
+        }
+      },
+    },
+    {
+      title: 'Version',
+      dataIndex: ['latest_version', 'version_number'],
+      key: 'version',
+      className: 'bg-gray-50',
+      render: (version) => version || 'N/A',
+    },
+    {
+      title: 'Upload Date',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      className: 'bg-gray-50',
+      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      className: 'bg-gray-50',
+      render: (_, record) => (
+        <div className="flex gap-2">
+          <Button
+            icon={<Download size={16} />}
+            onClick={() => handleDownload(record.id)}
+            loading={downloading}
+            size="small"
+          >
+            Download
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   const rawMaterialsColumns = [
     {
@@ -414,7 +426,7 @@ const DocumentsCard = () => {
       <div className="p-8">
         <Alert
           message="No Documents Found"
-          description={`No documents available for part number ${selectedJob.part_number}`}
+          description={`No documents available for part number ${selectedJob.part_number}. Fetching documents...`}
           type="info"
           showIcon
           icon={<Info />}
@@ -462,16 +474,6 @@ const DocumentsCard = () => {
                     >
                       Download
                     </Button>,
-                    // doc.latest_version && (
-                    //   <Button
-                    //     type="link"
-                    //     icon={<Eye size={16} />}
-                    //     onClick={() => handlePreview(doc.id)}
-                    //     key="preview"
-                    //   >
-                    //     Preview
-                    //   </Button>
-                    // ),
                   ]}
                 >
                   <List.Item.Meta
@@ -523,15 +525,15 @@ const DocumentsCard = () => {
               type="warning"
               showIcon
               icon={<AlertCircle />}
-              action={
-                <Button
-                  size="small"
-                  type="text"
-                  onClick={() => handleDownload(null, 'MPP')}
-                >
-                  Try Direct Download
-                </Button>
-              }
+              // action={
+              //   <Button
+              //     size="small"
+              //     type="text"
+              //     onClick={() => handleDownload(null, 'MPP')}
+              //   >
+              //     Try Direct Download
+              //   </Button>
+              // }
             />
           ) : (
             <Card className="mb-4">
@@ -550,14 +552,6 @@ const DocumentsCard = () => {
                   >
                     Download
                   </Button>
-                  {/* {jobDocuments.mpp_document.latest_version && (
-                    <Button
-                      icon={<Eye size={16} />}
-                      onClick={() => handlePreview(jobDocuments.mpp_document.id)}
-                    >
-                      Preview
-                    </Button>
-                  )} */}
                 </div>
               </div>
             </Card>
@@ -578,15 +572,15 @@ const DocumentsCard = () => {
               type="warning"
               showIcon
               icon={<AlertCircle />}
-              action={
-                <Button
-                  size="small"
-                  type="text"
-                  onClick={() => handleDownload(null, 'ENGINEERING_DRAWING')}
-                >
-                  Try Direct Download
-                </Button>
-              }
+              // action={
+              //   <Button
+              //     size="small"
+              //     type="text"
+              //     onClick={() => handleDownload(null, 'ENGINEERING_DRAWING')}
+              //   >
+              //     Try Direct Download
+              //   </Button>
+              // }
             />
           ) : (
             <Card className="mb-4">
@@ -605,14 +599,6 @@ const DocumentsCard = () => {
                   >
                     Download
                   </Button>
-                  {/* {jobDocuments.engineering_drawing_document.latest_version && (
-                    <Button
-                      icon={<Eye size={16} />}
-                      onClick={() => handlePreview(jobDocuments.engineering_drawing_document.id)}
-                    >
-                      Preview
-                    </Button>
-                  )} */}
                 </div>
               </div>
             </Card>

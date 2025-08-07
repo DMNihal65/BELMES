@@ -136,13 +136,26 @@ useEffect(() => {
     }
   
     if (!filteredJobs || filteredJobs.length === 0) {
-      return (
-        <Empty 
-          description="No custom jobs found" 
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
-      );
-    }
+  return (
+    <div className="flex flex-col items-center justify-center py-10">
+      <Empty 
+        description="No jobs found for selected filters"
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+      />
+      <Button 
+        onClick={() => {
+          setFilterKeyword('');
+          setFilterPriority(null);
+        }}
+        type="link"
+        className="mt-4"
+      >
+        Back to all jobs
+      </Button>
+    </div>
+  );
+}
+
   
     // Create a Set of production_order values from scheduledJobs
     const scheduledProductionOrders = new Set(scheduledJobs.map(job => job.production_order));
@@ -194,21 +207,39 @@ useEffect(() => {
               <div>
                 <div className="text-xs text-gray-500 mb-1">Priority</div>
                 <Select
-                  placeholder="Filter by priority"
-                  allowClear
-                  style={{ width: '100%' }}
-                  onChange={(value) => setFilterPriority(value)}
-                >
-                  <Option value={1}>Priority 1</Option>
-                  <Option value={2}>Priority 2</Option>
-                  <Option value={3}>Priority 3</Option>
-                  <Option value={4}>Priority 4</Option>
-                </Select>
+                placeholder="Filter by priority"
+                allowClear
+                style={{ width: '100%' }}
+                onChange={(value) => setFilterPriority(value)}
+                value={filterPriority || undefined}
+              >
+                {Array.from(
+                  new Set(availableJobs.map(job => job.project?.priority).filter(p => p != null))
+                )
+                  .sort((a, b) => a - b)
+                  .map(priority => (
+                    <Option key={priority} value={priority}>
+                      Priority {priority}
+                    </Option>
+                  ))}
+              </Select>
+
               </div>
             </div>
           </div>
         )}
-  
+        <div className="mt-3 text-right">
+      <Button
+        onClick={() => {
+          setFilterKeyword('');
+          setFilterPriority(null);
+        }}
+        size="small"
+        type="default"
+      >
+        Reset Filters
+      </Button>
+        </div>
         <List
           grid={{ gutter: 16, column: 1 }}
           dataSource={sortedJobs}

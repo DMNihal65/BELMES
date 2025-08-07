@@ -416,7 +416,7 @@ const Login = () => {
                 <img 
                   src={cmtiLogo} 
                   alt="CMTI Logo" 
-                  className="h-8 object-contain"
+                  className="h-14 object-contain"
                 />
               </div>
             </div>
@@ -692,8 +692,8 @@ const Login = () => {
             className="text-center mt-6 pt-4 border-t border-gray-200"
           >
             <div className="flex flex-col items-center gap-2">
-              <Text type="secondary" className="text-xs">
-                © 2025 Bharat Electronics Limited. All rights reserved.
+              <Text type="secondary" className="text-sm">
+                © 2025 Central Manufacturing Technology Institute. All rights reserved.
               </Text>
               <Text type="secondary" className="text-xs">
                 Developed and maintained by CMTI 

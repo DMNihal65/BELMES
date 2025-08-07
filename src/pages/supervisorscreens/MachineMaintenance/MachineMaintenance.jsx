@@ -123,14 +123,60 @@ export default function MachineMaintenance() {
     },
     {
       title: 'From',
-      dataIndex: 'available_from',
-      key: 'available_from',
-      // sorter: (a, b) => new Date(a.available_from) - new Date(b.available_from),
-      render: (_, record) => {
-        const editable = isEditing(record);
-        return editable ? (
+  dataIndex: 'available_from',
+  key: 'available_from',
+  sorter: (a, b) => new Date(a.available_from) - new Date(b.available_from),
+  render: (_, record) => {
+    const editable = isEditing(record);
+    
+
+    const status = editable ? currentStatus : (record.status_name === 'ON' ? '1' : '2');
+    if (status === '1') {
+      return '-'; 
+    }
+
+    if (editable) {
+      return (
+        <Form.Item
+          name="available_from"
+          style={{ margin: 0 }}
+          rules={[{ required: true, message: 'Please select date and time!' }]}
+        >
+          <DatePicker
+            showTime={{ format: 'HH:mm:ss' }}
+            format="YYYY-MM-DD HH:mm:ss"
+            style={{ width: '100%' }}
+            allowClear={false}
+            disabledDate={current => {
+              return current && current < dayjs().startOf('day');
+            }}
+          />
+        </Form.Item>
+      );
+    }
+
+    return format(new Date(record.available_from), 'dd/MM/yyyy HH:mm');
+  },
+  width: '15%',
+},
+
+{
+  title: 'To',
+  dataIndex: 'available_to',
+  key: 'available_to',
+  sorter: (a, b) => {
+    if (!a.available_to && !b.available_to) return 0;
+    if (!a.available_to) return 1;
+    if (!b.available_to) return -1;
+    return new Date(a.available_to) - new Date(b.available_to);
+  },
+  render: (_, record) => {
+    const editable = isEditing(record);
+    if (editable) {
+      if (currentStatus === '2') { 
+        return (
           <Form.Item
-            name="available_from"
+            name="available_to"
             style={{ margin: 0 }}
             rules={[{ required: true, message: 'Please select date and time!' }]}
           >
@@ -139,90 +185,25 @@ export default function MachineMaintenance() {
               format="YYYY-MM-DD HH:mm:ss"
               style={{ width: '100%' }}
               allowClear={false}
+              disabledDate={current => {
+               
+                const fromDate = form.getFieldValue('available_from');
+                
+                return current && fromDate && current < dayjs(fromDate).startOf('day');
+              }}
             />
           </Form.Item>
-        ) : (
-          format(new Date(record.available_from), 'dd/MM/yyyy HH:mm')
         );
-      },
-      width: '15%',
-    },
-    {
-      title: 'To',
-      dataIndex: 'available_to',
-      key: 'available_to',
-      // sorter: (a, b) => {
-      //   if (!a.available_to && !b.available_to) return 0;
-      //   if (!a.available_to) return 1;
-      //   if (!b.available_to) return -1;
-      //   return new Date(a.available_to) - new Date(b.available_to);
-      // },
-      render: (_, record) => {
-        const editable = isEditing(record);
-        if (editable) {
-          if (currentStatus === '2') { 
-            return (
-              <Form.Item
-                name="available_to"
-                style={{ margin: 0 }}
-                rules={[{ required: true, message: 'Please select date and time!' }]}
-              >
-                <DatePicker
-                  showTime={{ format: 'HH:mm:ss' }}
-                  format="YYYY-MM-DD HH:mm:ss"
-                  style={{ width: '100%' }}
-                  allowClear={false}
-                  disabledDate={(current) => {
-                    const fromDate = form.getFieldValue('available_from');
-                    return current && current < dayjs(fromDate).startOf('day');
-                  }}
-                  disabledTime={(current) => {
-                    const fromDate = form.getFieldValue('available_from');
-                    if (current && fromDate && current.isSame(fromDate, 'day')) {
-                      return {
-                        disabledHours: () => {
-                          const hours = [];
-                          for (let i = 0; i < fromDate.hour(); i++) {
-                            hours.push(i);
-                          }
-                          return hours;
-                        },
-                        disabledMinutes: (selectedHour) => {
-                          if (selectedHour === fromDate.hour()) {
-                            const minutes = [];
-                            for (let i = 0; i < fromDate.minute(); i++) {
-                              minutes.push(i);
-                            }
-                            return minutes;
-                          }
-                          return [];
-                        },
-                        disabledSeconds: (selectedHour, selectedMinute) => {
-                          if (selectedHour === fromDate.hour() && selectedMinute === fromDate.minute()) {
-                            const seconds = [];
-                            for (let i = 0; i < fromDate.second(); i++) {
-                              seconds.push(i);
-                            }
-                            return seconds;
-                          }
-                          return [];
-                        }
-                      };
-                    }
-                    return {};
-                  }}
-                />
-              </Form.Item>
-            );
-          }
-          return null;
-        }
-        return record.status_name === 'OFF' && record.available_to 
-          ? format(new Date(record.available_to), 'dd/MM/yyyy HH:mm') 
-          : '-';
-      },
-      width: '15%',
-    },
+      }
+      return null;
+    }
+    return record.status_name === 'OFF' && record.available_to 
+      ? format(new Date(record.available_to), 'dd/MM/yyyy HH:mm') 
+      : '-';
+  },
+  width: '15%',
+},
+
     {
       title: 'Status',
       dataIndex: 'status_name',

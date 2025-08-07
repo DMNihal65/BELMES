@@ -14,22 +14,8 @@ const OrderTable = ({ orders, onRefresh }) => {
   const [editingOrder, setEditingOrder] = useState(null);
   const [form] = Form.useForm();
 
-  // Add useEffect for initial load and polling
-  React.useEffect(() => {
-    // Initial load
-    if (onRefresh) {
-      onRefresh();
-    }
-
-    // Set up polling every 10 seconds
-    const intervalId = setInterval(() => {
-      if (onRefresh) {
-        onRefresh();
-      }
-    }, 10000);
-
-    return () => clearInterval(intervalId);
-  }, [onRefresh]);
+  // Remove polling - data will only be refreshed when parent component calls onRefresh
+  // No automatic polling to prevent unnecessary API calls
 
   // Handle delete action
   const handleDelete = async (record) => {

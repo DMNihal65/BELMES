@@ -130,7 +130,7 @@ const Notifications = () => {
         </Tooltip>
       ),
       defaultSortOrder: 'descend',
-      sorter: true
+      sorter: (a, b) => new Date(a.updated_at) - new Date(b.updated_at),
     }
   ];
 

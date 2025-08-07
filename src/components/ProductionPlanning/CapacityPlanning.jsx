@@ -291,15 +291,19 @@ const CapacityPlanning = () => {
     },
   });
 
-  const { fetchMachinePlanningByDateRange, isLoading: storeLoading } = usePlanningStore();
+ const { fetchMachinePlanningByDateRange, isLoading: storeLoading } = usePlanningStore();
 
-  // Fetch machine utilization data for the selected date range
   const fetchMachineData = async (startDate = dateRange[0], endDate = dateRange[1]) => {
-    try {
-      setLoading(true);
-      
-      // Call the store function with the date range
-      const data = await fetchMachinePlanningByDateRange(startDate, endDate);
+  try {
+    setLoading(true);
+    
+    const adjustedEndDate = dayjs(startDate).isSame(endDate, 'day') 
+      ? dayjs(endDate).add(1, 'day') 
+      : endDate;
+    
+    
+    const data = await fetchMachinePlanningByDateRange(startDate, adjustedEndDate);
+
       
       if (Array.isArray(data) && data.length > 0) {
         // Filter machines to only include those with work_center_bool = true AND exclude "Default" machines
@@ -554,6 +558,11 @@ const CapacityPlanning = () => {
     }
   };
 
+  const differentDateReferesh =()=>{
+    window.location.reload();
+  }
+
+
   // Format date for display
   const formatDate = (date) => {
     return date ? date.format('YYYY-MM-DD') : '';
@@ -688,7 +697,7 @@ const CapacityPlanning = () => {
                 <p className="text-gray-500 mb-4">No utilization data available for the selected date range</p>
                 <Button 
                   type="primary" 
-                  onClick={handleRefreshClick} 
+                  onClick={differentDateReferesh} 
                   icon={<ReloadOutlined />}
                   className="bg-blue-500"
                 >

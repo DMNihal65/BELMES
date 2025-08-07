@@ -231,56 +231,81 @@ const TicketAnalytics = () => {
   };
 
   const columns = [
-    {
-      title: 'Machine',
-      dataIndex: 'machine',
-      key: 'machine',
-      sorter: (a, b) => a.machine.localeCompare(b.machine),
-      filterSearch: true,
-      filters: [...new Set(tableData.map(item => item.machine))].map(machine => ({
+  {
+    title: 'Machine',
+    dataIndex: 'machine',
+    key: 'machine',
+    sorter: (a, b) => a.machine.localeCompare(b.machine),
+    filterSearch: true,
+    filters: [
+      { text: 'Select All', value: 'all' },
+      ...Array.from(new Set(tableData.map(item => item.machine))).map(machine => ({
         text: machine,
         value: machine,
       })),
-      onFilter: (value, record) => record.machine === value,
+    ],
+    onFilter: (value, record) => {
+      if (value === 'all') return true;
+      return record.machine === value;
     },
-    {
-      title: 'No of Failures',
-      dataIndex: 'failures',
-      key: 'failures',
-      sorter: (a, b) => a.failures - b.failures,
-      filters: [...new Set(tableData.map(item => item.failures))].map(failures => ({
+  },
+  {
+    title: 'No of Failures',
+    dataIndex: 'failures',
+    key: 'failures',
+    sorter: (a, b) => a.failures - b.failures,
+    filters: [
+      { text: 'Select All', value: 'all' },
+      ...Array.from(new Set(tableData.map(item => item.failures))).map(failures => ({
         text: failures.toString(),
         value: failures,
       })),
-      onFilter: (value, record) => record.failures === value,
+    ],
+    onFilter: (value, record) => {
+      if (value === 'all') return true;
+      return record.failures === value;
     },
-    {
-      title: 'MTTR (hours)',
-      dataIndex: 'mttr',
-      key: 'mttr',
-      sorter: (a, b) => a.mttr - b.mttr,
-      filterSearch: true,
-      filters: [...new Set(tableData.map(item => item.mttr))].map(mttr => ({
+  },
+  {
+    title: 'MTTR (hours)',
+    dataIndex: 'mttr',
+    key: 'mttr',
+    sorter: (a, b) => a.mttr - b.mttr,
+    filterSearch: true,
+    filters: [
+      { text: 'Select All', value: 'all' },
+      ...Array.from(new Set(tableData.map(item => item.mttr))).map(mttr => ({
         text: mttr.toFixed(2),
         value: mttr,
       })),
-      onFilter: (value, record) => record.mttr === value,
-      render: (text) => text.toFixed(2)
+    ],
+    onFilter: (value, record) => {
+      if (value === 'all') return true;
+      return record.mttr === value;
     },
-    {
-      title: 'MTBF (hours)',
-      dataIndex: 'mtbf',
-      key: 'mtbf',
-      sorter: (a, b) => a.mtbf - b.mtbf,
-      filterSearch: true,
-      filters: [...new Set(tableData.map(item => item.mtbf))].map(mtbf => ({
+    render: (text) => text.toFixed(2)
+  },
+  {
+    title: 'MTBF (hours)',
+    dataIndex: 'mtbf',
+    key: 'mtbf',
+    sorter: (a, b) => a.mtbf - b.mtbf,
+    filterSearch: true,
+    filters: [
+      { text: 'Select All', value: 'all' },
+      ...Array.from(new Set(tableData.map(item => item.mtbf))).map(mtbf => ({
         text: mtbf.toFixed(2),
         value: mtbf,
       })),
-      onFilter: (value, record) => record.mtbf === value,
-      render: (text) => text.toFixed(2)
-    }
-  ];
+    ],
+    onFilter: (value, record) => {
+      if (value === 'all') return true;
+      return record.mtbf === value;
+    },
+    render: (text) => text.toFixed(2)
+  }
+];
+
 
   const cardStyle = {
     // background: 'linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%)',

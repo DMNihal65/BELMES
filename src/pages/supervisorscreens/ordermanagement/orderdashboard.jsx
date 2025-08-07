@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty, Tag, Input } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty, Input, Switch, Modal } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import OrderTable from '../../../components/OrderManagement/OrderTable';
@@ -26,17 +26,28 @@ const OrderDashboard = () => {
     isLoading, 
     error,
     startPolling,
-    stopPolling 
+    stopPolling,
+    setOrderCompletion,
+    fetchAllCompletionRecords,
+    completionRecords,
+    isLoadingCompletionRecords,
+    completionRecordsError
   } = useOrderStore();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [localOrders, setLocalOrders] = useState([]);
   const [priorityOrders, setPriorityOrders] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [filteredOrders, setFilteredOrders] = useState([]);
+  const [completionSearchText, setCompletionSearchText] = useState('');
+  const [filteredCompletionRecords, setFilteredCompletionRecords] = useState([]);
+  const [scheduledSearchText, setScheduledSearchText] = useState('');
+  const [filteredScheduledOrders, setFilteredScheduledOrders] = useState([]);
   const [parent] = useAutoAnimate();
   const [timelineError, setTimelineError] = useState(null);
-  const [completedOrders, setCompletedOrders] = useState([]);
-  const [loadingCompletion, setLoadingCompletion] = useState(false);
+  const [completedTabView, setCompletedTabView] = useState('completed'); // 'completed' or 'scheduled'
+  const [completionModalVisible, setCompletionModalVisible] = useState(false);
+  const [selectedOrderForCompletion, setSelectedOrderForCompletion] = useState(null);
+
 
   const lottieOptions = {
     rendererSettings: {
@@ -58,6 +69,13 @@ const OrderDashboard = () => {
           console.error('Timeline data fetch failed, continuing without it:', timelineError);
           setTimelineError(timelineError);
         }
+        // Fetch completion records on initial load so they're available immediately
+        try {
+          await fetchAllCompletionRecords();
+        } catch (completionError) {
+          // Silently handle completion records errors
+          console.warn('Completion records fetch failed, continuing without it:', completionError);
+        }
       } catch (error) {
         console.error('Failed to initialize order data:', error);
         message.error('Failed to load order data. Please try refreshing the page.');
@@ -66,11 +84,11 @@ const OrderDashboard = () => {
     
     initializeOrders();
     
-    // Start polling with 1-hour interval
-    startPolling();
+    // Don't start polling - only fetch on page load
+    // startPolling();
 
     // Cleanup: stop polling when component unmounts
-    return () => stopPolling();
+    // return () => stopPolling();
   }, []);
 
   // Update local state when orders change
@@ -91,16 +109,16 @@ const OrderDashboard = () => {
       try {
         await fetchTimelineData();
       } catch (timelineError) {
-        // Silently handle timeline errors
         console.warn('Timeline refresh failed:', timelineError);
         setTimelineError(timelineError);
       }
+      // Don't refresh completion records on general refresh - only when needed
     } catch (error) {
       console.error('Failed to refresh data:', error);
       // Only show error message for critical failures
       message.error('Failed to refresh data. Please try again.');
     }
-  }, [fetchTimelineData, fetchAllOrders]);
+  }, [fetchAllOrders, fetchTimelineData]);
 
   const handleOrderCreate = async (newOrder) => {
     try {
@@ -122,8 +140,8 @@ const OrderDashboard = () => {
       // Close modal and show success message
       setIsModalVisible(false);
 
-      // Fetch fresh data in the background
-      await handleRefresh();
+      // Don't fetch fresh orders data - let it stay as is
+      // Orders will only be refreshed on page load or manual refresh
     } catch (error) {
       console.error('Error creating order:', error);
       message.error('Failed to create order');
@@ -190,6 +208,89 @@ const OrderDashboard = () => {
       ),
     },
   ];
+
+  // Completion records columns configuration
+  const completionRecordsColumns = [
+    { 
+      title: 'Production Order', 
+      dataIndex: 'production_order', 
+      key: 'production_order',
+      width: 150,
+    },
+    { 
+      title: 'Part Number', 
+      dataIndex: 'part_number', 
+      key: 'part_number',
+      width: 150,
+    },
+    { 
+      title: 'Project Name', 
+      dataIndex: 'project_name', 
+      key: 'project_name',
+      width: 200,
+    },
+    { 
+      title: 'Status', 
+      dataIndex: 'status', 
+      key: 'status',
+      width: 120,
+      render: (status) => (
+        <span className="px-2 py-1 rounded-full text-sm bg-green-100 text-green-800">
+          {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Completed'}
+        </span>
+      ),
+    },
+    { 
+      title: 'Completed At', 
+      dataIndex: 'completion_date', 
+      key: 'completion_date',
+      width: 180,
+      render: (date) => (
+        <span className="text-sm text-gray-600">
+          {date ? new Date(date).toLocaleDateString() : 'N/A'}
+        </span>
+      ),
+    },
+    // { 
+    //   title: 'Message', 
+    //   dataIndex: 'message', 
+    //   key: 'message',
+    //   width: 200,
+    //   render: (message) => (
+    //     <span className="text-sm text-gray-700 truncate" title={message}>
+    //       {message || 'Order completed successfully'}
+    //     </span>
+    //   ),
+    // },
+  ];
+
+  // Timeline columns with action column for scheduled jobs
+  const timelineColumnsWithActions = [
+    ...timelineColumns,
+    {
+      title: 'Action',
+      key: 'action',
+      width: 80,
+      render: (_, record) => (
+        <Button
+          type="primary"
+          size="small"
+          icon={<CheckCircleOutlined style={{ color: 'white', fontSize: '18px' }} />}
+          onClick={() => handleCompletionClick(record)}
+          className="bg-green-600 hover:bg-green-700 border-green-600"
+          title="Mark as completed"
+          style={{ 
+            minWidth: '36px', 
+            height: '36px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        />
+      ),
+    },
+  ];
   
   // Render timeline table with error handling
   const renderTimelineTable = () => {
@@ -224,102 +325,126 @@ const OrderDashboard = () => {
         columns={timelineColumns}
         rowKey="key"
         size="small"
-        pagination={{ pageSize: 10 }}
-        scroll={{ x: 'max-content' }}
+        pagination={{ 
+          // pageSize: 10,
+          // showSizeChanger: true,
+          // showQuickJumper: true,
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          pageSizeOptions: [5, 10, 20, 50],
+          position: ['bottomCenter'],
+          size: 'default'
+        }}
+        scroll={{ x: 'max-content', y: 'calc(100vh - 500px)' }}
       />
     );
   };
 
-  // Update useEffect to directly test the API call
-  useEffect(() => {
-    const testCompletionCheck = async () => {
-      try {
-        console.log('Testing completion check with specific order...');
-        
-        // Test with the specific order you mentioned
-        const testOrder = {
-          part_number: '213301940178',
-          production_order: '10593133'
-        };
-
-        console.log('Test order details:', testOrder);
-
-        // Get the store instance
-        const orderStore = useOrderStore.getState();
-        console.log('Order store instance:', !!orderStore);
-
-        // Call the completion check
-        const completionStatus = await orderStore.checkOrderCompletion(
-          testOrder.part_number,
-          testOrder.production_order
-        );
-
-        console.log('Received completion status:', completionStatus);
-
-        // Update the completed orders with the completed_orders array from the response
-        if (completionStatus.completed_orders && completionStatus.completed_orders.length > 0) {
-          setCompletedOrders(completionStatus.completed_orders);
-        } else {
-          setCompletedOrders([]);
-        }
-
-      } catch (error) {
-        console.error('Error in test completion check:', error);
-        message.error('Failed to check completion status: ' + error.message);
-      }
-    };
-
-    // Call the test function
-    testCompletionCheck();
-  }, []); // Empty dependency array to run only once on mount
-
-  // Update the checkCompletedOrdersStatus function
-  const checkCompletedOrdersStatus = useCallback(async (orders) => {
-    setLoadingCompletion(true);
-    try {
-      console.log('Starting to check completion status for orders:', orders);
-      
-      const completedOrdersWithStatus = await Promise.all(
-        orders.map(async (order) => {
-          try {
-            if (!order.part_number || !order.production_order) {
-              console.log('Missing part_number or production_order for order:', order);
-              return { ...order, completion_status: null };
-            }
-
-            console.log('Checking completion for order:', {
-              part_number: order.part_number,
-              production_order: order.production_order
-            });
-
-            const completionStatus = await useOrderStore.getState().checkOrderCompletion(
-              order.part_number,
-              order.production_order
-            );
-
-            console.log('Received completion status:', completionStatus);
-
-            return {
-              ...order,
-              completion_status: completionStatus
-            };
-          } catch (error) {
-            console.error(`Error checking completion for order ${order.production_order}:`, error);
-            message.error(`Failed to check completion for order ${order.production_order}`);
-            return { ...order, completion_status: null };
-          }
-        })
+  // Render timeline table with actions for scheduled jobs
+  const renderTimelineTableWithActions = () => {
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <Spin size="large" />
+        </div>
       );
-
-      console.log('All orders processed with completion status:', completedOrdersWithStatus);
-      setCompletedOrders(completedOrdersWithStatus);
-    } catch (error) {
-      console.error('Error checking completed orders:', error);
-      message.error('Failed to check completion status for some orders');
-    } finally {
-      setLoadingCompletion(false);
     }
-  }, []);
+    
+    if (timelineError) {
+      return (
+        <Empty 
+          description="No timeline data available" 
+          className="py-8" 
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
+      );
+    }
+    
+    if (!timelineData || timelineData.length === 0) {
+      return (
+        <Empty description="No timeline data available" className="py-8" />
+      );
+    }
+    
+    return (
+      <Table
+        dataSource={scheduledSearchText ? filteredScheduledOrders : timelineData}
+        columns={timelineColumnsWithActions}
+        rowKey="key"
+        size="small"
+        pagination={{ 
+          // pageSize: 10,
+          // showSizeChanger: true,
+          // showQuickJumper: true,
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          pageSizeOptions: [5, 10, 20, 50],
+          position: ['bottomCenter'],
+          size: 'default'
+        }}
+        scroll={{ x: 'max-content', y: 'calc(100vh - 500px)' }}
+      />
+    );
+  };
+
+  // Render completion records table
+  const renderCompletionRecordsTable = () => {
+    if (isLoadingCompletionRecords) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <Spin size="large" />
+        </div>
+      );
+    }
+    
+    if (completionRecordsError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8">
+          <Alert
+            message="Error Loading Completion Records"
+            description={completionRecordsError}
+            type="error"
+            showIcon
+            className="mb-4"
+          />
+          <Button onClick={handleRefresh} type="primary">
+            Retry
+          </Button>
+        </div>
+      );
+    }
+    
+    if (!completionRecords || completionRecords.length === 0) {
+      return (
+        <Empty 
+          description="No completion records found" 
+          className="py-8"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
+      );
+    }
+    
+    return (
+      <Table
+        dataSource={completionSearchText ? filteredCompletionRecords : completionRecords}
+        columns={completionRecordsColumns}
+        rowKey="order_id"
+        size="small"
+        pagination={{ 
+          // pageSize: 10,
+          showSizeChanger: true,
+          // showQuickJumper: true,
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+          pageSizeOptions: [5, 10, 20, 50],
+          position: ['bottomCenter'],
+          size: 'default'
+        }}
+        scroll={{ x: 'max-content', y: 'calc(100vh - 500px)' }}
+      />
+    );
+  };
+
+
+
+
 
   const handleSearch = (searchText) => {
     setSearchText(searchText);
@@ -332,6 +457,7 @@ const OrderDashboard = () => {
     const searchLower = searchText.toLowerCase().trim();
     const searchTerms = searchLower.split(/\s+/); // Split by any whitespace
 
+    // Search regular orders
     const filteredOrders = localOrders.filter((order) => {
       // Create a string with all searchable fields
       const searchableFields = [
@@ -354,88 +480,199 @@ const OrderDashboard = () => {
     setFilteredOrders(filteredOrders);
   };
 
+  // Separate search function for completion records
+  const handleCompletionSearch = (searchText) => {
+    setCompletionSearchText(searchText);
+    
+    if (!searchText.trim()) {
+      setFilteredCompletionRecords([]);
+      return;
+    }
+
+    const searchLower = searchText.toLowerCase().trim();
+    const searchTerms = searchLower.split(/\s+/); // Split by any whitespace
+
+    const filteredCompletionRecords = completionRecords.filter((record) => {
+      // Create a string with all searchable fields for completion records
+      const searchableFields = [
+        record.production_order?.toString().toLowerCase() || '',
+        record.part_number?.toString().toLowerCase() || '',
+        record.project_name?.toString().toLowerCase() || '',
+        record.status?.toString().toLowerCase() || '',
+        record.message?.toString().toLowerCase() || ''
+      ].join(' ');
+
+      // Check if all search terms are found in any of the fields
+      return searchTerms.every(term => 
+        searchableFields.includes(term)
+      );
+    });
+
+    setFilteredCompletionRecords(filteredCompletionRecords);
+  };
+
+  // Search function for scheduled orders
+  const handleScheduledSearch = (searchText) => {
+    setScheduledSearchText(searchText);
+    
+    if (!searchText.trim()) {
+      setFilteredScheduledOrders([]);
+      return;
+    }
+
+    const searchLower = searchText.toLowerCase().trim();
+    const searchTerms = searchLower.split(/\s+/); // Split by any whitespace
+
+    const filteredScheduledOrders = timelineData.filter((record) => {
+      // Create a string with all searchable fields for scheduled orders
+      const searchableFields = [
+        record.production_order?.toString().toLowerCase() || '',
+        record.part_number?.toString().toLowerCase() || '',
+        record.completed_total_quantity?.toString().toLowerCase() || '',
+        record.operations_count?.toString().toLowerCase() || '',
+        record.status?.toString().toLowerCase() || ''
+      ].join(' ');
+
+      // Check if all search terms are found in any of the fields
+      return searchTerms.every(term => 
+        searchableFields.includes(term)
+      );
+    });
+
+    setFilteredScheduledOrders(filteredScheduledOrders);
+  };
+
   // Reset search when tab changes
   const handleTabChange = (activeKey) => {
     if (activeKey !== 'all') {
       setSearchText('');
       setFilteredOrders([]);
+      setCompletionSearchText('');
+      setFilteredCompletionRecords([]);
+      setScheduledSearchText('');
+      setFilteredScheduledOrders([]);
+    }
+  };
+
+  // Handle toggle for completed tab view
+  const handleCompletedTabToggle = (checked) => {
+    const newView = checked ? 'scheduled' : 'completed';
+    setCompletedTabView(newView);
+    
+    // Clear search when switching views
+    setCompletionSearchText('');
+    setFilteredCompletionRecords([]);
+    setScheduledSearchText('');
+    setFilteredScheduledOrders([]);
+    
+    // Only fetch completion records when switching to completed view
+    if (newView === 'completed') {
+      fetchAllCompletionRecords().catch(error => {
+        console.warn('Failed to fetch completion records:', error);
+      });
+    }
+  };
+
+  // Handle completion click - show confirmation modal
+  const handleCompletionClick = (record) => {
+    setSelectedOrderForCompletion(record);
+    setCompletionModalVisible(true);
+  };
+
+  // Handle mark action for scheduled jobs
+  const handleMarkAction = async (record) => {
+    try {
+      console.log('Marking job as completed:', record);
+      message.loading({ content: 'Marking job as completed...', key: 'markJob' });
+      
+      // Use the setOrderCompletion function from the store
+      const result = await setOrderCompletion(record.production_order);
+      
+      message.success({ 
+        content: `Job ${record.production_order} marked as completed successfully`, 
+        key: 'markJob' 
+      });
+      
+      // Refresh the timeline data and completion records
+      await handleRefresh();
+    } catch (error) {
+      console.error('Error marking job:', error);
+      message.error({ 
+        content: `Failed to mark job as completed: ${error.message}`, 
+        key: 'markJob' 
+      });
+    }
+  };
+
+  // Handle completion confirmation
+  const handleCompletionConfirm = async () => {
+    if (!selectedOrderForCompletion) return;
+    
+    try {
+      setCompletionModalVisible(false);
+      message.loading({ content: 'Marking job as completed...', key: 'markJob' });
+      
+      // Use the setOrderCompletion function from the store
+      const result = await setOrderCompletion(selectedOrderForCompletion.production_order);
+      
+      message.success({ 
+        content: `Job ${selectedOrderForCompletion.production_order} marked as completed successfully`, 
+        key: 'markJob' 
+      });
+      
+      // Only fetch completion records when an order is successfully marked as completed
+      try {
+        await fetchAllCompletionRecords();
+      } catch (completionError) {
+        console.warn('Failed to refresh completion records:', completionError);
+      }
+      
+      // Don't refresh timeline data - let it stay as is
+      // Timeline data will only be refreshed on page load or manual refresh
+      
+      // Clear the selected order
+      setSelectedOrderForCompletion(null);
+    } catch (error) {
+      console.error('Error marking job:', error);
+      message.error({ 
+        content: `Failed to mark job as completed: ${error.message}`, 
+        key: 'markJob' 
+      });
+    }
+  };
+
+  // Handle completion modal cancel
+  const handleCompletionCancel = () => {
+    setCompletionModalVisible(false);
+    setSelectedOrderForCompletion(null);
+  };
+
+  // Render completed tab content based on toggle state
+  const renderCompletedTabContent = () => {
+    if (completedTabView === 'scheduled') {
+      return renderTimelineTableWithActions();
+    } else {
+      return renderCompletionRecordsTable();
     }
   };
 
   // Calculate the actual counts for each card based on tab data
   const totalOrdersCount = localOrders?.length || 0;
-  const inProgressOrdersCount = timelineData?.length || 0;
-  const completedOrdersCount = completedOrders?.length || 0;
+  
+  // Calculate scheduled count - only count orders with 'scheduled' status
+  let inProgressOrdersCount = localOrders?.filter(order => 
+    order.status === 'scheduled'
+  )?.length || 0;
+  
+  // If no scheduled orders found in localOrders, use timelineData as fallback
+  if (inProgressOrdersCount === 0 && timelineData && timelineData.length > 0) {
+    inProgressOrdersCount = timelineData.length;
+  }
+  
   const priorityOrdersCount = priorityOrders?.length || 0;
+  const completedOrdersCount = completionRecords?.length || 0;
 
-  // Add columns for completed orders table
-  const completedOrdersColumns = [
-    {
-      title: 'Production Order',
-      dataIndex: 'production_order',
-      key: 'production_order',
-      width: 150,
-    },
-    {
-      title: 'Part Number',
-      dataIndex: 'part_number',
-      key: 'part_number',
-      width: 150,
-    },
-    {
-      title: 'Project Name',
-      dataIndex: 'project_name',
-      key: 'project_name',
-      width: 200,
-    },
-    {
-      title: 'Status',
-      key: 'completion_date_status',
-      width: 150,
-      render: (_, record) => (
-        <Tag color={record.is_order_completed ? 'success' : 'warning'}>
-          {record.completion_date_status}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Progress',
-      key: 'completion_percentage',
-      width: 120,
-      render: (_, record) => (
-        <div className="flex items-center">
-          {/* <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
-            <div 
-              className="bg-blue-600 h-2.5 rounded-full" 
-              style={{ width: `${record.completion_percentage}%` }}
-            ></div>
-          </div> */}
-          <span className="text-sm">{record.completion_percentage}%</span>
-        </div>
-      ),
-    },
-    {
-      title: 'Completion Date',
-      key: 'overall_completion_date',
-      width: 150,
-      render: (_, record) => {
-        if (!record.overall_completion_date) return 'Not completed';
-        return new Date(record.overall_completion_date).toLocaleDateString();
-      },
-    },
-    {
-      title: 'Message',
-      key: 'message',
-      width: 300,
-      render: (_, record) => (
-        <div className="text-sm">
-          <span className={record.is_order_completed ? 'text-green-600' : 'text-yellow-600'}>
-            {record.message}
-          </span>
-        </div>
-      ),
-    },
-  ];
+
 
   return (
     <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
@@ -451,7 +688,7 @@ const OrderDashboard = () => {
       
       <div className="flex-1 p-4 overflow-hidden flex flex-col bg-sky-100 ">
         {/* Quick Stats Row - Reordered: Total Orders, In Progress, Completed, Priority */}
-        <Row gutter={[12, 12]} className="mb-6  " ref={parent}>
+        <Row gutter={[16, 16]} className="mb-6  " ref={parent}>
           {/* Total Orders Card - 1st */}
           <Col xs={24} sm={12} md={6}>
             <Card 
@@ -549,7 +786,7 @@ const OrderDashboard = () => {
                     Scheduled
                     </h3>
                     <p className="text-emerald-600 text-sm font-medium opacity-80">
-                      Active Orders
+                      Scheduled & In Progress
                     </p>
                   </div>
                 </div>
@@ -631,9 +868,7 @@ const OrderDashboard = () => {
               <div className="h-1 bg-gradient-to-r from-gray-400 via-gray-500 to-gray-600 group-hover:h-1.5 transition-all duration-300"></div>
             </Card>
           </Col>
-          
-          {/* Priority Card - 4th (Last) */}
-          {/*  */}
+{/*            */}
         </Row>
 
         {/* Main Content Area - Full Width Order Management */}
@@ -694,19 +929,76 @@ const OrderDashboard = () => {
                 </TabPane>
                 <TabPane tab={<span className="font-semibold">Completed</span>} key="completed">
                   <div className="h-full overflow-auto">
-                    {loadingCompletion ? (
-                      <div className="flex justify-center items-center py-8">
-                        <Spin size="large" />
+                    {/* Toggle Switch */}
+                    <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-700">
+                          {completedTabView === 'completed' ? 'Completed Orders' : 'Schedule Orders'}
+                        </span>
+                        <Switch
+                          checked={completedTabView === 'scheduled'}
+                          onChange={handleCompletedTabToggle}
+                          checkedChildren="Schedule"
+                          unCheckedChildren="View Scheduled"
+                          size="small"
+                        />
                       </div>
-                    ) : (
-                      <Table
-                        dataSource={completedOrders}
-                        columns={completedOrdersColumns}
-                        rowKey="production_order"
-                        pagination={{ pageSize: 10 }}
-                        scroll={{ x: 'max-content' }}
-                      />
-                    )}
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-gray-500">
+                          {completedTabView === 'completed' 
+                            ? `Showing ${completedOrdersCount} completed orders` 
+                            : 'Schedule orders for completion'
+                          }
+                        </div>
+                        {completedTabView === 'completed' && (
+                          <>
+                            <Input.Search
+                              placeholder="Search completed orders..."
+                              size="small"
+                              value={completionSearchText}
+                              onChange={(e) => handleCompletionSearch(e.target.value)}
+                              style={{ width: 200 }}
+                              allowClear
+                            />
+                            <Button 
+                              size="small" 
+                              onClick={async () => {
+                                try {
+                                  // Clear search when refreshing
+                                  setCompletionSearchText('');
+                                  setFilteredCompletionRecords([]);
+                                  
+                                  // Fetch fresh completion records
+                                  await fetchAllCompletionRecords();
+                                  
+                                  // Show success message
+                                  message.success('Completion records refreshed successfully');
+                                } catch (error) {
+                                  console.warn('Failed to refresh completion records:', error);
+                                  message.error('Failed to refresh completion records');
+                                }
+                              }}
+                              loading={isLoadingCompletionRecords}
+                            >
+                              Refresh
+                            </Button>
+                          </>
+                        )}
+                        {completedTabView === 'scheduled' && (
+                          <Input.Search
+                            placeholder="Search scheduled orders..."
+                            size="small"
+                            value={scheduledSearchText}
+                            onChange={(e) => handleScheduledSearch(e.target.value)}
+                            style={{ width: 200 }}
+                            allowClear
+                          />
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Content based on toggle state */}
+                    {renderCompletedTabContent()}
                   </div>
                 </TabPane>
                 <TabPane tab={<span className="font-semibold">Priority</span>} key="priority">
@@ -729,6 +1021,60 @@ const OrderDashboard = () => {
         onCreate={handleOrderCreate}
         onRefresh={handleRefresh} 
       />
+      
+      {/* Completion Confirmation Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '20px' }} />
+            <span>Confirm Order Completion</span>
+          </div>
+        }
+        open={completionModalVisible}
+        onOk={handleCompletionConfirm}
+        onCancel={handleCompletionCancel}
+        okText="Mark as Completed"
+        cancelText="Cancel"
+        okButtonProps={{
+          className: "bg-green-600 hover:bg-green-700 border-green-600"
+        }}
+        centered
+        destroyOnClose
+        maskClosable={false}
+        keyboard={false}
+      >
+
+        {selectedOrderForCompletion && (
+          <div className="py-4">
+            <p className="text-gray-700 mb-4">
+              Are you sure you want to mark this order as completed?
+            </p>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-gray-600">Production Order:</span>
+                  <p className="text-gray-800">{selectedOrderForCompletion.production_order}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Part Number:</span>
+                  <p className="text-gray-800">{selectedOrderForCompletion.part_number}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Completed Quantity:</span>
+                  <p className="text-gray-800">{selectedOrderForCompletion.completed_total_quantity || 0}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Operations:</span>
+                  <p className="text-gray-800">{selectedOrderForCompletion.operations_count || 0}</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              This action will mark the order as completed and move it to the completed orders list.
+            </p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

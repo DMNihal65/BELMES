@@ -47,6 +47,55 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 const { TabPane } = Tabs;
 
+// Component to display completion status
+const CompletionStatus = ({ status, isLoading }) => {
+  if (isLoading) {
+    return <Spin size="small" />;
+  }
+
+  if (!status) {
+    return (
+      <Tag color="default" style={{ fontSize: '12px', padding: '4px 8px' }}>
+        <InfoCircleOutlined style={{ marginRight: '4px' }} />
+        Not Available
+      </Tag>
+    );
+  }
+
+  // If order is not found in completion tracking system
+  if (status.message && status.message.includes('not found')) {
+    return (
+      <Tag color="default" style={{ fontSize: '12px', padding: '4px 8px' }}>
+        <InfoCircleOutlined style={{ marginRight: '4px' }} />
+        Not Tracked
+      </Tag>
+    );
+  }
+
+  if (status.is_completed === true) {
+    return (
+      <Tag color="success" style={{ fontSize: '12px', padding: '4px 8px' }}>
+        <CheckCircle2 size={14} style={{ marginRight: '4px' }} />
+        Completed
+      </Tag>
+    );
+  } else if (status.is_completed === false) {
+    return (
+      <Tag color="warning" style={{ fontSize: '12px', padding: '4px 8px' }}>
+        <ClockCircleOutlined style={{ marginRight: '4px' }} />
+        Not Completed
+      </Tag>
+    );
+  } else {
+    return (
+      <Tag color="default" style={{ fontSize: '12px', padding: '4px 8px' }}>
+        <InfoCircleOutlined style={{ marginRight: '4px' }} />
+        Unknown Status
+      </Tag>
+    );
+  }
+};
+
 const cellStyle = {
   border: '1px solid #222',
   padding: 8,
@@ -192,6 +241,7 @@ const Planning = () => {
   const [editProgramForm] = Form.useForm();
 
   const [completionStatus, setCompletionStatus] = useState(null);
+  const [completionStatusLoading, setCompletionStatusLoading] = useState(false);
   const planningStore = usePlanningStore();
 
   // Store hooks
@@ -582,6 +632,13 @@ const loadInventoryItems = async () => {
 
   // Update the handleStatusChange function to properly toggle status
   const handleStatusChange = (productionOrder, currentStatus) => {
+    // Check if job is completed - if so, prevent status change
+    const isCompleted = completionStatus && completionStatus.is_completed === true;
+    if (isCompleted) {
+      message.warning('Cannot change status for completed jobs');
+      return;
+    }
+    
     // Get the current status directly from activeParts to make sure we have the latest
     const actualCurrentStatus = getJobStatus(productionOrder);
     
@@ -621,32 +678,43 @@ const loadInventoryItems = async () => {
     // Check if launched_quantity is 0
     const isDisabled = selectedJob?.launched_quantity === 0;
     
+    // Check if job is completed - if completion status shows completed, disable the button
+    const isCompleted = completionStatus && completionStatus.is_completed === true;
+    
+    // If job is completed, force status to be inactive and disable the button
+    const finalStatus = isCompleted ? 'inactive' : status;
+    const finalDisabled = isDisabled || updatingStatus || isCompleted;
+    
     return (
       <Button
-        type={status === 'active' ? 'primary' : 'default'}
+        type={finalStatus === 'active' ? 'primary' : 'default'}
         onClick={() => handleStatusChange(productionOrder, status)}
         loading={updatingStatus}
-        disabled={isDisabled || updatingStatus}
+        disabled={finalDisabled}
         style={{
-          ...(status === 'active' ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : {}),
-          ...(isDisabled ? { cursor: 'not-allowed', opacity: 0.7 } : {})
+          ...(finalStatus === 'active' ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : {}),
+          ...(finalDisabled ? { cursor: 'not-allowed', opacity: 0.7 } : {})
         }}
       >
-        {status === 'active' ? 'Active' : 'Inactive'}
+        {finalStatus === 'active' ? 'Active' : 'Inactive'}
         {isDisabled && ' (No Quantity)'}
+        {isCompleted && ' (Completed)'}
       </Button>
     );
   };
 
   const fetchCompletionStatus = async (partNumber, productionOrder) => {
     try {
+      setCompletionStatusLoading(true);
       console.log('Fetching completion status for:', partNumber, productionOrder);
-      const status = await useOrderStore.getState().checkOrderCompletion(partNumber, productionOrder);
+      const status = await usePlanningStore.getState().checkOrderCompletion(partNumber, productionOrder);
       console.log('Completion status received:', status);
       setCompletionStatus(status);
     } catch (error) {
       console.error('Error fetching completion status:', error);
       // message.error('Failed to fetch completion status');
+    } finally {
+      setCompletionStatusLoading(false);
     }
   };
 
@@ -656,6 +724,7 @@ const loadInventoryItems = async () => {
       setLoading(true);
       setSelectedJob(null);
       setCompletionStatus(null); // Reset completion status when selecting new job
+      setCompletionStatusLoading(false); // Reset loading state
       setSelectedProductionOrder(partNumber); // Set the selected production order
       
       if (!partNumber) {
@@ -676,6 +745,13 @@ const loadInventoryItems = async () => {
             const jobData = orderData.orders[0];
             console.log('Job details:', jobData);
             setSelectedJob(jobData);
+            
+            // Fetch completion status immediately when job details are loaded
+            try {
+              await fetchCompletionStatus(jobData.part_number, jobData.production_order);
+            } catch (error) {
+              console.error('Error fetching completion status:', error);
+            }
             
             // Job data is now only stored in state
             
@@ -733,16 +809,6 @@ const loadInventoryItems = async () => {
       
       if (!jobDetails) {
         message.error('No job details found for the selected part number');
-      }
-      
-      if (selectedJob) {
-        console.log('Selected job:', selectedJob);
-        try {
-          await fetchCompletionStatus(partNumber, selectedJob.production_order);
-        } catch (error) {
-          console.error('Error fetching completion status:', error);
-          // message.error('Failed to fetch completion status');
-        }
       }
       
     } catch (error) {
@@ -2975,28 +3041,8 @@ const loadInventoryItems = async () => {
   )}
 </Modal>
 
-  // Add this effect to fetch completion status when job is selected
-  useEffect(() => {
-    const fetchCompletionStatus = async () => {
-      if (selectedJob?.part_number && selectedJob?.production_order) {
-        setLoading(true);
-        try {
-          const status = await usePlanningStore.getState().checkOrderCompletion(
-            selectedJob.part_number,
-            selectedJob.production_order
-          );
-          setCompletionStatus(status);
-        } catch (error) {
-          console.error('Error fetching completion status:', error);
-          // message.error('Failed to fetch completion status');
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchCompletionStatus();
-  }, [selectedJob]);
+  // Remove the duplicate useEffect that was causing completion status to change
+  // The completion status is already fetched in handleJobSelect when a job is selected
 
   
   return (
@@ -3133,23 +3179,7 @@ const loadInventoryItems = async () => {
                       {renderPdcInfo(selectedJob.production_order)}
                     </Descriptions.Item>
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Completion Status</span>}>
-                      {loading ? (
-                        <Spin size="small" />
-                      ) : completionStatus ? (
-                        <div style={{ 
-                          color: completionStatus.is_order_completed ? '#52c41a' : '#fa8c16',
-                          fontWeight: 'bold',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          {completionStatus.is_order_completed 
-                            ? `Completed on ${new Date(completionStatus.overall_completion_date).toLocaleDateString()}`
-                            : 'Not Yet Completed'}
-                        </div>
-                      ) : (
-                        <span style={{ color: '#999' }}>Loading status...</span>
-                      )}
+                      <CompletionStatus status={completionStatus} isLoading={completionStatusLoading} />
                     </Descriptions.Item>
                   </Descriptions>
 
@@ -4835,3 +4865,21 @@ const loadInventoryItems = async () => {
 };
 
 export default Planning;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

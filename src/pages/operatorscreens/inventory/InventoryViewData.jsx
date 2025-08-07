@@ -109,7 +109,7 @@ const InventoryViewData = () => {
               <span>{sub.name}</span>
               <Tooltip title="Dynamic Fields">
                 <Tag color="green">
-                  {Object.keys(sub.dynamic_fields || {}).length}
+                  {items.filter(item => item.subcategory_id === sub.id).length}
                 </Tag>
               </Tooltip>
             </Space>
@@ -348,6 +348,7 @@ const InventoryViewData = () => {
           <Input.Search
             placeholder="Enter values to match (e.g., ø4, WIDIA HANITA, 4)"
             allowClear
+            value={searchTerm}
             onSearch={handleSearch}
             onChange={(e) => handleSearch(e.target.value)}
             className="min-w-[300px] max-w-[500px] flex-1 xl:flex-none"

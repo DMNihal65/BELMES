@@ -121,6 +121,43 @@ const Workcenter = () => {
       const row = await form.validateFields();
       const currentRecord = data.find(item => item.id === key);
       
+      // Cross-field validations
+      const effectiveInstallationYear = row.year_of_installation
+        ? row.year_of_installation.year()
+        : (currentRecord.year_of_installation || null);
+
+      const calibrationDateValue = row.calibration_date
+        ? row.calibration_date
+        : (currentRecord.calibration_date ? dayjs(currentRecord.calibration_date) : null);
+
+      const calibrationDueDateValue = row.calibration_due_date
+        ? row.calibration_due_date
+        : (currentRecord.calibration_due_date ? dayjs(currentRecord.calibration_due_date) : null);
+
+      const lastMaintenanceDateValue = row.last_maintenance_date
+        ? row.last_maintenance_date
+        : (currentRecord.last_maintenance_date ? dayjs(currentRecord.last_maintenance_date) : null);
+
+      if (effectiveInstallationYear !== null && calibrationDateValue && calibrationDateValue.year() < effectiveInstallationYear) {
+        toast.error('Calibration Date cannot be before Installation Year');
+        return;
+      }
+
+      if (calibrationDateValue && calibrationDueDateValue && calibrationDueDateValue.isBefore(calibrationDateValue, 'day')) {
+        toast.error('Calibration Due Date cannot be before Calibration Date');
+        return;
+      }
+
+      if (effectiveInstallationYear !== null && !calibrationDateValue && calibrationDueDateValue && calibrationDueDateValue.year() < effectiveInstallationYear) {
+        toast.error('Calibration Due Date cannot be before Installation Year');
+        return;
+      }
+
+      if (effectiveInstallationYear !== null && lastMaintenanceDateValue && lastMaintenanceDateValue.year() < effectiveInstallationYear) {
+        toast.error('Last Maintenance cannot be before Installation Year');
+        return;
+      }
+
       const updatedItem = {
         id: currentRecord.id,
         work_center_id: currentRecord.work_center_id,
@@ -202,79 +239,91 @@ const Workcenter = () => {
     }
   };
 
-  const columns = [
-    {
-      title: 'Workcenter ID',
-      dataIndex: 'work_center_id',
-      width: 120,
-      sorter: (a, b) => {
-        // Extract numeric values if possible
-        const numA = parseInt(String(a.work_center_id).replace(/\D/g, ''));
-        const numB = parseInt(String(b.work_center_id).replace(/\D/g, ''));
-        
-        // If both are valid numbers, compare numerically
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return numA - numB;
-        }
-        
-        // Otherwise, compare as strings
-        return String(a.work_center_id || '').localeCompare(String(b.work_center_id || ''));
-      },
-      sortDirections: ['ascend'],
-      defaultSortOrder: 'ascend',
-      sortOrder: 'ascend',
-      render: (text) => text,
-      filters: [...new Set(data
-        .map(item => item.work_center_id)
-        .filter(Boolean)
-      )]
-      .sort((a, b) => {
-        if (!isNaN(a) && !isNaN(b)) {
-          return Number(a) - Number(b);
-        }
-        return String(a).localeCompare(String(b));
-      })
-      .map(id => ({ text: String(id), value: id })),
-      filterMode: 'menu',
-      filterSearch: true,
-      onFilter: (value, record) => {
-        if (!record.work_center_id) return false;
-        return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
-      },
-      className: 'filter-column',
-      showSorterTooltip: { title: 'Click to sort' }
+ const columns = [
+  {
+    title: 'Workcenter ID',
+    dataIndex: 'work_center_id',
+    width: 120,
+    sorter: (a, b) => {
+    
+      const aId = a.work_center_id || '';
+      const bId = b.work_center_id || '';
+      
+      
+      const aNum = parseInt(aId);
+      const bNum = parseInt(bId);
+      
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum;
+      }
+      
+    
+      return String(aId).localeCompare(String(bId));
     },
-    {
-      title: 'Workcenter Code',
-      dataIndex: ['work_center', 'code'],
-      width: 150,
-      render: (text) => text || '-',
-      sorter: (a, b) => (a.work_center?.code || '').localeCompare(b.work_center?.code || ''),
+    sortDirections: ['ascend', 'descend'],
+    defaultSortOrder: 'ascend',
+    render: (text) => text,
+    filters: [...new Set(data
+      .map(item => item.work_center_id)
+      .filter(Boolean)
+    )]
+    .sort((a, b) => {
+      const aNum = parseInt(a);
+      const bNum = parseInt(b);
+      
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum;
+      }
+      return String(a).localeCompare(String(b));
+    })
+    .map(id => ({ text: String(id), value: id })),
+    filterMode: 'menu',
+    filterSearch: true,
+    onFilter: (value, record) => {
+      if (!record.work_center_id) return false;
+      return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
     },
-    {
-      title: 'Machine Type',
-      dataIndex: 'type',
-      width: 130,
-      editable: true,
-      render: (text, record) => {
-        const editable = isEditing(record);
-        return editable ? (
-          <Form.Item
-            name="type"
-            style={{ margin: 0 }}
-            rules={[{ required: true, message: 'Please enter Machine Name' }]}
-          >
-            <Input />
-          </Form.Item>
-        ) : (
-          <span>{text}</span>
-        );
-      },
-      filterSearch: true,
-      filters: [...new Set(data.map(item => item.type))].filter(Boolean).map(type => ({ text: type, value: type })),
-      onFilter: (value, record) => record.type === value,
-      sorter: (a, b) => (a.type || '').localeCompare(b.type || ''),
+    className: 'filter-column',
+    showSorterTooltip: { title: 'Click to sort' }
+  },
+  {
+    title: 'Workcenter Code',
+    dataIndex: ['work_center', 'code'],
+    width: 150,
+    render: (text) => text || '-',
+    sorter: (a, b) => {
+      const aCode = a.work_center?.code || '';
+      const bCode = b.work_center?.code || '';
+      return aCode.localeCompare(bCode);
     },
+    sortDirections: ['ascend', 'descend'],
+  },
+  {
+    title: 'Machine Type',
+    dataIndex: 'type',
+    width: 130,
+    editable: true,
+    render: (text, record) => {
+      const editable = isEditing(record);
+      return editable ? (
+        <Form.Item
+          name="type"
+          style={{ margin: 0 }}
+          rules={[{ required: true, message: 'Please enter Machine Name' }]}
+        >
+          <Input />
+        </Form.Item>
+      ) : (
+        <span>{text}</span>
+      );
+    },
+    filterSearch: true,
+    filters: [...new Set(data.map(item => item.type))].filter(Boolean).map(type => ({ text: type, value: type })),
+    onFilter: (value, record) => record.type === value,
+    sorter: (a, b) => (a.type || '').localeCompare(b.type || ''),
+    sortDirections: ['ascend', 'descend'],
+  },
+
     {
       title: 'Machine Name',
       dataIndex: 'make',
@@ -1173,120 +1222,162 @@ const Workcenter = () => {
           </div>
 
           <Form
-            form={addMachineForm}
-            layout="vertical"
-            onFinish={handleAddMachine}
-            initialValues={{ work_center_id: selectedWorkcenterId }}
-          >
-            <Form.Item
-              name="work_center_id"
-              hidden
-            >
-              <Input />
-            </Form.Item>
+  form={addMachineForm}
+  layout="vertical"
+  onFinish={handleAddMachine}
+  initialValues={{ work_center_id: selectedWorkcenterId }}
+>
+  <Form.Item name="work_center_id" hidden>
+    <Input />
+  </Form.Item>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Form.Item
-                name="machine_name"
-                label="Machine Type"
-                rules={[{ required: true, message: 'Please enter Machine Name' }]}
-              >
-                <Input placeholder="Enter Machine Name" />
-              </Form.Item>
+  <div className="grid grid-cols-2 gap-4">
+    <Form.Item
+      name="machine_name"
+      label="Machine Type"
+      rules={[{ required: true, message: 'Please enter Machine Name' }]}
+    >
+      <Input placeholder="Enter Machine Name" />
+    </Form.Item>
 
-              <Form.Item
-                name="make"
-                label="Machine Name"
-                rules={[{ required: true, message: 'Please enter Make' }]}
-              >
-                <Input placeholder="Enter Make" />
-              </Form.Item>
+    <Form.Item
+      name="make"
+      label="Machine Name"
+      rules={[{ required: true, message: 'Please enter Make' }]}
+    >
+      <Input placeholder="Enter Make" />
+    </Form.Item>
 
-              <Form.Item
-                name="model"
-                label="Model"
-                rules={[{ required: true, message: 'Please enter Model' }]}
-              >
-                <Input placeholder="Enter Model" />
-              </Form.Item>
+    <Form.Item
+      name="model"
+      label="Model"
+      rules={[{ required: true, message: 'Please enter Model' }]}
+    >
+      <Input placeholder="Enter Model" />
+    </Form.Item>
 
-              <Form.Item
-                name="year_of_installation"
-                label="Year of Installation"
-                rules={[{ required: true, message: 'Please select Year of Installation' }]}
-              >
-                <DatePicker 
-                  picker="year" 
-                  style={{ width: '100%' }}
-                  format="YYYY"
-                  disabledDate={(current) => {
-                    return current && current.year() > 2029;
-                  }}
-                />
-              </Form.Item>
+    <Form.Item
+  name="year_of_installation"
+  label="Year of Installation"
+  rules={[{ required: true, message: 'Please select Year of Installation' }]}
+>
+  <DatePicker 
+    picker="year" 
+    style={{ width: '100%' }}
+    format="YYYY"
+  />
+</Form.Item>
 
-              <Form.Item
-                name="cnc_controller"
-                label="CNC Controller"
-                rules={[{ required: true, message: 'Please enter CNC Controller' }]}
-              >
-                <Input placeholder="Enter CNC Controller" />
-              </Form.Item>
+    <Form.Item
+      name="cnc_controller"
+      label="CNC Controller"
+      rules={[{ required: true, message: 'Please enter CNC Controller' }]}
+    >
+      <Input placeholder="Enter CNC Controller" />
+    </Form.Item>
 
-              <Form.Item
-                name="cnc_controller_series"
-                label="Controller Series"
-                rules={[{ required: true, message: 'Please enter Controller Series' }]}
-              >
-                <Input placeholder="Enter Controller Series" />
-              </Form.Item>
+    <Form.Item
+      name="cnc_controller_series"
+      label="Controller Series"
+      rules={[{ required: true, message: 'Please enter Controller Series' }]}
+    >
+      <Input placeholder="Enter Controller Series" />
+    </Form.Item>
 
-              <Form.Item
-                name="calibration_date"
-                label="Calibration Date"
-                rules={[{ required: true, message: 'Please select Calibration Date' }]}
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
+    <Form.Item
+  name="calibration_date"
+  label="Calibration Date"
+  rules={[
+    { required: true, message: 'Please select Calibration Date' },
+    ({ getFieldValue }) => ({
+      validator(_, value) {
+        const installationDate = getFieldValue('year_of_installation');
+        if (!value || !installationDate) {
+          return Promise.resolve();
+        }
+        if (value.year() < installationDate.year()) {
+          return Promise.reject(new Error('Calibration Date cannot be before Installation Year'));
+        }
+        return Promise.resolve();
+      },
+    }),
+  ]}
+>
+  <DatePicker 
+    style={{ width: '100%' }} 
+    disabledDate={(current) => {
+      const installationDate = addMachineForm.getFieldValue('year_of_installation');
+      return installationDate ? current && current.year() < installationDate.year() : false;
+    }}
+  />
+</Form.Item>
 
-              <Form.Item
-                name="calibration_due_date"
-                label="Calibration Due Date"
-                rules={[{ required: true, message: 'Please select Calibration Due Date' }]}
-              >
-                <DatePicker 
-                  style={{ width: '100%' }}
-                  disabledDate={current => {
-                    // Only allow dates from tomorrow onwards
-                    return current && current < dayjs().endOf('day');
-                  }}
-                />
-              </Form.Item>
+<Form.Item
+  name="calibration_due_date"
+  label="Calibration Due Date"
+  rules={[
+    { required: true, message: 'Please select Calibration Due Date' },
+    ({ getFieldValue }) => ({
+      validator(_, value) {
+        const calibrationDate = getFieldValue('calibration_date');
+        if (!value || !calibrationDate) {
+          return Promise.resolve();
+        }
+        if (value.isBefore(calibrationDate, 'day')) {
+          return Promise.reject(new Error('Due Date cannot be before Calibration Date'));
+        }
+        return Promise.resolve();
+      },
+    }),
+  ]}
+>
+  <DatePicker 
+    style={{ width: '100%' }} 
+    disabledDate={(current) => {
+      const calibrationDate = addMachineForm.getFieldValue('calibration_date');
+      return calibrationDate ? current && current.isBefore(calibrationDate, 'day') : false;
+    }}
+  />
+</Form.Item>
 
-              <Form.Item
-                name="last_maintenance_date"
-                label="Last Maintenance Date"
-                rules={[{ required: true, message: 'Please select Last Maintenance Date' }]}
-              >
-                <DatePicker 
-                  style={{ width: '100%' }}
-                  disabledDate={current => {
-                    // Only allow previous dates (not today or future)
-                    return current && current >= dayjs().startOf('day');
-                  }}
-                />
-              </Form.Item>
+<Form.Item
+  name="last_maintenance_date"
+  label="Last Maintenance Date"
+  rules={[
+    { required: true, message: 'Please select Last Maintenance Date' },
+    ({ getFieldValue }) => ({
+      validator(_, value) {
+        const installationDate = getFieldValue('year_of_installation');
+        if (!value || !installationDate) {
+          return Promise.resolve();
+        }
+        if (value.year() < installationDate.year()) {
+          return Promise.reject(new Error('Last Maintenance cannot be before Installation Year'));
+        }
+        return Promise.resolve();
+      },
+    }),
+  ]}
+>
+  <DatePicker 
+    style={{ width: '100%' }} 
+    disabledDate={(current) => {
+      const installationDate = addMachineForm.getFieldValue('year_of_installation');
+      return installationDate ? current && current.year() < installationDate.year() : false;
+    }}
+  />
+</Form.Item>
+    <Form.Item
+      name="remarks"
+      label="Remarks"
+      className="col-span-2"
+      rules={[{ required: true, message: 'Please Enter Remarks or any other Related information' }]}
+    >
+      <Input.TextArea rows={2} placeholder="Enter Remarks" />
+    </Form.Item>
+  </div>
+</Form>
 
-              <Form.Item
-                name="remarks"
-                label="Remarks"
-                className="col-span-2"
-                rules={[{ required: true, message: 'Please Enter Remarks or any other Related information' }]}
-              >
-                <Input.TextArea rows={2} placeholder="Enter Remarks" />
-              </Form.Item>
-            </div>
-          </Form>
 
           <div className="flex justify-between mt-4">
             <Button 

@@ -7,15 +7,15 @@ import MachineIssueModal from '../../operatorscreens/MachineIssueModal';
 
 // DMG Mori machine image for all types
 const machineImages = {
-  'CTX Beta 1250TC4A': '/CNCM-CTX BETA 1250TC4A.png',
-  'DMU 60eVo Linear': '/CNCM-DMU 60eVo Linear.png',
-  'DMU-60MB 5 AXIS': '/CNCM-DMU-60MB 5 AXIS.png',
-  'DMU-60T': '/CNCM-DMU-60T.png',
-  'Makino': '/Makino.png',
-  'Robofil 240': '/Robofil 240.png',
-  'VCP800W Duro': '/VCP800W Duro.png',
-  default: '/dmg.png'
+
+  default: '/dmg.png',
+  milling: '/dmg.png',
+  turning: '/dmg.png',
+  grinding: '/dmg.png'
+
 };
+
+
 
 const MachineStatusCard = () => {
   const {
@@ -29,14 +29,15 @@ const MachineStatusCard = () => {
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
   const [issueModalVisible, setIssueModalVisible] = useState(false);
   
-  useEffect(() => {
-    // Update current time every second
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString());
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, []);
+useEffect(() => {
+  const storedMachine = localStorage.getItem('currentMachine');
+  const parsedMachine = storedMachine ? JSON.parse(storedMachine) : null; 
+
+  // Only initialize if not already connected and machine exists
+  if(parsedMachine?.id && !isConnected && !useOperatorStore.getState().ws){
+    useOperatorStore.getState().initializeWebSocket(parsedMachine.id);
+  }
+}, []); // Remove isConnected dependency to prevent re-runs
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -100,22 +101,11 @@ const MachineStatusCard = () => {
   };
   
   // Get machine image
-  const getMachineImage = () => {
-    try {
-      const storedMachine = localStorage.getItem('currentMachine');
-      if (!storedMachine) return machineImages.default;
-  
-      const parsedMachine = JSON.parse(storedMachine);
-      const make = parsedMachine?.make?.trim();
-  
-      if (make && machineImages.hasOwnProperty(make)) {
-        return machineImages[make];
-      }
-    } catch (error) {
-      console.error("Failed to parse currentMachine from localStorage", error);
-    }
-  
-    return machineImages.default;
+const getMachineImage = () => {
+
+    const type = getMachineType();
+    return machineImages[type] || machineImages.default;
+
   };
   
 
@@ -226,14 +216,14 @@ const MachineStatusCard = () => {
               </div>
             </Col>
             {/* Idle Time */}
-            <Col span={8}>
+            {/* <Col span={8}>
               <div className="bg-sky-50 p-3 rounded-lg border border-sky-100 h-full flex flex-col justify-between">
                 <div className="text-sm text-sky-800 font-medium">Idle Time</div>
                 <div className="text-center">
                   <div className="text-xl font-bold text-amber-500 mt-2">{formatIdleTime(idleTime)}</div>
                 </div>
               </div>
-            </Col>
+            </Col> */}
           </Row>
           
         </div>

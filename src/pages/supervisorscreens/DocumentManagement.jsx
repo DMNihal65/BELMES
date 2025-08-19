@@ -2562,7 +2562,7 @@ const DocumentManagement = () => {
             showSearch
             optionFilterProp="children"
             filterOption={(input, option) =>
-              to.string(option.children).toLowerCase().indexOf(input.toLowerCase()) >= 0
+              String(option.children).toLowerCase().includes(input.toLowerCase())
             }
           >
             {machines.map(machine => (

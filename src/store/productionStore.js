@@ -20,8 +20,8 @@ const calculateUptime = (lastUpdated) => {
   return moment(lastUpdated).fromNow();
 };
 
-const BASE_URL = 'http://172.18.7.89:5467/production_monitoring';
-const WS_URL = 'ws://172.18.7.89:5467/production_monitoring/ws/live-status/';
+const BASE_URL = 'http://172.18.7.91:8008/production_monitoring';
+const WS_URL = 'ws://172.18.7.91:8008/production_monitoring/ws/live-status/';
 
 const useProductionStore = create(
   devtools((set, get) => ({
@@ -188,7 +188,7 @@ oeeData: {
     // Fetch work centres for filtering machines
     fetchWorkCenters: async () => {
       try {
-        const response = await axios.get('http://172.18.7.89:5467/api/v1/master-order/workcenters/?skip=0&limit=100');
+        const response = await axios.get('http://172.18.7.91:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
         const workcenters = response.data;
         
         // No longer filtering by is_schedulable
@@ -343,20 +343,37 @@ oeeData: {
           }
         });
 
-        // Filter out machines with 'default' in their name from timelineData.machines
+        const ALLOWED_MACHINES = [
+          {id: 1, name: "CNCM-DMU-60MB 5 Axis"},
+          {id: 2, name: "CNCM-Deckel Maho"},
+          {id: 3, name: "CNCM-DMU 60eVo Linear"},
+          {id: 4, name: "CNCM-DMU-60T"},
+          {id: 5, name: "CNCM-VCP800W Duro"},
+          {id: 6, name: "NEWC-Makino"},
+          {id: 7, name: "NEWC-Robofil 240"},
+          {id: 8, name: "CNCT-Pilatus 20T-L3"},
+          {id: 9, name: "CNCT-SCH-110"},
+          {id: 10, name: "CNCT-SCH-125 CCN"},
+          {id: 11, name: "CNCT-SCH-180 CCN-RT"},
+          {id: 12, name: "CNCT-TUR26"},
+          {id: 13, name: "CNCT-NU7B"},
+          {id: 14, name: "CNCM-CTX Beta 1250TC4A"}
+        ];
+
+        const ALLOWED_MACHINE_IDS = new Set(ALLOWED_MACHINES.map(m => m.id));
+
         let timelineData = response.data;
         if (timelineData && Array.isArray(timelineData.machines)) {
           timelineData = {
             ...timelineData,
-            machines: timelineData.machines.filter(m => m.name && !m.name.toLowerCase().includes('default'))
+            machines: timelineData.machines.filter(m => ALLOWED_MACHINE_IDS.has(m.id))
           };
         }
-        // Also filter timeline_data to only include valid machines
+
         if (timelineData && Array.isArray(timelineData.timeline_data) && Array.isArray(timelineData.machines)) {
-          const validMachineIds = new Set(timelineData.machines.map(m => m.id));
           timelineData = {
             ...timelineData,
-            timeline_data: timelineData.timeline_data.filter(item => validMachineIds.has(item.machine_id))
+            timeline_data: timelineData.timeline_data.filter(item => ALLOWED_MACHINE_IDS.has(item.machine_id))
           };
         }
 
@@ -626,4 +643,4 @@ setOEEDateRange: (date) => {
   }))
 );
 
-export default useProductionStore; 
+export default useProductionStore;

@@ -48,17 +48,37 @@ const Login = () => {
   };
 
   const onFinish = async (values) => {
-    try {
-      if (loginType === 'operator') {
-        if (currentStep === 0) {
-          // Get the selected machine ID and verify machine password
-          const selectedMachine = machines.find(m => m.id === values.machineName);
-          if (!selectedMachine) {
-            throw new Error('Please select a valid machine');
-          }
+      try {
+          if (loginType === 'operator') {
+            if (currentStep === 0) {
+              // Get the selected machine ID and verify machine password
+              const selectedMachine = machines.find(m => m.id === values.machineName);
+              if (!selectedMachine) {
+                throw new Error('Please select a valid machine');
+              }
 
-          // Move to next step if machine password is correct
-          setCurrentStep(1);
+              // Make API call to verify machine credentials
+              const response = await fetch('http://172.18.7.89:5467/api/v1/auth/machine-id-login', {
+                method: 'POST',
+                headers: {
+                  'accept': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  machine_id: values.machineName,
+                  password: values.machinePassword,
+                }),
+              });
+
+              const responseData = await response.json();
+
+              if (!response.ok) {
+                // Handle error from backend
+                throw new Error(responseData.detail || 'Invalid machine credentials');
+              }
+
+              // If successful, move to the next step
+              setCurrentStep(1);
         } else {
           const response = await login({
             username: values.operatorName,
@@ -416,7 +436,7 @@ const Login = () => {
                 <img 
                   src={cmtiLogo} 
                   alt="CMTI Logo" 
-                  className="h-14 object-contain"
+                  className="h-8 object-contain"
                 />
               </div>
             </div>
@@ -692,8 +712,8 @@ const Login = () => {
             className="text-center mt-6 pt-4 border-t border-gray-200"
           >
             <div className="flex flex-col items-center gap-2">
-              <Text type="secondary" className="text-sm">
-                © 2025 Central Manufacturing Technology Institute. All rights reserved.
+              <Text type="secondary" className="text-xs">
+                © 2025 Bharat Electronics Limited. All rights reserved.
               </Text>
               <Text type="secondary" className="text-xs">
                 Developed and maintained by CMTI 

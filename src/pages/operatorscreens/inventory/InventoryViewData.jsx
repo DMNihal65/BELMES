@@ -461,7 +461,7 @@ const InventoryViewData = () => {
       orderedDynamicFields.forEach(({ fieldName, config }) => {
         columns.push({
           title: (
-            <Tooltip title={`Type: ${config.type}${config.unit ? `, Unit: ${config.unit}` : ''}`}>
+            <Tooltip title={config.unit ? `Unit: ${config.unit}` : ''}>
               <Space>
                 {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
               </Space>

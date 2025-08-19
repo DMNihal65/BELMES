@@ -409,11 +409,11 @@ const RequestTable = () => {
             title="Requests Table" 
             extra={
               <Space>
-                <Button
+                {/* <Button
                   icon={<ReloadOutlined />}
                   onClick={handleRefresh}
                   loading={loading}
-                />
+                /> */}
                 <AntInput.Search
                   placeholder="Search across all columns..."
                   onChange={(e) => handleGlobalSearch(e.target.value)}

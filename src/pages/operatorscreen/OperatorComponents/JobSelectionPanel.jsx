@@ -36,7 +36,7 @@ const JobSelectionPanel = ({ visible, onClose }) => {
   const [activeTab, setActiveTab] = useState('custom');
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmationAction, setConfirmationAction] = useState(null);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(true);
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [filterKeyword, setFilterKeyword] = useState('');
   const [filterPriority, setFilterPriority] = useState(null);
@@ -175,14 +175,14 @@ useEffect(() => {
           <div className="text-sm font-medium">
             {sortedJobs.length} jobs available
           </div>
-          <Button 
+          {/* <Button 
             icon={<ListFilter size={16} />} 
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             type={showFilterPanel ? 'primary' : 'default'}
             size="small"
           >
             Filter
-          </Button>
+          </Button> */}
         </div>
   
         {showFilterPanel && (
@@ -236,6 +236,7 @@ useEffect(() => {
         }}
         size="small"
         type="default"
+        style={{marginBottom:'10px'}}
       >
         Reset Filters
       </Button>
@@ -492,7 +493,7 @@ useEffect(() => {
                   <p className="font-medium">
                     Are you sure you want to deactivate the current job? 
                   </p>
-                  {inProgressJobs && inProgressJobs.length > 0 && (
+                  {/* {inProgressJobs && inProgressJobs.length > 0 && (
                     <div className="mt-2 bg-gray-50 p-3 rounded-lg">
                       <div>
                         <span className="font-medium">Part:</span> {inProgressJobs[0].part_number} - {inProgressJobs[0].part_description}
@@ -501,7 +502,7 @@ useEffect(() => {
                         <span className="font-medium">Operation:</span> OP{inProgressJobs[0].operation_number} - {inProgressJobs[0].description}
                       </div>
                     </div>
-                  )}
+                  )} */}
                   <div className="mt-3 bg-red-50 border border-red-200 p-2 rounded-lg">
                     <div className="flex items-center gap-2">
                       <AlertTriangle size={16} className="text-red-600" />

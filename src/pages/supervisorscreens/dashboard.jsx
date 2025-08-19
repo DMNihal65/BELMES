@@ -877,7 +877,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
       title={
         <div className="flex justify-between items-center">
           <span>{selectedMachine.name}</span>
-          {show3DControls && (
+          {/* {show3DControls && (
             <Tooltip title="Focus on this machine">
               <Button 
                 type="primary" 
@@ -886,7 +886,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
                 onClick={onZoomToMachine}
               />
             </Tooltip>
-          )}
+          )} */}
         </div>
       }
       className="h-full"

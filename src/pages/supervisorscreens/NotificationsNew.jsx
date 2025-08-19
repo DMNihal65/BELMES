@@ -142,12 +142,24 @@ const NotificationsNew = () => {
     setProcessingIds(prev => [...prev, notificationId]);
     
     try {
-      // Get the current user's name
-      const username = localStorage.getItem('name') || localStorage.getItem('username') || 'admin';
+      // Get the current user's name from localStorage key 'user' (JSON: { "username": "...", ... })
+      let username = 'admin';
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const userObj = JSON.parse(userStr);
+          if (userObj && userObj.username) {
+            username = userObj.username;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse user from localStorage:', e);
+        username = localStorage.getItem('username') || localStorage.getItem('name') || 'admin';
+      }
       
       // Handle both machine and material notifications
       if (notification.notificationType === 'material') {
-        const response = await fetch('http://172.18.7.89:5467/api/v1/newlogs/raw_material_status_logs/acknowledge', {
+        const response = await fetch('http://172.18.7.91:8008/api/v1/newlogs/raw_material_status_logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -170,7 +182,7 @@ const NotificationsNew = () => {
         setLastAcknowledgedId(notification.id);
         setLastAcknowledgedType('material');
       } else if (notification.notificationType === 'machine') {
-        const response = await fetch('http://172.18.7.89:5467/api/v1/newlogs/machine-status-logs/acknowledge', {
+        const response = await fetch('http://172.18.7.91:8008/api/v1/newlogs/machine-status-logs/acknowledge', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

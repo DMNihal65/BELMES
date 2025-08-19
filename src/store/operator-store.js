@@ -111,6 +111,9 @@ const useOperatorStore = create((set, get) => ({
   
   // Initialize dashboard
   initializeDashboard: async () => {
+
+    get().closeWebSocket();
+
     set({ 
       isInitializing: true, 
       error: null,
@@ -168,6 +171,20 @@ const useOperatorStore = create((set, get) => ({
   // WebSocket functions
   initializeWebSocket: (machineId) => {
     // Close existing connection if any
+
+    const currentState = get();
+    
+    // Don't create new connection if already connecting/connected
+    if (currentState.ws && (currentState.ws.readyState === WebSocket.CONNECTING || currentState.ws.readyState === WebSocket.OPEN)) {
+      console.log('WebSocket already exists, skipping initialization');
+      return;
+    }
+    
+    // Close existing connection if any
+    if (currentState.ws) {
+      currentState.ws.close();
+    }
+
     if (get().ws) {
       get().ws.close();
     }
@@ -222,16 +239,17 @@ const useOperatorStore = create((set, get) => ({
       };
       
       ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        set({ isConnected: false });
-        
-        // Attempt to reconnect after a delay
-        setTimeout(() => {
-          if (get().machineId) {
-            get().initializeWebSocket(get().machineId);
-          }
-        }, 5000);
-      };
+      console.log('WebSocket disconnected');
+      set({ isConnected: false });
+      
+      // Only attempt reconnect if we still have the same machineId and no existing connection
+      setTimeout(() => {
+        const currentState = get();
+        if (currentState.machineId === machineId && !currentState.ws) {
+          currentState.initializeWebSocket(machineId);
+        }
+      }, 5000);
+    };
       
       set({ ws });
     } catch (error) {

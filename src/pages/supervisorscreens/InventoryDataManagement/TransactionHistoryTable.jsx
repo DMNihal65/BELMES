@@ -305,6 +305,7 @@ const TransactionHistoryTable = () => {
             <Input.Search
               placeholder="Search transactions..."
               allowClear
+              value={searchText}
               onChange={(e) => handleSearch(e.target.value)}
               style={{ width: 300 }}
               className="mr-2"

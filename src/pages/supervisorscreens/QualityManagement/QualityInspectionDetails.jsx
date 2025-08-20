@@ -624,18 +624,20 @@ const QualityInspectionDetails = ({
     useEffect(() => {
       if (measuredData) {
         const data = prepareInspectionData();
-        let filtered = data;
-        if (qtyFilter !== '' && !isNaN(qtyFilter)) {
-          filtered = filtered.filter(item => Number(item.quantity_no) === Number(qtyFilter));
+        // Always filter for quantity 1 by default
+        let filtered = data.filter(item => Number(item.quantity_no) === 1);
+        // Only apply qtyFilter if it's explicitly set to something other than 1
+        if (qtyFilter !== '' && !isNaN(qtyFilter) && qtyFilter !== 1) {
+          filtered = data.filter(item => Number(item.quantity_no) === Number(qtyFilter));
         }
         setFilteredData(filtered);
       }
-    }, [measuredData]);
+    }, [measuredData, qtyFilter]);
 
-    // Reset quantity to 1 and fetch data when modal opens
+    // Set default quantity to 1 and fetch data when modal opens
     useEffect(() => {
       if (isMeasuredDataModalVisible && selectedOperation) {
-        // Always reset to quantity 1 when modal opens
+        // Set quantity filter to 1 by default
         setQtyFilter(1);
         // Fetch data for quantity 1
         handleQtyChange(1);
@@ -715,31 +717,33 @@ const QualityInspectionDetails = ({
           />
         )}
 
-        {/* Add approve button for all operations */}
-        <div className="mb-4 flex justify-end">
-          <Button 
-            type={ftpApprovalStatus?.is_completed === true ? "primary" : "default"}
-            icon={<CheckCircleOutlined />}
-            onClick={isViewingFinalInspection ? handleFinalApproveAll : handleApproveAll}
-            loading={isViewingFinalInspection ? isFinalApprovingAll : isApprovingAll}
-            size="large"
-            className="approve-all-btn"
-            style={ftpApprovalStatus?.is_completed === true ? { 
-              backgroundColor: "#52c41a", 
-              borderColor: "#52c41a", 
-              color: "#fff",
-              cursor: 'not-allowed',
-              opacity: 0.8
-            } : {}}
-            disabled={ftpApprovalStatus?.is_completed === true}
-          >
-            {ftpApprovalStatus?.is_completed === true 
-              ? "Already Approved" 
-              : isViewingFinalInspection 
-                ? "Approve Final Inspection" 
-                : "Approve All Measurements"}
-          </Button>
-        </div>
+        {/* Add approve button for all operations - only show for quantity 1 */}
+        {qtyFilter === 1 && (
+          <div className="mb-4 flex justify-end">
+            <Button 
+              type={ftpApprovalStatus?.is_completed === true ? "primary" : "default"}
+              icon={<CheckCircleOutlined />}
+              onClick={isViewingFinalInspection ? handleFinalApproveAll : handleApproveAll}
+              loading={isViewingFinalInspection ? isFinalApprovingAll : isApprovingAll}
+              size="large"
+              className="approve-all-btn"
+              style={ftpApprovalStatus?.is_completed === true ? { 
+                backgroundColor: "#52c41a", 
+                borderColor: "#52c41a", 
+                color: "#fff",
+                cursor: 'not-allowed',
+                opacity: 0.8
+              } : {}}
+              disabled={ftpApprovalStatus?.is_completed === true}
+            >
+              {ftpApprovalStatus?.is_completed === true 
+                ? "Already Approved" 
+                : isViewingFinalInspection 
+                  ? "Approve Final Inspection" 
+                  : "Approve All Measurements"}
+            </Button>
+          </div>
+        )}
 
         {/* Filter and search controls with updated functionality */}
         <div className="mb-4 flex flex-wrap gap-4 justify-between items-center">
@@ -803,13 +807,13 @@ const QualityInspectionDetails = ({
           measuredData && measuredData.inspection_data && measuredData.inspection_data.length > 0 ? (
             <Table
               columns={[
-                { 
-                  title: 'Sl. No',
-                  key: 'slno',
-                  width: 70,
-                  render: (text, record, index) => index + 1,
-                  fixed: 'left',
-                },
+                // { 
+                //   title: 'Sl. No',
+                //   key: 'slno',
+                //   width: 70,
+                //   render: (text, record, index) => index + 1,
+                //   fixed: 'left',
+                // },
                 { 
                   title: 'Operation',
                   dataIndex: 'operation_number',

@@ -1647,7 +1647,7 @@ const CommonDocuments = () => {
                       searchByPartNumber(value, selectedDocType?.id || null);
                     }}
                     filterOption={(input, option) =>
-                      option?.children?.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                      option?.children?.toString().toLowerCase().includes(input.toLowerCase())
                     }
                   >
                     {partNumbers.map(part => (
@@ -1689,7 +1689,7 @@ const CommonDocuments = () => {
                       }
                     }}
                     filterOption={(input, option) =>
-                      option?.children?.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                      option?.children?.toString().toLowerCase().includes(input.toLowerCase())
                     }
                     dropdownRender={menu => (
                       <>
@@ -2599,7 +2599,7 @@ const CommonDocuments = () => {
   // Update the folder tree rendering
   const renderFolderTree = (folders) => {
     return folders
-    .filter(folder => folder.name === 'Common Documents' || folder.path.includes('Common Documents'))
+    .filter(folder => folder.name === 'Common Documents' || folder.path.includes('Common Documents') || folder.path.includes('Catalogues'))
     .map(folder => ({
       key: folder.id.toString(),
       title: folder.folder_name,
@@ -2828,7 +2828,7 @@ const CommonDocuments = () => {
 
       <Card bordered={false} className="shadow-sm" bodyStyle={{ padding: '16px' }}>
         {/* Add error alert */}
-        {renderErrorAlert()}
+        {/* {renderErrorAlert()} */}
         
         <Row gutter={[16, 16]}>
           <Col flex="220px">

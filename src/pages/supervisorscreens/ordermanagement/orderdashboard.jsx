@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Row, Col, Statistic, Select, Button, Space, Alert, Tabs, message, Table, Spin, Empty, Input, Switch, Modal } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined, MenuOutlined, PlusOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import OrderTable from '../../../components/OrderManagement/OrderTable';
@@ -38,6 +38,8 @@ const OrderDashboard = () => {
   const [priorityOrders, setPriorityOrders] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [filteredOrders, setFilteredOrders] = useState([]);
+  
+
   const [completionSearchText, setCompletionSearchText] = useState('');
   const [filteredCompletionRecords, setFilteredCompletionRecords] = useState([]);
   const [scheduledSearchText, setScheduledSearchText] = useState('');
@@ -45,6 +47,9 @@ const OrderDashboard = () => {
   const [parent] = useAutoAnimate();
   const [timelineError, setTimelineError] = useState(null);
   const [completedTabView, setCompletedTabView] = useState('completed'); // 'completed' or 'scheduled'
+  const [scheduledTabView, setScheduledTabView] = useState('scheduled'); // 'scheduled' or 'all'
+  const [prioritySearchText, setPrioritySearchText] = useState('');
+  const [filteredPriorityOrders, setFilteredPriorityOrders] = useState([]);
   const [completionModalVisible, setCompletionModalVisible] = useState(false);
   const [selectedOrderForCompletion, setSelectedOrderForCompletion] = useState(null);
 
@@ -100,22 +105,39 @@ const OrderDashboard = () => {
       }));
       setLocalOrders(ordersWithPriority);
       setPriorityOrders(ordersWithPriority);
+      setFilteredPriorityOrders(ordersWithPriority);
     }
   }, [orders]);
 
   const handleRefresh = useCallback(async () => {
     try {
-      await fetchAllOrders();
+      // Clear all search states
+      setSearchText('');
+      setFilteredOrders([]);
+      setScheduledSearchText('');
+      setFilteredScheduledOrders([]);
+      setPrioritySearchText('');
+      setFilteredPriorityOrders([]);
+      
+      // Show loading state
+      const hideLoading = message.loading('Refreshing data...', 0);
+      
       try {
-        await fetchTimelineData();
-      } catch (timelineError) {
-        console.warn('Timeline refresh failed:', timelineError);
-        setTimelineError(timelineError);
+        // Fetch fresh data
+        await fetchAllOrders();
+        try {
+          await fetchTimelineData();
+          message.success('Data refreshed successfully');
+        } catch (timelineError) {
+          console.warn('Timeline refresh failed:', timelineError);
+          setTimelineError(timelineError);
+        }
+      } finally {
+        // Hide loading message
+        hideLoading();
       }
-      // Don't refresh completion records on general refresh - only when needed
     } catch (error) {
       console.error('Failed to refresh data:', error);
-      // Only show error message for critical failures
       message.error('Failed to refresh data. Please try again.');
     }
   }, [fetchAllOrders, fetchTimelineData]);
@@ -294,6 +316,8 @@ const OrderDashboard = () => {
   
   // Render timeline table with error handling
   const renderTimelineTable = () => {
+    const dataToShow = scheduledSearchText ? filteredScheduledOrders : timelineData;
+    
     if (isLoading) {
       return (
         <div className="flex justify-center items-center py-12">
@@ -321,20 +345,19 @@ const OrderDashboard = () => {
     
     return (
       <Table
-        dataSource={timelineData}
+        dataSource={dataToShow}
         columns={timelineColumns}
         rowKey="key"
         size="small"
         pagination={{ 
-          // pageSize: 10,
-          // showSizeChanger: true,
-          // showQuickJumper: true,
           showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
           pageSizeOptions: [5, 10, 20, 50],
           position: ['bottomCenter'],
-          size: 'default'
+          size: 'default',
+          showSizeChanger: true
         }}
         scroll={{ x: 'max-content', y: 'calc(100vh - 500px)' }}
+        loading={isLoading}
       />
     );
   };
@@ -445,6 +468,37 @@ const OrderDashboard = () => {
 
 
 
+
+  const handlePrioritySearch = (searchText) => {
+    setPrioritySearchText(searchText);
+    
+    if (!searchText.trim()) {
+      setFilteredPriorityOrders(priorityOrders);
+      return;
+    }
+
+    const searchLower = searchText.toLowerCase().trim();
+    const searchTerms = searchLower.split(/\s+/); // Split by any whitespace
+
+    const filtered = priorityOrders.filter((order) => {
+      // Create a string with all searchable fields
+      const searchableFields = [
+        order.priority?.toString() || '', // Sl.No
+        order.part_number?.toString().toLowerCase() || '',
+        order.production_order?.toString().toLowerCase() || '',
+        order.project?.toString().toLowerCase() || '',
+        order.description?.toString().toLowerCase() || '',
+        order.quantity?.toString().toLowerCase() || '',
+        order.wbs_element?.toString().toLowerCase() || '',
+        order.sales_order?.toString().toLowerCase() || ''
+      ].join(' ');
+
+      // Check if all search terms are found in any of the fields
+      return searchTerms.every(term => searchableFields.includes(term));
+    });
+    
+    setFilteredPriorityOrders(filtered);
+  };
 
   const handleSearch = (searchText) => {
     setSearchText(searchText);
@@ -620,15 +674,15 @@ const OrderDashboard = () => {
         key: 'markJob' 
       });
       
-      // Only fetch completion records when an order is successfully marked as completed
+      // Refresh both completion records and timeline data
       try {
-        await fetchAllCompletionRecords();
-      } catch (completionError) {
-        console.warn('Failed to refresh completion records:', completionError);
+        await Promise.all([
+          fetchAllCompletionRecords(),
+          fetchTimelineData() // Refresh timeline data to remove the completed order
+        ]);
+      } catch (error) {
+        console.warn('Failed to refresh data:', error);
       }
-      
-      // Don't refresh timeline data - let it stay as is
-      // Timeline data will only be refreshed on page load or manual refresh
       
       // Clear the selected order
       setSelectedOrderForCompletion(null);
@@ -876,26 +930,16 @@ const OrderDashboard = () => {
           <Col span={24} className="h-full ">
             <Card
               title={
-                <div className="flex justify-between items-center ">
+                <div className="flex justify-between items-center">
                   <span className="text-base font-semibold">Order Management</span>
-                  <Space>
-                    <Input.Search
-                      placeholder="Search orders..."
-                      size="small"
-                      value={searchText}
-                      onChange={(e) => handleSearch(e.target.value)}
-                      style={{ width: 200 }}
-                      allowClear
-                    />
-                    <Button 
-                      type="primary" 
-                      icon={<PlusOutlined />} 
-                      size="small"
-                      onClick={() => setIsModalVisible(true)}
-                    >
-                      New Order
-                    </Button>
-                  </Space>
+                  <Button 
+                    type="primary" 
+                    icon={<PlusOutlined />} 
+                    size="small"
+                    onClick={() => setIsModalVisible(true)}
+                  >
+                    New Order
+                  </Button>
                 </div>
               }
               bordered={false}
@@ -914,17 +958,73 @@ const OrderDashboard = () => {
                 onChange={handleTabChange}
               >
                 <TabPane tab={<span className="font-semibold">All Orders</span>} key="all">
-                  <div className="h-[calc(100vh-320px)] overflow-auto">
-                    <OrderTable 
-                      orders={searchText ? filteredOrders : localOrders} 
-                      onRefresh={handleRefresh}
-                      key={JSON.stringify(searchText ? filteredOrders : localOrders)}
-                    />
+                  <div className="flex flex-col h-[calc(100vh-320px)]">
+                    <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <span className="text-base font-medium text-gray-700">All Orders</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input.Search
+                          placeholder="Search orders..."
+                          size="small"
+                          value={searchText}
+                          onChange={(e) => handleSearch(e.target.value)}
+                          style={{ width: 250 }}
+                          allowClear
+                        />
+                        <Button 
+                          size="small" 
+                          onClick={handleRefresh}
+                          loading={isLoading}
+                          icon={<ReloadOutlined />}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-auto">
+                      <OrderTable 
+                        orders={searchText ? filteredOrders : localOrders} 
+                        onRefresh={handleRefresh}
+                        key={JSON.stringify(searchText ? filteredOrders : localOrders)}
+                      />
+                    </div>
                   </div>
                 </TabPane>
                 <TabPane tab={<span className="font-semibold">Scheduled</span>} key="in_progress">
                   <div className="h-full overflow-auto">
-                    {renderTimelineTable()}
+                    <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <span className="text-base font-medium text-gray-700">Scheduled Orders</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input.Search
+                          placeholder="Search by Production Order..."
+                          size="small"
+                          value={scheduledSearchText}
+                          onChange={(e) => handleScheduledSearch(e.target.value)}
+                          style={{ width: 250 }}
+                          allowClear
+                        />
+                        <Button 
+                          size="small" 
+                          onClick={handleRefresh}
+                          loading={isLoading}
+                          icon={<ReloadOutlined />}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                    </div>
+                    {scheduledTabView === 'scheduled' ? renderTimelineTable() : (
+                      <div className="h-[calc(100vh-320px)] overflow-auto">
+                        <OrderTable 
+                          orders={searchText ? filteredOrders : localOrders} 
+                          onRefresh={handleRefresh}
+                          key={`all-orders-${JSON.stringify(searchText ? filteredOrders : localOrders)}`}
+                        />
+                      </div>
+                    )}
                   </div>
                 </TabPane>
                 <TabPane tab={<span className="font-semibold">Completed</span>} key="completed">
@@ -933,7 +1033,7 @@ const OrderDashboard = () => {
                     <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-gray-700">
-                          {completedTabView === 'completed' ? 'Completed Orders' : 'Schedule Orders'}
+                          {completedTabView === 'completed' ? 'Completed Orders' : 'Scheduled Orders'}
                         </span>
                         <Switch
                           checked={completedTabView === 'scheduled'}
@@ -951,7 +1051,7 @@ const OrderDashboard = () => {
                           }
                         </div>
                         {completedTabView === 'completed' && (
-                          <>
+                          <div className="flex items-center gap-2">
                             <Input.Search
                               placeholder="Search completed orders..."
                               size="small"
@@ -979,20 +1079,31 @@ const OrderDashboard = () => {
                                 }
                               }}
                               loading={isLoadingCompletionRecords}
+                              icon={<ReloadOutlined />}
                             >
                               Refresh
                             </Button>
-                          </>
+                          </div>
                         )}
                         {completedTabView === 'scheduled' && (
-                          <Input.Search
-                            placeholder="Search scheduled orders..."
-                            size="small"
-                            value={scheduledSearchText}
-                            onChange={(e) => handleScheduledSearch(e.target.value)}
-                            style={{ width: 200 }}
-                            allowClear
-                          />
+                          <div className="flex items-center gap-2">
+                            <Input.Search
+                              placeholder="Search scheduled orders..."
+                              size="small"
+                              value={scheduledSearchText}
+                              onChange={(e) => handleScheduledSearch(e.target.value)}
+                              style={{ width: 200 }}
+                              allowClear
+                            />
+                            <Button 
+                              size="small" 
+                              onClick={handleRefresh}
+                              loading={isLoading}
+                              icon={<ReloadOutlined />}
+                            >
+                              Refresh
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1003,10 +1114,38 @@ const OrderDashboard = () => {
                 </TabPane>
                 <TabPane tab={<span className="font-semibold">Priority</span>} key="priority">
                   <div className="h-full overflow-auto">
+                    <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-700">
+                          Priority Orders
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input.Search
+                          placeholder="Search by Order..."
+                          size="small"
+                          value={prioritySearchText}
+                          onChange={(e) => handlePrioritySearch(e.target.value)}
+                          style={{ width: 250 }}
+                          allowClear
+                        />
+                        <Button 
+                          size="small" 
+                          onClick={() => {
+                            setPrioritySearchText('');
+                            handleRefresh();
+                          }}
+                          loading={isLoading}
+                          icon={<ReloadOutlined />}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                    </div>
                     <ReorderableTable 
-                      orders={priorityOrders}
+                      orders={filteredPriorityOrders}
                       onOrdersUpdate={handlePriorityUpdate}
-                      key={JSON.stringify(priorityOrders)}
+                      key={`priority-${JSON.stringify(priorityOrders)}-${prioritySearchText}`}
                     />
                   </div>
                 </TabPane>

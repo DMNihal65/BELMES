@@ -51,6 +51,10 @@ const NotificationsNew = () => {
   const [tableLoading, setTableLoading] = useState(false);
   const [itemDetailsMap, setItemDetailsMap] = useState(new Map());
   const [searchText, setSearchText] = useState('');
+  const [machineSearchText, setMachineSearchText] = useState('');
+  const [materialSearchText, setMaterialSearchText] = useState('');
+  const [instrumentSearchText, setInstrumentSearchText] = useState('');
+  const [machineCalibrationSearchText, setMachineCalibrationSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
   const { getItemDetails } = useInventoryStore();
   const [lastAcknowledgedId, setLastAcknowledgedId] = useState(null);
@@ -142,20 +146,34 @@ const NotificationsNew = () => {
     setProcessingIds(prev => [...prev, notificationId]);
     
     try {
-      // Get the current user's name from localStorage key 'user' (JSON: { "username": "...", ... })
-      let username = 'admin';
-      try {
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-          const userObj = JSON.parse(userStr);
-          if (userObj && userObj.username) {
-            username = userObj.username;
-          }
-        }
-      } catch (e) {
-        console.error('Failed to parse user from localStorage:', e);
-        username = localStorage.getItem('username') || localStorage.getItem('name') || 'admin';
-      }
+      // Get the current user's name
+       // Get the current user's name from localStorage key 'user' (JSON: { "username": "...", ... })
+
+       let username = 'admin';
+
+       try {
+ 
+         const userStr = localStorage.getItem('user');
+ 
+         if (userStr) {
+ 
+           const userObj = JSON.parse(userStr);
+ 
+           if (userObj && userObj.username) {
+ 
+             username = userObj.username;
+ 
+           }
+ 
+         }
+ 
+       } catch (e) {
+ 
+         console.error('Failed to parse user from localStorage:', e);
+ 
+         username = localStorage.getItem('username') || localStorage.getItem('name') || 'admin';
+ 
+       }
       
       // Handle both machine and material notifications
       if (notification.notificationType === 'material') {
@@ -1210,18 +1228,8 @@ const NotificationsNew = () => {
         >
           {/* Filter section */}
           <div style={{ marginBottom: '20px' }}>
-            <Row gutter={[16, 16]} align="middle">
-              <Col xs={24} lg={8}>
-                <Input.Search
-                  placeholder="Search notifications..."
-                  allowClear
-                  enterButton
-                  size="middle"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  style={{ width: '100%' }}
-                />
-              </Col>
+            <Row gutter={[16, 16]} align="stretch">
+              
               <Col xs={24} lg={12}>
                 <Space size="middle">
                   <span>Date Range:</span>
@@ -1233,14 +1241,7 @@ const NotificationsNew = () => {
                   />
                 </Space>
               </Col>
-              <Col xs={24} lg={4} style={{ textAlign: 'right' }}>
-                <Button 
-                  icon={<FilterOutlined />}
-                  onClick={handleResetFilters}
-                >
-                  Reset
-                </Button>
-              </Col>
+              
             </Row>
           </div>
 
@@ -1328,51 +1329,270 @@ const NotificationsNew = () => {
             />
           )} */}
 
-          {isLoading || tableLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-              <div style={{ textAlign: 'center' }}>
-                <Spin size="large" style={{ marginBottom: '20px' }} />
-                <div>
-                  <Text>Loading notifications...</Text>
+          {/* Search inputs for Notifications */}
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+            {activeTabKey === 'machine' && (
+              <Input.Search
+                placeholder="Search machine notifications..."
+                allowClear
+                style={{ width: 300, marginBottom: '16px' }}
+                value={machineSearchText}
+                onChange={(e) => setMachineSearchText(e.target.value)}
+                onSearch={(value) => setMachineSearchText(value)}
+                onPaste={(e) => {
+                  const pastedText = e.clipboardData.getData('text');
+                  setMachineSearchText(pastedText);
+                  e.preventDefault();
+                }}
+              />
+            )}
+            {activeTabKey === 'material' && (
+              <Input.Search
+                placeholder="Search material notifications..."
+                allowClear
+                style={{ width: 300, marginBottom: '16px' }}
+                value={materialSearchText}
+                onChange={(e) => setMaterialSearchText(e.target.value)}
+                onSearch={(value) => setMaterialSearchText(value)}
+                onPaste={(e) => {
+                  const pastedText = e.clipboardData.getData('text');
+                  setMaterialSearchText(pastedText);
+                  e.preventDefault();
+                }}
+              />
+            )}
+            {activeTabKey === 'instrumentCalibration' && (
+              <Input.Search
+                placeholder="Search instrument calibrations..."
+                allowClear
+                style={{ width: 300, marginBottom: '16px' }}
+                value={instrumentSearchText}
+                onChange={(e) => setInstrumentSearchText(e.target.value)}
+                onSearch={(value) => setInstrumentSearchText(value)}
+                onPaste={(e) => {
+                  const pastedText = e.clipboardData.getData('text');
+                  setInstrumentSearchText(pastedText);
+                  e.preventDefault();
+                }}
+              />
+            )}
+            {activeTabKey === 'machineCalibration' && (
+              <Input.Search
+                placeholder="Search machine calibrations..."
+                allowClear
+                style={{ width: 300, marginBottom: '16px' }}
+                value={machineCalibrationSearchText}
+                onChange={(e) => setMachineCalibrationSearchText(e.target.value)}
+                onSearch={(value) => setMachineCalibrationSearchText(value)}
+                onPaste={(e) => {
+                  const pastedText = e.clipboardData.getData('text');
+                  setMachineCalibrationSearchText(pastedText);
+                  e.preventDefault();
+                }}
+              />
+            )}
+          </div>
+
+          {/* Filter and display notifications */}
+          {(() => {
+            // Filter notifications based on the active tab and search text
+            let filteredNotifications = [...notifications];
+            
+            // Filter by notification type
+            if (activeTabKey === 'machine') {
+              filteredNotifications = filteredNotifications.filter(
+                notification => notification.notificationType === 'machine'
+              );
+              
+              // Apply machine search filter if there's search text
+              if (machineSearchText) {
+                const searchLower = machineSearchText.toLowerCase();
+                filteredNotifications = filteredNotifications.filter(notification => {
+                  // Check all searchable fields
+                  return (
+                    // Machine make/name
+                    (notification.machine_make && String(notification.machine_make).toLowerCase().includes(searchLower)) ||
+                    // Machine ID
+                    (notification.machine_id && String(notification.machine_id).toLowerCase().includes(searchLower)) ||
+                    // Status
+                    (notification.status_name && String(notification.status_name).toLowerCase().includes(searchLower)) ||
+                    // Description
+                    (notification.description && String(notification.description).toLowerCase().includes(searchLower)) ||
+                    // Created by
+                    (notification.created_by && String(extractUsername(notification.created_by)).toLowerCase().includes(searchLower)) ||
+                    // Updated at (formatted date)
+                    (notification.updated_at && formatDate(notification.updated_at).toLowerCase().includes(searchLower)) ||
+                    // Acknowledged by
+                    (notification.acknowledged_by && String(notification.acknowledged_by).toLowerCase().includes(searchLower)) ||
+                    // Acknowledged status
+                    (notification.is_acknowledged ? 'acknowledged' : 'unacknowledged').includes(searchLower)
+                  );
+                });
+              }
+            } else if (activeTabKey === 'material') {
+              filteredNotifications = filteredNotifications.filter(
+                notification => notification.notificationType === 'material'
+              );
+              
+              // Apply material search filter if there's search text
+              if (materialSearchText) {
+                const searchLower = materialSearchText.toLowerCase();
+                filteredNotifications = filteredNotifications.filter(notification => {
+                  // Check all searchable fields
+                  return (
+                    // Part number
+                    (notification.part_number && String(notification.part_number).toLowerCase().includes(searchLower)) ||
+                    // Status
+                    (notification.status_name && String(notification.status_name).toLowerCase().includes(searchLower)) ||
+                    // Description
+                    (notification.description && String(notification.description).toLowerCase().includes(searchLower)) ||
+                    // Created by
+                    (notification.created_by && String(extractUsername(notification.created_by)).toLowerCase().includes(searchLower)) ||
+                    // Updated at (formatted date)
+                    (notification.updated_at && formatDate(notification.updated_at).toLowerCase().includes(searchLower)) ||
+                    // Acknowledged status
+                    (notification.is_acknowledged ? 'acknowledged' : 'unacknowledged').includes(searchLower)
+                  );
+                });
+              }
+            } else if (activeTabKey === 'instrumentCalibration') {
+              filteredNotifications = filteredNotifications.filter(
+                notification => notification.notificationType === 'instrumentCalibration'
+              );
+              
+              // Apply instrument calibration search filter if there's search text
+              if (instrumentSearchText) {
+                const searchLower = instrumentSearchText.toLowerCase();
+                filteredNotifications = filteredNotifications.filter(notification => {
+                  const details = notification.instrument_details || {};
+                  const dynamicData = details.dynamic_data || {};
+                  const lastCalibration = details.last_calibration ? formatDate(details.last_calibration) : '';
+                  const nextCalibration = details.next_calibration ? formatDate(details.next_calibration) : '';
+                  
+                  // Check all searchable fields
+                  return (
+                    // Instrument code
+                    (dynamicData['Instrument code'] && String(dynamicData['Instrument code']).toLowerCase().includes(searchLower)) ||
+                    // Item code
+                    (details.item_code && String(details.item_code).toLowerCase().includes(searchLower)) ||
+                    // Category
+                    (details.subcategory_name && String(details.subcategory_name).toLowerCase().includes(searchLower)) ||
+                    // Calibration type
+                    (notification.calibration_type && String(notification.calibration_type).toLowerCase().includes(searchLower)) ||
+                    // Last calibration date
+                    (lastCalibration && lastCalibration.toLowerCase().includes(searchLower)) ||
+                    // Next calibration date
+                    (nextCalibration && nextCalibration.toLowerCase().includes(searchLower)) ||
+                    // Due date
+                    (notification.calibration_due_date && String(notification.calibration_due_date).toLowerCase().includes(searchLower))
+                  );
+                });
+              }
+            } else if (activeTabKey === 'machineCalibration') {
+              filteredNotifications = filteredNotifications.filter(
+                notification => notification.notificationType === 'machineCalibration'
+              );
+              
+              // Apply machine calibration search filter if there's search text
+              if (machineCalibrationSearchText) {
+                const searchLower = machineCalibrationSearchText.toLowerCase();
+                filteredNotifications = filteredNotifications.filter(notification => {
+                  const timestamp = notification.timestamp ? formatDate(notification.timestamp) : '';
+                  
+                  // Check all searchable fields
+                  return (
+                    // Machine name/make
+                    ((notification.machine_name || notification.machine_make || '').toLowerCase().includes(searchLower)) ||
+                    // Machine ID
+                    (notification.machine_id && String(notification.machine_id).toLowerCase().includes(searchLower)) ||
+                    // Machine type
+                    (notification.machine_type && String(notification.machine_type).toLowerCase().includes(searchLower)) ||
+                    // Due date
+                    (notification.calibration_due_date && String(notification.calibration_due_date).toLowerCase().includes(searchLower)) ||
+                    // Notification time
+                    (timestamp && timestamp.toLowerCase().includes(searchLower))
+                  );
+                });
+              }
+            }
+            
+            // Apply date range filter if set
+            if (dateRange && dateRange[0] && dateRange[1]) {
+              const startDate = dateRange[0].startOf('day');
+              const endDate = dateRange[1].endOf('day');
+              
+              filteredNotifications = filteredNotifications.filter(notification => {
+                const notificationDate = dayjs(notification.updated_at || notification.timestamp);
+                return notificationDate.isBetween(startDate, endDate, null, '[]');
+              });
+            }
+            
+            // Handle loading state
+            if (isLoading || tableLoading) {
+              return (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Spin size="large" style={{ marginBottom: '20px' }} />
+                    <div>
+                      <Text>Loading notifications...</Text>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ) : getFilteredNotifications().length > 0 ? (
-            <Table 
-              dataSource={getFilteredNotifications()}
-              columns={getColumns()}
-              rowKey={(record) => record._uniqueId || `${record.notificationType}-${record.id || record.machine_id || record.part_number}-${record.updated_at || record.timestamp}`}
-              // pagination={{ 
-              //   pageSize: 10,
-              //   showSizeChanger: true,
-              //   pageSizeOptions: ['10', '20', '50'],
-              //   showTotal: (total) => `Total ${total} notification${total !== 1 ? 's' : ''}`,
-              //   style: { marginTop: '16px' }
-              // }}
-              rowClassName={(record) => 
-                !record.is_acknowledged 
-                  ? 'unread-row' 
-                  : ''
-              }
-              style={{
-                background: '#fff',
-                borderRadius: '8px',
-                overflow: 'hidden'
-              }}
-            />
-          ) : (
-            <Empty 
-              description={
-                <span>
-                  {searchText || dateRange ? 'No notifications match your search criteria' : 
-                   activeTabKey === 'machine' 
-                    ? 'No unacknowledged notifications' 
-                    : 'No notifications found'}
-                </span>
-              }
-              style={{ padding: '40px 0' }}
-            />
-          )}
+              );
+            }
+            
+            // Handle empty state
+            if (filteredNotifications.length === 0) {
+              const hasSearchText = (activeTabKey === 'machine' && machineSearchText) || 
+                                (activeTabKey === 'material' && materialSearchText) || 
+                                (activeTabKey === 'instrumentCalibration' && instrumentSearchText) ||
+                                (activeTabKey === 'machineCalibration' && machineCalibrationSearchText) ||
+                                dateRange;
+                                 
+              return (
+                <Empty 
+                  description={
+                    <span>
+                      {hasSearchText 
+                        ? 'No notifications match your search criteria' 
+                        : activeTabKey === 'machine' 
+                          ? 'No unacknowledged machine notifications' 
+                          : activeTabKey === 'material'
+                            ? 'No material notifications found'
+                            : activeTabKey === 'instrumentCalibration'
+                              ? 'No instrument calibrations found'
+                              : activeTabKey === 'machineCalibration'
+                                ? 'No machine calibrations found'
+                                : 'No notifications found'
+                      }
+                    </span>
+                  }
+                  style={{ padding: '40px 0' }}
+                />
+              );
+            }
+            
+            // Return the table with filtered notifications
+            return (
+              <Table 
+                dataSource={filteredNotifications}
+                columns={getColumns()}
+                rowKey={(record) => record._uniqueId || `${record.notificationType}-${record.id || record.machine_id || record.part_number}-${record.updated_at || record.timestamp}`}
+                rowClassName={(record) => 
+                  !record.is_acknowledged 
+                    ? 'unread-row' 
+                    : ''
+                }
+                style={{
+                  background: '#fff',
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}
+              />
+            );
+          })()}
+
+
         </Card>
       </Card>
     </div>

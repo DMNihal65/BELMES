@@ -325,7 +325,7 @@ const useDocumentStore = create((set, get) => ({
     } catch (error) {
       const errorMessage = error.message || 'Failed to fetch folder documents';
       set({ error: errorMessage, isLoading: false });
-      message.error(errorMessage);
+      // message.error(errorMessage);
       return { items: [], total: 0 };
     }
   },

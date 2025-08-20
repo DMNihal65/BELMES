@@ -151,31 +151,31 @@ const OrderTable = ({ orders, onRefresh }) => {
       key: 'sale_order',
     },
     
-    {
-      title: 'Status',
-      key: 'status',
-      render: (_, record) => {
-        const status = record.status || 'pending';
-        const statusColors = {
-          in_progress: 'processing',
-          completed: 'success',
-          delayed: 'error',
-          pending: 'default'
-        };
-        return (
-          <Badge
-            status={statusColors[status]}
-            text={status.replace('_', ' ').toUpperCase()}
-          />
-        );
-      },
-      filters: [
-        { text: 'In Progress', value: 'in_progress' },
-        { text: 'Completed', value: 'completed' },
-        { text: 'Delayed', value: 'delayed' },
-      ],
-      onFilter: (value, record) => record.status === value,
-    },
+    // {
+    //   title: 'Status',
+    //   key: 'status',
+    //   render: (_, record) => {
+    //     const status = record.status || 'pending';
+    //     const statusColors = {
+    //       in_progress: 'processing',
+    //       completed: 'success',
+    //       delayed: 'error',
+    //       pending: 'default'
+    //     };
+    //     return (
+    //       <Badge
+    //         status={statusColors[status]}
+    //         text={status.replace('_', ' ').toUpperCase()}
+    //       />
+    //     );
+    //   },
+    //   filters: [
+    //     { text: 'In Progress', value: 'in_progress' },
+    //     { text: 'Completed', value: 'completed' },
+    //     { text: 'Delayed', value: 'delayed' },
+    //   ],
+    //   onFilter: (value, record) => record.status === value,
+    // },
     {
       title: 'Actions',
       key: 'actions',

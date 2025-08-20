@@ -230,6 +230,8 @@ const AccessControlManagement = ({onSuccess }) => {
       if (onSuccess) onSuccess();
     } catch (error) {
       toast.error(error.message);
+      // Clear form on error as well to prevent showing invalid data
+      registerForm.resetFields();
     } finally {
       setIsLoading(false);
     }
@@ -279,14 +281,20 @@ const AccessControlManagement = ({onSuccess }) => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: '20%',
-      render: (date) => (
-        <Tooltip title={format(parseISO(date), 'dd/MM/yyyy HH:mm:ss')}>
-          <span>
-            <ClockCircleOutlined style={{ marginRight: 8 }} />
-            {format(parseISO(date), 'dd/MM/yyyy HH:mm')}
-          </span>
-        </Tooltip>
-      ),
+      render: (date) => {
+        // Add 5:30 hours to match timezone (IST)
+        const dateObj = parseISO(date);
+        const adjustedDate = new Date(dateObj.getTime() + (5.5 * 60 * 60 * 1000));
+        
+        return (
+          <Tooltip title={format(adjustedDate, 'dd/MM/yyyy HH:mm:ss')}>
+            <span>
+              <ClockCircleOutlined style={{ marginRight: 8 }} />
+              {format(adjustedDate, 'dd/MM/yyyy HH:mm')}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Actions',
@@ -527,7 +535,7 @@ const AccessControlManagement = ({onSuccess }) => {
               bordered
             />
           </TabPane>
-          <TabPane
+          {/* <TabPane
             tab={
            
                 <span>Roles</span>
@@ -550,7 +558,7 @@ const AccessControlManagement = ({onSuccess }) => {
               size="middle"
               bordered
             />
-          </TabPane>
+          </TabPane> */}
           
           {/* Other tabs can be added here */}
         </Tabs>
@@ -559,7 +567,10 @@ const AccessControlManagement = ({onSuccess }) => {
       <Modal
         title="Register New User"
         open={showRegister}
-        onCancel={() => setShowRegister(false)}
+        onCancel={() => {
+          setShowRegister(false);
+          registerForm.resetFields(); // Clear form when modal is closed
+        }}
         footer={null}
         destroyOnClose
         centered

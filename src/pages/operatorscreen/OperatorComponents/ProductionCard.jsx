@@ -235,6 +235,9 @@ const ProductionCard = () => {
     return '#0284c7';
   };
 
+     const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(now.getDate() - 30);
+
   return (
     <Card
       className="status-card h-full shadow-sm"
@@ -346,6 +349,7 @@ const ProductionCard = () => {
                 <DatePicker
                 selected={fromDate}
                 onChange={setFromDate}
+                minDate={thirtyDaysAgo}
                 maxDate={now}
                 placeholderText="Select From Date"
                 dateFormat="MMMM d, yyyy"

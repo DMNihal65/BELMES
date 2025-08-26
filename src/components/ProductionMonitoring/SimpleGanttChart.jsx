@@ -39,7 +39,6 @@ const MACHINE_COLORS = [
   '#EC4899', // pink
   '#22D3EE', // cyan
   '#6EE7B7', // teal
-  // ...add more if needed
 ];
 
 const SimpleGanttChart = ({ 
@@ -56,7 +55,6 @@ const SimpleGanttChart = ({
 }) => {
   const containerRef = useRef(null);
   const timelineRef = useRef(null);
-  const refreshIntervalRef = useRef(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [viewMode, setViewMode] = useState('daily');
@@ -65,18 +63,23 @@ const SimpleGanttChart = ({
   useEffect(() => {
     let countdownInterval;
 
+    const refreshData = () => {
+      if (onSubmit) {
+        onSubmit(false);
+        console.log('Auto-refreshing data...', new Date().toLocaleString());
+      }
+      return 60;
+    };
+
     if (autoRefresh) {
       // Initial refresh
-      onSubmit(false);
-      setCountdown(60);
-
+      setCountdown(prev => prev === 60 ? prev : 60);
+      
       // Set up countdown interval
       countdownInterval = setInterval(() => {
         setCountdown(prev => {
           if (prev <= 1) {
-            onSubmit(false);
-            console.log('Auto-refreshing data...', new Date().toLocaleString());
-            return 60;
+            return refreshData();
           }
           return prev - 1;
         });
@@ -93,124 +96,284 @@ const SimpleGanttChart = ({
         clearInterval(countdownInterval);
       }
     };
+    // We're intentionally omitting onSubmit from deps to prevent re-creating the effect
+    // when the parent component re-renders and creates a new onSubmit function
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh]);
 
   const toggleAutoRefresh = useCallback(() => {
     setAutoRefresh(prev => !prev);
   }, []);
 
+  // Memoize the refresh handler to prevent unnecessary re-renders
+  const handleRefresh = useCallback(() => {
+    if (onSubmit) {
+      onSubmit(true);
+    }
+  }, [onSubmit]);
+
   // Handle view mode change
   const handleViewModeChange = (e) => {
     const newMode = e.target.value;
     setViewMode(newMode);
-    const newRange = VIEW_MODES[newMode].getRange();
-    onDateChange(newRange);
+    if (onDateChange) {
+      const newRange = VIEW_MODES[newMode].getRange();
+      onDateChange(newRange);
+    }
   };
 
+  // Main timeline rendering effect
   useEffect(() => {
     if (!containerRef.current) return;
 
     try {
+      // Destroy existing timeline
       if (timelineRef.current) {
         timelineRef.current.destroy();
+        timelineRef.current = null;
       }
 
-      if (data.length === 0) return;
+      // Don't render if no data
+      if (!data || data.length === 0) {
+        console.log('No data to render timeline');
+        return;
+      }
 
-      const uniqueMachines = [...new Set(data.map(item => item.machine))].sort();
-      // Create color dots HTML for all machines
-      const colorDotsHtml = machines.map(m =>
-        `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${machineColorMap[m]};margin-right:2px;"></span>`
-      ).join('');
+      console.log('Rendering timeline with data:', data.length, 'items');
+
+      // Get unique machines from data
+      let uniqueMachines = [...new Set(data.map(item => item.machine))].sort();
+      
+      // Filter by selected machine if specified
+      if (selectedMachine && selectedMachine !== 'all') {
+        uniqueMachines = uniqueMachines.filter(machine => machine === selectedMachine);
+      }
+
+      console.log('Unique machines:', uniqueMachines);
+
+      // Create groups for hierarchical structure
       const groups = [];
-      uniqueMachines.forEach(machine => {
-        const singleDot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${machineColorMap[machine]};margin-right:6px;"></span>`;
-        groups.push(
-          {
-            id: `${machine}-scheduled`,
-            content: `<div class="machine-group">${colorDotsHtml}<span class="machine-name" style="color: ${machineColorMap[machine]}; font-weight: 600; margin-left: 8px;">${machine} (Scheduled)</span></div>`
-          },
-          {
-            id: `${machine}-production`,
-            content: `<div class="machine-group">${colorDotsHtml}<span class="machine-name" style="color: ${machineColorMap[machine]}; font-weight: 600; margin-left: 8px;">${machine} (Production)</span></div>`
-          }
-        );
-      });
-
-      const items = data.map((item, index) => {
-        const startTime = dayjs(item.start_time).toDate();
-        const endTime = dayjs(item.end_time).toDate();
-
-        return {
-          id: item.id || `item-${index}`,
-          group: `${item.machine}-${item.type}`,
+      
+      uniqueMachines.forEach((machine, machineIndex) => {
+        const machineColor = MACHINE_COLORS[machineIndex % MACHINE_COLORS.length];
+        
+        // Parent machine group
+        groups.push({
+          id: `machine-${machine}`,
           content: `
-            <div class="timeline-item ${item.type}-item">
-              <div class="item-content">
-                ${item.component || 'No Part'} (${item.quantity || 0})
-              </div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-weight: 700; font-size: 14px;">
+              <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: ${machineColor}; border: 2px solid white; box-shadow: 0 0 0 1px ${machineColor};"></span>
+              <span style="color: ${machineColor};">${machine}</span>
             </div>
           `,
-          title: `
-            <div class="tooltip-content">
-              <div class="tooltip-header">${item.type === 'production' ? 'Production' : 'Scheduled'}</div>
-              <div><strong>Part Number:</strong> ${item.component || 'N/A'}</div>
-              <div><strong>Description:</strong> ${item.description || 'N/A'}</div>
-              <div><strong>Quantity:</strong> ${item.quantity || 'N/A'}</div>
-              <div><strong>PO:</strong> ${item.po || 'N/A'}</div>
-              ${item.operator ? `<div><strong>Operator:</strong> ${item.operator}</div>` : ''}
-              ${item.notes ? `<div><strong>Notes:</strong> ${item.notes}</div>` : ''}
-              <div class="tooltip-time">
-                <div><strong>Start:</strong> ${dayjs(item.start_time).format('YYYY-MM-DD HH:mm')}</div>
-                <div><strong>End:</strong> ${dayjs(item.end_time).format('YYYY-MM-DD HH:mm')}</div>
-              </div>
+          style: `background: linear-gradient(90deg, ${machineColor}10, ${machineColor}05); border-left: 4px solid ${machineColor}; border-bottom: 1px solid ${machineColor}30;`,
+          order: machineIndex * 100,
+          nestedGroups: [`${machine}-scheduled`, `${machine}-production`],
+          showNested: true
+        });
+        
+        // Scheduled subgroup
+        groups.push({
+          id: `${machine}-scheduled`,
+          content: `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 40px; font-weight: 500; font-size: 13px; min-height: 40px;">
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #ffa940; border: 1px solid #d46b08;"></span>
+              <span style="color: #d46b08;">Scheduled</span>
             </div>
           `,
-          start: startTime,
-          end: endTime,
-          subgroup: item.type, // 'scheduled' or 'production'
-          className: `${item.type}-item`
-        };
+          style: 'background-color: #fff7e6; border-bottom: 1px solid #ffe7ba;',
+          order: (machineIndex * 100) + 10,
+          parent: `machine-${machine}`
+        });
+        
+        // Production subgroup
+        groups.push({
+          id: `${machine}-production`,
+          content: `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 40px; font-weight: 500; font-size: 13px; min-height: 40px;">
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #52c41a; border: 1px solid #389e0d;"></span>
+              <span style="color: #389e0d;">Production</span>
+            </div>
+          `,
+          style: 'background-color: #f6ffed; border-bottom: 1px solid #d9f7be;',
+          order: (machineIndex * 100) + 20,
+          parent: `machine-${machine}`
+        });
       });
 
+      console.log('Created groups:', groups.length);
+
+      // Create timeline items
+      const items = data.map((item, idx) => {
+        try {
+          const startTime = dayjs(item.start_time);
+          const endTime = dayjs(item.end_time);
+          
+          if (!startTime.isValid() || !endTime.isValid()) {
+            console.warn('Invalid dates for item:', item);
+            return null;
+          }
+
+          const duration = endTime.diff(startTime, 'minutes');
+          const groupId = `${item.machine}-${item.type}`;
+          
+          return {
+            id: item.id || `item-${idx}`,
+            group: groupId,
+            start: startTime.toDate(),
+            end: endTime.toDate(),
+            content: `
+              <div class="gantt-item-content">
+                <div class="item-title">${item.component || 'No Component'}</div>
+              </div>
+            `,
+            className: `${item.type}-item`,
+            title: `
+              <div style="font-weight: 600; margin-bottom: 8px; color: ${item.type === 'scheduled' ? '#d46b08' : '#389e0d'};">${item.component || 'No Component'}</div>
+              <div style="margin-bottom: 4px;"><strong>Machine:</strong> ${item.machine}</div>
+              <div style="margin-bottom: 4px;"><strong>Type:</strong> ${item.type}</div>
+              <div style="margin-bottom: 4px;"><strong>Quantity:</strong> ${item.quantity || 0}</div>
+              <div style="margin-bottom: 4px;"><strong>Duration:</strong> ${duration} minutes</div>
+              <div style="margin-bottom: 2px;"><strong>Start:</strong> ${startTime.format('YYYY-MM-DD HH:mm:ss')}</div>
+              <div><strong>End:</strong> ${endTime.format('YYYY-MM-DD HH:mm:ss')}</div>
+            `
+          };
+        } catch (error) {
+          console.error('Error processing item:', item, error);
+          return null;
+        }
+      }).filter(Boolean);
+
+      console.log('Created items:', items.length);
+
+      // Calculate appropriate time range
+      const startRange = dateRange?.[0] ? dateRange[0].toDate() : dayjs().startOf('day').toDate();
+      const endRange = dateRange?.[1] ? dateRange[1].toDate() : dayjs().endOf('day').toDate();
+
+      // Timeline options
       const options = {
-        stack: true,
-        start: dateRange?.[0]?.toDate() || dayjs().startOf('day').toDate(),
-        end: dateRange?.[1]?.toDate() || dayjs().endOf('day').toDate(),
+        // Layout options
+        stack: false,  // Disable stacking to allow side-by-side items
+        stackSubgroups: false,  // Disable subgroup stacking
+        width: '100%',
+        height: 'auto',
+        minHeight: '600px',
+        maxHeight: '900px',
+        
+        // Time range
+        start: startRange,
+        end: endRange,
+        
+        // Interaction
         editable: false,
-        margin: { item: { horizontal: 10, vertical: 7 } },
+        selectable: false,
+        zoomable: true,
+        moveable: true,
+        zoomKey: 'ctrlKey',
+        
+        // Margins and spacing
+        margin: {
+          item: {
+            horizontal: 1,
+            vertical: 1
+          },
+          axis: 30
+        },
+        
+        // Group configuration
+        groupOrder: 'order',
+        groupHeightMode: 'fixed',
+        groupMinHeight: 30,  // Reduced height for more compact view
+        groupMaxHeight: 30,
+        
+        // Scrolling
         horizontalScroll: true,
         verticalScroll: true,
-        zoomKey: 'ctrlKey',
-        height: '600px',
-        orientation: 'top',
-        timeAxis: { 
-          scale: VIEW_MODES[viewMode].scale, 
-          step: VIEW_MODES[viewMode].step 
+        
+        // Item styling
+        itemsAlwaysDraggable: false,
+        showCurrentTime: true,
+        showMajorLabels: true,
+        showMinorLabels: true,
+        
+        // Time axis
+        timeAxis: {
+          scale: VIEW_MODES[viewMode].scale,
+          step: VIEW_MODES[viewMode].step
         },
-        subgroupOrder: (a, b) => {
-          // Always put 'scheduled' above 'production'
-          if (a.subgroup === 'scheduled' && b.subgroup === 'production') return -1;
-          if (a.subgroup === 'production' && b.subgroup === 'scheduled') return 1;
-          return 0;
-        },
+        
+        // Visual features
+        showCurrentTime: true,
+        showMajorLabels: true,
+        showMinorLabels: true,
+        
+        // Tooltip
         tooltip: {
           followMouse: true,
-          overflowMethod: 'cap'
-        }
+          overflowMethod: 'cap',
+          delay: 300
+        },
+        
+        // Time formatting
+        format: {
+          minorLabels: {
+            hour: 'HH:mm',
+            day: 'DD',
+            weekday: 'ddd DD',
+            month: 'MMM',
+            year: 'YYYY'
+          },
+          majorLabels: {
+            hour: 'ddd DD MMMM',
+            day: 'MMMM YYYY',
+            weekday: 'MMMM YYYY', 
+            month: 'YYYY',
+            year: ''
+          }
+        },
+        
+        orientation: 'top',
+        
+        // Additional width and spacing options
+        autoResize: true,
+        fit: true
       };
 
+      // Create timeline
       timelineRef.current = new Timeline(containerRef.current, items, groups, options);
+      
+      console.log('Timeline created successfully');
+
+      // Event listeners
+      timelineRef.current.on('select', (event) => {
+        console.log('Selected items:', event.items);
+      });
 
     } catch (error) {
-      console.error('Error initializing timeline:', error);
+      console.error('Error creating timeline:', error);
     }
-  }, [data, dateRange, viewMode]);
+  }, [data, dateRange, viewMode, selectedMachine]);
 
-  const handleZoomIn = () => timelineRef.current?.zoomIn(0.5);
-  const handleZoomOut = () => timelineRef.current?.zoomOut(0.5);
-  const handleFit = () => timelineRef.current?.fit();
+  // Zoom and navigation functions
+  const handleZoomIn = () => {
+    if (timelineRef.current) {
+      timelineRef.current.zoomIn(0.5);
+    }
+  };
 
+  const handleZoomOut = () => {
+    if (timelineRef.current) {
+      timelineRef.current.zoomOut(0.5);
+    }
+  };
+
+  const handleFit = () => {
+    if (timelineRef.current) {
+      timelineRef.current.fit();
+    }
+  };
+
+  // Create color map for machine dropdown
   const machineColorMap = {};
   machines.forEach((machine, idx) => {
     machineColorMap[machine] = MACHINE_COLORS[idx % MACHINE_COLORS.length];
@@ -218,13 +381,24 @@ const SimpleGanttChart = ({
 
   return (
     <div className="gantt-chart">
+      {/* Controls */}
       <div className="gantt-controls">
-        <div className="flex items-center justify-between gap-4 p-4 border-b">
-          <div className="flex items-center gap-4">
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          gap: '16px', 
+          padding: '16px', 
+          borderBottom: '1px solid #e5e7eb', 
+          background: '#f9fafb',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            {/* Machine Selector */}
             <Select
               value={selectedMachine}
               onChange={onMachineChange}
-              style={{ width: 300 }}
+              style={{ width: 250 }}
               options={[
                 { value: 'all', label: 'All Machines' },
                 ...machines.map((m, idx) => ({
@@ -238,10 +412,9 @@ const SimpleGanttChart = ({
                           height: 10,
                           borderRadius: '50%',
                           backgroundColor: machineColorMap[m],
-                          marginRight: 6,
                         }}
                       />
-                      <span style={{ color: machineColorMap[m], fontWeight: 500 }}>{m}</span>
+                      <span style={{ fontWeight: 500 }}>{m}</span>
                     </span>
                   ),
                 }))
@@ -250,58 +423,57 @@ const SimpleGanttChart = ({
               disabled={isLoading}
             />
             
+            {/* View Mode Selector */}
             <Radio.Group
               value={viewMode}
               onChange={handleViewModeChange}
               disabled={isLoading}
               size="small"
-              className="mr-2 flex items-center"
-              style={{ gap: 2 }}
             >
               {Object.entries(VIEW_MODES).map(([key, { label }]) => (
-                <Radio.Button
-                  className="text-xs px-2 py-0 h-6 leading-6"
-                  key={key}
-                  value={key}
-                  style={{
-                    minWidth: 60,
-                    padding: '0 6px',
-                    fontSize: 12,
-                    height: 24,
-                    lineHeight: '22px'
-                  }}
-                >
-                  {label.replace(' View', '')}
+                <Radio.Button key={key} value={key}>
+                  {label}
                 </Radio.Button>
               ))}
             </Radio.Group>
 
+            {/* Date Range Picker */}
             <RangePicker
               value={dateRange}
               onChange={onDateChange}
               showTime
-              format="YYYY-MM-DD HH:mm:ss"
-              className="min-w-[300px]"
+              format="YYYY-MM-DD HH:mm"
+              style={{ minWidth: '300px' }}
               allowClear={false}
               disabled={isLoading}
             />
             
+            {/* Action Buttons */}
             <Space>
               <Button 
+                icon={<RefreshCw size={16} />} 
+                onClick={handleRefresh}
+                loading={isLoading}
+                disabled={isLoading}
+                className="control-button"
+              >
+                Refresh
+              </Button>
+              <Button 
                 type="primary" 
-                onClick={() => onSubmit(false)}
+                onClick={() => onSubmit && onSubmit(false)}
                 loading={isLoading}
               >
                 Submit
               </Button>
               <Button 
-                onClick={() => onSubmit(true)}
+                onClick={() => onSubmit && onSubmit(true)}
                 disabled={isLoading}
               >
                 Get All Data
               </Button>
               <Button 
-                onClick={onClear} 
+                onClick={onClear}
                 disabled={isLoading}
               >
                 Reset
@@ -309,12 +481,23 @@ const SimpleGanttChart = ({
             </Space>
           </div>
 
+          {/* Right side controls */}
           <Space>
-            <div className="flex items-center gap-2 bg-gray-100 p-1 rounded">
-              <Badge color="#10B981" text="Production" />
-              <Badge color="#3B82F6" text="Scheduled" />
+            {/* Legend */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              background: 'white', 
+              padding: '8px 12px', 
+              borderRadius: '6px', 
+              border: '1px solid #d9d9d9' 
+            }}>
+              <Badge color="#52c41a" text="Production" />
+              <Badge color="#ffa940" text="Scheduled" />
             </div>
             
+            {/* Auto Refresh */}
             <Tooltip title={autoRefresh ? `Auto Refresh: ${countdown}s` : "Start Auto Refresh"}>
               <Button 
                 icon={autoRefresh ? <Pause size={16} /> : <Play size={16} />}
@@ -322,12 +505,11 @@ const SimpleGanttChart = ({
                 type={autoRefresh ? "primary" : "default"}
                 disabled={isLoading}
               >
-                {autoRefresh && (
-                  <span className="ml-1">{countdown}s</span>
-                )}
+                {autoRefresh && <span style={{ marginLeft: '4px' }}>{countdown}s</span>}
               </Button>
             </Tooltip>
 
+            {/* Zoom Controls */}
             <Tooltip title="Zoom In">
               <Button icon={<ZoomIn size={16} />} onClick={handleZoomIn} disabled={isLoading} />
             </Tooltip>
@@ -338,18 +520,27 @@ const SimpleGanttChart = ({
               <Button icon={<Maximize size={16} />} onClick={handleFit} disabled={isLoading} />
             </Tooltip>
             <Tooltip title="Refresh Now">
-              <Button icon={<RefreshCw size={16} />} onClick={() => onSubmit(false)} disabled={isLoading} />
+              <Button icon={<RefreshCw size={16} />} onClick={() => onSubmit && onSubmit(false)} disabled={isLoading} />
             </Tooltip>
           </Space>
         </div>
       </div>
 
-      {/* Status bar for auto-refresh */}
+      {/* Auto-refresh progress bar */}
       {autoRefresh && (
-        <div className="auto-refresh-status">
+        <div style={{
+          height: '3px',
+          backgroundColor: '#f0f0f0',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
           <div 
-            className="progress-bar" 
             style={{ 
+              height: '100%',
+              background: 'linear-gradient(90deg, #10B981, #22d3ee)',
+              position: 'absolute',
+              left: 0,
+              top: 0,
               width: `${(countdown / 60) * 100}%`,
               transition: 'width 1s linear'
             }} 
@@ -357,162 +548,161 @@ const SimpleGanttChart = ({
         </div>
       )}
 
+      {/* Error Alert */}
       {error && (
-        <Alert message="Error" description={error} type="error" showIcon className="m-4" />
+        <Alert message="Error" description={error} type="error" showIcon style={{ margin: '16px' }} />
       )}
 
+      {/* Main Content */}
       {isLoading ? (
-        <div className="flex justify-center items-center h-[500px]">
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '500px' 
+        }}>
           <Spin size="large" tip="Loading data..." />
         </div>
-      ) : data.length > 0 ? (
+      ) : data && data.length > 0 ? (
         <>
           {selectedMachine && selectedMachine !== 'all' && (
             <div style={{
-              fontWeight: 600,
-              fontSize: 18,
-              margin: '16px 0 0 8px',
-              color: machineColorMap[selectedMachine]
+              fontWeight: 700,
+              fontSize: '18px',
+              margin: '16px 0 8px 16px',
+              color: machineColorMap[selectedMachine] || '#333',
+              padding: '8px 0',
+              borderBottom: '2px solid #f0f0f0'
             }}>
-              {selectedMachine}
+              Machine: {selectedMachine}
             </div>
           )}
-          <div ref={containerRef} className="timeline-container" />
+          <div 
+            ref={containerRef} 
+            className="timeline-container" 
+            style={{ 
+              minHeight: '400px',
+              borderTop: '1px solid #e5e7eb'
+            }} 
+          />
         </>
       ) : (
-        <Empty description="No data available" className="py-20" />
+        <Empty 
+          description="No data available for the selected criteria" 
+          style={{ padding: '80px 20px' }} 
+        />
       )}
 
+      {/* Global Styles */}
       <style jsx global>{`
         .gantt-chart {
           background: white;
-          border-radius: 8px;
+          border-radius: 12px;
           overflow: hidden;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          border: 1px solid #e5e7eb;
         }
 
         .vis-timeline {
           border: none !important;
-          font-family: inherit !important;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+
+        .gantt-item-content {
+          padding: 6px 10px;
+          border-radius: 4px;
+          background: white;
+          font-size: 11px;
+          line-height: 1.3;
+          min-height: 30px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        .item-title {
+          font-weight: 600;
+          font-size: 12px;
+          margin-bottom: 2px;
+        }
+
+        .item-details {
+          font-size: 10px;
+          color: #666;
+          margin-bottom: 1px;
+        }
+
+        .item-time {
+          font-size: 10px;
+          color: #999;
+        }
+
+        .scheduled-item {
+          border: 2px solid #d46b08 !important;
+          border-left: 4px solid #d46b08 !important;
+          background-color: rgba(255, 169, 64, 0.15) !important;
+        }
+
+        .scheduled-item .item-title {
+          color: #d46b08 !important;
+          font-weight: 600 !important;
+        }
+
+        .production-item {
+          border: 2px solid #389e0d !important;
+          border-left: 4px solid #389e0d !important;
+          background-color: rgba(82, 196, 26, 0.15) !important;
+        }
+
+        .production-item .item-title {
+          color: #389e0d !important;
         }
 
         .vis-item {
           border-radius: 4px !important;
-          border: none !important;
-        }
-
-        .production-item {
-          background-color: #10B981 !important;
-          color: white !important;
-          border-color: #059669 !important;
-        }
-
-        .scheduled-item {
-          background-color: #3B82F6 !important;
-          color: white !important;
-          border-color: #2563EB !important;
-        }
-
-        .timeline-item {
-          height: 100%;
-          display: flex;
-          align-items: center;
-          padding: 4px 8px;
-        }
-
-        .item-content {
-          font-size: 12px;
-          font-weight: 500;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .machine-group {
-          padding: 8px;
-          background: #f9fafb;
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .machine-name {
-          font-weight: 600;
-          color: #374151;
-        }
-
-        .tooltip-content {
-          background: white;
-          border-radius: 6px;
-          padding: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          font-size: 12px;
-          line-height: 1.5;
-          max-width: 300px;
-        }
-
-        .tooltip-header {
-          font-weight: 600;
-          font-size: 14px;
-          margin-bottom: 8px;
-          padding-bottom: 4px;
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .tooltip-time {
-          margin-top: 8px;
-          padding-top: 8px;
-          border-top: 1px solid #e5e7eb;
-          color: #6B7280;
-        }
-
-        .vis-time-axis .vis-grid.vis-minor {
-          border-color: #f0f0f0;
-        }
-
-        .vis-time-axis .vis-grid.vis-major {
-          border-color: #e0e0e0;
-        }
-
-        .vis-panel.vis-center {
-          border-left: 1px solid #f0f0f0;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+          font-weight: 600 !important;
         }
 
         .vis-group {
-          border-bottom: 1px solid #f0f0f0;
-          background: #fafafa;
+          border-bottom: 1px solid #e5e7eb !important;
         }
 
-        .ant-radio-group {
-          background: white;
-          padding: 1px;
-          border-radius: 6px;
-          border: 1px solid #d9d9d9;
+        .vis-time-axis .vis-grid.vis-minor {
+          border-color: #f0f0f0 !important;
         }
 
-        .ant-radio-button-wrapper {
-          padding: 0 12px;
-          height: 32px;
-          line-height: 30px;
+        .vis-time-axis .vis-grid.vis-major {
+          border-color: #d9d9d9 !important;
+          font-weight: 500 !important;
         }
 
-        .auto-refresh-status {
-          height: 2px;
-          background-color: #f0f0f0;
+        .vis-current-time {
+          background-color: #ef4444 !important;
+          width: 2px !important;
+        }
+
+        .vis-tooltip {
+          background: white !important;
+          border: 1px solid #d9d9d9 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+          font-size: 12px !important;
+          padding: 12px !important;
+          max-width: 300px !important;
+          line-height: 1.4 !important;
+        }
+
+        .vis-panel.vis-center {
+          border-left: 1px solid #e5e7eb !important;
+        }
+
+        .vis-labelset .vis-label {
+          border-bottom: 1px solid #e5e7eb !important;
+        }
+
+        .timeline-container {
           position: relative;
-          overflow: hidden;
-        }
-
-        .progress-bar {
-          height: 100%;
-          background-color: #10B981;
-          position: absolute;
-          left: 0;
-          top: 0;
-        }
-
-        .ant-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
         }
       `}</style>
     </div>

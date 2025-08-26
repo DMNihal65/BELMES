@@ -30,9 +30,16 @@ const TransactionHistoryTable = () => {
     createReturnTransaction
   } = useTransactionHistoryStore();
 
+  const { fetchTransactionHistoryEnhanced } = useInventoryStore();
+
   useEffect(() => {
-    fetchTransactionHistory();
-  }, [fetchTransactionHistory]);
+    // Use enhanced transaction history from inventory store
+    fetchTransactionHistoryEnhanced(100, 0);
+    // Fallback to original if enhanced fails
+    fetchTransactionHistory().catch(() => {
+      console.log('Using fallback transaction history');
+    });
+  }, [fetchTransactionHistory, fetchTransactionHistoryEnhanced]);
 
   const { fetchCategories, fetchItems, fetchAllSubcategories } = useInventoryStore();
 
@@ -313,10 +320,15 @@ const TransactionHistoryTable = () => {
             <Button
               type="default"
               icon={<ReloadOutlined />}
-              onClick={handleReset}
+              onClick={() => {
+                handleReset();
+                fetchTransactionHistoryEnhanced(100, 0);
+                fetchTransactionHistory();
+              }}
               className="mr-2"
+              loading={loading}
             >
-              Reset
+              Refresh
             </Button>
           </Space>
         </div>

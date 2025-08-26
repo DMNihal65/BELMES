@@ -26,6 +26,7 @@ import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagem
 import AlertScreens from './pages/operatorscreens/AlertScreens';
 import MaintenanceDashboard from './pages/operatorscreens/maintanance/MaintenanceDashboard';
 import InspectionResult from './pages/operatorscreens/Inspection/InspectionResult';
+import InventoryHistory from './pages/operatorscreens/inventory/InventoryHistory';
 import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
 import MachineDetails from './pages/supervisorscreens/EnergyMonitoring/MachineDetails';
 import Notifications from './pages/supervisorscreens/Notifications';
@@ -52,7 +53,7 @@ import NewOperatorDashboard from './pages/operatorscreen/NewOperatorDashboard';
 
 const App = () => {
 
-  console.log("Deployed on 16-05-2025")
+  console.log("Deployed on 20-08-2025")
   return (
     <ConfigProvider>
       {/* basename="/belmes" this should be added in the deployment mode ISNIDE BROWSER ROUTER*/}
@@ -158,6 +159,7 @@ const App = () => {
             <Route path="maintenance" element={<MaintenanceDashboard />} />
             <Route path="inspection" element={<InspectionResult />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="inventory/history" element={<InventoryHistory />} />
             <Route path="help" element={<HelpAndSupport />} />
           </Route>
 

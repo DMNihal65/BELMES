@@ -17,7 +17,7 @@ import useAuthStore from './auth-store';
 
 
 
-const BASE_URL = 'http://172.18.7.91:8008/api/v1/inventory';
+const BASE_URL = 'http://172.18.7.89:5467/api/v1/inventory';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -84,6 +84,7 @@ const useInventoryStore = create((set, get) => ({
   transactionSummary: [],
   transactionMetrics: null,
   transactionHistory: { transactions: [] },
+  enhancedTransactionHistory: null,
   selectedCategory: null,
   selectedSubcategory: null,
   loading: false,
@@ -91,6 +92,7 @@ const useInventoryStore = create((set, get) => ({
   allOrders: [],
   operations: [],
   requests: [],
+  returnRequests: [],
   machines: [],
   transactions: [],
   set: (state) => set(state),
@@ -532,32 +534,8 @@ const useInventoryStore = create((set, get) => ({
   submitItemRequest: async (requestData) => {
     set({ loading: true });
     try {
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-      
-      // Validate token exists
-      if (!token) {
-        throw new Error('No authentication token found. Please login again.');
-      }
-
-      // Validate token format
-      const tokenParts = token.split('.');
-      if (tokenParts.length !== 3) {
-        throw new Error('Invalid token format');
-      }
-
-      // Create axios instance with default headers
-      const axiosInstance = axios.create({
-        baseURL: 'http://172.18.7.91:8008/api/v1',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // Make the request
-      const response = await axiosInstance.post(
-        '/inventory/requests',
+      const response = await axios.post(
+        `${BASE_URL}/requests/`,
         {
           expected_return_date: requestData.expected_return_date?.toISOString(),
           inventory_item_id: parseInt(requestData.item_id),
@@ -567,7 +545,8 @@ const useInventoryStore = create((set, get) => ({
           quantity: parseInt(requestData.quantity),
           remarks: requestData.remarks || "",
           status: "Pending"
-        }
+        },
+        getAuthHeaders()
       );
       
       message.success('Request submitted successfully');
@@ -578,7 +557,6 @@ const useInventoryStore = create((set, get) => ({
       // Handle different types of errors
       if (error.response?.status === 401) {
         message.error('Session expired. Please login again.');
-        // You might want to trigger a logout or redirect to login here
       } else if (error.response?.data?.detail) {
         message.error(`Failed to submit request: ${error.response.data.detail}`);
       } else {
@@ -622,37 +600,168 @@ const useInventoryStore = create((set, get) => ({
     }
   },
 
-  approveRequest: async (requestId, requestData) => {
+  // Fetch user's own requests for history
+  fetchUserRequests: async () => {
     set({ loading: true });
     try {
-      // Create transaction for the request
-      const transactionPayload = {
-        inventory_item_id: requestData.inventory_item_id,
-        transaction_type: "Issue",
-        quantity: requestData.quantity,
-        performed_by: getUserId(), // You might want to get this from user context
-        reference_request_id: requestId,
-        remarks: requestData.remarks || "Issued based on approved request"
-      };
+      const response = await axios.get(`${BASE_URL}/requests/`, getAuthHeaders());
+      const userId = getUserId();
+      const userRequests = response.data.filter(request => request.requested_by === userId);
+      set({ requests: userRequests, loading: false });
+      return userRequests;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch your requests');
+      throw error;
+    }
+  },
 
-      await axios.post(
-        `${BASE_URL}/transactions`,
-        transactionPayload,
+  approveRequest: async (requestId) => {
+    set({ loading: true });
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/requests/${requestId}/approve`,
+        {},
         getAuthHeaders()
       );
 
-      // Update local state
-      set(state => ({
-        requests: state.requests.map(req => 
-          req.id === requestId ? { ...req, status: 'approved' } : req
-        ),
-        loading: false
-      }));
+      // After approval, create transaction
+      const requestData = get().requests.find(req => req.id === requestId);
+      if (requestData) {
+        await axios.post(
+          `${BASE_URL}/transactions/`,
+          {
+            transaction_type: "Issue",
+            quantity: requestData.quantity,
+            inventory_item_id: requestData.inventory_item_id,
+            performed_by: getUserId(),
+            reference_request_id: requestId,
+            reference_return_request_id: null,
+            remarks: "Issuing tools for approved request"
+          },
+          getAuthHeaders()
+        );
+      }
 
+      // Refresh requests list
+      await get().fetchRequests();
       message.success('Request approved successfully');
     } catch (error) {
       set({ error: error.message, loading: false });
       message.error('Failed to approve request');
+      throw error;
+    }
+  },
+
+  rejectRequest: async (requestId) => {
+    set({ loading: true });
+    try {
+      await axios.post(
+        `${BASE_URL}/requests/${requestId}/reject`,
+        {},
+        getAuthHeaders()
+      );
+
+      // Refresh requests list
+      await get().fetchRequests();
+      message.success('Request rejected');
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to reject request');
+      throw error;
+    }
+  },
+
+  // Return Requests Management
+  submitReturnRequest: async (returnData) => {
+    set({ loading: true });
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/return-requests/`,
+        returnData,
+        getAuthHeaders()
+      );
+      
+      message.success('Return request submitted successfully');
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting return request:', error);
+      message.error('Failed to submit return request');
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  fetchReturnRequests: async () => {
+    set({ loading: true });
+    try {
+      const response = await axios.get(`${BASE_URL}/return-requests/`, getAuthHeaders());
+      set({ returnRequests: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch return requests');
+      throw error;
+    }
+  },
+
+  approveReturnRequest: async (returnRequestId) => {
+    set({ loading: true });
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/return-requests/${returnRequestId}/approve`,
+        {},
+        getAuthHeaders()
+      );
+
+      // Process the return transaction
+      const returnData = get().returnRequests?.find(req => req.id === returnRequestId);
+      if (returnData) {
+        await axios.post(
+          `${BASE_URL}/transactions/process-return/?return_request_id=${returnRequestId}&quantity=${returnData.quantity_to_return}&remarks=Return approved`,
+          {},
+          getAuthHeaders()
+        );
+      }
+
+      // Refresh return requests list
+      await get().fetchReturnRequests();
+      message.success('Return request approved successfully');
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to approve return request');
+      throw error;
+    }
+  },
+
+  // Enhanced transaction history
+  fetchTransactionHistoryEnhanced: async (startDate = null, endDate = null) => {
+    set({ loading: true });
+    try {
+      let url = `${BASE_URL}/analytics/transaction-history-enhanced`;
+      const params = new URLSearchParams();
+      
+      if (startDate) {
+        params.append('start_date', startDate);
+      }
+      if (endDate) {
+        params.append('end_date', endDate);
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await axios.get(url, getAuthHeaders());
+      set({ 
+        enhancedTransactionHistory: response.data, 
+        loading: false 
+      });
+      return response.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      message.error('Failed to fetch enhanced transaction history');
       throw error;
     }
   },

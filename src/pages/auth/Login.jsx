@@ -58,7 +58,7 @@ const Login = () => {
               }
 
               // Make API call to verify machine credentials
-              const response = await fetch('http://172.18.7.89:5467/api/v1/auth/machine-id-login', {
+              const response = await fetch('http://172.18.7.91:8008/api/v1/auth/machine-id-login', {
                 method: 'POST',
                 headers: {
                   'accept': 'application/json',

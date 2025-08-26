@@ -415,7 +415,7 @@ function Sidebar() {
         {
           key: '/admin/production-monitoring/production-vs-actual',
           icon: <BarChartBig size={18} />,
-          label: 'Production vs Actual',
+          label: 'Planned vs Production',
         },
         // {
         //   key: '/admin/production-monitoring/order-analysis',

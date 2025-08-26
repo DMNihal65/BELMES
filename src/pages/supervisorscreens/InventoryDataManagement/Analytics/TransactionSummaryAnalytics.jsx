@@ -556,49 +556,7 @@ const TransactionSummaryAnalytics = () => {
         </Col>
       </Row>
 
-      {/* Transaction History Table */}
-      <Card title="Recent Transactions" style={{ marginBottom: '24px' }}>
-        <Space style={{ marginBottom: 16 }}>
-          <Search
-            placeholder="Search all fields"
-            allowClear
-            onSearch={handleSearch}
-            style={{ width: 300 }}
-          />
-          <RangePicker
-            value={dateRange}
-            onChange={handleDateRangeChange}
-            style={{ width: 300 }}
-          />
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>
-            Reset Filters
-          </Button>
-        </Space>
-        <Table
-          columns={transactionHistoryColumns}
-          dataSource={filteredData}
-          rowKey={(record) => record.id}
-          onChange={handleTableChange}
-          // pagination={{
-          //   current: currentPage,
-          //   pageSize: pageSize,
-          //   total: transactionHistory.metadata?.total_count,
-          //   showSizeChanger: true,
-          //   showQuickJumper: true,
-          //   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-          //   pageSizeOptions: ['5', '10', '20', '50'],
-          //   onChange: (page, size) => {
-          //     setCurrentPage(page);
-          //     setPageSize(size);
-          //   },
-          //   onShowSizeChange: (current, size) => {
-          //     setCurrentPage(1);
-          //     setPageSize(size);
-          //   }
-          // }}
-          scroll={{ x: true }}
-        />
-      </Card>
+     
     </div>
   );
 };

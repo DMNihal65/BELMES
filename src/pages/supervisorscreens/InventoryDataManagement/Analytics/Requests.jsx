@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Tag, Button, Space, Tooltip, Modal, Input, message, Card, Form, Row, Col, Input as AntInput, Spin, Tabs, Statistic } from 'antd';
-import { EyeOutlined, CheckOutlined, ReloadOutlined, DatabaseOutlined, ToolOutlined, ArrowUpOutlined, ArrowDownOutlined, SearchOutlined } from '@ant-design/icons';
+import { EyeOutlined, CheckOutlined, CloseOutlined, ReloadOutlined, DatabaseOutlined, ToolOutlined, ArrowUpOutlined, ArrowDownOutlined, SearchOutlined } from '@ant-design/icons';
 import { Pie, Column } from '@ant-design/plots';
 import useInventoryStore from '../../../../store/inventory-store';
 import 'tailwindcss/tailwind.css';
 import axios from 'axios';
 import TransactionHistoryTable from '../TransactionHistoryTable';
 import TransactionSummaryAnalytics from './TransactionSummaryAnalytics';
+import EnhancedTransactionHistory from './EnhancedTransactionHistory';
 
 const { TabPane } = Tabs;
 
@@ -15,13 +16,17 @@ const RequestTable = () => {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [isApproveModalVisible, setIsApproveModalVisible] = useState(false);
+  const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
   const [approveRecord, setApproveRecord] = useState(null);
+  const [rejectRecord, setRejectRecord] = useState(null);
   const [columnFilters, setColumnFilters] = useState({});
   const [inventoryItems, setInventoryItems] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [itemInfoModalVisible, setItemInfoModalVisible] = useState(false);
+  const [selectedItemInfo, setSelectedItemInfo] = useState(null);
   
-  const { requests, loading, fetchRequests, approveRequest, fetchCategories, fetchItems, fetchAllSubcategories, } = useInventoryStore();
+  const { requests, loading, fetchRequests, approveRequest, rejectRequest, fetchCategories, fetchItems, fetchAllSubcategories } = useInventoryStore();
 
   useEffect(() => {
     fetchRequests().catch(error => {
@@ -40,7 +45,7 @@ const RequestTable = () => {
         ]);
       } catch (error) {
         console.error('Error initializing data:', error);
-        toast.error('Failed to load some data');
+        message.error('Failed to load some data');
       } finally {
         setIsLoading(false);
       }
@@ -56,7 +61,7 @@ const RequestTable = () => {
       setSubcategories(subCats || []);
     } catch (error) {
       console.error('Error loading subcategories:', error);
-      toast.error('Failed to load subcategories');
+      message.error('Failed to load subcategories');
       setSubcategories([]);
     }
   };
@@ -68,7 +73,7 @@ const RequestTable = () => {
       setInventoryItems(items || []);
     } catch (error) {
       console.error('Error loading inventory items:', error);
-      toast.error('Failed to load inventory items');
+      message.error('Failed to load inventory items');
       setInventoryItems([]);
     }
   };
@@ -197,13 +202,30 @@ const RequestTable = () => {
     setIsApproveModalVisible(true);
   };
 
-  const handleApprove = async (record) => {
+  const showRejectConfirm = (record) => {
+    setRejectRecord(record);
+    setIsRejectModalVisible(true);
+  };
+
+  const handleApprove = async () => {
     try {
-      await approveRequest(record.id, record);
+      await approveRequest(approveRecord.id);
       await fetchRequests();
       setIsApproveModalVisible(false);
+      setApproveRecord(null);
     } catch (error) {
       console.error('Error approving request:', error);
+    }
+  };
+
+  const handleReject = async () => {
+    try {
+      await rejectRequest(rejectRecord.id);
+      await fetchRequests();
+      setIsRejectModalVisible(false);
+      setRejectRecord(null);
+    } catch (error) {
+      console.error('Error rejecting request:', error);
     }
   };
 
@@ -214,6 +236,16 @@ const RequestTable = () => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleString();
+  };
+
+  const handleInventoryItemClick = (itemId) => {
+    const item = inventoryItems.find(i => i.id === itemId);
+    if (item) {
+      setSelectedItemInfo(item);
+      setItemInfoModalVisible(true);
+    } else {
+      message.error('Inventory item not found.');
+    }
   };
 
   const columns = [
@@ -388,13 +420,24 @@ const RequestTable = () => {
             <Button icon={<EyeOutlined />} onClick={() => handleDetails(record)} />
           </Tooltip>
           {record.status.toLowerCase() === 'pending' && (
-            <Tooltip title="Approve">
-              <Button
-                icon={<CheckOutlined />}
-                onClick={() => showApproveConfirm(record)}
-                className="text-green-500"
-              />
-            </Tooltip>
+            <>
+              <Tooltip title="Approve">
+                <Button
+                  icon={<CheckOutlined />}
+                  onClick={() => showApproveConfirm(record)}
+                  type="primary"
+                  size="small"
+                />
+              </Tooltip>
+              <Tooltip title="Reject">
+                <Button
+                  icon={<CloseOutlined />}
+                  onClick={() => showRejectConfirm(record)}
+                  danger
+                  size="small"
+                />
+              </Tooltip>
+            </>
           )}
         </Space>
       ),
@@ -553,17 +596,119 @@ const RequestTable = () => {
               title="Confirm Approval"
               open={isApproveModalVisible}
               onCancel={() => setIsApproveModalVisible(false)}
-              onOk={() => handleApprove(approveRecord)}
-              okText="Yes"
-              cancelText="No"
+              onOk={handleApprove}
+              okText="Approve"
+              cancelText="Cancel"
               confirmLoading={loading}
+              okButtonProps={{ type: 'primary' }}
             >
               <p>Are you sure you want to approve this request?</p>
               {approveRecord && (
                 <div>
-                  <p>Request ID: {approveRecord.id}</p>
-                  <p>Quantity: {approveRecord.quantity}</p>
-                  <p>Purpose: {approveRecord.purpose}</p>
+                  <p><strong>Request ID:</strong> {approveRecord.id}</p>
+                  <p><strong>Item Code:</strong> {approveRecord.inventory_item_code}</p>
+                  <p><strong>Quantity:</strong> {approveRecord.quantity}</p>
+                  <p><strong>Purpose:</strong> {approveRecord.purpose}</p>
+                  <p><strong>Requested By:</strong> {approveRecord.requested_by_username}</p>
+                </div>
+              )}
+            </Modal>
+
+            <Modal
+              title="Confirm Rejection"
+              open={isRejectModalVisible}
+              onCancel={() => setIsRejectModalVisible(false)}
+              onOk={handleReject}
+              okText="Reject"
+              cancelText="Cancel"
+              confirmLoading={loading}
+              okButtonProps={{ danger: true }}
+            >
+              <p>Are you sure you want to reject this request?</p>
+              {rejectRecord && (
+                <div>
+                  <p><strong>Request ID:</strong> {rejectRecord.id}</p>
+                  <p><strong>Item Code:</strong> {rejectRecord.inventory_item_code}</p>
+                  <p><strong>Quantity:</strong> {rejectRecord.quantity}</p>
+                  <p><strong>Purpose:</strong> {rejectRecord.purpose}</p>
+                  <p><strong>Requested By:</strong> {rejectRecord.requested_by_username}</p>
+                </div>
+              )}
+            </Modal>
+
+            {/* Item Info Modal */}
+            <Modal
+              title={
+                <div className="flex items-center gap-2">
+                  <ToolOutlined />
+                  <span>Inventory Item Details</span>
+                </div>
+              }
+              open={itemInfoModalVisible}
+              onCancel={() => setItemInfoModalVisible(false)}
+              footer={null}
+              width={700}
+            >
+              {selectedItemInfo && (
+                <div className="space-y-4">
+                  {/* Basic Item Information */}
+                  <div className="bg-gray-50 p-4 rounded">
+                    <h4 className="font-medium mb-3">Basic Information</h4>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <div className="mb-2">
+                          <span className="text-gray-600">Item ID:</span>
+                          <span className="ml-2 font-medium">{selectedItemInfo.id}</span>
+                        </div>
+                        <div className="mb-2">
+                          <span className="text-gray-600">Item Code:</span>
+                          <span className="ml-2 font-medium text-blue-600">{selectedItemInfo.item_code}</span>
+                        </div>
+                        
+                      </Col>
+                      <Col span={12}>
+                        <div className="mb-2">
+                          <span className="text-gray-600">Quantity:</span>
+                          <span className="ml-2 font-medium">{selectedItemInfo.quantity || 0}</span>
+                        </div>
+                        <div className="mb-2">
+                          <span className="text-gray-600">Available Quantity:</span>
+                          <span className="ml-2 font-medium text-green-600">{selectedItemInfo.available_quantity || 0}</span>
+                        </div>
+                        <div className="mb-2">
+                            <span className="text-gray-600">Subcategory:</span>
+                            <span className="ml-2 font-medium text-orange-600">
+                              {subcategories.find(sub => sub.id === selectedItemInfo.subcategory_id)?.name || 'N/A'}
+                            </span>
+                          </div>
+                          
+                        
+                        
+                        
+                      </Col>
+                    </Row>
+                  </div>
+
+                  {/* Dynamic Data */}
+                  {selectedItemInfo.dynamic_data && Object.keys(selectedItemInfo.dynamic_data).length > 0 && (
+                    <div className="bg-blue-50 p-4 rounded">
+                      <h4 className="font-medium mb-3">Item Data</h4>
+                      <Row gutter={16}>
+                        {Object.entries(selectedItemInfo.dynamic_data).map(([key, value]) => (
+                          <Col span={12} key={key}>
+                            <div className="mb-2">
+                              <span className="text-gray-600">{key}:</span>
+                              <span className="ml-2 font-medium">
+                                {typeof value === 'number' ? value : value}
+                              </span>
+                            </div>
+                          </Col>
+                        ))}
+                      </Row>
+                    </div>
+                  )}
+
+                  
                 </div>
               )}
             </Modal>
@@ -573,7 +718,7 @@ const RequestTable = () => {
           <TransactionSummaryAnalytics />
         </TabPane>
         <TabPane tab="Transaction History" key="3">
-          <TransactionHistoryTable />
+          <EnhancedTransactionHistory />
         </TabPane>
       </Tabs>
     </div>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Tabs } from 'antd'; 
 import Analytics from './Analytics/Analytics'; // Import Analytics component
 import Requests from './Analytics/Requests'; // Import Requests component
+import ReturnRequests from './Analytics/ReturnRequests'; // Import Return Requests component
 import Calibration from './Analytics/Calibration'; // Import Calibration component
 import History from './Analytics/History'; // Import History component
 const { TabPane } = Tabs;
@@ -21,16 +22,19 @@ function InventoryAnalytics() {
     };
 
     return (
-        <Tabs defaultActiveKey="analytics">
-            {/* <TabPane tab="Analytics" key="analytics">
-                <Analytics />
-            </TabPane> */}
-            <TabPane tab="Requests" key="requests">
+        <Tabs defaultActiveKey="requests">
+            <TabPane tab="Inventory Requests" key="requests">
                 <Requests />
+            </TabPane>
+            <TabPane tab="Return Requests" key="return-requests">
+                <ReturnRequests />
             </TabPane>
             <TabPane tab="Calibration" key="calibration">
                 <Calibration />
             </TabPane>
+            {/* <TabPane tab="Analytics" key="analytics">
+                <Analytics />
+            </TabPane> */}
             {/* <TabPane tab="History" key="history">
                 <History 
                     showModal={showModal} 

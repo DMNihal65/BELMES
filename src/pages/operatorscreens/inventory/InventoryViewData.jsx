@@ -28,8 +28,11 @@ import {
   CompressOutlined,
   FileExcelOutlined,
   MenuFoldOutlined,
-  MenuUnfoldOutlined, ReloadOutlined
+  MenuUnfoldOutlined, 
+  ReloadOutlined,
+  HistoryOutlined
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import useInventoryStore from '../../../store/inventory-store';
 import dayjs from 'dayjs';
 import axios from 'axios';
@@ -41,6 +44,8 @@ import { ToastContainer } from 'react-toastify';
 const { Title, Text } = Typography;
 
 const InventoryViewData = () => {
+  const navigate = useNavigate();
+  
   // State management
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -890,22 +895,18 @@ const InventoryViewData = () => {
   return (
     <div className="bg-white p-4 lg:p-6 xl:p-8 rounded-lg shadow min-h-screen">
       <div className="flex flex-col h-full">
-        {/* <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-          <Title level={4} className="m-0">Inventory Master Data</Title>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+          <Title level={4} className="m-0">Inventory Management</Title>
           <Space wrap className="self-start lg:self-auto">
             <Button 
-              type="primary" 
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setModalType('category');
-                setRightClickedNode(null);
-                setIsModalVisible(true);
-              }}
+              type="default" 
+              icon={<HistoryOutlined />}
+              onClick={() => navigate('/operator/inventory/history')}
             >
-              Add Category
+              Request History
             </Button>
           </Space>
-        </div> */}
+        </div>
 
         <Divider className="my-2" />
         

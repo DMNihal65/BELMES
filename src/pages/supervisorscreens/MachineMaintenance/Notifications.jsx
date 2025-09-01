@@ -110,12 +110,7 @@ const Notifications = () => {
         </Tag>
       )
     },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-      width: '45%',
-    },
+    
     {
       title: 'Updated At',
       dataIndex: 'updated_at',

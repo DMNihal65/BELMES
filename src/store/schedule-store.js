@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import axios from 'axios';///
+import axios from 'axios';
 
 const useScheduleStore = create((set, get) => ({
   scheduleData: null,
@@ -29,11 +29,14 @@ const useScheduleStore = create((set, get) => ({
   combinedScheduleLoading: false,
   combinedScheduleError: null,
   
-  // Fetch schedule data
+  // Fetch latest schedule data (for initial load)
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.91:8008/api/v1/scheduling/schedule-batch/');
+      const response = await fetch('http://172.18.7.89:5469/api/v1/scheduling/schedule/latest');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
 
       // Extract unique production orders
@@ -66,10 +69,10 @@ const useScheduleStore = create((set, get) => ({
         work_center: machineToWorkCenter[op.machine],
         component: op.component,
         production_order: op.production_order,
-        progress: calculateProgress(op, data.component_status[op.component]),
+        progress: calculateProgress(op, data.component_status?.[op.component]),
         type: 'task',
         quantity: op.quantity,
-        styles: getTaskStyles(op, data.component_status[op.component])
+        styles: getTaskStyles(op, data.component_status?.[op.component])
       }));
 
       set({ 
@@ -87,14 +90,100 @@ const useScheduleStore = create((set, get) => ({
         loading: false 
       });
     } catch (error) {
+      console.error('Failed to fetch latest schedule:', error);
       set({ error: error.message, loading: false });
+    }
+  },
+
+  // Update schedule (generate new schedule)
+  updateSchedule: async () => {
+    set({ loading: true, error: null });
+    try {
+      // Call the update endpoint
+      const updateResponse = await fetch('http://172.18.7.89:5469/api/v1/scheduling/schedule/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json'
+        },
+        body: ''
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error(`Failed to update schedule: ${updateResponse.status}`);
+      }
+
+      // After successful update, fetch the latest schedule
+      const latestResponse = await fetch('http://172.18.7.89:5469/api/v1/scheduling/schedule/latest');
+      if (!latestResponse.ok) {
+        throw new Error(`Failed to fetch latest schedule: ${latestResponse.status}`);
+      }
+      
+      const data = await latestResponse.json();
+
+      // Extract unique production orders
+      const uniqueProductionOrders = [...new Set(data.scheduled_operations.map(op => op.production_order))];
+      
+      // Store work centres data
+      const workCenters = data.work_centers || [];
+      
+      // Create a mapping of machines to their work centres
+      const machineToWorkCenter = {};
+      workCenters.forEach(wc => {
+        wc.machines.forEach(machine => {
+          machineToWorkCenter[machine.id] = {
+            work_center_code: wc.work_center_code,
+            work_center_name: wc.work_center_name,
+            machine_name: machine.name,
+            machine_id: machine.id,
+            display_name: `${wc.work_center_code} - ${machine.name}`
+          };
+        });
+      });
+
+      // Transform the data for Gantt chart
+      const tasks = data.scheduled_operations.map((op, index) => ({
+        id: `${op.component}-${op.description}-${index}`,
+        name: `${op.component} - ${op.description}`,
+        start: new Date(op.start_time),
+        end: new Date(op.end_time),
+        machine: op.machine,
+        work_center: machineToWorkCenter[op.machine],
+        component: op.component,
+        production_order: op.production_order,
+        progress: calculateProgress(op, data.component_status?.[op.component]),
+        type: 'task',
+        quantity: op.quantity,
+        styles: getTaskStyles(op, data.component_status?.[op.component])
+      }));
+
+      set({ 
+        scheduleData: {
+          ...data,
+          tasks,
+          metrics: {
+            ...data.metrics,
+            earlyDelays: data.early_complete,
+            delayedDelays: data.delayed_complete
+          }
+        },
+        workCenters,
+        availableProductionOrders: uniqueProductionOrders,
+        loading: false 
+      });
+
+      return true; // Indicate success
+    } catch (error) {
+      console.error('Failed to update schedule:', error);
+      set({ error: error.message, loading: false });
+      return false; // Indicate failure
     }
   },
 
   fetchLeadTimeData: async () => {
     set({ leadTimeLoading: true, leadTimeError: null });
     try {
-      const response = await axios.get('http://172.18.7.91:8008/api/v1/component_status/');
+      const response = await axios.get('http://172.18.7.89:5469/api/v1/component_status/');
       const formattedData = [
         ...response.data.early_complete,
         ...response.data.delayed_complete
@@ -125,80 +214,26 @@ const useScheduleStore = create((set, get) => ({
 
   getDailyProduction: (componentId) => {
     const { scheduleData } = get();
-    if (!scheduleData || !scheduleData.daily_production) return null; // Ensure daily_production exists
+    if (!scheduleData || !scheduleData.daily_production) return null;
     const productionData = scheduleData.daily_production[componentId] || [];
     
-    // Return the expected structure
     return productionData.map(item => ({
-      date: item.scheduled_end_time, // Assuming this is the date field
+      date: item.scheduled_end_time,
       partno: componentId,
-      quantity: item.completed_quantity || 0, // Adjust based on your actual data structure
+      quantity: item.completed_quantity || 0,
     }));
   },
   
   getComponentDetails: (componentId) => {
     const { scheduleData } = get();
-    if (!scheduleData || !scheduleData.component_status) return null; // Ensure component_status exists
-    return scheduleData.component_status[componentId] || {}; // Return an empty object if not found
+    if (!scheduleData || !scheduleData.component_status) return null;
+    return scheduleData.component_status[componentId] || {};
   },
-  
-
-  ////unit schedule
-    // Fetch schedule data
-    // fetchScheduleData: async () => {
-    //   set({ loading: true, error: null });
-    //   try {
-    //     const response = await fetch('http://172.18.7.91:8008/api/v1/operations/unit_schedule/');
-    //     const operations = await response.json();
-        
-    //     // Transform the array response into the expected format
-    //     const transformedData = {
-    //       scheduled_operations: operations,
-    //       component_status: {} // Since the new API doesn't provide status, initialize empty
-    //     };
-        
-    //     // Transform the data for Gantt chart
-    //     const tasks = operations.map((op, index) => ({
-    //       id: `${op.component}-${op.description}-${index}`,
-    //       name: `${op.component} - ${op.description}`,
-    //       start: new Date(op.start_time),
-    //       end: new Date(op.end_time),
-    //       machine: op.machine,
-    //       component: op.component,
-    //       progress: 0, // Since we don't have status data, default to 0
-    //       type: 'task',
-    //       quantity: op.quantity,
-    //       styles: getTaskStyles(op, null) // Pass null for status since we don't have it
-    //     }));
-  
-    //     set({ 
-    //       scheduleData: {
-    //         ...transformedData,
-    //         tasks
-    //       },
-    //       loading: false 
-    //     });
-    //   } catch (error) {
-    //     set({ error: error.message, loading: false });
-    //   }
-    // },
 
   setSelectedComponent: (component) => set({ selectedComponent: component }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setDateRange: (range) => set({ dateRange: range }),
   
-  getComponentDetails: (componentId) => {
-    const { scheduleData } = get();
-    if (!scheduleData) return null;
-    return scheduleData.component_status[componentId];
-  },
-  
-  getDailyProduction: (componentId) => {
-    const { scheduleData } = get();
-    if (!scheduleData) return null;
-    return scheduleData.daily_production[componentId];
-  },
-
   filterScheduleByMachines: (machines) => {
     const { scheduleData } = get();
     if (!scheduleData) return null;
@@ -249,7 +284,7 @@ const useScheduleStore = create((set, get) => ({
     if (!scheduleData) return [];
     
     return scheduleData.scheduled_operations.filter(op => {
-      const status = scheduleData.component_status[op.component];
+      const status = scheduleData.component_status?.[op.component];
       return status && new Date(op.end_time) > new Date(status.lead_time);
     });
   },
@@ -274,18 +309,14 @@ const useScheduleStore = create((set, get) => ({
     return scheduleData.scheduled_operations.filter(op => {
       const start = new Date(op.start_time);
       return start > now;
-    }).slice(0, 5); // Get next 5 upcoming operations
+    }).slice(0, 5);
   },
 
   rescheduleOperation: async (operationId, newStartTime, newEndTime, reason) => {
-    // This would be implemented to call your backend API
     set({ loading: true });
     try {
-      // Mock API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      // Update local state
       const { scheduleData } = get();
-      // ... update logic ...
       set({ loading: false });
       return true;
     } catch (error) {
@@ -317,7 +348,7 @@ const useScheduleStore = create((set, get) => ({
     const machineOps = scheduleData.scheduled_operations.filter(op => op.machine === machine);
     const total = machineOps.length;
     const completed = machineOps.filter(op => {
-      const status = scheduleData.component_status[op.component];
+      const status = scheduleData.component_status?.[op.component];
       return status && status.completed_quantity === status.total_quantity;
     }).length;
     
@@ -353,10 +384,8 @@ const useScheduleStore = create((set, get) => ({
   fetchScheduleComparison: async () => {
     set({ comparisonLoading: true });
     try {
-      // Mock API response
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Set the data
       set({ 
         plannedSchedule: MOCK_COMPARISON_DATA.planned,
         forecastSchedule: MOCK_COMPARISON_DATA.forecast,
@@ -368,14 +397,13 @@ const useScheduleStore = create((set, get) => ({
         error: error.message, 
         comparisonLoading: false 
       });
-      throw error; // Re-throw to handle in component
+      throw error;
     }
   },
 
   getScheduleComparison: () => {
     const { scheduleData, plannedSchedule, forecastSchedule } = get();
     
-    // Use mock data if actual data is not available
     const actualData = scheduleData || MOCK_COMPARISON_DATA.planned;
     
     if (!plannedSchedule || !forecastSchedule) return null;
@@ -395,7 +423,7 @@ const useScheduleStore = create((set, get) => ({
 
     const delays = scheduleData.scheduled_operations
       .filter(op => {
-        const status = scheduleData.component_status[op.component];
+        const status = scheduleData.component_status?.[op.component];
         return status && new Date(op.end_time) > new Date(status.lead_time);
       })
       .map(op => ({
@@ -411,14 +439,14 @@ const useScheduleStore = create((set, get) => ({
       delays,
       totalDelays: delays.length,
       averageDelay: delays.reduce((acc, curr) => acc + curr.delay, 0) / delays.length,
-      criticalDelays: delays.filter(d => d.delay > 24) // Delays more than 24 hours
+      criticalDelays: delays.filter(d => d.delay > 24)
     };
   },
 
   fetchProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.91:8008/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.89:5469/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -438,7 +466,7 @@ const useScheduleStore = create((set, get) => ({
   fetchWeeklyProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.91:8008/api/v1/production/weekly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.89:5469/api/v1/production/weekly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -462,7 +490,7 @@ const useScheduleStore = create((set, get) => ({
   fetchMonthlyProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.91:8008/api/v1/production/monthly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.89:5469/api/v1/production/monthly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -497,17 +525,14 @@ const useScheduleStore = create((set, get) => ({
 
   fetchPartNumberSuggestions: async (searchText) => {
     try {
-      // Get a date range that covers last 365 days to ensure we get all part numbers
       const endEpoch = Math.floor(Date.now() / 1000);
-      const startEpoch = endEpoch - (365 * 24 * 60 * 60); // 365 days ago
+      const startEpoch = endEpoch - (365 * 24 * 60 * 60);
       
-      const response = await axios.get(`http://172.18.7.91:8008/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`);
+      const response = await axios.get(`http://172.18.7.89:5469/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`);
       const allPartNumbers = response.data.daily_production || [];
       
-      // Get unique part numbers
       const uniquePartNumbers = [...new Set(allPartNumbers.map(item => item.part_number))];
       
-      // Filter based on search text
       return uniquePartNumbers
         .filter(pn => pn && pn.toLowerCase().includes(searchText.toLowerCase()))
         .map(pn => ({
@@ -523,7 +548,7 @@ const useScheduleStore = create((set, get) => ({
   fetchCombinedScheduleData: async () => {
     set({ combinedScheduleLoading: true, combinedScheduleError: null });
     try {
-      const response = await axios.get('http://172.18.7.91:8008/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://172.18.7.89:5469/api/v1/rescheduling/reschedule-actual-planned-combined');
       set({ 
         combinedScheduleData: response.data,
         combinedScheduleLoading: false 
@@ -539,10 +564,6 @@ const useScheduleStore = create((set, get) => ({
   },
 }));
 
-
-
-
-
 // Helper function to calculate progress
 const calculateProgress = (operation, status) => {
   if (!status) return 0;
@@ -552,32 +573,32 @@ const calculateProgress = (operation, status) => {
 // Helper function to get task styles using Ant Design colors
 const getTaskStyles = (operation, status) => {
   if (!status) return { 
-    progressColor: '#1890ff', // Ant Design primary blue
-    backgroundColor: '#e6f7ff'  // Ant Design blue background
+    progressColor: '#1890ff',
+    backgroundColor: '#e6f7ff'
   };
   
   if (status.on_time) {
     return { 
-      progressColor: '#52c41a', // Ant Design success green
-      backgroundColor: '#f6ffed'  // Ant Design success background
+      progressColor: '#52c41a',
+      backgroundColor: '#f6ffed'
     };
   } else if (new Date(operation.end_time) > new Date(status.lead_time)) {
     return { 
-      progressColor: '#ff4d4f', // Ant Design error red
-      backgroundColor: '#fff1f0'  // Ant Design error background
+      progressColor: '#ff4d4f',
+      backgroundColor: '#fff1f0'
     };
   }
   
   return { 
-    progressColor: '#faad14', // Ant Design warning yellow
-    backgroundColor: '#fffbe6'  // Ant Design warning background
+    progressColor: '#faad14',
+    backgroundColor: '#fffbe6'
   };
 };
 
 const calculateDelay = (endTime, leadTime) => {
   const end = new Date(endTime);
   const lead = new Date(leadTime);
-  return Math.round((end - lead) / (1000 * 60 * 60)); // Convert to hours
+  return Math.round((end - lead) / (1000 * 60 * 60));
 };
 
 const calculateDeviations = (actual, planned) => {
@@ -592,7 +613,7 @@ const calculateDeviations = (actual, planned) => {
 
     const actualStart = new Date(actualOp.start_time);
     const plannedStart = new Date(plannedOp.start_time);
-    const deviation = (actualStart - plannedStart) / (1000 * 60 * 60); // Hours
+    const deviation = (actualStart - plannedStart) / (1000 * 60 * 60);
 
     return {
       machine: actualOp.machine,
@@ -600,7 +621,7 @@ const calculateDeviations = (actual, planned) => {
       description: actualOp.description,
       plannedStart: plannedStart,
       actualStart: actualStart,
-      deviation: Math.round(deviation * 10) / 10 // Round to 1 decimal
+      deviation: Math.round(deviation * 10) / 10
     };
   }).filter(Boolean);
 };
@@ -614,36 +635,11 @@ const calculateEfficiency = (actual, planned) => {
   }, 0);
 
   const totalActualHours = actual.scheduled_operations.reduce((acc, op) => {
-    const duration = new Date(op.end_time) - new Date(op.start_time);
+    const duration = new Date(op.end_time) - new Daste(op.start_time);
     return acc + duration / (1000 * 60 * 60);
   }, 0);
 
   return (totalPlannedHours / totalActualHours) * 100;
-};
-
-const calculateDelayDistribution = (delays) => {
-  if (!delays) return [0, 0, 0, 0, 0];
-  
-  const distribution = [0, 0, 0, 0, 0]; // [0-4h, 4-8h, 8-16h, 16-24h, >24h]
-  
-  delays.forEach(delay => {
-    const hours = delay.delay;
-    if (hours <= 4) distribution[0]++;
-    else if (hours <= 8) distribution[1]++;
-    else if (hours <= 16) distribution[2]++;
-    else if (hours <= 24) distribution[3]++;
-    else distribution[4]++;
-  });
-  
-  return distribution;
-};
-
-const getDelayColor = (hours) => {
-  if (hours <= 4) return 'blue';
-  if (hours <= 8) return 'orange';
-  if (hours <= 16) return 'gold';
-  if (hours <= 24) return 'volcano';
-  return 'red';
 };
 
 export default useScheduleStore;

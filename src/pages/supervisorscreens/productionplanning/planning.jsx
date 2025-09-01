@@ -147,7 +147,7 @@ const PdcInfo = ({ productionOrder }) => {
   
   // For active parts without PDC data
   if (pdcInfo.status === 'active' && !pdcInfo.pdc) {
-    return <span className="text-blue-600 font-medium">Pending PDC</span>;
+    return <span className="text-blue-600 font-medium">Not Yet Scheduled</span>;
   }
   
   // Fallback for any other case

@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { qualityStore } from '../../../store/quality-store';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { 
-  Card, 
+  Tag, 
   Table, 
+  Card, 
+  Typography, 
   Space, 
+  Badge, 
+  Spin,
   Button,
-  Select,
+  Empty,
   Row,
   Col,
   DatePicker,
@@ -12,43 +19,43 @@ import {
   Tree,
   Input,
   message,
-  Spin,
-  Typography,
   Tooltip,
-  Badge,
   Divider,
   Modal,
   Checkbox,
   Upload,
   Popover,
-  Tag
+  Dropdown,
+  Progress
 } from 'antd';
 import { 
+  FileTextOutlined, 
+  CheckCircleOutlined, 
+  CloseCircleOutlined, 
+  ClockCircleOutlined,
+  FilePdfOutlined,
   SearchOutlined,
   UploadOutlined,
   StarOutlined,
   DeleteOutlined,
-  FilePdfOutlined,
   FileExcelOutlined,
   FolderOutlined,
-  FileTextOutlined,
   AppstoreOutlined,
   ReloadOutlined,
   DownloadOutlined,
   FileSearchOutlined,
   FilterOutlined,
-  CalendarOutlined
+  CalendarOutlined,
+  DownOutlined
 } from '@ant-design/icons';
-import { qualityStore } from '../../../store/quality-store';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 const { Title, Text } = Typography;
 
-const InspectionReport = () => {
+const InspectionReport = (props) => {
+  const { inspectionDetails, loading: propLoading } = props;
   const [selectedReportType, setSelectedReportType] = useState('all');
   const [searchText, setSearchText] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(propLoading || false);
   const [reportStructure, setReportStructure] = useState(null);
   const [treeData, setTreeData] = useState([]);
   const [expandedKeys, setExpandedKeys] = useState({});
@@ -61,18 +68,77 @@ const InspectionReport = () => {
   const [pageSize, setPageSize] = useState(10);
   const [totalDocuments, setTotalDocuments] = useState(0);
   const [selectedFolderId, setSelectedFolderId] = useState(null);
-  const [isVersionModalVisible, setIsVersionModalVisible] = useState(false);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [deletedIds, setDeletedIds] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [documentVersions, setDocumentVersions] = useState([]);
   const [selectedVersion, setSelectedVersion] = useState(null);
   const [selectedVersionIds, setSelectedVersionIds] = useState([]);
+  const [isVersionModalVisible, setIsVersionModalVisible] = useState(false);
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [newVersionNumber, setNewVersionNumber] = useState('');
-  const [deletedIds, setDeletedIds] = useState([]);
+  const [selectedOperations, setSelectedOperations] = useState({});
 
-  // Update the useEffect to fetch folders instead of report structure
+  // Use effect to update loading state when prop changes
+  useEffect(() => {
+    setLoading(propLoading);
+  }, [propLoading]);
+
+  // Reset selected operations when inspection details change (new production order)
+  useEffect(() => {
+    if (inspectionDetails?.production_order) {
+      // Reset the selected operation for this production order
+      setSelectedOperations(prev => ({
+        ...prev,
+        [inspectionDetails.production_order]: inspectionDetails.operations?.[0]?.toString() || null
+      }));
+    }
+  }, [inspectionDetails?.production_order]);
+
+  // Get production order ID from URL
+  const getProductionOrderFromUrl = () => {
+    const pathParts = window.location.pathname.split('/');
+    return pathParts[pathParts.length - 1];
+  };
+
+  // Function to fetch the initial folder structure
+  const fetchFolders = async () => {
+    try {
+      setLoading(true);
+      // First, fetch the root folders (parentId = 26)
+      const rootFolders = await qualityStore.fetchFolders(26);
+      
+      if (rootFolders && rootFolders.length > 0) {
+        // Format the folders for the Tree component
+        const formattedFolders = rootFolders.map(folder => ({
+          title: folder.name,
+          key: `folder-${folder.id}`,
+          icon: <FolderOutlined className="text-blue-500" />,
+          isLeaf: false // This will be updated when expanded
+        }));
+        
+        setTreeData(formattedFolders);
+        
+        // If there's a REPORT folder, select it by default
+        const reportFolder = formattedFolders.find(f => f.title === 'REPORT');
+        if (reportFolder) {
+          handleTreeSelect([reportFolder.key], { node: reportFolder });
+        }
+      } else {
+        // If no folders found, show a message
+        message.info('No report categories found');
+      }
+    } catch (error) {
+      console.error('Error loading folders:', error);
+      message.error('Failed to load report categories');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch data when component mounts
   useEffect(() => {
     fetchFolders();
   }, []);
@@ -150,7 +216,15 @@ const InspectionReport = () => {
       return;
     }
     
-    const formattedTreeData = formatTreeData(data);
+    // Filter to keep only REPORT category and its children
+    const filteredData = data.filter(item => {
+      if (item.type === 'folder' && item.name === 'REPORT') {
+        return true;
+      }
+      return false;
+    });
+    
+    const formattedTreeData = formatTreeData(filteredData);
     setTreeData(formattedTreeData);
     
     const extractedReports = [];
@@ -163,22 +237,25 @@ const InspectionReport = () => {
           const versionId = item.latest_version?.id || '1.0';
           const fullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
           
-          extractedReports.push({
-            key: item.id,
-            name: item.name,
-            type: 'REPORT',
-            date: item.created_at,
-            status: 'Available',
-            description: item.description || '',
-            part_number: item.part_number || '',
-            production_order_id: item.production_order_id,
-            file_path: item.latest_version?.minio_path || '',
-            file_size: item.latest_version?.file_size || 0,
-            version: item.latest_version?.version_number || '1.0',
-            version_id: versionId,
-            category: item.path?.split('/')[2] || 'Unknown',
-            path: fullPath
-          });
+          // Only add documents that are under the REPORT category
+          if (item.path && item.path.includes('REPORT')) {
+            extractedReports.push({
+              key: item.id,
+              name: item.name,
+              type: 'REPORT',
+              date: item.created_at,
+              status: 'Available',
+              description: item.description || '',
+              part_number: item.part_number || '',
+              production_order_id: item.production_order_id,
+              file_path: item.latest_version?.minio_path || '',
+              file_size: item.latest_version?.file_size || 0,
+              version: item.latest_version?.version_number || '1.0',
+              version_id: versionId,
+              category: 'REPORT',
+              path: fullPath
+            });
+          }
         }
         
         if (item.children && item.children.length > 0) {
@@ -244,31 +321,6 @@ const InspectionReport = () => {
     fetchFolders();
   }, []);
 
-  // Replace fetchReportStructure with fetchFolders
-  const fetchFolders = async () => {
-    try {
-      setLoading(true);
-      const folders = await qualityStore.fetchFolders();
-      
-      // Transform folders into tree data format
-      const formattedTreeData = folders.map(folder => ({
-        title: folder.name,
-        key: `folder-${folder.id}`,
-        icon: <FolderOutlined className="text-blue-500" />,
-        isLeaf: false,
-        selectable: true,
-        children: []
-      }));
-      
-      setTreeData(formattedTreeData);
-      
-    } catch (error) {
-      console.error('Error fetching folders:', error);
-      message.error('Failed to load folders');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Add new function to fetch documents for a folder
   const fetchDocumentsForFolder = async (folderId) => {
@@ -279,10 +331,27 @@ const InspectionReport = () => {
       const data = await qualityStore.fetchDocumentsByFolder(folderId, currentPage, pageSize);
       console.log('Documents data received:', data);
       
+      // Get production order ID from URL for context
+      const urlProductionOrderId = window.location.pathname.split('/').pop();
+      
       // Transform the data to match your table structure
       const transformedData = await Promise.all(data.items.map(async item => {
         const versions = await qualityStore.fetchDocumentVersions(item.id);
         console.log(`Versions for document ${item.id}:`, versions);
+        
+        // Try to extract operation number from the document name or metadata
+        let operationNumber = null;
+        
+        // Check if the document has operation metadata
+        if (item.metadata && item.metadata.operation_number) {
+          operationNumber = item.metadata.operation_number;
+        } else {
+          // Try to extract from the document name
+          operationNumber = extractOperationFromName(item.name);
+        }
+        
+        // Use production_order_id from the document, or fall back to URL parameter
+        const productionOrderId = item.production_order_id || urlProductionOrderId;
         
         return {
           key: item.id,
@@ -292,7 +361,8 @@ const InspectionReport = () => {
           status: 'Available',
           description: item.description || '',
           part_number: item.part_number || '',
-          production_order_id: item.production_order_id,
+          production_order_id: productionOrderId,
+          operation_number: operationNumber, // Add operation number
           file_path: item.file_path || '',
           file_size: item.file_size || 0,
           version: versions.length > 0 ? versions[0].version_number : '1.0',
@@ -302,11 +372,16 @@ const InspectionReport = () => {
           versions: versions
         };
       }));
-
+  
+      // Filter out deleted documents
+      const validDocuments = deletedIds.length > 0 
+        ? transformedData.filter(doc => !deletedIds.includes(doc.key))
+        : transformedData;
+      
       // Update both reports and filtered reports
-      setReports(transformedData.filter(doc => !deletedIds.includes(doc.key)));
-      setFilteredReports(transformedData.filter(doc => !deletedIds.includes(doc.key)));
-      setTotalDocuments(data.total - deletedIds.length);
+      setReports(validDocuments);
+      setFilteredReports(validDocuments);
+      setTotalDocuments(validDocuments.length);
       
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -331,189 +406,149 @@ const InspectionReport = () => {
     message.loading({ content: 'Refreshing folders...', key: 'refresh', duration: 1 });
   };
 
-  // Handle downloading a report
-  const handleDownloadReport = async (report) => {
-    // Check if we have a valid document ID and version info
-    if (!report.key) {
-      toast.error('Missing document information for download', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
-      return;
-    }
-    
-    const toastId = toast.loading('Preparing download...', {
-      position: 'top-right',
-    });
-    
+  // Handle generate consolidated report
+  const handleGenerateConsolidatedReport = async () => {
     try {
-      const documentId = report.key;
-      // Extract version number from the report data, default to "1.0" if not available
-      const versionId = report.version_id || "1.0";
+      setLoading(true);
       
-      console.log(`Download request details:`, {
-        documentId,
-        versionId,
-        reportName: report.name,
-        reportDetails: report
-      });
+      // Get the production order ID from the URL or the first report in the list
+      const productionOrderId = window.location.pathname.split('/').pop(); // Assuming the URL contains the order ID
       
-      try {
-        // Try downloading using the new document endpoint first
-        console.log(`Attempting primary download method with documentId=${documentId}, versionId=${versionId}`);
-        const downloadData = await qualityStore.downloadDocument(documentId, versionId);
-        console.log('Download data received:', downloadData);
-        
-        // Create a link and click it to download
-        const a = document.createElement('a');
-        a.href = downloadData.url;
-        // Ensure filename has .pdf extension
-        let filename = report.name || downloadData.fileName;
-        if (!filename.toLowerCase().endsWith('.pdf')) {
-          filename += '.pdf';
-        }
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        // Clean up the blob URL
-        setTimeout(() => URL.revokeObjectURL(downloadData.url), 5000);
-        
-        // Dismiss the loading toast and show success toast
-        toast.dismiss(toastId);
-        toast.success('Report downloaded successfully', {
-          position: 'top-right',
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
-      } catch (downloadError) {
-        console.log('Error in primary download method:', downloadError);
-        console.log('Error details:', downloadError.response || downloadError.message || downloadError);
-        console.log('Trying alternative methods...');
-        
-        try {
-          // Fallback 1: Try the downloadReportById method
-          console.log(`Attempting download using downloadReportById method with documentId=${documentId}, versionId=${versionId}`);
-          const byIdData = await qualityStore.downloadReportById(documentId, versionId);
-          console.log('Download data from alternative method:', byIdData);
-          
-          const a = document.createElement('a');
-          a.href = byIdData.url;
-          // Ensure filename has .pdf extension
-          let filename = report.name || byIdData.fileName;
-          if (!filename.toLowerCase().endsWith('.pdf')) {
-            filename += '.pdf';
-          }
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          
-          // Clean up the blob URL
-          setTimeout(() => URL.revokeObjectURL(byIdData.url), 5000);
-          
-          // Dismiss loading toast and show success toast
-          toast.dismiss(toastId);
-          toast.success('Report downloaded using alternative method', {
-            position: 'top-right',
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
-          return;
-        } catch (byIdError) {
-          console.log('Error in first alternative method:', byIdError);
-          console.log('Error details:', byIdError.response || byIdError.message || byIdError);
-          
-          // Fallback 2: If report has a file_path, try downloading by path
-          if (report.file_path) {
-            console.log('Attempting download using file path:', report.file_path);
-            const pathDownloadData = await qualityStore.downloadReport(report.file_path);
-            console.log('Download data from file path method:', pathDownloadData);
-            
-            const a = document.createElement('a');
-            a.href = pathDownloadData.url;
-            // Ensure filename has .pdf extension
-            let filename = report.name || pathDownloadData.fileName;
-            if (!filename.toLowerCase().endsWith('.pdf')) {
-              filename += '.pdf';
-            }
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            // Clean up the blob URL
-            setTimeout(() => URL.revokeObjectURL(pathDownloadData.url), 5000);
-            
-            // Dismiss loading toast and show success toast
-            toast.dismiss(toastId);
-            toast.success('Report downloaded using file path method', {
-              position: 'top-right',
-              autoClose: 3000,
-              hideProgressBar: false,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-            });
-            return;
-          }
-          
-          // If no alternatives work, show detailed error
-          throw byIdError;
-        }
+      if (!productionOrderId) {
+        message.error('No production order ID found');
+        return;
       }
+      
+      message.loading({ content: 'Generating consolidated report...', key: 'consolidatedReport' });
+      
+      // Call the quality store to generate the consolidated report
+      await qualityStore.generateConsolidatedReport(productionOrderId);
+      
+      message.success({ content: 'Consolidated report generated successfully', key: 'consolidatedReport' });
     } catch (error) {
-      console.error('Error downloading report:', error);
-      console.error('Full error object:', {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        stack: error.stack
+      console.error('Error generating consolidated report:', error);
+      message.error({ 
+        content: error.response?.data?.message || 'Failed to generate consolidated report', 
+        key: 'consolidatedReport' 
       });
-      
-      // Provide more specific error messages based on status code
-      let errorMsg = 'Failed to download report';
-      
-      if (error.response) {
-        switch (error.response.status) {
-          case 404:
-            errorMsg = 'Report file not found on server';
-            break;
-          case 403:
-            errorMsg = 'You do not have permission to access this report';
-            break;
-          case 500:
-            errorMsg = 'Server error occurred while downloading the report';
-            break;
-          default:
-            errorMsg = `Server returned error (${error.response.status})`;
-        }
-      } else if (error.request) {
-        errorMsg = 'No response from server. Please check your network connection';
-      } else {
-        errorMsg = error.message || 'Unknown error occurred';
-      }
-      
-      // Dismiss loading toast and show error toast
-      toast.dismiss(toastId);
-      toast.error(errorMsg, {
-        position: 'top-right',
-        autoClose: 4000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+    } finally {
+      setLoading(false);
     }
   };
+
+// Updated handleDownloadReport function in InspectionReport.jsx
+const handleDownloadReport = async (record) => {
+  // Check if we have a valid document ID and version info
+  if (!record.key) {
+    message.error('Missing document information for download');
+    return;
+  }
+  
+  const hideLoading = message.loading('Preparing download...', 0);
+  
+  try {
+    const documentId = record.key;
+    const versionId = record.version_id || "1.0";
+    
+    // Get production order ID from URL or from record
+    const productionOrderId = window.location.pathname.split('/').pop() || record.production_order_id;
+    
+    // Extract operation number from record if available
+    // This might need adjustment based on your data structure
+    const operationNumber = record.operation_number || record.op_no || extractOperationFromName(record.name);
+    
+    console.log(`Download request details:`, {
+      documentId,
+      versionId,
+      productionOrderId,
+      operationNumber,
+      reportName: record.name,
+      reportDetails: record
+    });
+    
+    // Prepare additional info for meaningful filename
+    const additionalInfo = {
+      name: record.name,
+      production_order_id: productionOrderId,
+      operation_number: operationNumber
+    };
+    
+    try {
+      console.log(`Attempting download with documentId=${documentId}, versionId=${versionId}, additionalInfo=`, additionalInfo);
+      const downloadData = await qualityStore.downloadReportById(documentId, versionId, additionalInfo);
+      
+      if (!downloadData || !downloadData.url) {
+        throw new Error('Invalid response from server');
+      }
+      
+      console.log('Download data received:', downloadData);
+      
+      // Create a link and click it to download
+      const a = document.createElement('a');
+      a.href = downloadData.url;
+      a.download = downloadData.fileName; // This will now have the meaningful filename
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      // Clean up the blob URL after a delay
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(downloadData.url);
+        } catch (e) {
+          console.warn('Error revoking blob URL:', e);
+        }
+      }, 5000);
+      
+      // Show success message
+      hideLoading();
+      message.success(`Report downloaded as: ${downloadData.fileName}`);
+      
+    } catch (downloadError) {
+      console.error('Download error:', downloadError);
+      
+      // Show appropriate error message
+      let errorMessage = 'Failed to download document';
+      if (downloadError.response) {
+        if (downloadError.response.status === 404) {
+          errorMessage = 'Document not found. It may have been moved or deleted.';
+        } else if (downloadError.response.status >= 500) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+      }
+      
+      hideLoading();
+      message.error(errorMessage);
+    }
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    hideLoading();
+    message.error('An unexpected error occurred. Please try again.');
+  }
+};
+
+// Helper function to extract operation number from document name if needed
+const extractOperationFromName = (name) => {
+  if (!name) return null;
+  
+  // Try to extract operation number from common patterns
+  // Adjust these regex patterns based on your naming conventions
+  const patterns = [
+    /op[_-]?(\d+)/i,           // op_10, op-20, op10
+    /operation[_-]?(\d+)/i,    // operation_10, operation-20
+    /(\d+)[_-]op/i,            // 10_op, 20-op
+    /[_-](\d+)[_-]/,           // _10_, -20-
+  ];
+  
+  for (const pattern of patterns) {
+    const match = name.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+};
 
   // Update the handleDeleteReport function
   const handleDeleteReport = async (record) => {
@@ -694,12 +729,12 @@ const InspectionReport = () => {
           {record.description && (
             <div className="text-xs text-gray-500 mt-1 max-w-md">{record.description}</div>
           )}
-          {record.category && (
+          {/* {record.category && (
             <div className="text-xs text-gray-400 mt-1">
               <FolderOutlined className="mr-1" />
               {record.category}
             </div>
-          )}
+          )} */}
         </div>
       ),
     },
@@ -915,13 +950,336 @@ const InspectionReport = () => {
     }
   };
 
+  // Use props for inspection details if available, otherwise use local state
+  const [localInspectionDetails, setLocalInspectionDetails] = useState(inspectionDetails || null);
+  
+  // Update local state when props change
+  useEffect(() => {
+    if (inspectionDetails) {
+      setLocalInspectionDetails(inspectionDetails);
+    }
+  }, [inspectionDetails]);
+
+  // If we don't have inspection details from props, try to fetch them
+  useEffect(() => {
+    if (!inspectionDetails) {
+      const fetchInspectionDetails = async () => {
+        const orderId = getProductionOrderFromUrl();
+        if (!orderId) return;
+
+        try {
+          setLoading(true);
+          const allOrders = await qualityStore.fetchAllOrders();
+          const selectedOrder = allOrders.find(order => order.production_order === orderId);
+          
+          if (selectedOrder) {
+            const details = await qualityStore.fetchDetailedInspection(selectedOrder.order_id);
+            setLocalInspectionDetails(details);
+          } else {
+            setLocalInspectionDetails({
+              production_order: orderId,
+              part_number: 'PN-00000',
+              operations: [],
+              final_inspection: 'Not Started'
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching inspection details:', error);
+          setLocalInspectionDetails({
+            production_order: getProductionOrderFromUrl() || 'PO-00000',
+            part_number: 'PN-00000',
+            operations: [],
+            final_inspection: 'Error loading details'
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchInspectionDetails();
+    }
+  }, []);
+
+  // Reset selected operation when production order changes
+  useEffect(() => {
+    if (localInspectionDetails?.production_order) {
+      const currentPO = localInspectionDetails.production_order;
+      if (selectedOperations[currentPO] === undefined && localInspectionDetails.operations?.length > 0) {
+        setSelectedOperations(prev => ({
+          ...prev,
+          [currentPO]: localInspectionDetails.operations[0].toString()
+        }));
+      }
+    }
+  }, [localInspectionDetails?.production_order, localInspectionDetails?.operations]);
+
+  // Prepare summary data for the table
+  const summaryData = React.useMemo(() => {
+    if (!localInspectionDetails) return [];
+    
+    const data = {
+      key: 'summary',
+      order_id: localInspectionDetails.order_id,
+      production_order: localInspectionDetails.production_order,
+      part_number: localInspectionDetails.part_number,
+      operations: localInspectionDetails.operations || [],
+      final_inspection: localInspectionDetails.final_inspection || 'Not Started',
+      status: localInspectionDetails.final_inspection === 'Completed' ? 'success' : 
+              localInspectionDetails.final_inspection === 'In Progress' ? 'processing' : 'warning'
+    };
+
+    return [data];
+  }, [localInspectionDetails]);
+
+  const summaryColumns = [
+    {
+      title: 'Production Order',
+      dataIndex: 'production_order',
+      key: 'production_order',
+      width: '20%',
+      render: (text) => (
+        <Typography.Text strong>
+          {text || '-'}
+        </Typography.Text>
+      )
+    },
+    {
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+      width: '20%',
+      render: (text) => text || '-'
+    },
+    {
+      title: 'Operations',
+      key: 'operations',
+      width: '25%',
+      render: (_, record) => {
+        const operations = record.operations || [];
+        const recordKey = record.key || record.production_order;
+        const selectedOp = selectedOperations[recordKey] || (operations.length > 0 ? operations[0].toString() : null);
+        
+        // Add Final Inspection option to the operations list if it doesn't exist
+        const finalInspectionOp = 999;
+        const operationsWithFinalInspection = [...new Set([...operations, finalInspectionOp])];
+        
+        const items = operationsWithFinalInspection.map(op => {
+          const isFinal = op === finalInspectionOp;
+          const labelText = isFinal ? 'FINAL' : `OP ${op}`;
+          const itemClassName = isFinal ? 'bg-red-100 text-red-800' : 'bg-blue-50 text-blue-800';
+          
+          return {
+            key: op.toString(),
+            label: (
+              <div className="w-full">
+                <span className={`inline-block w-full px-3 py-1 rounded ${itemClassName}`}>
+                  {labelText}
+                </span>
+              </div>
+            ),
+            className: itemClassName,
+            style: { width: '100%' },
+            onClick: () => {
+              setSelectedOperations(prev => ({
+                ...prev,
+                [recordKey]: op.toString()
+              }));
+            }
+          };
+        });
+        
+        return (
+          <Dropdown
+            menu={{
+              items,
+              selectedKeys: selectedOp ? [selectedOp] : [],
+              selectable: true,
+            }}
+            trigger={['click']}
+          >
+            <Button type="link" className="p-0">
+              <div className={`inline-flex items-center px-3 py-1 rounded ${selectedOp ? (selectedOp === '999' ? 'bg-red-100 text-red-800' : 'bg-blue-50 text-blue-800') : ''}`}>
+                {selectedOp ? (
+                  <span>
+                    {selectedOp === '999' ? 'FINAL' : `OP ${selectedOp}`}
+                  </span>
+                ) : 'Select Operation'}
+                <DownOutlined className="ml-1" />
+              </div>
+            </Button>
+          </Dropdown>
+        );
+      }
+    },
+    // {
+    //   title: 'Final Inspection',
+    //   key: 'final_inspection',
+    //   width: '20%',
+    //   render: (_, record) => {
+    //     const hasFinalInspection = localInspectionDetails?.operation_groups?.some(
+    //       group => group.op_no === 999
+    //     );
+  
+    //     return (
+    //       <Button
+    //         type={hasFinalInspection ? 'primary' : 'default'}
+    //         icon={<FileSearchOutlined />}
+    //         className={`
+    //           transition-all duration-300
+    //           ${hasFinalInspection 
+    //             ? 'bg-blue-100 hover:bg-blue-200 border-blue-200 hover:border-blue-300 text-blue-700' 
+    //             : 'bg-gray-100 hover:bg-gray-200 border-gray-200 hover:border-gray-300 text-gray-700'}
+    //         `}
+    //       >
+    //         Final Inspection
+    //       </Button>
+    //     );
+    //   }
+    // },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: '15%',
+      render: (_, record) => (
+        <Button
+          type="primary"
+          icon={<FilePdfOutlined />}
+          onClick={() => handleGenerateReport(record)}
+          className="bg-green-600 hover:bg-green-700 border-green-600 hover:border-green-700"
+        >
+          Generate Report
+        </Button>
+      )
+    }
+  ];
+
+  const [generatingReport, setGeneratingReport] = useState(false);
+
+  const handleGenerateReport = async (record) => {
+    if (!record) {
+      message.error('No record selected for report generation');
+      return;
+    }
+  
+    const recordKey = record.key || record.production_order;
+    let selectedOp = selectedOperations[recordKey];
+    
+    // If no operation is selected but there are operations available, select the first one
+    if (!selectedOp && record.operations && record.operations.length > 0) {
+      selectedOp = record.operations[0].toString();
+      setSelectedOperations(prev => ({
+        ...prev,
+        [recordKey]: selectedOp
+      }));
+    }
+  
+    if (!selectedOp) {
+      message.error('No operations available for this record');
+      return;
+    }
+  
+    // Get the operation number directly from the selected operation
+    const operationNumber = Number(selectedOp);
+    
+    if (isNaN(operationNumber)) {
+      console.error('Invalid operation number:', selectedOp);
+      message.error('Invalid operation number');
+      return;
+    }
+  
+    try {
+      setGeneratingReport(true);
+      message.loading({ content: 'Generating report...', key: 'reportGen' });
+      
+      console.log('Triggering report generation with params:', {
+        productionOrder: record.production_order,
+        operationNo: operationNumber,
+        recordKey
+      });
+
+      // Use the same endpoint for both regular operations and final inspection
+      // Final inspection is handled by operation_no=999
+      await qualityStore.api.post(
+        `/document-management/report/generate-consolidated/${record.production_order}?operation_no=${operationNumber}`,
+        {},
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      message.success({ content: 'Report generated successfully!', key: 'reportGen' });
+    } catch (error) {
+      console.error('Error generating report:', {
+        error,
+        record,
+        selectedOp,
+        operationNumber,
+        operations: record.operations
+      });
+      message.error({ 
+        content: error.message || 'Failed to generate report. Please try again.',
+        key: 'reportGen',
+        duration: 5
+      });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm">
       {/* Page Header */}
       <div className="mb-6">
-        <Title level={4} className="mb-2">Quality Inspection Reports</Title>
-        <Text type="secondary">View, filter, and download quality inspection reports</Text>
+        <div className="flex justify-between items-center mb-2">
+          <Title level={4} className="mb-0">Quality Inspection Reports</Title>
+          {/* <Button 
+            type="primary" 
+            icon={<FilePdfOutlined />} 
+            className="bg-purple-600 hover:bg-purple-700 border-none flex items-center"
+            onClick={() => handleGenerateConsolidatedReport()}
+          >
+            Generate Consolidated Report
+          </Button> */}
+        </div>
+        {/* <Text type="secondary">View, filter, and download quality inspection reports</Text> */}
+
+
+
+        
       </div>
+
+      {/* Inspection Details Section */}
+      {loading ? (
+        <div className="flex justify-center my-8">
+          <Spin tip="Loading inspection details..." />
+        </div>
+      ) : inspectionDetails ? (
+        <Card 
+          className="mb-6 shadow-sm"
+          title={
+            <div className="flex items-center">
+              <FileTextOutlined className="mr-2 text-blue-500" />
+              <span>Consolidated Report</span>
+            </div>
+          }
+        >
+          <Table
+            columns={summaryColumns}
+            dataSource={summaryData}
+            pagination={false}
+            size="middle"
+            loading={loading}
+            className="mb-4"
+            rowClassName="hover:bg-gray-50"
+          />
+        </Card>
+      ) : (
+        <Card className="mb-6">
+          <Empty description="No inspection details found" />
+        </Card>
+      )}
       
       <Divider className="my-4" />
       
@@ -1004,19 +1362,22 @@ const InspectionReport = () => {
           <Card 
             title={
               <div>
-                <div className="flex items-center mb-2">
-                  <FileTextOutlined className="mr-2 text-blue-500" />
-                  <span>Reports List</span>
-                  {/* {filteredReports.length > 0 && (
-                    <Badge 
-                      count={filteredReports.length} 
-                      className="ml-2"
-                      style={{ 
-                        backgroundColor: '#52c41a', 
-                        boxShadow: '0 0 0 1px #52c41a inset' 
-                      }}
-                    />
-                  )} */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <FileTextOutlined className="mr-2 text-blue-500" />
+                    <span className="text-lg font-medium">Reports List</span>
+                    {/* {filteredReports.length > 0 && (
+                      <Badge 
+                        count={filteredReports.length} 
+                        className="ml-2"
+                        style={{ 
+                          backgroundColor: '#52c41a', 
+                          boxShadow: '0 0 0 1px #52c41a inset' 
+                        }}
+                      />
+                    )} */}
+                  </div>
+
                 </div>
                 {currentPath && (
                   <div className="text-sm text-gray-500 flex items-center">
@@ -1140,9 +1501,9 @@ const InspectionReport = () => {
                   />
                   <div className="flex-grow">
                     <div className="font-medium">Version {version.version_number}</div>
-                    <div className="text-sm text-gray-500">
+                    {/* <div className="text-sm text-gray-500">
                       Created: {new Date(version.created_at).toLocaleString()}
-                    </div>
+                    </div> */}
                     {version.metadata && version.metadata.operation_number && (
                       <div className="text-sm text-gray-500">
                         Operation: {version.metadata.operation_number}

@@ -78,6 +78,7 @@ const QualityInspectionDetails = ({
   const [loadingQty, setLoadingQty] = useState(false);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
+  let ipid1 = inspectionDetails?.operation_groups?.[0]?.ipid;
 
   // Get IPID number from operation groups
   const getIpidNumber = () => {
@@ -285,7 +286,8 @@ const QualityInspectionDetails = ({
           <Button
             type={hasFinalInspection ? 'primary' : 'default'}
             icon={<FileSearchOutlined />}
-            onClick={() => handleFinalInspectionClick()}
+            onClick={() => {handleFinalInspectionClick(); 
+              setSelectedOperation(999);}}
             className={`
               transition-all duration-300
               ${hasFinalInspection 
@@ -336,7 +338,7 @@ const QualityInspectionDetails = ({
           <FilePdfOutlined /> Inspection Report
         </span>
       ),
-      children: <InspectionReport />
+      children: <InspectionReport inspectionDetails={inspectionDetails} loading={loading} />
     }
   ];
 
@@ -573,6 +575,7 @@ const QualityInspectionDetails = ({
       setFilteredData(filtered);
     };
     // Handle qty change
+    // console.log("YEET11", !selectedOperation);
     const handleQtyChange = async (value) => {
       setQtyFilter(value);
       if (!isMeasuredDataModalVisible || !selectedOperation) return;
@@ -1185,6 +1188,7 @@ const QualityInspectionDetails = ({
     const orderId = inspectionDetails?.order_id;
     // FIX: Get IPID for the selected operation
     const ipid = inspectionDetails?.operation_groups?.find(group => group.op_no === selectedOperation)?.ipid;
+    ipid1 = ipid;
 
     if (!orderId || !ipid) {
       message.error('Order ID or IPID not found.');
@@ -1498,12 +1502,12 @@ const QualityInspectionDetails = ({
   // Add function to check FTP approval status
   const checkFTPStatus = async () => {
     const orderId = inspectionDetails?.order_id;
-    const ipid = inspectionDetails?.operation_groups?.[0]?.ipid;
     
-    if (!orderId || !ipid) return;
+    console.log('YETTE:', orderId, ipid1);
+    if (!orderId || !ipid1) return;
 
     try {
-      const response = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+      const response = await qualityStore.checkFTPApprovalStatus(orderId, ipid1);
       console.log('FTP Approval Status:', response);
       
       // Update FTP status
@@ -1522,7 +1526,7 @@ const QualityInspectionDetails = ({
 
   // Update useEffect to check FTP status when component mounts and when inspection details change
   useEffect(() => {
-    if (inspectionDetails?.order_id && inspectionDetails?.operation_groups?.[0]?.ipid) {
+    if (inspectionDetails?.order_id && ipid1) {
       checkFTPStatus();
     }
   }, [inspectionDetails]);
@@ -1540,8 +1544,9 @@ const QualityInspectionDetails = ({
     }
 
     const orderId = inspectionDetails?.order_id;
-    const ipid = inspectionDetails?.operation_groups?.find(group => group.op_no === selectedOperation)?.ipid;
-    
+    const ipid = inspectionDetails?.operation_groups?.find(group => group.op_no === 999)?.ipid;
+    ipid1 = ipid;
+
     if (!orderId || !ipid) {
       message.error('Order ID or IPID not found.');
       return;
@@ -1549,6 +1554,8 @@ const QualityInspectionDetails = ({
 
     setIsFinalApprovingAll(true);
     try {
+      console.log('Approving all final inspection measurements for Order ID:', orderId, ipid);
+      
       await qualityStore.approveAllMeasurements(orderId, ipid);
       message.success('All final inspection measurements approved');
       setIsFinalAllApproved(true);
@@ -1630,6 +1637,8 @@ const QualityInspectionDetails = ({
         group => group.op_no === 999
       );
       const ipid = finalOpGroup?.ipid;
+      console.log("YEET");
+      console.log(ipid);
 
       if (!ipid) {
         message.error('IPID not found for final inspection');

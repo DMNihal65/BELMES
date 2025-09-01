@@ -4,7 +4,7 @@ class QualityStore {
   constructor() {
     // Create axios instance with better configuration
     this.api = axios.create({
-      baseURL: 'http://172.18.7.91:8008/api/v1',
+      baseURL: 'http://172.18.7.89:5469/api/v1',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
@@ -182,6 +182,80 @@ class QualityStore {
     });
   }
 
+  /**
+   * Generate a consolidated report for a production order and operation
+   * @param {string} productionOrder - The production order number
+   * @param {string|number} operationNo - The operation number
+   * @returns {Promise<Blob>} The generated report as a Blob
+   */
+  async generateConsolidatedReport(productionOrder, operationNo) {
+    try {
+      // Ensure operationNo is provided and is a valid number
+      if (operationNo === undefined || operationNo === null || operationNo === '') {
+        throw new Error('Operation number is required');
+      }
+      
+      // Convert to number to ensure it's a valid operation number
+      const opNo = Number(operationNo);
+      if (isNaN(opNo)) {
+        throw new Error('Invalid operation number');
+      }
+      
+      // Create URL with production order and operation_no as a query parameter
+      const baseUrl = 'http://172.18.7.89:5469/api/v1/document-management/report/generate-consolidated';
+      const url = new URL(`${baseUrl}/${productionOrder}`);
+      url.searchParams.append('operation_no', opNo);
+      
+      console.log('=== API Request Details ===');
+      console.log('URL:', url.toString());
+      console.log('Method: GET');
+      console.log('Query Params:', Object.fromEntries(url.searchParams));
+      console.log('Headers:', {
+        'Authorization': 'Bearer [TOKEN]',
+        'Accept': 'application/pdf'
+      });
+      
+      // Make the request using the URL object
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.getValidToken()}`,
+          'Accept': 'application/pdf'
+        },
+        credentials: 'include'  // Include cookies if needed
+      });
+      
+      console.log('=== API Response ===');
+      console.log('Status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { detail: errorText };
+        }
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      console.log('Received blob of size:', blob.size, 'bytes');
+      return blob;
+      
+    } catch (error) {
+      console.error('Error in generateConsolidatedReport:', {
+        productionOrder,
+        operationNo,
+        error: error.message
+      });
+      
+      // Rethrow with a more user-friendly message
+      throw new Error(`Failed to generate report: ${error.message}`);
+    }
+  }
+
   async fetchInspectionDetails(orderId) {
     return this.retryRequest(async () => {
       try {
@@ -347,14 +421,15 @@ class QualityStore {
     });
   }
 
-  async downloadReportById(documentId, versionNumber) {
+  async downloadReportById(documentId, versionNumber, additionalInfo = {}) {
     return this.retryRequest(async () => {
       try {
         console.log(`Downloading report with document ID: ${documentId}, version: ${versionNumber}`);
         
         const response = await this.api.get(
-          `/document-management/documents/download-version/${documentId}/${versionNumber}`,
+          `/document-management/documents/${documentId}/download`,
           {
+            params: { version_id: versionNumber },
             headers: { 'Accept': 'application/pdf' },
             responseType: 'blob'
           }
@@ -364,13 +439,28 @@ class QualityStore {
         const blob = new Blob([response.data], { type: contentType });
         const url = URL.createObjectURL(blob);
         
+        // Try to get filename from additionalInfo first, then from content-disposition header
+        let fileName = additionalInfo.name 
+          ? `${additionalInfo.name.replace(/[^a-zA-Z0-9-_ ]/g, '_')}.pdf`
+          : `document_${documentId}_v${versionNumber}.pdf`;
+          
+        const contentDisposition = response.headers['content-disposition'];
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (filenameMatch && filenameMatch[1]) {
+            fileName = filenameMatch[1].replace(/['"]/g, '');
+          }
+        }
+        
         return {
           url,
-          fileName: `document_${documentId}_v${versionNumber}.pdf`,
+          fileName,
           contentType
         };
       } catch (error) {
+        console.error('Error in downloadReportById:', error);
         this.handleError(error, 'Downloading report by ID');
+        throw error; // Re-throw to allow handling in the component
       }
     });
   }
@@ -460,6 +550,66 @@ class QualityStore {
     });
   }
 
+  async generateConsolidatedReport(productionOrder, operationNo) {
+    return this.retryRequest(async () => {
+      try {
+        // Ensure operationNo is provided and is a valid number
+        if (operationNo === undefined || operationNo === null || operationNo === '') {
+          throw new Error('Operation number is required');
+        }
+
+        // Convert to number to ensure it's a valid operation number
+        const opNo = Number(operationNo);
+        if (isNaN(opNo)) {
+          throw new Error('Invalid operation number');
+        }
+
+        console.log(`Generating consolidated report for production order: ${productionOrder}, operation: ${opNo}`);
+        
+        const response = await this.api({
+          method: 'post',
+          url: `/document-management/report/generate-consolidated/${productionOrder}?operation_no=${opNo}`,
+          responseType: 'arraybuffer',
+          headers: {
+            'Accept': 'application/pdf',
+            'Content-Type': 'application/json'
+          },
+          responseEncoding: 'binary'
+        });
+
+        if (!response.data) {
+          throw new Error('No data received from server');
+        }
+
+        // Get filename from Content-Disposition header or use default
+        let fileName = `Consolidated_Report_${productionOrder}_OP${opNo}.pdf`;
+        const contentDisposition = response.headers['content-disposition'];
+        if (contentDisposition) {
+          const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (match && match[1]) {
+            fileName = match[1].replace(/['"]/g, '');
+          }
+        }
+
+        // Create a blob from the arraybuffer
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        
+        // Create a temporary URL for the blob
+        const url = window.URL.createObjectURL(blob);
+        
+        return {
+          url,
+          blob,
+          fileName
+        };
+      } catch (error) {
+        console.error('Error in generateConsolidatedReport:', error);
+        this.handleError(error, 'Generating consolidated report');
+        throw error;
+      }
+    });
+  }
+
   async approveAllMeasurements(orderId, ipid) {
     return this.retryRequest(async () => {
       try {
@@ -545,7 +695,7 @@ class QualityStore {
     });
   }
 
-  async fetchFolders(parentId = 1) {
+  async fetchFolders(parentId = 26) {
     return this.retryRequest(async () => {
       try {
         console.log(`Fetching folders for parent ID: ${parentId}`);
@@ -554,18 +704,19 @@ class QualityStore {
         
         console.log('Raw response data:', response.data);
         
-        const folders = parentId === 1 
-          ? response.data.filter(folder => folder.name === 'IPID' || folder.name === 'REPORT')
-          : response.data.filter(folder => folder.is_active);
+        // Get all active folders
+        const folders = response.data.filter(folder => folder.is_active);
+        console.log('Active folders:', folders);
         
-        console.log('Processed folders data:', folders);
         return folders;
-        
       } catch (error) {
+        console.error('Error fetching folders:', error);
         this.handleError(error, 'Fetching folders');
+        return []; // Return empty array on error to prevent crashes
       }
     });
   }
+
 
   async uploadNewVersion(documentId, file, versionNumber) {
     return this.retryRequest(async () => {

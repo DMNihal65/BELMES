@@ -261,7 +261,15 @@ class QualityStore {
       try {
         console.log(`Fetching inspection details for Order ID: ${orderId}`);
         
-        const response = await this.api.get(`/quality/master-boc/ipids/${orderId}`);
+        // Fetch initial inspection details to get part_number
+        const initialDetails = await this.fetchInspectionByOrderId(orderId);
+        const partNumber = initialDetails.part_number;
+        
+        if (!partNumber) {
+          throw new Error('Part number not found for the given order ID');
+        }
+
+        const response = await this.api.get(`/quality/master-boc/ipids/${orderId}/${partNumber}`);
         
         console.log('API Response:', response.data);
 

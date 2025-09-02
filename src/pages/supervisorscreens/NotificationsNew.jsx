@@ -25,6 +25,13 @@ import { ToolFilled, FilterOutlined, ToolOutlined } from '@ant-design/icons';
 import Lottie from 'lottie-react';
 import notificationAnimation from '../../assets/notification.json';
 import useInventoryStore from '../../store/inventory-store';
+import dayjs from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+
+// Extend dayjs with plugins
+dayjs.extend(isBetween);
+dayjs.extend(isSameOrAfter);
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -1067,7 +1074,7 @@ const NotificationsNew = () => {
           </Row>
         </div>
         
-        {/* Improved summary cards */}
+        {/* Improved summary cards
         <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
           <Col xs={24} lg={6}>
             <Card 
@@ -1216,7 +1223,7 @@ const NotificationsNew = () => {
               </div>
             </Card>
           </Col>
-        </Row>
+        </Row> */}
 
         {/* Tabs section with improved styling */}
         <Card 

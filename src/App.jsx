@@ -29,7 +29,7 @@ import InspectionResult from './pages/operatorscreens/Inspection/InspectionResul
 import InventoryHistory from './pages/operatorscreens/inventory/InventoryHistory';
 import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
 import MachineDetails from './pages/supervisorscreens/EnergyMonitoring/MachineDetails';
-import Notifications from './pages/supervisorscreens/Notifications';
+// import Notifications from './pages/supervisorscreens/Notifications';
 import NotificationsNew from './pages/supervisorscreens/NotificationsNew';
 import MaintenanceNotifications from './pages/supervisorscreens/MachineMaintenance/Notifications';
 
@@ -99,7 +99,7 @@ const App = () => {
             <Route path="quality-management/inspection-report" element={<InspectionReport />} />
             <Route path="logs" element={<LogsDashboard />} />
             <Route path="pokayoke" element={<PokaYokeDashboard />} />
-            <Route path="notifications" element={<Notifications />} />
+            {/* <Route path="notifications" element={<Notifications />} /> */}
             <Route path="notifications_new" element={<NotificationsNew />} />
             <Route path="access_control_management" element={<AccessControlManagement />} />
             <Route path="access_control_management/user_management" element={<UserManagement />} />
@@ -144,7 +144,7 @@ const App = () => {
             <Route path="quality-management/inspection-report" element={<InspectionReport />} />
             <Route path="logs" element={<LogsDashboard />} />
             <Route path="pokayoke" element={<PokaYokeDashboard />} />
-            <Route path="notifications" element={<Notifications />} />
+            {/* <Route path="notifications" element={<Notifications />} /> */}
             <Route path="notifications_new" element={<NotificationsNew />} />
           </Route>
 

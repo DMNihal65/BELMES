@@ -17,7 +17,7 @@ import useAuthStore from './auth-store';
 
 
 
-const BASE_URL = 'http://172.18.7.89:5469/api/v1/inventory';
+const BASE_URL = 'http://172.16.0.229:1292/api/v1/inventory';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -39,7 +39,7 @@ const getUserId = () => {
 // Add these functions before the create function
 const addCalibration = async (calibrationData) => {
   try {
-    const response = await axios.post('http://172.18.7.89:5469/api/v1/inventory/calibrations/', {
+    const response = await axios.post('http://172.16.0.229:1292/api/v1/inventory/calibrations/', {
       ...calibrationData,
       created_by: getUserId()
     });
@@ -52,7 +52,7 @@ const addCalibration = async (calibrationData) => {
 
 const updateCalibration = async (id, calibrationData) => {
   try {
-    const response = await axios.put(`http://172.18.7.89:5469/api/v1/inventory/calibrations/${id}`, {
+    const response = await axios.put(`http://172.16.0.229:1292/api/v1/inventory/calibrations/${id}`, {
       ...calibrationData,
       created_by: getUserId()
     });
@@ -65,7 +65,7 @@ const updateCalibration = async (id, calibrationData) => {
 
 const getCalibrationByItemId = async (itemId) => {
   try {
-    const response = await axios.get(`http://172.18.7.89:5469/api/v1/inventory/calibrations/?inventory_item_id=${itemId}`);
+    const response = await axios.get(`http://172.16.0.229:1292/api/v1/inventory/calibrations/?inventory_item_id=${itemId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching calibration:', error);
@@ -517,7 +517,7 @@ const useInventoryStore = create((set, get) => ({
   fetchAllOrders: async () => {
     set({ loading: true });
     try {
-      const response = await axios.get('http://172.18.7.89:5469/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.16.0.229:1292/api/v1/planning/all_orders');
       set({ 
         allOrders: response.data || [],
         loading: false 
@@ -571,7 +571,7 @@ const useInventoryStore = create((set, get) => ({
   fetchOperationsByPartNumber: async (partNumber) => {
     set({ loading: true });
     try {
-      const response = await axios.get(`http://172.18.7.89:5469/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await axios.get(`http://172.16.0.229:1292/api/v1/planning/search_order?part_number=${partNumber}`);
       const operations = response.data?.orders?.[0]?.operations || [];
       set({ 
         operations: operations,

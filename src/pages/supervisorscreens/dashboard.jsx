@@ -917,31 +917,22 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
           >
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center">
-                <Progress
-                  type="dashboard"
-                  percent={oeeData.average_availability ? Number(oeeData.average_availability.toFixed(2)) : 0}
-                  width={80}
-                  strokeColor="#1890ff"
-                />
-                <div className="text-xs mt-1">Availability</div>
+                <div className="text-2xl font-bold text-blue-600 mb-1">
+                  {oeeData.average_availability ? Number(oeeData.average_availability.toFixed(2)) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">Availability</div>
               </div>
               <div className="text-center">
-                <Progress
-                  type="dashboard"
-                  percent={oeeData.average_performance ? Number(oeeData.average_performance.toFixed(2)) : 0}
-                  width={80}
-                  strokeColor="#52c41a"
-                />
-                <div className="text-xs mt-1">Performance</div>
+                <div className="text-2xl font-bold text-green-600 mb-1">
+                  {oeeData.average_performance ? Number(oeeData.average_performance.toFixed(2)) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">Performance</div>
               </div>
               <div className="text-center">
-                <Progress
-                  type="dashboard"
-                  percent={oeeData.average_quality ? Number(oeeData.average_quality.toFixed(2)) : 0}
-                  width={80}
-                  strokeColor="#722ed1"
-                />
-                <div className="text-xs mt-1">Quality</div>
+                <div className="text-2xl font-bold text-purple-600 mb-1">
+                  {oeeData.average_quality ? Number(oeeData.average_quality.toFixed(2)) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">Quality</div>
               </div>
             </div>
           </Card>

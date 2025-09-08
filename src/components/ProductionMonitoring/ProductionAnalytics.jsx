@@ -72,7 +72,7 @@ function ProductionAnalytics() {
   const fetchWorkCenters = async () => {
     setLoadingWorkCenters(true);
     try {
-      const response = await axios.get('http://172.18.7.89:5469/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await axios.get('http://172.16.0.229:1292/api/v1/master-order/workcenters/?skip=0&limit=100');
       const workCentersData = response.data;
       
       // No longer filtering by is_schedulable

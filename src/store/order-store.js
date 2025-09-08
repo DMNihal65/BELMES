@@ -7,10 +7,10 @@ import axios from 'axios';
 
 // API endpoints configuration
 const API_CONFIG = {
-  BASE_URL: 'http://172.18.7.89:5469',
-  QUALITY_URL: 'http://172.18.7.89:5469',
-  PLANNING_URL: 'http://172.18.7.89:5469',
-  SCHEDULING_URL: 'http://172.18.7.89:5469',
+  BASE_URL: 'http://172.16.0.229:1292',
+  QUALITY_URL: 'http://172.16.0.229:1292',
+  PLANNING_URL: 'http://172.16.0.229:1292',
+  SCHEDULING_URL: 'http://172.16.0.229:1292',
   endpoints: {
     allOrders: '/api/v1/planning/all_orders',
     saveOrder: '/api/v1/planning/save-to-db',
@@ -26,8 +26,8 @@ const API_CONFIG = {
     getDocumentsByPartNumber: (partNumber) => `/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
     updateProjectPriorities: '/api/v1/planning/projects/priority',
 
-    allCompletionRecords: 'http://172.18.7.89:5469/api/v1/scheduling/all-completion-records',
-    orderCompletionRecord: (orderId) => `http://172.18.7.89:5469/api/v1/scheduling/order-completion-record/${orderId}`
+    allCompletionRecords: 'http://172.16.0.229:1292/api/v1/scheduling/all-completion-records',
+    orderCompletionRecord: (orderId) => `http://172.16.0.229:1292/api/v1/scheduling/order-completion-record/${orderId}`
   }
 };
 
@@ -175,7 +175,7 @@ const useOrderStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
   
-      const response = await fetch('http://172.18.7.89:5469/api/v1/planning/upload-pdf', {
+      const response = await fetch('http://172.16.0.229:1292/api/v1/planning/upload-pdf', {
         method: 'POST',
         body: formData,
       });
@@ -241,7 +241,7 @@ const useOrderStore = create((set, get) => ({
       console.log('Updating order with data:', updatedOrder);
       
       const response = await fetch(
-        `http://172.18.7.89:5469/api/v1/planning/orders/${updatedOrder.id}`,
+        `http://172.16.0.229:1292/api/v1/planning/orders/${updatedOrder.id}`,
         {
           method: 'PUT',
           headers: {
@@ -521,7 +521,7 @@ const useOrderStore = create((set, get) => ({
   updateWorkcenter: async (workcenterData) => {
     set({ isLoadingWorkcenters: true, workcenterError: null });
     try {
-      const response = await fetch(`http://172.18.7.89:5469/api/v1/work_centers/${workcenterData.workcenter_id}`, {
+      const response = await fetch(`http://172.16.0.229:1292/api/v1/work_centers/${workcenterData.workcenter_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -903,7 +903,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       // Fetch latest priorities after successful swap
-      const priorityResponse = await fetch('http://172.18.7.89:5469/api/v1/planning/projects/priority', {
+      const priorityResponse = await fetch('http://172.16.0.229:1292/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -960,7 +960,7 @@ const useOrderStore = create((set, get) => ({
   fetchPriorityOrders: async () => {
     set({ isLoadingPriority: true, priorityError: null });
     try {
-      const response = await fetch('http://172.18.7.89:5469/api/v1/planning/projects/priority', {
+      const response = await fetch('http://172.16.0.229:1292/api/v1/planning/projects/priority', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
@@ -1326,7 +1326,7 @@ const useOrderStore = create((set, get) => ({
 
       // Call the documents endpoint
       const response = await fetch(
-        `http://172.18.7.89:5469/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
+        `http://172.16.0.229:1292/api/v1/document-management/documents/by-part-number-all/${partNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1576,7 +1576,7 @@ const useOrderStore = create((set, get) => ({
       }
 
       const response = await fetch(
-        `http://172.18.7.89:5469/api/v1/master-order/machines/${machineId}`,
+        `http://172.16.0.229:1292/api/v1/master-order/machines/${machineId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1642,7 +1642,7 @@ const useOrderStore = create((set, get) => ({
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://172.18.7.89:5469/api/v1/scheduling/part-production-timeline/', {
+      const response = await fetch('http://172.16.0.229:1292/api/v1/scheduling/part-production-timeline/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1704,7 +1704,7 @@ const useOrderStore = create((set, get) => ({
       console.log('Found order:', order);
       const orderId = order.id;
 
-      const url = `http://172.18.7.89:5469/api/v1/scheduling/set-order-completion/${orderId}`;
+      const url = `http://172.16.0.229:1292/api/v1/scheduling/set-order-completion/${orderId}`;
       console.log('API Endpoint URL:', url);
 
       const response = await fetch(url, {

@@ -322,7 +322,20 @@ function Header() {
           <Button 
             type="link" 
             onClick={() => {
-              navigate('/supervisor/notifications');
+              // Get user from localStorage
+              let userRole = 'supervisor'; // default fallback
+              try {
+                const userStr = localStorage.getItem('user');
+                if (userStr) {
+                  const userObj = JSON.parse(userStr);
+                  if (userObj && userObj.role) {
+                    userRole = userObj.role;
+                  }
+                }
+              } catch (e) {
+                // fallback to default
+              }
+              navigate(`/${userRole}/notifications_new`);
               // Close dropdown after clicking
               document.body.click();
             }}

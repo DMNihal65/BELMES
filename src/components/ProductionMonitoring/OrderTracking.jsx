@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Select, Card, Spin, Alert, Row, Col, Typography, Descriptions, Table, Tag, Progress, Button, Statistic, Space, Modal, Form, InputNumber, DatePicker, Input, message } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { ReloadOutlined, FileTextOutlined, DownloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
 const { Title, Text } = Typography;
+
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const OrderTracking = () => {
   const [orders, setOrders] = useState([]);
@@ -17,6 +20,11 @@ const OrderTracking = () => {
   const [updateOperation, setUpdateOperation] = useState(null);
   const [updateForm] = Form.useForm();
 
+  // Report modal states
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportData, setReportData] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+
   const fetchOrders = async () => {
     setLoading(true);
     setError(null);
@@ -24,7 +32,7 @@ const OrderTracking = () => {
     setSelectedOrder(null);
     setOperationStatus(null);
     try {
-      const response = await axios.get('http://172.16.0.229:1292/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.89:8008/api/v1/planning/all_orders');
       setOrders(response.data);
     } catch (err) {
       setError('Failed to fetch production orders. Please try again.');
@@ -41,7 +49,7 @@ const OrderTracking = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await axios.get('http://172.16.0.229:1292/api/v1/auth/api/v1/auth/users-get?active_only=true');
+        const res = await axios.get('http://172.18.7.89:8008/api/v1/auth/api/v1/auth/users-get?active_only=true');
         setUsers(res.data);
       } catch (err) {
         console.error('Failed to fetch users', err);
@@ -63,7 +71,7 @@ const OrderTracking = () => {
     try {
       const productionOrder = selected.production_order;
 
-      const { data } = await axios.get(`http://172.16.0.229:1292/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`);
+      const { data } = await axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`);
       setOperationStatus(data);
 
     } catch (err) {
@@ -92,7 +100,7 @@ const OrderTracking = () => {
         notes: values.notes || '',
         machine_id: values.machine_id || null,
       };
-      await axios.post('http://172.16.0.229:1292/api/v1/operatorlogs2/operator-log', payload);
+      await axios.post('http://172.18.7.89:8008/api/v1/operatorlogs2/operator-log', payload);
       message.success('Quantity updated successfully');
       setShowUpdateModal(false);
       // refresh
@@ -106,20 +114,54 @@ const OrderTracking = () => {
     }
   };
 
+  // Function to fetch report data
+  const fetchReportData = async () => {
+    if (!selectedOrder) return;
+    
+    setReportLoading(true);
+    try {
+      const response = await axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-report/${selectedOrder.production_order}`);
+      setReportData(response.data);
+    } catch (err) {
+      message.error('Failed to fetch report data');
+      console.error(err);
+    }
+    setReportLoading(false);
+  };
+
+  // Function to handle view report button click
+  const handleViewReport = () => {
+    setShowReportModal(true);
+    fetchReportData();
+  };
+
+
+
+const downloadPDF = async () => {
+  const input = document.getElementById('report-content');
+  if (!input) return;
+
+  try {
+    const canvas = await html2canvas(input, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`ProductionOrderReport_${reportData.production_order}.pdf`);
+  } catch (err) {
+    console.error('PDF download failed:', err);
+    message.error('Failed to generate PDF');
+  }
+};
+
+
   const columns = [
     { title: 'Operation No', dataIndex: 'operation_number', key: 'operation_number', sorter: (a, b) => a.operation_number - b.operation_number, },
     { title: 'Description', dataIndex: 'description', key: 'description' },
     { title: 'Work Center', dataIndex: 'work_center', key: 'work_center' },
-    // {
-    //   title: 'Status',
-    //   dataIndex: 'is_complete',
-    //   key: 'is_complete',
-    //   render: (is_complete) => (
-    //     <Tag color={is_complete ? 'success' : 'processing'}>
-    //       {is_complete ? 'Completed' : 'In Progress'}
-    //     </Tag>
-    //   ),
-    // },
     { title: 'Completed Qty', dataIndex: 'completed_quantity', key: 'completed_quantity' },
     { title: 'Rejected Qty', dataIndex: 'rejected_quantity', key: 'rejected_quantity' },
     { title: 'Required Qty', dataIndex: 'required_quantity', key: 'required_quantity' },
@@ -133,6 +175,19 @@ const OrderTracking = () => {
           </Button>
         ) : null,
     },
+  ];
+
+  // Report table columns
+  const reportColumns = [
+    { title: 'Operation Number', dataIndex: 'operation_number', key: 'operation_number' },
+    { title: 'Description', dataIndex: 'description', key: 'description' },
+    { title: 'Machine Name', dataIndex: 'machines_used', key: 'machines_used', render: (machines) => machines?.join(', ') || '-' },
+    { title: 'Operator', dataIndex: 'operators', key: 'operators', render: (operators) => operators?.join(', ') || '-' },
+    { title: 'Total Time', dataIndex: 'total_time_invested_hours', key: 'total_time_invested_hours' },
+    { title: 'Required Quantity', dataIndex: 'required_quantity', key: 'required_quantity' },
+    { title: 'Completed Quantity', dataIndex: 'completed_quantity', key: 'completed_quantity' },
+    { title: 'Rejected Quantity', dataIndex: 'rejected_quantity', key: 'rejected_quantity' },
+    
   ];
 
   // Aggregated statistics for quick insight
@@ -175,7 +230,19 @@ const OrderTracking = () => {
 
        <Spin spinning={loading && !!selectedOrder}>
         {operationStatus && (
-          <Card style={{ marginBottom: 24 }} title="Order Overview">
+          <Card 
+            style={{ marginBottom: 24 }} 
+            title="Order Overview"
+            extra={
+              <Button 
+                type="primary" 
+                icon={<FileTextOutlined />} 
+                onClick={handleViewReport}
+              >
+                View Report
+              </Button>
+            }
+          >
             <Row gutter={[16, 16]}>
               <Col xs={24} md={12} lg={8} style={{ textAlign: 'center' }}>
                  <Progress 
@@ -214,6 +281,7 @@ const OrderTracking = () => {
           </Card>
         )}
       </Spin>
+
     {/* Update Quantity Modal */}
       <Modal
         title="Update Quantity"
@@ -250,6 +318,73 @@ const OrderTracking = () => {
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Report Modal */}
+      <Modal
+        title="Production Order Report"
+        open={showReportModal}
+        onCancel={() => setShowReportModal(false)}
+        width="50%"  // Changed from 90% to 70%
+        style={{ top: 20 }}
+        footer={[
+          <Button key="close" onClick={() => setShowReportModal(false)}>
+            Close
+          </Button>,
+          <Button 
+            key="download" 
+            type="primary" 
+            icon={<DownloadOutlined />} 
+            onClick={downloadPDF}
+            disabled={!reportData}
+          >
+            Download PDF
+          </Button>
+        ]}
+      >
+        <Spin spinning={reportLoading}>
+          <div id="report-content" style={{ minHeight: '297mm', padding: '20px', backgroundColor: 'white' }}>
+            {reportData && (
+              <>
+                <div className="report-header" style={{ textAlign: 'center', marginBottom: '30px' }}>
+                  <Title level={2} style={{ margin: 0 }}>PO Summary</Title>
+                </div>
+                
+                <div className="report-subheader" style={{ marginBottom: '20px' }}>
+                  <Row gutter={[16, 8]}>
+                    <Col span={12}>
+                      <Text strong>Production Order: </Text>
+                      <Text>{reportData.production_order}</Text>
+                    </Col>
+                    <Col span={12}>
+                      <Text strong>Part Number: </Text>
+                      <Text>{reportData.part_number}</Text>
+                    </Col>
+                    <Col span={12}>
+                      <Text strong>Project: </Text>
+                      <Text>{reportData.project}</Text>
+                    </Col>
+                    <Col span={12}>
+                      <Text strong>Sale Order: </Text>
+                      <Text>{reportData.sale_order}</Text>
+                    </Col>
+                  </Row>
+                </div>
+
+                <Title level={4} style={{ marginBottom: '16px' }}>Operations</Title>
+                <Table
+                  dataSource={reportData.operations}
+                  columns={reportColumns}
+                  rowKey="operation_id"
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 'max-content' }}
+                  className="report-table"
+                />
+              </>
+            )}
+          </div>
+        </Spin>
       </Modal>
     </div>
   </> );

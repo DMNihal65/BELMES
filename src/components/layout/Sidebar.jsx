@@ -201,11 +201,6 @@ function Sidebar() {
           label: 'OEE Overview',
         },
         {
-          key: '/supervisor/production-monitoring/oee-overview',
-          icon: <Gauge size={18} />,
-          label: 'OEE Overview',
-        },
-        {
           key: '/supervisor/production-monitoring/analytics',
           icon: <LineChart size={18} />,
           label: 'Analytics',

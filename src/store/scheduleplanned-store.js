@@ -17,7 +17,7 @@ const useSchedulePlannedStore = create((set, get) => ({
   viewType: 'week',
 
   // API Base URL
-  API_BASE_URL: 'http://172.16.0.229:1292/api/v1/scheduling-planned',
+  API_BASE_URL: 'http://172.18.7.89:8008/api/v1/scheduling-planned',
 
   // Fetch schedule data from the endpoint
   fetchScheduleData: async () => {

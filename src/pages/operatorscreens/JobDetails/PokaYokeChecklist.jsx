@@ -23,7 +23,7 @@ const { TextArea } = Input;
 const { Step } = Steps;
 const { Option } = Select;
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.16.0.229:1292';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.18.7.89:8008';
 
 const PokaYokeChecklist = ({ jobId, machineId, visible, onClose }) => {
   const { currentUser, currentMachine } = useAuthStore();
@@ -443,9 +443,10 @@ const PokaYokeChecklist = ({ jobId, machineId, visible, onClose }) => {
                     value={selectedOrder?.id}
                     className="w-full"
                     size="large"
-                    filterOption={(input, option) =>
-                      option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                    }
+                    filterOption={(input, option) => {
+                      const children = option?.children?.toString() || '';
+                      return children.toLowerCase().includes(input.toLowerCase());
+                    }}
                   >
                     {availableOrders.map(order => (
                       <Option key={order.id} value={order.id}>

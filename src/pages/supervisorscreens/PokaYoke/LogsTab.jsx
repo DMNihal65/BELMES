@@ -141,7 +141,22 @@ const LogsTab = () => {
       dataIndex: 'completed_at',
       key: 'completed_at',
       width: '15%',
-      render: (date) => new Date(date).toLocaleString(),
+      render: (date) => {
+        if (!date) return '-';
+        const dateObj = new Date(date);
+        const timezoneOffset = dateObj.getTimezoneOffset() * 60000; // in milliseconds
+        const localDate = new Date(dateObj.getTime() - timezoneOffset);
+        return localDate.toLocaleString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+      },
       sorter: (a, b) => new Date(b.completed_at) - new Date(a.completed_at),
       defaultSortOrder: 'descend',
     },
@@ -336,7 +351,23 @@ const LogsTab = () => {
                 
                 <div>
                   <div className="text-sm text-gray-500">Completed At</div>
-                  <div className="font-medium">{new Date(currentLog.completed_at).toLocaleString()}</div>
+                  <div className="font-medium">
+                    {currentLog.completed_at ? (() => {
+                      const dateObj = new Date(currentLog.completed_at);
+                      const timezoneOffset = dateObj.getTimezoneOffset() * 60000;
+                      const localDate = new Date(dateObj.getTime() - timezoneOffset);
+                      return localDate.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true,
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                      });
+                    })() : '-'}
+                  </div>
                 </div>
               </div>
             </Card>

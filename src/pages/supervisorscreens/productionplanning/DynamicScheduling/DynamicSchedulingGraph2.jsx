@@ -119,7 +119,7 @@ const DynamicSchedulingGraph2 = () => {
   const fetchScheduleData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://172.16.0.229:1292/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://172.18.7.89:8008/api/v1/rescheduling/reschedule-actual-planned-combined');
       setScheduleData(response.data);
       setLoading(false);
     } catch (err) {

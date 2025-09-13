@@ -1551,9 +1551,13 @@ const DocumentManagement = () => {
               }
               uploadForm.setFieldsValue({ production_order_id: undefined });
             }}
-            filterOption={(input, option) =>
-              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-            }
+            filterOption={(input, option) => {
+              if (!option || !option.children) return false;
+              const text = Array.isArray(option.children) 
+                ? option.children.join(' ') 
+                : String(option.children);
+              return text.toLowerCase().includes(input.toLowerCase());
+            }}
           >
             {allOrders.map(order => (
               <Select.Option key={order.part_number} value={order.part_number}>

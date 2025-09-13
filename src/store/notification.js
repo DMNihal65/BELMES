@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { message } from 'antd';
 
 // Centralized API endpoints
-const API_BASE_URL = 'http://172.16.0.229:1292/api/v1';
+const API_BASE_URL = 'http://172.18.7.89:8008/api/v1';
 const API_ENDPOINTS = {
   simpleNotifications: `${API_BASE_URL}/simple-notifications/unread`,
   markAsRead: `${API_BASE_URL}/simple-notifications/mark-read`,

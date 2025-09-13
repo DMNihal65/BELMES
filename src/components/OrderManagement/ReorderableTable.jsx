@@ -31,6 +31,7 @@ const ReorderableTable = ({ orders = [] }) => {
   const [showScheduled, setShowScheduled] = useState(true); // Set to true by default
   const [scheduledOrders, setScheduledOrders] = useState([]);
   const [isLoadingScheduled, setIsLoadingScheduled] = useState(false);
+  const [showHighPriority, setShowHighPriority] = useState(false);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -64,37 +65,44 @@ const ReorderableTable = ({ orders = [] }) => {
 
     let filteredOrders = [...orders];
     
-    // Filter for scheduled orders if the toggle is on
-    if (showScheduled && scheduledOrders.length > 0) {
-      // Create a set of scheduled production order numbers for quick lookup
-      const scheduledOrderNumbers = new Set(
-        scheduledOrders
-          .map(order => order.production_order?.toString())
-          .filter(Boolean) // Remove any undefined/null values
-      );
-      
-      console.log('Scheduled order numbers:', Array.from(scheduledOrderNumbers));
-      
-      // Filter orders to only include those that are in the scheduled orders list
-      filteredOrders = filteredOrders.filter(order => {
-        const orderNumber = order.production_order?.toString() || order.id?.toString();
-        const isScheduled = scheduledOrderNumbers.has(orderNumber);
-        console.log(`Order ${orderNumber} - Scheduled: ${isScheduled}`);
-        return isScheduled;
-      });
-      
-      console.log('Filtered orders:', filteredOrders);
+    // If showing scheduled orders
+    if (showScheduled) {
+      if (scheduledOrders.length > 0) {
+        // Create a set of scheduled production order numbers for quick lookup
+        const scheduledOrderNumbers = new Set(
+          scheduledOrders
+            .map(order => order.production_order?.toString())
+            .filter(Boolean) // Remove any undefined/null values
+        );
+        
+        console.log('Scheduled order numbers:', Array.from(scheduledOrderNumbers));
+        
+        // Filter orders to only include those that are in the scheduled orders list
+        filteredOrders = filteredOrders.filter(order => {
+          const orderNumber = order.production_order?.toString() || order.id?.toString();
+          return scheduledOrderNumbers.has(orderNumber);
+        });
+        
+        console.log('Filtered orders:', filteredOrders);
+      } else {
+        filteredOrders = [];
+      }
     }
-
-    // Sort by priority
-    const sortedOrders = [...filteredOrders].sort((a, b) => {
+    
+    // First sort by priority
+    let sortedAndFiltered = [...filteredOrders].sort((a, b) => {
       const priorityA = a.project?.priority || a.priority || 999;
       const priorityB = b.project?.priority || b.priority || 999;
       return priorityA - priorityB;
     });
 
-    setLocalOrders(sortedOrders);
-  }, [orders, showScheduled, scheduledOrders]);
+    // If high priority is enabled, show only first 15 orders after sorting
+    if (showHighPriority && showScheduled) {
+      sortedAndFiltered = sortedAndFiltered.slice(0, 15);
+    }
+
+    setLocalOrders(sortedAndFiltered);
+  }, [orders, showScheduled, scheduledOrders, showHighPriority]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -304,10 +312,23 @@ const ReorderableTable = ({ orders = [] }) => {
         </div>
         <Space>
           {isLoadingScheduled && <Spin size="small" />}
+          {showScheduled && (
+            <Button 
+              type={showHighPriority ? 'primary' : 'default'}
+              onClick={() => setShowHighPriority(!showHighPriority)}
+              className={`mr-2 ${showHighPriority ? 'bg-green-500 text-white' : ''}`}
+              style={showHighPriority ? { border: '2px solid #166534' } : {}}
+            >
+              High Priority
+            </Button>
+          )}
           <span className="text-sm font-medium text-gray-600">Show Scheduled</span>
           <Switch 
             checked={showScheduled}
-            onChange={setShowScheduled}
+            onChange={(checked) => {
+              setShowScheduled(checked);
+              if (!checked) setShowHighPriority(false);
+            }}
             checkedChildren="Yes"
             unCheckedChildren="No"
             className={showScheduled ? 'bg-blue-500' : 'bg-gray-300'}

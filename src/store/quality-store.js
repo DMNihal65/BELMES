@@ -259,24 +259,37 @@ class QualityStore {
   async fetchInspectionDetails(orderId) {
     return this.retryRequest(async () => {
       try {
+        if (!orderId) {
+          throw new Error('Order ID is required');
+        }
+        
         console.log(`Fetching inspection details for Order ID: ${orderId}`);
         
         // Fetch initial inspection details to get part_number
         const initialDetails = await this.fetchInspectionByOrderId(orderId);
-        const partNumber = initialDetails.part_number;
         
-        if (!partNumber) {
-          throw new Error('Part number not found for the given order ID');
+        // If no initial details were found, return empty data structure
+        if (!initialDetails || !initialDetails.part_number) {
+          console.log('No inspection data or part number found for order ID:', orderId);
+          return {
+            order_id: orderId,
+            production_order: '',
+            part_number: '',
+            operations: [],
+            operation_groups: [],
+            inspection_data: []
+          };
         }
-
+        
+        const partNumber = initialDetails.part_number;
         const response = await this.api.get(`/quality/master-boc/ipids/${orderId}/${partNumber}`);
         
         console.log('API Response:', response.data);
 
         return {
-          order_id: response.data.order_id,
-          production_order: response.data.production_order,
-          part_number: response.data.part_number,
+          order_id: response.data.order_id || orderId,
+          production_order: response.data.production_order || '',
+          part_number: response.data.part_number || partNumber,
           operations: response.data.operations || [],
           operation_groups: response.data.operation_groups?.map(group => ({
             key: `${group.op_no}-${group.details?.zone}`,

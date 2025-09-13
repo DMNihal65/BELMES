@@ -58,6 +58,60 @@ const SimpleGanttChart = ({
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [viewMode, setViewMode] = useState('daily');
+  const [selectedOrder, setSelectedOrder] = useState('all');
+  
+  // Extract unique production orders from data
+  const productionOrders = React.useMemo(() => {
+    const orders = new Set();
+    data.forEach(item => {
+      if (item.po) {
+        orders.add(item.po);
+      } else if (item.production_order) {
+        orders.add(item.production_order);
+      }
+    });
+    return Array.from(orders).sort();
+  }, [data]);
+  
+  // Handle production order selection from parent component
+  useEffect(() => {
+    if (selectedOrder && selectedOrder !== 'all') {
+      // Find the first item with this production order to ensure it's in view
+      const firstMatchingItem = data.find(item => 
+        item.po === selectedOrder || item.production_order === selectedOrder
+      );
+      
+      if (firstMatchingItem && timelineRef.current) {
+        // Wait for the next tick to ensure the timeline is rendered with filtered data
+        setTimeout(() => {
+          const itemId = firstMatchingItem.id || `item-${data.indexOf(firstMatchingItem)}`;
+          const itemElement = document.querySelector(`.vis-item[data-item-id="${itemId}"]`);
+          if (itemElement) {
+            itemElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      }
+    }
+  }, [selectedOrder, data]);
+
+  // Filter data based on selected machine and production order
+  const filteredData = React.useMemo(() => {
+    let result = [...data];
+    
+    // Filter by machine
+    if (selectedMachine && selectedMachine !== 'all') {
+      result = result.filter(item => item.machine === selectedMachine);
+    }
+    
+    // Filter by production order
+    if (selectedOrder && selectedOrder !== 'all') {
+      result = result.filter(item => 
+        item.po === selectedOrder || item.production_order === selectedOrder
+      );
+    }
+    
+    return result;
+  }, [data, selectedMachine, selectedOrder]);
 
   // Handle auto-refresh with countdown
   useEffect(() => {
@@ -144,10 +198,8 @@ const SimpleGanttChart = ({
       // Get unique machines from data
       let uniqueMachines = [...new Set(data.map(item => item.machine))].sort();
       
-      // Filter by selected machine if specified
-      if (selectedMachine && selectedMachine !== 'all') {
-        uniqueMachines = uniqueMachines.filter(machine => machine === selectedMachine);
-      }
+      // Use the filtered data for rendering
+      const itemsToRender = filteredData;
 
       console.log('Unique machines:', uniqueMachines);
 
@@ -204,7 +256,7 @@ const SimpleGanttChart = ({
       console.log('Created groups:', groups.length);
 
       // Create timeline items
-      const items = data.map((item, idx) => {
+      const items = itemsToRender.map((item, idx) => {
         try {
           const startTime = dayjs(item.start_time);
           const endTime = dayjs(item.end_time);
@@ -224,12 +276,13 @@ const SimpleGanttChart = ({
             end: endTime.toDate(),
             content: `
               <div class="gantt-item-content">
-                <div class="item-title">${item.component || 'No Component'}</div>
+                <div class="item-title">${item.po || item.component || 'No Order'}</div>
               </div>
             `,
             className: `${item.type}-item`,
             title: `
-              <div style="font-weight: 600; margin-bottom: 8px; color: ${item.type === 'scheduled' ? '#d46b08' : '#389e0d'};">${item.component || 'No Component'}</div>
+              <div style="font-weight: 600; margin-bottom: 8px; color: ${item.type === 'scheduled' ? '#d46b08' : '#389e0d'};">${item.po || 'No Order'}</div>
+              ${item.component ? `<div style="margin-bottom: 4px;"><strong>Part:</strong> ${item.component}</div>` : ''}
               <div style="margin-bottom: 4px;"><strong>Machine:</strong> ${item.machine}</div>
               <div style="margin-bottom: 4px;"><strong>Type:</strong> ${item.type}</div>
               <div style="margin-bottom: 4px;"><strong>Quantity:</strong> ${item.quantity || 0}</div>
@@ -346,13 +399,55 @@ const SimpleGanttChart = ({
 
       // Event listeners
       timelineRef.current.on('select', (event) => {
-        console.log('Selected items:', event.items);
+        if (event.items && event.items.length > 0) {
+          const itemId = event.items[0];
+          const selectedItem = items.find(item => item.id === itemId);
+          if (selectedItem) {
+            const originalItem = data.find(item => 
+              item.id === selectedItem.id || 
+              (item.po === selectedItem.po && item.machine === selectedItem.machine)
+            );
+            
+            if (originalItem) {
+              const productionOrder = originalItem.po || originalItem.production_order;
+              if (productionOrder) {
+                setSelectedOrder(productionOrder);
+                
+                // If the item is not fully visible, scroll it into view
+                const itemElement = document.querySelector(`.vis-item[data-item-id="${itemId}"]`);
+                if (itemElement) {
+                  itemElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // Add click handler to items
+      timelineRef.current.on('click', (properties) => {
+        if (properties.item) {
+          const selectedItem = items.find(item => item.id === properties.item);
+          if (selectedItem) {
+            const originalItem = data.find(item => 
+              item.id === selectedItem.id || 
+              (item.po === selectedItem.po && item.machine === selectedItem.machine)
+            );
+            
+            if (originalItem) {
+              const productionOrder = originalItem.po || originalItem.production_order;
+              if (productionOrder) {
+                setSelectedOrder(productionOrder);
+              }
+            }
+          }
+        }
       });
 
     } catch (error) {
       console.error('Error creating timeline:', error);
     }
-  }, [data, dateRange, viewMode, selectedMachine]);
+  }, [data, dateRange, viewMode, selectedMachine, selectedOrder]);
 
   // Zoom and navigation functions
   const handleZoomIn = () => {
@@ -429,6 +524,7 @@ const SimpleGanttChart = ({
               onChange={handleViewModeChange}
               disabled={isLoading}
               size="small"
+              style={{ marginRight: 8 }}
             >
               {Object.entries(VIEW_MODES).map(([key, { label }]) => (
                 <Radio.Button key={key} value={key}>
@@ -436,6 +532,24 @@ const SimpleGanttChart = ({
                 </Radio.Button>
               ))}
             </Radio.Group>
+            
+            {/* Production Order Selector */}
+            <Select
+              value={selectedOrder}
+              onChange={setSelectedOrder}
+              style={{ width: 200 }}
+              placeholder="Filter by Order"
+              disabled={isLoading || productionOrders.length === 0}
+              allowClear
+              onClear={() => setSelectedOrder('all')}
+              options={[
+                { value: 'all', label: 'All Production Orders' },
+                ...productionOrders.map(order => ({
+                  value: order,
+                  label: order
+                }))
+              ]}
+            />
 
             {/* Date Range Picker */}
             <RangePicker

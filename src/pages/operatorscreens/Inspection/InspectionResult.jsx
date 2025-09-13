@@ -43,6 +43,18 @@ function InspectionResult() {
   
   // Add state for quantity input
   const [quantity, setQuantity] = useState('');
+  const [pagination, setPagination] = useState({ 
+    current: 1, 
+    pageSize: 10,
+    showSizeChanger: true,
+    showTotal: (total) => `Total ${total} items`,
+    onChange: (page, pageSize) => {
+      setPagination(prev => ({ ...prev, current: page, pageSize }));
+    },
+    onShowSizeChange: (current, size) => {
+      setPagination(prev => ({ ...prev, current: 1, pageSize: size }));
+    }
+  });
   
   // State for no measurements popup
   const [noMeasurementsModal, setNoMeasurementsModal] = useState({
@@ -127,14 +139,17 @@ function InspectionResult() {
         }
       }
       
-      // Transform the response data to match the expected format
+      // Sort the response data by ID in ascending order
+      const sortedResponse = [...response].sort((a, b) => a.id - b.id);
+      
+      // Transform the sorted response data to match the expected format
       const transformedData = {
         order_id: selectedOrderId,
         production_order: inspectionData?.[0]?.production_order || '',
         part_number: inspectionData?.[0]?.part_number || '',
         inspection_data: [{
           operation_number: selectedOperation,
-          inspections: response.map(item => ({
+          inspections: sortedResponse.map(item => ({
             id: item.id,
             zone: item.zone,
             dimension_type: item.dimension_type,
@@ -151,6 +166,8 @@ function InspectionResult() {
           }))
         }]
       };
+      
+      console.log('Sorted measurements by ID:', transformedData.inspection_data[0].inspections.map(i => i.id));
       
       setDetailedMeasurements(transformedData);
       setIsDetailedMeasurementsVisible(true);
@@ -1126,14 +1143,17 @@ function InspectionResult() {
           }
         }
         
-        // Transform the response data to match the expected format
+        // Sort the response data by ID in ascending order
+        const sortedResponse = [...response].sort((a, b) => a.id - b.id);
+        
+        // Transform the sorted response data to match the expected format
         const transformedData = {
           order_id: inspectionId,
           production_order: inspectionData?.[0]?.production_order || '',
           part_number: inspectionData?.[0]?.part_number || '',
           inspection_data: [{
             operation_number: selectedOperation,
-            inspections: response.map(item => ({
+            inspections: sortedResponse.map(item => ({
               id: item.id,
               zone: item.zone,
               dimension_type: item.dimension_type,
@@ -1150,6 +1170,8 @@ function InspectionResult() {
             }))
           }]
         };
+        
+        console.log('Sorted measurements by ID in fetchDetailedMeasurements:', transformedData.inspection_data[0].inspections.map(i => i.id));
         
         setDetailedMeasurements(transformedData);
         setIsDetailedMeasurementsVisible(true);
@@ -1363,6 +1385,16 @@ function InspectionResult() {
     // Simplified measurement columns as requested
     const simplifiedColumns = [
       {
+        title: 'S.No',
+        key: 'sno',
+        width: '5%',
+        render: (text, record, index) => {
+          const current = pagination.current || 1;
+          const pageSize = pagination.pageSize || 10;
+          return (current - 1) * pageSize + index + 1;
+        },
+      },
+      {
         title: 'Zone',
         dataIndex: 'zone',
         key: 'zone',
@@ -1449,7 +1481,9 @@ function InspectionResult() {
                data.operation_number === selectedOperation
       );
       
-      return operationData?.inspections || [];
+      // Ensure measurements are always sorted by ID in ascending order
+      const measurements = operationData?.inspections || [];
+      return [...measurements].sort((a, b) => a.id - b.id);
     };
     
     const measurements = getOperationMeasurements();
@@ -1533,7 +1567,7 @@ function InspectionResult() {
                         )}
                         {ftpApprovalStatus?.updated_at && (
                           <Text type="secondary" className="ml-4">
-                            Last Updated: {new Date(ftpApprovalStatus.updated_at).toLocaleString()}
+                            Last Updated: {new Date(ftpApprovalStatus.updated_at).toLocaleDateString()}
                           </Text>
                         )}
                       </div>
@@ -1544,18 +1578,23 @@ function InspectionResult() {
                   />
                   
                   <Table
-                    columns={detailedMeasurementColumns}
-                    dataSource={measurements.map(item => ({
-                      ...item,
-                      key: item.id || `${item.zone}-${item.dimension_type}`
-                    }))}
+                    columns={simplifiedColumns}
+                    dataSource={measurements}
+                    rowKey={record => record.id || `${record.zone}-${record.dimension_type}`}
                     bordered
                     size="middle"
                     scroll={{ x: 'max-content', y: 600 }}
-                    pagination={{ 
-                      pageSize: 10, 
+                    pagination={{
+                      ...pagination,
+                      total: measurements.length,
                       showSizeChanger: true,
-                      showTotal: (total) => `Total ${total} items`
+                      showTotal: (total) => `Total ${total} items`,
+                      onChange: (page, pageSize) => {
+                        setPagination(prev => ({ ...prev, current: page, pageSize }));
+                      },
+                      onShowSizeChange: (current, size) => {
+                        setPagination(prev => ({ ...prev, current: 1, pageSize: size }));
+                      }
                     }}
                     className="detailed-measurements-table"
                     style={{ 

@@ -241,7 +241,7 @@ const Workcenter = () => {
 
  const columns = [
   {
-    title: 'Workcenter ID',
+    title: 'Sl.No',
     dataIndex: 'work_center_id',
     width: 120,
     sorter: (a, b) => {

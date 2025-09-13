@@ -443,9 +443,10 @@ const PokaYokeChecklist = ({ jobId, machineId, visible, onClose }) => {
                     value={selectedOrder?.id}
                     className="w-full"
                     size="large"
-                    filterOption={(input, option) =>
-                      option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                    }
+                    filterOption={(input, option) => {
+                      const children = option?.children?.toString() || '';
+                      return children.toLowerCase().includes(input.toLowerCase());
+                    }}
                   >
                     {availableOrders.map(order => (
                       <Option key={order.id} value={order.id}>

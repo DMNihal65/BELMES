@@ -122,7 +122,32 @@ const ChecklistsTab = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: '15%',
-      render: (date) => new Date(date).toLocaleString(),
+      render: (date) => {
+        if (!date) return '-';
+        
+        // Log the raw date for debugging
+        console.log('Raw date from API:', date);
+        
+        // Create a date object and account for timezone offset
+        const dateObj = new Date(date);
+        const timezoneOffset = dateObj.getTimezoneOffset() * 60000; // in milliseconds
+        const localDate = new Date(dateObj.getTime() - timezoneOffset);
+        
+        // Format the date manually
+        const formattedDate = localDate.toLocaleString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+        
+        console.log('Formatted date:', formattedDate);
+        return formattedDate;
+      },
     },
     {
       title: 'Status',
@@ -440,7 +465,23 @@ const ChecklistsTab = () => {
             <div className="mb-4 flex gap-4">
               <div>
                 <span className="text-gray-500">Created At:</span>
-                <span className="ml-2">{new Date(checklist.created_at).toLocaleString()}</span>
+                <span className="ml-2">
+                  {checklist.created_at ? (() => {
+                    const dateObj = new Date(checklist.created_at);
+                    const timezoneOffset = dateObj.getTimezoneOffset() * 60000;
+                    const localDate = new Date(dateObj.getTime() - timezoneOffset);
+                    return localDate.toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: true,
+                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                    });
+                  })() : '-'}
+                </span>
               </div>
               
               <div>

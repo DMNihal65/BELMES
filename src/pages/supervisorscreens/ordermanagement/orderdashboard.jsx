@@ -713,14 +713,12 @@ const OrderDashboard = () => {
   // Calculate the actual counts for each card based on tab data
   const totalOrdersCount = localOrders?.length || 0;
   
-  // Calculate scheduled count - only count orders with 'scheduled' status
-  let inProgressOrdersCount = localOrders?.filter(order => 
-    order.status === 'scheduled'
-  )?.length || 0;
+  // Calculate scheduled count - use timelineData length as it contains all scheduled orders
+  let inProgressOrdersCount = timelineData?.length || 0;
   
-  // If no scheduled orders found in localOrders, use timelineData as fallback
-  if (inProgressOrdersCount === 0 && timelineData && timelineData.length > 0) {
-    inProgressOrdersCount = timelineData.length;
+  // Fallback to filtering localOrders if timelineData is empty
+  if (inProgressOrdersCount === 0 && localOrders && localOrders.length > 0) {
+    inProgressOrdersCount = localOrders.filter(order => order.status === 'scheduled')?.length || 0;
   }
   
   const priorityOrdersCount = priorityOrders?.length || 0;

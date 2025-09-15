@@ -150,32 +150,44 @@ const OrderTable = ({ orders, onRefresh }) => {
       dataIndex: 'sale_order',
       key: 'sale_order',
     },
-    
-    // {
-    //   title: 'Status',
-    //   key: 'status',
-    //   render: (_, record) => {
-    //     const status = record.status || 'pending';
-    //     const statusColors = {
-    //       in_progress: 'processing',
-    //       completed: 'success',
-    //       delayed: 'error',
-    //       pending: 'default'
-    //     };
-    //     return (
-    //       <Badge
-    //         status={statusColors[status]}
-    //         text={status.replace('_', ' ').toUpperCase()}
-    //       />
-    //     );
-    //   },
-    //   filters: [
-    //     { text: 'In Progress', value: 'in_progress' },
-    //     { text: 'Completed', value: 'completed' },
-    //     { text: 'Delayed', value: 'delayed' },
-    //   ],
-    //   onFilter: (value, record) => record.status === value,
-    // },
+    {
+      title: 'Status',
+      key: 'status',
+      fixed: 'right',
+      width: 120,
+      render: (_, record) => {
+        const status = (record.status || 'created').toLowerCase();
+        const statusConfig = {
+          created: { color: '#1890ff', text: 'Created' }, // Blue
+          in_progress: { color: '#722ed1', text: 'In Progress' }, // Purple
+          completed: { color: '#52c41a', text: 'Completed' }, // Green
+          delayed: { color: '#f5222d', text: 'Delayed' }, // Red
+          default: { color: '#d9d9d9', text: 'Pending' } // Gray
+        };
+        
+        const { color, text } = statusConfig[status] || statusConfig.default;
+        
+        return (
+          <Tag 
+            color={color}
+            style={{
+              color: color === '#d9d9d9' ? 'rgba(0, 0, 0, 0.65)' : '#fff',
+              borderColor: color,
+              backgroundColor: color === '#d9d9d9' ? '#f5f5f5' : color
+            }}
+          >
+            {text}
+          </Tag>
+        );
+      },
+      filters: [
+        { text: 'Created', value: 'created' },
+        { text: 'In Progress', value: 'in_progress' },
+        { text: 'Completed', value: 'completed' },
+        { text: 'Delayed', value: 'delayed' },
+      ],
+      onFilter: (value, record) => (record.status || '').toLowerCase() === value,
+    },
     {
       title: 'Actions',
       key: 'actions',

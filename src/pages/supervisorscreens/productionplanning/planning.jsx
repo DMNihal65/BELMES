@@ -17,7 +17,7 @@ import {
 } from '@ant-design/icons';
 import {
   Timer, AlertTriangle, CheckCircle2, 
-  Gauge, Settings, Users, Calendar,  CheckCircle, Hourglass, CalendarCheck
+  Gauge, Settings, Users, Calendar, CheckCircle, Hourglass, CalendarCheck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import JobOperationsTable from '../../../components/ProductionPlanning/JobOperationsTable';
@@ -103,55 +103,98 @@ const cellStyle = {
 };
 
 // Create a separate component for PDC info
-const PdcInfo = ({ productionOrder }) => {
-  const [pdcInfo, setPdcInfo] = useState({ pdc: null, status: 'loading', data_source: null });
-  const { fetchPdcForCurrentJob, activeParts } = usePlanningStore();
+const PdcInfo = ({ productionOrder, partNumber }) => {
+  const [pdcData, setPdcData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { fetchPdcData } = usePlanningStore();
 
-  // This effect will run whenever productionOrder changes
   useEffect(() => {
-    if (productionOrder) {
-      fetchPdc();
-    }
-  }, [productionOrder, activeParts]); // Include activeParts to refresh when status changes
+    const loadPdcData = async () => {
+      if (!productionOrder || !partNumber) return;
+      
+      try {
+        setLoading(true);
+        const data = await fetchPdcData(partNumber, productionOrder);
+        console.log('PDC Data from API:', data); // Debug log
+        
+        if (data && data.length > 0) {
+          // Use the first item from the array as the PDC data
+          setPdcData({
+            pdc: data[0].pdc_data, // Updated to use pdc_data instead of pdc_date
+            last_updated: data[0].updated_at || new Date().toISOString()
+          });
+        } else {
+          setPdcData(null);
+        }
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching PDC data:', err);
+        setError(err.message);
+        setPdcData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchPdc = async () => {
-    try {
-      console.log(`Fetching PDC for production order: ${productionOrder}`);
-      const data = await fetchPdcForCurrentJob(productionOrder);
-      console.log(`PDC result:`, data);
-      setPdcInfo(data);
-    } catch (error) {
-      console.error('Error fetching PDC info:', error);
-      setPdcInfo({ pdc: null, status: 'error', data_source: null });
-    }
-  };
+    loadPdcData();
+  }, [productionOrder, partNumber, fetchPdcData]);
 
-  // Different display based on status
-  if (pdcInfo.status === 'loading') {
-    return <Spin size="small" />;
-  }
+  if (loading) return <Spin size="small" />;
+  if (error) return <span className="text-red-500">Error</span>;
+  if (!pdcData) return <span>N/A</span>;
   
-  // For inactive parts, show "Not yet scheduled" in orange color
-  if (pdcInfo.status === 'inactive') {
-    return <span className="text-orange-500 font-medium">Not yet scheduled</span>;
-  }
-  
-  // For active parts with PDC data, show the date with blue text
-  if (pdcInfo.status === 'active' && pdcInfo.pdc) {
-    return (
-      <Tooltip title={`Data source: ${pdcInfo.data_source || 'Unknown'}`}>
-        <span className="text-blue-600 font-medium">{moment(pdcInfo.pdc).format('DD/MM/YYYY')}</span>
-      </Tooltip>
-    );
-  }
-  
-  // For active parts without PDC data
-  if (pdcInfo.status === 'active' && !pdcInfo.pdc) {
-    return <span className="text-blue-600 font-medium">Not Yet Scheduled</span>;
-  }
-  
-  // Fallback for any other case
-  return <span>-</span>;
+  return (
+    <Tooltip title={`Last updated: ${pdcData.last_updated ? new Date(pdcData.last_updated).toLocaleString() : 'N/A'}`}>
+      <span className="text-blue-600 font-medium">
+        {pdcData.pdc ? new Date(pdcData.pdc).toLocaleDateString() : 'Not Scheduled'}
+      </span>
+    </Tooltip>
+  );
+};
+
+// Component to fetch and display start date from scheduling API
+const StartDateWithLoader = ({ productionOrder, partNumber }) => {
+  const [startDate, setStartDate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchStartDate = async () => {
+      if (!productionOrder || !partNumber) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        const response = await fetch(
+          `http://172.18.7.89:8008/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch start date');
+        }
+        
+        const data = await response.json();
+        setStartDate(data.start_date ? new Date(data.start_date) : null);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching start date:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStartDate();
+  }, [productionOrder, partNumber]);
+
+  if (loading) return <Spin size="small" />;
+  if (error) return <span className="text-red-500">Error</span>;
+  if (!startDate) return <span>N/A</span>;
+
+  return <span>{startDate.toLocaleDateString()}</span>;
 };
 
 
@@ -1747,9 +1790,16 @@ const loadInventoryItems = async () => {
     }
   };
 
-  // In your Planning component, replace the renderPdcInfo function with:
+  // Function to render PDC info with both production order and part number
   const renderPdcInfo = (productionOrder) => {
-    return <PdcInfo productionOrder={productionOrder} key={`pdc-${productionOrder}`} />;
+    if (!selectedJob) return <span>N/A</span>;
+    return (
+      <PdcInfo 
+        productionOrder={productionOrder} 
+        partNumber={selectedJob.part_number}
+        key={`pdc-${productionOrder}`} 
+      />
+    );
   };
 
   // Handle viewing/downloading a drawing
@@ -3163,11 +3213,12 @@ const loadInventoryItems = async () => {
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Total Operations (Active + Inactive WC)</span>}>
                       {selectedJob.total_operations}
                     </Descriptions.Item>
-                    {/* <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Start Date</span>}>
-                      {selectedJob.project?.start_date 
-                        ? new Date(selectedJob.project.start_date).toLocaleDateString()
-                        : 'N/A'}
-                    </Descriptions.Item> */}
+                    <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Start Date</span>}>
+                      <StartDateWithLoader 
+                        productionOrder={selectedJob.production_order} 
+                        partNumber={selectedJob.part_number} 
+                      />
+                    </Descriptions.Item>
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Status</span>}>
                       <div className="flex items-center space-x-2">
                         {renderStatusButton(selectedJob.production_order)}

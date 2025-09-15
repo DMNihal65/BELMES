@@ -19,7 +19,7 @@ const useIpidStore = create((set, get) => ({
       formData.append('version_number', 'v1');
       formData.append('metadata', JSON.stringify({}));
 
-      const response = await fetch('http://172.18.7.91:8008/api/v1/documents/ipid/upload/', {
+      const response = await fetch('http://127.0.0.1:8000/api/v1/documents/ipid/upload/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -53,7 +53,7 @@ const OperationDetailsCard = () => {
           }
         } else {
           const userSelectedJob = localStorage.getItem('user-selected-job');
-          if (userSelectedJob) {
+          if (userSelectedJob) {  
             try {
               const parsedUserSelected = JSON.parse(userSelectedJob);
               const minimalJob = {

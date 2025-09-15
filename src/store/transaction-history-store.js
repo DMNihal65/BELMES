@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import axios from 'axios';
 import { message } from 'antd';
 
-const BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const BASE_URL = 'http://172.18.7.89:8008/api/v1';
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');

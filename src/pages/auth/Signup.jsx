@@ -8,7 +8,7 @@ const Signup = () => {
   const handleSignup = async (values) => {
     try {
       // Call your signup API here
-      const response = await fetch('http://127.0.0.1:8000/register', {
+      const response = await fetch('http://172.18.7.89:8008/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

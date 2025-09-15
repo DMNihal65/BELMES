@@ -183,7 +183,7 @@ const JobDetails = () => {
   // Function to load all available jobs
   const loadAvailableJobs = useCallback(async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/v1/planning/all_orders');
+      const response = await fetch('http://172.18.7.89:8008/api/v1/planning/all_orders');
       
       if (!response.ok) {
         throw new Error('Failed to fetch available jobs');
@@ -201,7 +201,7 @@ const JobDetails = () => {
   const loadJobDetails = useCallback(async (partNumber) => {
     try {
       setIsLoadingJobData(true);
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/planning/search_order?part_number=${partNumber}`);
+      const response = await fetch(`http://172.18.7.89:8008/api/v1/planning/search_order?part_number=${partNumber}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch job details');

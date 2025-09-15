@@ -240,52 +240,52 @@ const Workcenter = () => {
   };
 
  const columns = [
-  {
-    title: 'Sl.No',
-    dataIndex: 'work_center_id',
-    width: 120,
-    sorter: (a, b) => {
+  // {
+  //   title: 'Sl.No',
+  //   dataIndex: 'work_center_id',
+  //   width: 120,
+  //   sorter: (a, b) => {
     
-      const aId = a.work_center_id || '';
-      const bId = b.work_center_id || '';
+  //     const aId = a.work_center_id || '';
+  //     const bId = b.work_center_id || '';
       
       
-      const aNum = parseInt(aId);
-      const bNum = parseInt(bId);
+  //     const aNum = parseInt(aId);
+  //     const bNum = parseInt(bId);
       
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        return aNum - bNum;
-      }
+  //     if (!isNaN(aNum) && !isNaN(bNum)) {
+  //       return aNum - bNum;
+  //     }
       
     
-      return String(aId).localeCompare(String(bId));
-    },
-    sortDirections: ['ascend', 'descend'],
-    defaultSortOrder: 'ascend',
-    render: (text) => text,
-    filters: [...new Set(data
-      .map(item => item.work_center_id)
-      .filter(Boolean)
-    )]
-    .sort((a, b) => {
-      const aNum = parseInt(a);
-      const bNum = parseInt(b);
+  //     return String(aId).localeCompare(String(bId));
+  //   },
+  //   sortDirections: ['ascend', 'descend'],
+  //   defaultSortOrder: 'ascend',
+  //   render: (text) => text,
+  //   filters: [...new Set(data
+  //     .map(item => item.work_center_id)
+  //     .filter(Boolean)
+  //   )]
+  //   .sort((a, b) => {
+  //     const aNum = parseInt(a);
+  //     const bNum = parseInt(b);
       
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        return aNum - bNum;
-      }
-      return String(a).localeCompare(String(b));
-    })
-    .map(id => ({ text: String(id), value: id })),
-    filterMode: 'menu',
-    filterSearch: true,
-    onFilter: (value, record) => {
-      if (!record.work_center_id) return false;
-      return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
-    },
-    className: 'filter-column',
-    showSorterTooltip: { title: 'Click to sort' }
-  },
+  //     if (!isNaN(aNum) && !isNaN(bNum)) {
+  //       return aNum - bNum;
+  //     }
+  //     return String(a).localeCompare(String(b));
+  //   })
+  //   .map(id => ({ text: String(id), value: id })),
+  //   filterMode: 'menu',
+  //   filterSearch: true,
+  //   onFilter: (value, record) => {
+  //     if (!record.work_center_id) return false;
+  //     return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
+  //   },
+  //   className: 'filter-column',
+  //   showSorterTooltip: { title: 'Click to sort' }
+  // },
   {
     title: 'Workcenter Code',
     dataIndex: ['work_center', 'code'],

@@ -199,18 +199,18 @@ const ReorderableTable = ({ orders = [] }) => {
         );
       },
     },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (status) => (
-        <div className="flex items-center">
-          <span className="mr-2">•</span>
-          <span>PENDING</span>
-        </div>
-      ),
-    }
+    // {
+    //   title: 'Status',
+    //   dataIndex: 'status',
+    //   key: 'status',
+    //   width: 120,
+    //   render: (status) => (
+    //     <div className="flex items-center">
+    //       <span className="mr-2">•</span>
+    //       <span>PENDING</span>
+    //     </div>
+    //   ),
+    // }
   ];
 
   const getPriorityBackgroundColor = (priority) => {
@@ -346,24 +346,27 @@ const ReorderableTable = ({ orders = [] }) => {
             strategy={verticalListSortingStrategy}
           >
             <Table
-              className="priority-table"
               components={{
                 body: {
                   row: Row,
                 },
               }}
+              rowKey="id"
               columns={columns}
               dataSource={localOrders}
-              rowKey={record => record.id || record.production_order}
               pagination={{
                 ...pagination,
+                style: { 
+                  margin: '8px 0',
+                  fontSize: '10px'
+                },
                 showSizeChanger: true,
                 showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} orders`,
                 pageSizeOptions: ['10', '20', '50', '100'],
                 onShowSizeChange: (current, size) => {
                   setPagination({
                     ...pagination,
-                    current: 1, // Reset to first page when changing page size
+                    current: 1,
                     pageSize: size,
                   });
                 },
@@ -374,7 +377,15 @@ const ReorderableTable = ({ orders = [] }) => {
                     pageSize: pageSize,
                   });
                 },
+                size: 'small',
+                showQuickJumper: false
               }}
+              className="text-2xs"
+              style={{ 
+                fontSize: '10px',
+                lineHeight: '1'
+              }}
+              bordered
               loading={isLoadingScheduled}
               locale={{
                 emptyText: showScheduled 
@@ -388,7 +399,7 @@ const ReorderableTable = ({ orders = [] }) => {
                 if (priority === 3) return 'bg-yellow-50';
                 return '';
               }}
-              scroll={{ y: 480 }}
+              scroll={{ y: 450 }}
               size="middle"
               onChange={(pagination, filters, sorter) => {
                 if (sorter.field === 'project') {

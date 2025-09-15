@@ -23,7 +23,7 @@ const { TextArea } = Input;
 const { Step } = Steps;
 const { Option } = Select;
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.18.7.89:5469';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.18.7.91:8008';
 
 const PokaYokeChecklist = ({ jobId, machineId, visible, onClose }) => {
   const { currentUser, currentMachine } = useAuthStore();
@@ -434,7 +434,7 @@ const PokaYokeChecklist = ({ jobId, machineId, visible, onClose }) => {
                   <Select
                     showSearch
                     placeholder="Select a production order"
-                    optionFilterProp="children"
+                    optionFilterProp="label"
                     loading={loadingOrders}
                     onChange={(value) => {
                       const order = availableOrders.find(o => o.id === value);
@@ -444,15 +444,20 @@ const PokaYokeChecklist = ({ jobId, machineId, visible, onClose }) => {
                     className="w-full"
                     size="large"
                     filterOption={(input, option) =>
-                      option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                      option?.label?.toLowerCase().includes(input.toLowerCase())
                     }
                   >
                     {availableOrders.map(order => (
-                      <Option key={order.id} value={order.id}>
+                      <Option 
+                        key={order.id} 
+                        value={order.id} 
+                        label={`${order.production_order} | ${order.part_number} - ${order.part_description}`}
+                      >
                         {order.production_order} | {order.part_number} - {order.part_description}
                       </Option>
                     ))}
                   </Select>
+
                   
                   {selectedOrder && (
                     <div className="mt-3 bg-white p-3 rounded-lg border border-blue-100">

@@ -85,6 +85,7 @@ function Header() {
     localStorage.removeItem('jobSource');
     localStorage.removeItem('currentJobData');
     localStorage.removeItem('activeOperation');
+    localStorage.removeItem('user-selected-job');
   };
   
   // Handle acknowledging a single notification

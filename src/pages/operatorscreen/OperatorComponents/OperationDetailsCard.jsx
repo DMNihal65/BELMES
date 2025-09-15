@@ -26,183 +26,121 @@ const OperationDetailsCard = () => {
     downloadDocument,
     isLoadingMppData,
     scheduledJobs,
-    fetchJobDetails, // Add this to the destructuring
+    fetchJobDetails,
+    selectJob, // Add selectJob to the destructuring
   } = useOperatorStore();
-
-  // Local state to hold data from localStorage when store states are empty
-  const [localSelectedJob, setLocalSelectedJob] = useState(null);
-  const [localJobSource, setLocalJobSource] = useState(null);
-  const [localScheduledJobs, setLocalScheduledJobs] = useState([]);
-  const [isFetchingFromStorage, setIsFetchingFromStorage] = useState(false);
 
   const [activateModalVisible, setActivateModalVisible] = useState(false);
   const [operationToActivate, setOperationToActivate] = useState(null);
   const [mppModalVisible, setMppModalVisible] = useState(false);
   const [mppData, setMppData] = useState(null);
   const [currentOperationForMpp, setCurrentOperationForMpp] = useState(null);
-
+  const [isActivating, setIsActivating] = useState(false);
   const [localActiveOperation, setLocalActiveOperation] = useState(null);
 
-
-  // Function to fetch job details from API using localStorage data
-  const fetchJobDetailsFromStorage = async () => {
-    const currentJobData = localStorage.getItem('currentJobData');
-    if (!currentJobData) return;
-
-    try {
-      const parsedJobData = JSON.parse(currentJobData);
-      if (!parsedJobData.production_order) return;
-
-      setIsFetchingFromStorage(true);
-      const result = await fetchJobDetails(parsedJobData.production_order);
-      
-      if (result.success && result.data) {
-        // The store should now be populated with the fetched data
-        console.log('Successfully fetched job details from API:', result.data);
-      } else {
-        console.error('Failed to fetch job details:', result.error);
-        message.error(`Failed to load operations: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Error parsing currentJobData or fetching details:', error);
-    } finally {
-      setIsFetchingFromStorage(false);
-    }
-  };
-
-  // Function to fetch and update local state from localStorage
-  const updateFromLocalStorage = () => {
-    // Fetch currentJobData from localStorage
-    const currentJobData = localStorage.getItem('currentJobData');
-    if (!selectedJob) {
-      if (currentJobData) {
-        try {
-          const parsedJobData = JSON.parse(currentJobData);
-          setLocalSelectedJob(parsedJobData);
-        } catch (error) {
-          console.error('Error parsing currentJobData from localStorage:', error);
-          setLocalSelectedJob(null); // Reset if parsing fails
+  // Hydrate selectedJob from localStorage on mount if not set
+  useEffect(() => {
+    const hydrateSelectedJob = () => {
+      if (!selectedJob) {
+        const currentJobData = localStorage.getItem('currentJobData');
+        if (currentJobData) {
+          try {
+            const parsedJobData = JSON.parse(currentJobData);
+            selectJob(parsedJobData); // Use selectJob to set selectedJob in the store
+          } catch (error) {
+            console.error('Error parsing currentJobData from localStorage:', error);
+            message.error('Failed to parse job data from storage');
+          }
+        } else {
+          const userSelectedJob = localStorage.getItem('user-selected-job');
+          if (userSelectedJob) {
+            try {
+              const parsedUserSelected = JSON.parse(userSelectedJob);
+              const minimalJob = {
+                production_order: parsedUserSelected.production_order,
+                part_number: parsedUserSelected.part_number
+              };
+              selectJob(minimalJob); // Set minimal selectedJob and trigger fetches
+            } catch (error) {
+              console.error('Error parsing user-selected-job from localStorage:', error);
+              message.error('Failed to parse user-selected job from storage');
+            }
+          }
         }
-      } else {
-        setLocalSelectedJob(null); // Reset if not in localStorage
       }
-    }
+    };
+    hydrateSelectedJob();
+  }, [selectedJob, selectJob]);
 
-    // Fetch jobSource from localStorage
-    const storedJobSource = localStorage.getItem('jobSource');
-    if (!jobSource) {
-      if (storedJobSource) {
-        setLocalJobSource(storedJobSource);
-      } else {
-        setLocalJobSource(null); // Reset if not in localStorage
-      }
-    }
-
-    // Fetch scheduledJobs from localStorage
-    const storedScheduledJobs = localStorage.getItem('scheduledJobs');
-    if (!scheduledJobs || scheduledJobs.length === 0) {
-      if (storedScheduledJobs) {
+  // Fetch job details when selectedJob changes
+  useEffect(() => {
+    const fetchDetails = async () => {
+      if (selectedJob?.production_order && (!availableOperations || availableOperations.length === 0)) {
         try {
-          const parsedScheduledJobs = JSON.parse(storedScheduledJobs);
-          setLocalScheduledJobs(parsedScheduledJobs);
-        } catch (error) {
-          console.error('Error parsing scheduledJobs from localStorage:', error);
-          setLocalScheduledJobs([]); // Reset if parsing fails
-        }
-      } else if (currentJobData) {
-        // Assume job is scheduled if currentJobData exists
-        try {
-          const parsedJobData = JSON.parse(currentJobData);
-          if (parsedJobData?.production_order) {
-            setLocalScheduledJobs([{ production_order: parsedJobData.production_order }]);
-          } else {
-            setLocalScheduledJobs([]); // Reset if no production_order
+          const result = await fetchJobDetails(selectedJob.production_order);
+          if (!result.success) {
+            console.error('Failed to fetch job details:', result.error);
+            message.error(`Failed to load operations: ${result.error}`);
           }
         } catch (error) {
-          setLocalScheduledJobs([]); // Reset if parsing fails
+          console.error('Error fetching job details:', error);
+          message.error('Failed to fetch job details');
         }
-      } else {
-        setLocalScheduledJobs([]); // Reset if not in localStorage
       }
-    }
+    };
+    fetchDetails();
+  }, [selectedJob, fetchJobDetails, availableOperations]);
 
-
+  // Fetch active operation from localStorage
+  useEffect(() => {
     const storedActiveOperation = localStorage.getItem('activeOperation');
-  if (storedActiveOperation) {
-    try {
-      const parsedActiveOperation = JSON.parse(storedActiveOperation);
-      setLocalActiveOperation(parsedActiveOperation);
-    } catch (error) {
-      console.error('Error parsing activeOperation from localStorage:', error);
+    if (storedActiveOperation) {
+      try {
+        const parsedActiveOperation = JSON.parse(storedActiveOperation);
+        setLocalActiveOperation(parsedActiveOperation);
+      } catch (error) {
+        console.error('Error parsing activeOperation from localStorage:', error);
+        setLocalActiveOperation(null);
+      }
+    } else {
       setLocalActiveOperation(null);
     }
-  } else {
-    setLocalActiveOperation(null);
-  }
-  };
+  }, []);
 
-  // Check if we need to fetch data from API
-  const shouldFetchFromAPI = () => {
-    const hasEmptyStoreStates = (
-      (!availableOperations || availableOperations.length === 0) &&
-      !selectedJob &&
-      !isLoadingOperations
-    );
-    
-    const hasLocalStorageData = localStorage.getItem('currentJobData');
-    
-    return hasEmptyStoreStates && hasLocalStorageData && !isFetchingFromStorage;
-  };
-
-  // Fetch data from localStorage on mount and when localStorage changes
+  // Fetch jobSource and scheduledJobs from localStorage if not in store
   useEffect(() => {
-    updateFromLocalStorage();
-
-    // Check if we need to fetch from API
-    if (shouldFetchFromAPI()) {
-      fetchJobDetailsFromStorage();
-    }
-
-    // Listen for storage events to detect localStorage changes
-    const handleStorageChange = (event) => {
-      if (
-        event.key === 'currentJobData' ||
-        event.key === 'jobSource' ||
-        event.key === 'scheduledJobs' ||
-         event.key === 'activeOperation' ||
-        event.key === null // localStorage.clear()
-      ) {
-        updateFromLocalStorage();
-        
-        // Check if we need to fetch from API after storage change
-        setTimeout(() => {
-          if (shouldFetchFromAPI()) {
-            fetchJobDetailsFromStorage();
-          }
-        }, 100); // Small delay to ensure state updates
+    const updateFromLocalStorage = () => {
+      const storedJobSource = localStorage.getItem('jobSource');
+      const storedScheduledJobs = localStorage.getItem('scheduledJobs');
+      if (!jobSource && storedJobSource) {
+        // Update jobSource if not in store
+      }
+      if (!scheduledJobs?.length && storedScheduledJobs) {
+        try {
+          const parsedScheduledJobs = JSON.parse(storedScheduledJobs);
+          // Update scheduledJobs if needed
+        } catch (error) {
+          console.error('Error parsing scheduledJobs from localStorage:', error);
+        }
       }
     };
+    updateFromLocalStorage();
 
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
+    const handleStorageChange = (event) => {
+      if (event.key === 'currentJobData' || event.key === 'user-selected-job' || event.key === 'jobSource' || event.key === 'scheduledJobs' || event.key === 'activeOperation' || event.key === null) {
+        updateFromLocalStorage();
+      }
     };
-  }, [selectedJob, selectedOperation, jobSource, scheduledJobs, availableOperations]);
-
-  // Additional useEffect to monitor state changes and trigger API fetch if needed
-  useEffect(() => {
-    if (shouldFetchFromAPI()) {
-      fetchJobDetailsFromStorage();
-    }
-  }, [availableOperations, selectedJob, isLoadingOperations]);
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [jobSource, scheduledJobs]);
 
   // Determine which data to use (store or local)
-  const effectiveSelectedJob = selectedJob || localSelectedJob;
+  const effectiveSelectedJob = selectedJob;
   const effectiveSelectedOperation = selectedOperation;
   const effectiveAvailableOperations = availableOperations;
-  const effectiveJobSource = jobSource || localJobSource;
-  const effectiveScheduledJobs = scheduledJobs?.length > 0 ? scheduledJobs : localScheduledJobs;
+  const effectiveJobSource = jobSource;
+  const effectiveScheduledJobs = scheduledJobs?.length > 0 ? scheduledJobs : [];
 
   const isJobScheduled = effectiveSelectedJob
     ? effectiveScheduledJobs?.some(
@@ -220,42 +158,34 @@ const OperationDetailsCard = () => {
     setActivateModalVisible(true);
   };
 
-  const [isActivating, setIsActivating] = useState(false);
   // Handle activation confirmation
-const handleActivate = async () => {
-  if (!operationToActivate) return;
-  
-  const operationId = operationToActivate.operation_id || operationToActivate.id;
-  
-  if (!operationId) {
-    console.error('No valid operation ID found for activation');
-    return;
-  }
-  setIsActivating(true);
-  
-try {
-    const result = await activateJob(operationId);
-
-    if (result.success) {
-      // Only close modal if activation was successful
-      setIsActivating(false);
-
-      setActivateModalVisible(false);
+  const handleActivate = async () => {
+    if (!operationToActivate) return;
+    const operationId = operationToActivate.operation_id || operationToActivate.id;
+    if (!operationId) {
+      console.error('No valid operation ID found for activation');
+      return;
     }
-  } catch (error) {
-    console.error('Error activating job:', error);
-    message.error(`Failed to activate operation: ${error.message}`);
-  }
-};
+    setIsActivating(true);
+    try {
+      const result = await activateJob(operationId);
+      if (result.success) {
+        setActivateModalVisible(false);
+      }
+    } catch (error) {
+      console.error('Error activating job:', error);
+      message.error(`Failed to activate operation: ${error.message}`);
+    } finally {
+      setIsActivating(false);
+    }
+  };
 
   // Handle viewing MPP for an operation
   const handleViewMpp = async (operation) => {
     if (!effectiveSelectedJob || !effectiveSelectedJob.part_number || !operation) return;
-    
     setMppModalVisible(true);
     setCurrentOperationForMpp(operation);
     setMppData(null);
-    
     try {
       const result = await fetchOperationMpp(effectiveSelectedJob.part_number, operation.operation_number);
       if (result.success) {
@@ -276,48 +206,36 @@ try {
   };
 
   // Get operation status tag
-const getOperationStatusTag = (record) => {
-  const recordId = record.operation_id || record.id;
-  
-  // Check if this operation is the active one from localStorage
-  if (localActiveOperation && recordId === localActiveOperation.operation_id) {
-    return <Tag color="success" className="px-2 py-1 text-base font-medium">Active</Tag>;
-  }
-  
-  // Fallback to existing logic for selected operation
-  const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
-  
-  if (selectedOpId && recordId === selectedOpId) {
-    if (effectiveJobSource === 'inprogress') {
+  const getOperationStatusTag = (record) => {
+    const recordId = record.operation_id || record.id;
+    if (localActiveOperation && recordId === localActiveOperation.operation_id) {
       return <Tag color="success" className="px-2 py-1 text-base font-medium">Active</Tag>;
     }
-    return <Tag color="blue" className="px-2 py-1 text-base font-medium">Selected</Tag>;
-  }
-  
-  if (record.can_log === false) {
-    return <Tag color="warning" className="px-2 py-1 text-base font-medium">Cannot Log</Tag>;
-  }
-  
-  return null;
-};
+    const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
+    if (selectedOpId && recordId === selectedOpId) {
+      if (effectiveJobSource === 'inprogress') {
+        return <Tag color="success" className="px-2 py-1 text-base font-medium">Active</Tag>;
+      }
+      return <Tag color="blue" className="px-2 py-1 text-base font-medium">Selected</Tag>;
+    }
+    if (record.can_log === false) {
+      return <Tag color="warning" className="px-2 py-1 text-base font-medium">Cannot Log</Tag>;
+    }
+    return null;
+  };
 
   // Get row class name
-const getRowClassName = (record) => {
-  const recordId = record.operation_id || record.id;
-  
-  // Check if this operation is the active one from localStorage
-  if (localActiveOperation && recordId === localActiveOperation.operation_id) {
-    return 'operation-row bg-sky-50 border-l-4 border-sky-500';
-  }
-  
-  // Fallback to existing logic for selected operation
-  const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
-  
-  if (selectedOpId && recordId === selectedOpId) {
-    return 'operation-row bg-sky-50 border-l-4 border-sky-500';
-  }
-  return 'operation-row';
-};
+  const getRowClassName = (record) => {
+    const recordId = record.operation_id || record.id;
+    if (localActiveOperation && recordId === localActiveOperation.operation_id) {
+      return 'operation-row bg-sky-50 border-l-4 border-sky-500';
+    }
+    const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
+    if (selectedOpId && recordId === selectedOpId) {
+      return 'operation-row bg-sky-50 border-l-4 border-sky-500';
+    }
+    return 'operation-row';
+  };
 
   // Define table columns
   const columns = [
@@ -385,55 +303,34 @@ const getRowClassName = (record) => {
       render: (_, record) => getOperationStatusTag(record)
     },
     {
-  title: 'Action',
-  key: 'action',
-  width: 200,
-  render: (_, record) => {
-    const recordId = record.operation_id || record.id;
-    const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
-    
-    // Check if this operation is currently active (from localStorage)
-    const isCurrentlyActive = localActiveOperation && recordId === localActiveOperation.operation_id;
-    
-    const isSelectable = !(
-      record.completed_quantity === record.required_quantity ||
-      record.can_log === false
-    );
-
-    return (
-      <Space size="middle" wrap>
-        {/* <Button
-          type="default"
-          icon={<FileText size={16} />}
-          onClick={() => handleViewMpp(record)}
-          size="middle"
-          className="border-sky-300 text-sky-600"
-          disabled={!isJobScheduled || !isSelectable}
-        >
-          MPP
-        </Button> */}
-        <Button
-          type="primary"
-          icon={<Zap size={16} />}
-          onClick={() => showActivateConfirmation(record)}
-          disabled={
-            !isJobScheduled ||
-            !isSelectable ||
-            isCurrentlyActive // Disable if this operation is currently active
-          }
-          size="middle"
-          className={
-            isCurrentlyActive
-              ? "bg-green-500"
-              : "bg-sky-500"
-          }
-        >
-          {isCurrentlyActive ? "Active" : "Activate"}
-        </Button>
-      </Space>
-    );
-  },
-}
+      title: 'Action',
+      key: 'action',
+      width: 200,
+      render: (_, record) => {
+        const recordId = record.operation_id || record.id;
+        const selectedOpId = effectiveSelectedOperation ? (effectiveSelectedOperation.operation_id || effectiveSelectedOperation.id) : null;
+        const isCurrentlyActive = localActiveOperation && recordId === localActiveOperation.operation_id;
+        const isSelectable = !(
+          record.completed_quantity === record.required_quantity ||
+          record.can_log === false
+        );
+        return (
+          <Space size="middle" wrap>
+            
+            <Button
+              type="primary"
+              icon={<Zap size={16} />}
+              onClick={() => showActivateConfirmation(record)}
+              disabled={!isJobScheduled || !isSelectable || isCurrentlyActive}
+              size="middle"
+              className={isCurrentlyActive ? "bg-green-500" : "bg-sky-500"}
+            >
+              {isCurrentlyActive ? "Active" : "Activate"}
+            </Button>
+          </Space>
+        );
+      },
+    }
   ];
 
   // Render MPP content based on data type
@@ -446,7 +343,6 @@ const getRowClassName = (record) => {
         </div>
       );
     }
-    
     if (!mppData) {
       return (
         <div className="p-8 text-center">
@@ -457,7 +353,6 @@ const getRowClassName = (record) => {
         </div>
       );
     }
-    
     if (mppData.error) {
       return (
         <div className="p-8 text-center">
@@ -468,7 +363,6 @@ const getRowClassName = (record) => {
         </div>
       );
     }
-    
     if (mppData.type === 'pdf') {
       return (
         <div className="p-8 text-center">
@@ -494,21 +388,17 @@ const getRowClassName = (record) => {
         </div>
       );
     }
-    
     if (mppData.type === 'instructions' && mppData.instructions) {
       const instructions = mppData.instructions;
-      
       return (
         <div className="p-4">
           <h3 className="text-lg font-medium mb-4">Operation Work Instructions</h3>
-          
           {instructions.operation_description && (
             <div className="mb-4">
               <div className="font-medium text-gray-700">Description</div>
               <div className="p-2 bg-gray-50 rounded-md">{instructions.operation_description}</div>
             </div>
           )}
-          
           {instructions.steps && instructions.steps.length > 0 && (
             <div className="mb-4">
               <div className="font-medium text-gray-700 mb-2">Steps</div>
@@ -538,14 +428,12 @@ const getRowClassName = (record) => {
               </div>
             </div>
           )}
-          
           {instructions.notes && (
             <div className="mb-4">
               <div className="font-medium text-gray-700">Notes</div>
               <div className="p-2 bg-gray-50 rounded-md whitespace-pre-wrap">{instructions.notes}</div>
             </div>
           )}
-          
           {instructions.tools && instructions.tools.length > 0 && (
             <div className="mb-4">
               <div className="font-medium text-gray-700 mb-2">Tools Required</div>
@@ -561,7 +449,6 @@ const getRowClassName = (record) => {
         </div>
       );
     }
-    
     return (
       <div className="p-8 text-center">
         <div className="text-gray-400">
@@ -572,8 +459,7 @@ const getRowClassName = (record) => {
     );
   };
 
-  // Show loading state when fetching from storage
-  const isLoading = isLoadingOperations || isFetchingFromStorage;
+  const isLoading = isLoadingOperations;
 
   return (
     <>
@@ -581,9 +467,7 @@ const getRowClassName = (record) => {
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Spin size="large" />
-            <span className="ml-2 text-gray-500">
-              {isFetchingFromStorage ? 'Loading job data...' : 'Loading operation sequence...'}
-            </span>
+            <span className="ml-2 text-gray-500">Loading operation sequence...</span>
           </div>
         ) : !effectiveAvailableOperations || effectiveAvailableOperations.length === 0 ? (
           <Empty 
@@ -620,7 +504,6 @@ const getRowClassName = (record) => {
                     )}
                   </div>
                 </div>
-                
                 <Row gutter={16} className="mt-4">
                   <Col span={8}>
                     <div className="flex flex-col gap-2 p-3 bg-white rounded-md shadow-sm">
@@ -654,14 +537,12 @@ const getRowClassName = (record) => {
                 </Row>
               </div>
             )}
-
             <div className="mb-2 flex justify-between items-center">
               <div className="text-lg font-semibold text-sky-800">Operation Sequence</div>
               <div className="text-sm text-gray-500">
                 {effectiveAvailableOperations.length} operations
               </div>
             </div>
-            
             <Table 
               columns={columns}
               dataSource={effectiveAvailableOperations}
@@ -676,7 +557,6 @@ const getRowClassName = (record) => {
                   record.completed_quantity === record.required_quantity ||
                   record.can_log === false
                 );
-
                 return {
                   onClick: () => {
                     if (!isJobScheduled) {
@@ -696,7 +576,6 @@ const getRowClassName = (record) => {
           </>
         )}
       </div>
-
       <Modal
         title={
           <div className="flex items-center gap-2">
@@ -735,7 +614,6 @@ const getRowClassName = (record) => {
           )}
         </div>
       </Modal>
-
       <Modal
         title={
           <div className="flex items-center gap-2">
@@ -752,29 +630,23 @@ const getRowClassName = (record) => {
       >
         {renderMppContent()}
       </Modal>
-
       <style jsx global>{`
         .operations-table .ant-table-cell {
           padding: 16px 12px;
         }
-        
         .operations-table .operation-row {
           transition: all 0.3s ease;
         }
-        
         .operations-table .operation-row.bg-sky-50 {
           background-color: #f0f9ff;
         }
-        
         .operations-table .operation-row.cursor-not-allowed {
           background-color: #f5f5f5 !important;
           opacity: 0.7;
         }
-        
         .operations-table .operation-row.cursor-not-allowed:hover {
           background-color: #f5f5f5 !important;
         }
-        
         .operations-table .ant-table-row:hover {
           background-color: #f5f5f5;
         }

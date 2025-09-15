@@ -3,9 +3,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { message } from 'antd';
 
 // API endpoints
-const API_BASE_URL = "http://172.18.7.89:5469";
-const MPP_API_BASE_URL = "http://172.18.7.89:5469";
-const WS_URL = "ws://172.18.7.89:5469/production_monitoring/ws/live-status/";
+const API_BASE_URL = "http://172.18.7.91:8008";
+const MPP_API_BASE_URL = "http://172.18.7.91:8008";
+const WS_URL = "ws://172.18.7.91:8008/production_monitoring/ws/live-status/";
 
 // Helper function to get authentication token
 const getAuthToken = () => {
@@ -544,6 +544,7 @@ const useOperatorStore = create((set, get) => ({
       localStorage.removeItem('jobSource');
       localStorage.removeItem('currentJobData');
       localStorage.removeItem('activeOperation');
+      localStorage.removeItem('user-selected-job');
   
       // Reset all job-related state
       set({

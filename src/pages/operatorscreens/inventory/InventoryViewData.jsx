@@ -314,8 +314,11 @@ const InventoryViewData = () => {
       return [];
     }
 
+    // Initialize searchTerm as empty string if undefined or null
+    const currentSearchTerm = searchTerm || '';
+    
     // Split search terms by comma and trim whitespace
-    const searchTerms = searchTerm
+    const searchTerms = currentSearchTerm
       .split(',')
       .map(term => term.trim())
       .filter(term => term.length > 0);
@@ -482,10 +485,20 @@ const InventoryViewData = () => {
           sorter: (a, b) => {
             const aValue = a.dynamic_data[fieldName];
             const bValue = b.dynamic_data[fieldName];
+            
+            // Handle null/undefined cases
+            if (aValue === null || aValue === undefined) return -1;
+            if (bValue === null || bValue === undefined) return 1;
+            
+            // Handle number comparison
             if (typeof aValue === 'number' && typeof bValue === 'number') {
               return aValue - bValue;
             }
-            return aValue.toString().localeCompare(bValue.toString());
+            
+            // Convert to string and compare
+            const aStr = String(aValue || '');
+            const bStr = String(bValue || '');
+            return aStr.localeCompare(bStr);
           },
           filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
             <div style={{ padding: 8 }}>

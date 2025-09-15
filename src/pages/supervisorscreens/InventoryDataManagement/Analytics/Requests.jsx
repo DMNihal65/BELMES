@@ -235,7 +235,18 @@ const RequestTable = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleString();
+    const date = new Date(dateString);
+    // Convert to local timezone by adding the timezone offset
+    const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+    return localDate.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
   };
 
   const handleInventoryItemClick = (itemId) => {
@@ -304,11 +315,26 @@ const RequestTable = () => {
       align: 'center',
       width: 120,
       ...getColumnSearchProps('status'),
-      render: (status) => (
-        <Tag color={status.toLowerCase() === 'pending' ? 'red' : 'green'}>
-          {status.toUpperCase()}
-        </Tag>
-      ),
+      render: (status) => {
+        const statusLower = status.toLowerCase();
+        let color = 'default';
+        
+        if (statusLower === 'pending') {
+          color = 'orange';
+        } else if (statusLower === 'approved') {
+          color = 'green';
+        } else if (statusLower === 'rejected') {
+          color = 'red';
+        } else if (statusLower === 'returned') {
+          color = 'blue';
+        }
+        
+        return (
+          <Tag color={color}>
+            {status.toUpperCase()}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Expected Return',
@@ -494,7 +520,14 @@ const RequestTable = () => {
               {selectedRecord && (
                 <Form
                   layout="vertical"
-                  initialValues={selectedRecord}
+                  initialValues={{
+                    ...selectedRecord,
+                    expected_return_date: formatDate(selectedRecord.expected_return_date),
+                    actual_return_date: formatDate(selectedRecord.actual_return_date),
+                    approved_at: formatDate(selectedRecord.approved_at),
+                    created_at: formatDate(selectedRecord.created_at),
+                    updated_at: formatDate(selectedRecord.updated_at)
+                  }}
                 >
                   <Row gutter={16}>
                     <Col span={8}>
@@ -530,12 +563,12 @@ const RequestTable = () => {
                   <Row gutter={16}>
                     <Col span={8}>
                       <Form.Item label="Expected Return Date" name="expected_return_date">
-                        <Input disabled value={formatDate(selectedRecord.expected_return_date)} />
+                        <Input disabled />
                       </Form.Item>
                     </Col>
                     <Col span={8}>
                       <Form.Item label="Actual Return Date" name="actual_return_date">
-                        <Input disabled value={formatDate(selectedRecord.actual_return_date)} />
+                        <Input disabled />
                       </Form.Item>
                     </Col>
                     <Col span={8}>
@@ -571,7 +604,7 @@ const RequestTable = () => {
                     </Col>
                     <Col span={8}>
                       <Form.Item label="Approved At" name="approved_at">
-                        <Input disabled value={formatDate(selectedRecord.approved_at)} />
+                        <Input disabled />
                       </Form.Item>
                     </Col>
                   </Row>
@@ -579,12 +612,12 @@ const RequestTable = () => {
                   <Row gutter={16}>
                     <Col span={12}>
                       <Form.Item label="Created At" name="created_at">
-                        <Input disabled value={formatDate(selectedRecord.created_at)} />
+                        <Input disabled />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
                       <Form.Item label="Updated At" name="updated_at">
-                        <Input disabled value={formatDate(selectedRecord.updated_at)} />
+                        <Input disabled />
                       </Form.Item>
                     </Col>
                   </Row>

@@ -357,32 +357,49 @@ const QualityInspectionDetails = ({
     const operationData = inspectionDetails.operation_groups.filter(
       group => group.op_no === selectedOperation
     );
-
+  
+    const details = operationData.map((item, index) => ({
+      key: index,
+      id: item.details?.id || 0, // Keep the original ID for reference
+      zone: item.details?.zone || '',
+      dimension_type: item.details?.dimension_type || '',
+      nominal: item.details?.nominal || '',
+      uppertol: item.details?.uppertol || '',
+      lowertol: item.details?.lowertol || '',
+      measured_instrument: item.details?.measured_instrument || ''
+    }));
+  
+    // Sort details by id in ascending order
+    details.sort((a, b) => {
+      const idA = typeof a.id === 'number' ? a.id : parseInt(a.id) || 0;
+      const idB = typeof b.id === 'number' ? b.id : parseInt(b.id) || 0;
+      return idA - idB;
+    });
+  
+    // After sorting, update the key to reflect the new order
+    details.forEach((item, index) => {
+      item.key = index;
+    });
+  
     return {
       ipid: operationData[0]?.ipid || 'No IPID',
       operation_number: selectedOperation,
-      details: operationData.map((item, index) => ({
-        key: index,
-        zone: item.details?.zone || '',
-        dimension_type: item.details?.dimension_type || '',
-        nominal: item.details?.nominal || '',
-        uppertol: item.details?.uppertol || '',
-        lowertol: item.details?.lowertol || '',
-        measured_instrument: item.details?.measured_instrument || ''
-      }))
+      details: details
     };
   };
-
   const renderOperationDetails = () => {
     const data = getOperationDetails();
     if (!data) return null;
-
+  
     const columns = [
-      {
-        title: 'Zone',
-        dataIndex: 'zone',
-        key: 'zone',
-        width: 100,
+      { 
+        title: 'S.No',
+        key: 'sno',
+        width: 70,
+        fixed: 'left',
+        sorter: (a, b) => a.id - b.id,
+        defaultSortOrder: 'ascend',
+        render: (_, __, index) => index + 1,
       },
       {
         title: 'Description',
@@ -415,7 +432,7 @@ const QualityInspectionDetails = ({
         width: 150,
       }
     ];
-
+  
     return (
       <>
         <div className="mb-4">
@@ -427,12 +444,13 @@ const QualityInspectionDetails = ({
           columns={columns}
           dataSource={data.details}
           pagination={false}
-          scroll={{ x: 800, y: 400 }}
+          scroll={{ x: 900, y: 400 }}
           size="small"
         />
       </>
     );
   };
+  
 
   const renderModalHeader = () => {
     const data = getOperationDetails();
@@ -441,8 +459,8 @@ const QualityInspectionDetails = ({
     return (
       <div className="flex justify-between items-center border-b pb-4 mb-4">
         <div className="flex-1">
-          <Text strong className="mr-4">IPID No.: {data.ipid}</Text>
-          <Text strong className="mr-4">Part No.: {inspectionDetails.part_number}</Text>
+          <Text strong className="mr-4">IPID No: {data.ipid}</Text>
+          <Text strong className="mr-4">Part No: {inspectionDetails.part_number}</Text>
           <Text strong className="mr-4">Date: {moment().format('DD-MM-YYYY')}</Text>
           <Text strong className="mr-4">Time: {moment().format('HH:mm A')}</Text>
         </div>
@@ -704,6 +722,12 @@ const QualityInspectionDetails = ({
                     <Text strong className="text-base">{inspectionDetails?.part_number || '-'}</Text>
                   </div>
                 </Col>
+                <Col span={8}>
+                  <div className="flex flex-col">
+                    <Text type="secondary" className="text-xs">Operation</Text>
+                    <Text strong className="text-base">OP {selectedOperation || '-'}</Text>
+                  </div>
+                </Col>
               </Row>
             </Col>
           </Row>
@@ -720,31 +744,58 @@ const QualityInspectionDetails = ({
           />
         )}
 
-        {/* Add approve button for all operations - only show for quantity 1 */}
+        {/* Add action buttons for all operations - only show for quantity 1 */}
         {qtyFilter === 1 && (
-          <div className="mb-4 flex justify-end">
-            <Button 
-              type={ftpApprovalStatus?.is_completed === true ? "primary" : "default"}
-              icon={<CheckCircleOutlined />}
-              onClick={isViewingFinalInspection ? handleFinalApproveAll : handleApproveAll}
-              loading={isViewingFinalInspection ? isFinalApprovingAll : isApprovingAll}
-              size="large"
-              className="approve-all-btn"
-              style={ftpApprovalStatus?.is_completed === true ? { 
-                backgroundColor: "#52c41a", 
-                borderColor: "#52c41a", 
-                color: "#fff",
-                cursor: 'not-allowed',
-                opacity: 0.8
-              } : {}}
-              disabled={ftpApprovalStatus?.is_completed === true}
-            >
-              {ftpApprovalStatus?.is_completed === true 
-                ? "Already Approved" 
-                : isViewingFinalInspection 
-                  ? "Approve Final Inspection" 
-                  : "Approve All Measurements"}
-            </Button>
+          <div className="mb-4 flex justify-end gap-4">
+            {ftpApprovalStatus?.is_completed === true ? (
+              <Button 
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                size="large"
+                style={{ 
+                  backgroundColor: "#52c41a", 
+                  borderColor: "#52c41a", 
+                  color: "#fff",
+                  cursor: 'default',
+                  opacity: 0.8
+                }}
+                disabled
+              >
+                Already Approved
+              </Button>
+            ) : (
+              <>
+                <Button 
+                  type="default"
+                  icon={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                  onClick={isViewingFinalInspection ? handleFinalApproveAll : handleApproveAll}
+                  loading={isViewingFinalInspection ? isFinalApprovingAll : isApprovingAll}
+                  size="large"
+                  className="approve-all-btn"
+                  style={{
+                    color: '#52c41a',
+                    borderColor: '#52c41a',
+                    backgroundColor: '#ffffff',
+                    fontWeight: 500
+                  }}
+                >
+                  {isViewingFinalInspection ? "Approve Final Inspection" : "Approve All Measurements"}
+                </Button>
+                <Button 
+                  type="primary" 
+                  danger
+                  icon={<CloseCircleOutlined />}
+                  size="large"
+                  onClick={() => {
+                    // Add your reject logic here
+                    console.log('Reject button clicked');
+                    // You can add a confirmation modal or directly call a reject function
+                  }}
+                >
+                  Reject Inspection
+                </Button>
+              </>
+            )}
           </div>
         )}
 
@@ -809,31 +860,43 @@ const QualityInspectionDetails = ({
         ) : (
           measuredData && measuredData.inspection_data && measuredData.inspection_data.length > 0 ? (
             <Table
+              rowClassName={(record) => {
+                // Check if any measurement value is 'G' or 'NG'
+                const hasG = ['measured_1', 'measured_2', 'measured_3'].some(
+                  field => record[field]?.toString().toUpperCase() === 'G'
+                );
+                const hasNG = ['measured_1', 'measured_2', 'measured_3'].some(
+                  field => record[field]?.toString().toUpperCase() === 'NG'
+                );
+                
+                if (hasG) {
+                  return 'bg-green-50 in-tolerance-row';
+                } else if (hasNG) {
+                  return 'bg-red-50 out-of-tolerance-row';
+                } else if (record.status === 'G' || record.isWithinTolerance) {
+                  return 'bg-green-50 in-tolerance-row';
+                } else if (record.status === 'NG' || !record.isWithinTolerance) {
+                  return 'bg-red-50 out-of-tolerance-row';
+                }
+                return '';
+              }}
               columns={[
-                // { 
-                //   title: 'Sl. No',
-                //   key: 'slno',
-                //   width: 70,
-                //   render: (text, record, index) => index + 1,
-                //   fixed: 'left',
-                // },
                 { 
-                  title: 'Operation',
-                  dataIndex: 'operation_number',
-                  key: 'operation_number',
-                  width: 90,
+                  title: 'S.No',
+                  key: 'sno',
+                  width: 70,
                   fixed: 'left',
-                  render: (opNum) => <Tag color="purple" className="op-tag">OP {opNum}</Tag>,
-                  filters: measuredData.inspection_data.map(op => ({
-                    text: `OP ${op.operation_number}`,
-                    value: op.operation_number
-                  })),
-                  onFilter: (value, record) => record.operation_number === value
+                  render: (_, __, index) => index + 1,
                 },
-                // { 
-                //   title: 'ID',
-                //   dataIndex: 'id',
-                //   key: 'id',
+                { 
+                  title: 'ID',
+                  dataIndex: 'id',
+                  key: 'id',
+                  width: 70,
+                  render: (id) => <span className="font-medium">{id}</span>,
+                  sorter: (a, b) => a.id - b.id,
+                  defaultSortOrder: 'ascend'
+                },
                 //   width: 70,
                 //   render: (id) => <Tag color="blue">{id}</Tag>,
                 //   sorter: (a, b) => a.id - b.id,
@@ -1020,9 +1083,7 @@ const QualityInspectionDetails = ({
               size="small"
               scroll={{ x: 1800, y: 500 }}
               bordered
-              rowClassName={(record) => {
-                return record.isWithinTolerance ? 'bg-green-50 in-tolerance-row' : 'bg-red-50 out-of-tolerance-row';
-              }}
+
               summary={pageData => {
                 const totalItems = pageData.length;
                 const withinToleranceItems = pageData.filter(item => item.isWithinTolerance).length;
@@ -1482,14 +1543,14 @@ const QualityInspectionDetails = ({
     setIsFinalInspectionModalVisible(true);
   };
 
-  // Add function to get final inspection data
   const getFinalInspectionData = () => {
     if (!inspectionDetails?.operation_groups) return [];
     
-    return inspectionDetails.operation_groups
+    const finalInspectionData = inspectionDetails.operation_groups
       .filter(group => group.op_no === 999)
       .map((group, index) => ({
         key: index,
+        id: group.details?.id || 0, // Keep the original ID for reference
         zone: group.details?.zone || '',
         dimension_type: group.details?.dimension_type || '',
         nominal: group.details?.nominal || '',
@@ -1497,6 +1558,20 @@ const QualityInspectionDetails = ({
         lowertol: group.details?.lowertol || '',
         measured_instrument: group.details?.measured_instrument || ''
       }));
+  
+    // Sort by id in ascending order
+    finalInspectionData.sort((a, b) => {
+      const idA = typeof a.id === 'number' ? a.id : parseInt(a.id) || 0;
+      const idB = typeof b.id === 'number' ? b.id : parseInt(b.id) || 0;
+      return idA - idB;
+    });
+  
+    // After sorting, update the key to reflect the new order
+    finalInspectionData.forEach((item, index) => {
+      item.key = index;
+    });
+  
+    return finalInspectionData;
   };
 
   // Add function to check FTP approval status
@@ -1837,11 +1912,17 @@ const QualityInspectionDetails = ({
     );
   };
 
-  // Update the renderFinalInspectionModal function
+  // Render the final inspection modal
   const renderFinalInspectionModal = () => {
     const finalInspectionData = getFinalInspectionData();
     
     const columns = [
+      {
+        title: 'S.No',
+        key: 'sno',
+        width: 60,
+        render: (_, record, index) => index + 1, // Display sequential serial number
+      },
       {
         title: 'Zone',
         dataIndex: 'zone',
@@ -1959,7 +2040,7 @@ const QualityInspectionDetails = ({
                 columns={columns}
                 dataSource={finalInspectionData}
                 pagination={false}
-                scroll={{ x: 800, y: 400 }}
+                scroll={{ x: 900, y: 400 }}
                 size="small"
                 onRow={(record) => ({
                   onClick: () => handleMeasurementClick(record),
@@ -2475,6 +2556,20 @@ const QualityInspectionDetails = ({
 
 // Enhanced styles
 const styles = `
+  /* Row styling for measurement status */
+  .ant-table-tbody > tr.row-ok > td {
+    background-color: #f6ffed !important; /* Light green background for G/Within Tolerance */
+  }
+  .ant-table-tbody > tr.row-ok:hover > td {
+    background-color: #f0f9eb !important; /* Slightly darker green on hover */
+  }
+  .ant-table-tbody > tr.row-error > td {
+    background-color: #fff2f0 !important; /* Light red background for NG/Out of Tolerance */
+  }
+  .ant-table-tbody > tr.row-error:hover > td {
+    background-color: #ffebeb !important; /* Slightly darker red on hover */
+  }
+  
   .no-ipid-table .ant-table-cell {
     color: rgba(0, 0, 0, 0.45);
     transition: all 0.3s;
@@ -2522,6 +2617,9 @@ const styles = `
     margin-bottom: 0 !important;
   }
 
+.hidden-column {
+  display: none !important;
+}
   .ant-tabs-content {
     background: #ffffff;
     padding: 16px;

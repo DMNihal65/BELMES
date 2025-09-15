@@ -247,13 +247,10 @@ function Header() {
                   </div>
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <div style={{ marginBottom: '4px' }}>
                       <Tag color={getNotificationTagColor(item.notificationType)} style={{ margin: 0, fontSize: '11px' }}>
                         {item.notificationType || 'Notification'}
                       </Tag>
-                      <Text type="secondary" style={{ fontSize: '11px' }}>
-                        {formatDate(item.updated_at || item.completed_at || item.timestamp || item.created_at)}
-                      </Text>
                     </div>
                     <Text strong style={{ 
                       display: 'block',
@@ -323,7 +320,20 @@ function Header() {
           <Button 
             type="link" 
             onClick={() => {
-              navigate('/supervisor/notifications');
+              // Get user from localStorage
+              let userRole = 'supervisor'; // default fallback
+              try {
+                const userStr = localStorage.getItem('user');
+                if (userStr) {
+                  const userObj = JSON.parse(userStr);
+                  if (userObj && userObj.role) {
+                    userRole = userObj.role;
+                  }
+                }
+              } catch (e) {
+                // fallback to default
+              }
+              navigate(`/${userRole}/notifications_new`);
               // Close dropdown after clicking
               document.body.click();
             }}

@@ -672,7 +672,7 @@ const extractOperationFromName = (name) => {
       window.open(downloadData.url, '_blank');
     } catch (error) {
       console.error('Error previewing version:', error);
-      message.error('Failed to preview document version');
+      // message.error('Failed to preview document version');
     }
   };
 
@@ -1501,9 +1501,9 @@ const extractOperationFromName = (name) => {
                   />
                   <div className="flex-grow">
                     <div className="font-medium">Version {version.version_number}</div>
-                    {/* <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500">
                       Created: {new Date(version.created_at).toLocaleString()}
-                    </div> */}
+                    </div>
                     {version.metadata && version.metadata.operation_number && (
                       <div className="text-sm text-gray-500">
                         Operation: {version.metadata.operation_number}

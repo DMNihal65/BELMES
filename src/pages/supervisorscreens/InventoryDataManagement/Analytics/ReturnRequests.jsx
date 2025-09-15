@@ -102,7 +102,7 @@ const ReturnRequests = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return dayjs(dateString).format('DD/MM/YYYY HH:mm');
+    return dayjs(dateString).format('DD/MM/YYYY');
   };
 
   const getColumnSearchProps = (dataIndex) => ({

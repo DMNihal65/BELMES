@@ -84,6 +84,57 @@ const OrderTracking = () => {
     fetchUsers();
   }, []);
 
+  const downloadReportExcel = () => {
+  if (!reportData) return;
+
+  // Create a new workbook
+  const workbook = XLSX.utils.book_new();
+
+  // Operations sheet
+  const operationsData = reportData.operations.map(op => ({
+    'Operation Number': op.operation_number,
+    Description: op.description,
+    'Machine Name': op.machines_used?.join(', ') || '-',
+    Operator: op.operators?.join(', ') || '-',
+    'Total Time': op.total_time_invested_hours,
+    'Required Quantity': op.required_quantity,
+    'Completed Quantity': op.completed_quantity,
+    'Rejected Quantity': op.rejected_quantity
+  }));
+  const operationsSheet = XLSX.utils.json_to_sheet(operationsData);
+  XLSX.utils.book_append_sheet(workbook, operationsSheet, 'Operations');
+
+  // Operators sheet
+  const operatorsData = reportData.operators.flatMap(operator =>
+    operator.operations.map(op => ({
+      'Operator Name': operator.operator,
+      'Operation Number': op.operation_number,
+      Description: op.operation_description,
+      Machine: op.machine || '-',
+      'Total Time': op.time_invested_hours,
+      'Completed Quantity': op.completed_quantity,
+      'Rejected Quantity': op.rejected_quantity
+    }))
+  );
+  const operatorsSheet = XLSX.utils.json_to_sheet(operatorsData);
+  XLSX.utils.book_append_sheet(workbook, operatorsSheet, 'Operators');
+
+  // Machines sheet
+  const machinesData = reportData.machines.map(machine => ({
+    'Machine Name': machine.machine,
+    'Operation Number': machine.operation_number,
+    'Operation Description': machine.operation_description,
+    'Total Time': machine.time_invested_hours,
+    'Completed Quantity': machine.completed_quantity,
+    'Rejected Quantity': machine.rejected_quantity
+  }));
+  const machinesSheet = XLSX.utils.json_to_sheet(machinesData);
+  XLSX.utils.book_append_sheet(workbook, machinesSheet, 'Machines');
+
+  // Generate Excel file and trigger download
+  XLSX.writeFile(workbook, `ProductionOrderReport_${reportData.production_order}.xlsx`);
+};
+
   const handleOrderSelect = async (value) => {
     const selected = orders.find(order => order.production_order === value);
     if (!selected) return;
@@ -186,48 +237,7 @@ const OrderTracking = () => {
     fetchDailyReportData();
   };
 
-const downloadPDF = async () => {
-  const input = document.getElementById('report-content');
-  if (!input) return;
 
-  try {
-    // Lower scale to reduce image resolution
-    const canvas = await html2canvas(input, { scale: 1 });
-
-    // Use JPEG with compression instead of PNG
-    const imgData = canvas.toDataURL('image/jpeg', 0.9);
-
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    // If content exceeds page height, handle multipage
-    if (pdfHeight > pdf.internal.pageSize.getHeight()) {
-      let position = 0;
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      while (position < pdfHeight) {
-        pdf.addImage(
-          imgData,
-          'JPEG',
-          0,
-          position ? 0 : 0,
-          pdfWidth,
-          pdfHeight
-        );
-        position += pageHeight;
-        if (position < pdfHeight) pdf.addPage();
-      }
-    } else {
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    }
-
-    pdf.save(`ProductionOrderReport_${reportData.production_order}.pdf`);
-  } catch (err) {
-    console.error('PDF download failed:', err);
-    message.error('Failed to generate PDF');
-  }
-};
 
 
   const columns = [
@@ -472,14 +482,15 @@ const downloadPDF = async () => {
             Close
           </Button>,
           <Button
-            key="download"
+            key="download-excel"
             type="primary"
             icon={<DownloadOutlined />}
-            onClick={downloadPDF}
+            onClick={downloadReportExcel}
             disabled={!reportData}
           >
-            Download PDF
+            Download Excel
           </Button>
+
         ]}
       >
         <Spin spinning={reportLoading}>

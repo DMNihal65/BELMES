@@ -297,12 +297,12 @@ const CapacityPlanning = () => {
   try {
     setLoading(true);
     
-    const adjustedEndDate = dayjs(startDate).isSame(endDate, 'day') 
-      ? dayjs(endDate).add(1, 'day') 
-      : endDate;
+    // const adjustedEndDate = dayjs(startDate).isSame(endDate, 'day') 
+    //   ? dayjs(endDate).add(1, 'day') 
+    //   : endDate;
     
     
-    const data = await fetchMachinePlanningByDateRange(startDate, adjustedEndDate);
+    const data = await fetchMachinePlanningByDateRange(startDate, endDate);
 
       
       if (Array.isArray(data) && data.length > 0) {

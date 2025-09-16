@@ -2096,7 +2096,6 @@ console.log('Content-Disposition Header:', contentDisposition);
 
       if (!response.ok) {
         if (response.status === 404) {
-          // No programs found for this part
           set({ isLoading: false });
           return [];
         }
@@ -2110,10 +2109,41 @@ console.log('Content-Disposition Header:', contentDisposition);
       return data;
     } catch (error) {
       console.error('Error fetching CNC program details:', error);
-      set({ isLoading: false, error: error.message });
+      set({ error: error.message, isLoading: false });
       return [];
     }
-  }
+  },
+
+  // Function to fetch PDC data by part number and production order
+  fetchPdcData: async (partNumber, productionOrder) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const response = await fetch(
+        `http://172.18.7.89:8008/api/v1/scheduling/pdc/by-part-po?part_number=${encodeURIComponent(partNumber)}&production_order=${encodeURIComponent(productionOrder)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'accept': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch PDC data');
+      }
+
+      const data = await response.json();
+      console.log('Raw PDC API response:', data); // Debug log
+      set({ isLoading: false });
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error('Error fetching PDC data:', error);
+      set({ error: error.message, isLoading: false });
+      return [];
+    }
+  },
 }));
 
 export default usePlanningStore;

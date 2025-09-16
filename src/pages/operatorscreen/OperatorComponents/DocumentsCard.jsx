@@ -23,18 +23,28 @@ const DocumentsCard = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   // Hydrate selectedJob from localStorage on mount if not set
-  useEffect(() => {
-    const hydrateSelectedJob = () => {
-      if (!selectedJob) {
-        const currentJobData = localStorage.getItem('currentJobData');
-        if (currentJobData) {
-          const parsedJobData = JSON.parse(currentJobData);
-          selectJob(parsedJobData); // Use selectJob to set selectedJob in the store
+useEffect(() => {
+  const hydrateSelectedJob = () => {
+    if (!selectedJob) {
+      const currentJobData = localStorage.getItem('currentJobData');
+      if (currentJobData) {
+        const parsedJobData = JSON.parse(currentJobData);
+        selectJob(parsedJobData); // Use selectJob to set selectedJob in the store
+      } else {
+        const userSelectedJob = localStorage.getItem('user-selected-job');
+        if (userSelectedJob) {
+          const parsedUserSelected = JSON.parse(userSelectedJob);
+          const minimalJob = {
+            production_order: parsedUserSelected.production_order,
+            part_number: parsedUserSelected.part_number
+          };
+          selectJob(minimalJob); // Set minimal selectedJob and trigger fetches
         }
       }
-    };
-    hydrateSelectedJob();
-  }, [selectedJob, selectJob]);
+    }
+  };
+  hydrateSelectedJob();
+}, [selectedJob, selectJob]);
 
   // Fetch job documents if selectedJob exists and jobDocuments is empty
   useEffect(() => {

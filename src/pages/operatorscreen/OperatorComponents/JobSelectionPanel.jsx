@@ -41,6 +41,8 @@ const JobSelectionPanel = ({ visible, onClose }) => {
   const [filterKeyword, setFilterKeyword] = useState('');
   const [filterPriority, setFilterPriority] = useState(null);
 
+
+
 useEffect(() => {
   setActiveTab('custom'); // Always open on custom jobs tab
   setFilteredJobs(availableJobs); // Still update available jobs filter
@@ -168,6 +170,28 @@ useEffect(() => {
     });
 
     const isJobSelectionDisabled = !!localStorage.getItem('currentJobData');
+
+      const handleJobSelection = (job) => {
+        if (isJobSelectionDisabled) {
+          message.warning('Cannot select a job while another job is active. Please deactivate the current job first.');
+          return;
+        }
+
+        // Select the job in the store
+        selectJob(job);
+
+        // Store the latest selected job details in localStorage
+        const userSelectedJobData = {
+          production_order: job.production_order,
+          part_number: job.part_number
+        };
+        localStorage.setItem('user-selected-job', JSON.stringify(userSelectedJobData));
+
+        // Fetch job details if production order is available
+        if (job.production_order) {
+          fetchJobDetails(job.production_order);
+        }
+      };
   
     return (
       <>
@@ -252,16 +276,17 @@ useEffect(() => {
               <List.Item>
                   <Card 
                   className={`w-full ${isJobSelectionDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-md transition-all'}`}
-                  onClick={() => {
-                    if (isJobSelectionDisabled) {
-                      message.warning('Cannot select a job while another job is active. Please deactivate the current job first.');
-                      return;
-                    }
-                    selectJob(job);
-                    if (job.production_order) {
-                      fetchJobDetails(job.production_order);
-                    }
-                  }}
+                  // onClick={() => {
+                  //   if (isJobSelectionDisabled) {
+                  //     message.warning('Cannot select a job while another job is active. Please deactivate the current job first.');
+                  //     return;
+                  //   }
+                  //   selectJob(job);
+                  //   if (job.production_order) {
+                  //     fetchJobDetails(job.production_order);
+                  //   }
+                  // }}
+                  onClick={() => handleJobSelection(job)}
                   style={{
                     borderLeft: selectedJob?.id === job.id
                       ? '4px solid #1890ff'

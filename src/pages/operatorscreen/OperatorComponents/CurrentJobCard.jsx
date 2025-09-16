@@ -22,31 +22,45 @@ const CurrentJobCard = () => {
   } = useOperatorStore();
 
   // Fallback to localStorage if states are empty
-  const getLocalStorageData = () => {
-    let fallbackJob = null;
-    let fallbackOperation = null;
-    let fallbackJobSource = 'custom'; // Default fallback if not found in localStorage
+const getLocalStorageData = () => {
+  let fallbackJob = null;
+  let fallbackOperation = null;
+  let fallbackJobSource = 'custom'; // Default fallback if not found in localStorage
 
-    try {
-      const storedJob = localStorage.getItem('currentJobData');
-      const storedOperation = localStorage.getItem('activeOperation');
-      const storedJobSource = localStorage.getItem('jobSource');
+  try {
+    const storedJob = localStorage.getItem('currentJobData');
+    const storedOperation = localStorage.getItem('activeOperation');
+    const storedJobSource = localStorage.getItem('jobSource');
 
-      fallbackJob = storedJob ? JSON.parse(storedJob) : null;
-      fallbackOperation = storedOperation ? JSON.parse(storedOperation) : null;
-      fallbackJobSource = storedJobSource ? JSON.parse(storedJobSource) : 'custom';
-    } catch (error) {
-      console.error('Failed to parse localStorage data:', error);
-    }
-
-    return {
-      selectedJob: selectedJob || fallbackJob,
-      selectedOperation: selectedOperation || fallbackOperation,
-      jobDetails: jobDetails || fallbackJob,
-      isLoadingJobs: isLoadingJobs || false,
-      jobSource: jobSource || fallbackJobSource
+    // Helper to safely parse: only if it looks like JSON (starts/ends with quotes or is [])
+    const safeParse = (storedValue) => {
+      if (!storedValue) return null;
+      // Quick heuristic: if it's a plain string without quotes, treat as-is (not JSON)
+      if (typeof storedValue === 'string' && !storedValue.startsWith('"') && !storedValue.startsWith('[')) {
+        return storedValue;
+      }
+      try {
+        return JSON.parse(storedValue);
+      } catch {
+        return storedValue; // Fallback to raw value if parse fails
+      }
     };
+
+    fallbackJob = safeParse(storedJob);
+    fallbackOperation = safeParse(storedOperation);
+    fallbackJobSource = safeParse(storedJobSource) || 'custom';
+  } catch (error) {
+    console.error('Failed to parse localStorage data:', error);
+  }
+
+  return {
+    selectedJob: selectedJob || fallbackJob,
+    selectedOperation: selectedOperation || fallbackOperation,
+    jobDetails: jobDetails || fallbackJob,
+    isLoadingJobs: isLoadingJobs || false,
+    jobSource: jobSource || fallbackJobSource
   };
+};
 
   const {
     selectedJob: finalSelectedJob,

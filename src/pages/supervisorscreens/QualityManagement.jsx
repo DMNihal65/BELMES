@@ -39,6 +39,9 @@ const { TabPane } = Tabs;
 const { Step } = Steps;
 const { RangePicker } = DatePicker;
 
+const QualityManagementDashboard = () => {
+  const [isQmsModalVisible, setIsQmsModalVisible] = useState(false);
+
   const handleLaunchQMS = async () => {
     try {
       // Use the custom protocol handler to launch QMS
@@ -46,14 +49,11 @@ const { RangePicker } = DatePicker;
       
       // Close the QMS modal
       setIsQmsModalVisible(false);
-
     } catch (error) {
       console.error('Failed to launch QMS:', error);
       message.error('Failed to launch QMS software');
     }
   };
-
-const QualityManagementDashboard = () => {
   const [selectedPart, setSelectedPart] = useState(null);
   const [activeTab, setActiveTab] = useState('qualityOverview');
   const [isIPIDModalVisible, setIsIPIDModalVisible] = useState(false);

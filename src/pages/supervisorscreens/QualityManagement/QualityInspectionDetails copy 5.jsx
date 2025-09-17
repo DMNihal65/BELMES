@@ -32,10 +32,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   InfoCircleOutlined,
-  CheckCircleFilled,
-  LinkOutlined,
-  ExclamationCircleFilled,
-  CloseCircleFilled 
+  LinkOutlined
 } from '@ant-design/icons';
 import moment from 'moment';
 import InspectionReport from './InspectionReport';
@@ -79,62 +76,6 @@ const QualityInspectionDetails = ({
   const [selectedMeasurement, setSelectedMeasurement] = useState(null);
   const [qtyFilter, setQtyFilter] = useState(1);
   const [loadingQty, setLoadingQty] = useState(false);
-  const [quantityData, setQuantityData] = useState({
-    operations: {},
-    required_qty: 0,
-    completed_qty: 0,
-    rejected_qty: 0,
-    accepted_qty: 0
-  });
-
-  // Fetch quantity data when component mounts or orderId changes
-  useEffect(() => {
-    const fetchQuantityData = async () => {
-      if (!inspectionDetails?.order_id) return;
-      
-      try {
-        setLoadingQty(true);
-        const data = await qualityStore.getProductionOrderOperationsStatus(inspectionDetails?.production_order);
-        console.log("Operations data:", data);
-        
-        // Create operations map with operation number as key
-        const operationsMap = {};
-        let totalCompleted = 0;
-        let totalRejected = 0;
-        
-        if (data.operations && Array.isArray(data.operations)) {
-          data.operations.forEach(op => {
-            operationsMap[op.operation_number] = {
-              completed_qty: op.completed_quantity || 0,
-              rejected_qty: op.rejected_quantity || 0,
-              required_qty: op.required_quantity || 0,
-              remaining_qty: op.remaining_quantity || 0,
-              is_complete: op.is_complete || false,
-              description: op.description || ''
-            };
-            
-            totalCompleted += op.completed_quantity || 0;
-            totalRejected += op.rejected_quantity || 0;
-          });
-        }
-        
-        setQuantityData({
-          operations: operationsMap,
-          required_qty: data.required_quantity || 0,
-          completed_qty: totalCompleted,
-          rejected_qty: totalRejected,
-          accepted_qty: totalCompleted - totalRejected
-        });
-      } catch (error) {
-        console.error('Error fetching quantity data:', error);
-        message.error('Failed to load quantity data');
-      } finally {
-        setLoadingQty(false);
-      }
-    };
-
-    fetchQuantityData();
-  }, [inspectionDetails?.order_id]);
 
   const hasIpid = inspectionDetails?.operation_groups?.length > 0;
   let ipid1 = inspectionDetails?.operation_groups?.[0]?.ipid;
@@ -272,265 +213,166 @@ const QualityInspectionDetails = ({
   // Check if we have data
   const hasData = inspectionDetails && inspectionDetails.order_id;
 
-  // Create summary data from the response - one row per operation
-  const summaryData = hasData ? [
-    // First create rows for each operation
-    ...(inspectionDetails.operations || []).map((op, index) => ({
-      key: `op-${op}-${index}`,
-      order_id: inspectionDetails.order_id,
-      production_order: inspectionDetails.production_order,
-      part_number: inspectionDetails.part_number,
-      operations: [op],
-      isFinalInspection: false
-    })),
-    // Then add the final inspection row
-    {
-      key: 'final-inspection',
-      order_id: inspectionDetails.order_id,
-      production_order: inspectionDetails.production_order,
-      part_number: inspectionDetails.part_number,
-      operations: ['Final Inspection'],
-      isFinalInspection: true
-    }
-  ] : [];
-  // console.log("SUMMARY", summaryData);
+  // Create summary data from the response
+  const summaryData = hasData ? [{
+    key: 'summary',
+    order_id: inspectionDetails.order_id,
+    production_order: inspectionDetails.production_order,
+    part_number: inspectionDetails.part_number,
+    operations: [...(inspectionDetails.operations || []), 'Final Inspection']
+  }] : [];
+
   const summaryColumns = [
+    // {
+    //   title: 'Production Order',
+    //   dataIndex: 'production_order',
+    //   key: 'production_order',
+    //   width: '25%',
+    //   render: (text) => (
+    //     <Typography.Text strong>
+    //       {text}
+    //     </Typography.Text>
+    //   )
+    // },
+    // {
+    //   title: 'Part Number',
+    //   dataIndex: 'part_number',
+    //   key: 'part_number',
+    //   width: '25%'
+    // },
     {
-      title: 'OP Number',
-      key: 'operation_number',
-      width: '8%',
-      align: 'center',
-      render: (_, record, index) => (
-        <div className="text-center">
-          {record.operations?.[0] === 'Final Inspection' ? 'FINAL' : `OP${record.operations?.[0] || ''}`}
+      title: 'Operations',
+      key: 'operations',
+      width: '20%',
+      render: (_, record) => (
+        <div className="flex flex-col gap-1">
+          {(record.operations || []).map(op => {
+            const isFinalInspection = op === 'Final Inspection';
+            const hasOperationData = isFinalInspection 
+              ? inspectionDetails?.operation_groups?.some(g => g.op_no === 999)
+              : inspectionDetails?.operation_groups?.some(g => g.op_no === op && g.details);
+
+            return (
+              <Button 
+                key={op}
+                type={selectedOperation === (isFinalInspection ? 999 : op) ? 'primary' : 'default'}
+                size="small"
+                onClick={() => isFinalInspection ? handleFinalInspectionClick() : handleOperationClick(op)}
+                icon={hasOperationData ? <EyeOutlined /> : <FileSearchOutlined />}
+                className={`
+                  text-left p-0.5 m-0 h-7 min-h-7 flex items-center justify-start rounded-md text-xs
+                  ${selectedOperation === (isFinalInspection ? 999 : op)
+                    ? 'bg-blue-100 border-blue-200 text-blue-700 hover:bg-blue-200' 
+                    : hasOperationData 
+                      ? 'bg-green-100 border-green-200 text-green-600 hover:bg-green-200' 
+                      : 'bg-yellow-100 border-yellow-200 text-yellow-600 hover:bg-yellow-200'}
+                `}
+              >
+                <span className="truncate">{isFinalInspection ? 'Final Inspection' : `OP ${op}`}</span>
+              </Button>
+            );
+          })}
         </div>
       )
     },
-    {
-      title: 'Operation Description',
-      key: 'operation',
-      width: '20%',
-      render: (_, record) => {
-        const opNumber = record.operations?.[0];
-        if (opNumber === 'Final Inspection') {
-          return <div className="font-normal">Final Inspection</div>;
-        }
-        
-        const opData = quantityData.operations[opNumber];
-        return (
-          <div className="font-normal">
-            {opData?.description || `Operation ${opNumber}`}
-          </div>
-        );
-      }
-    },
-    {
-      title: 'Inspection Plan',
-      key: 'inspection_plan',
-      width: '9%',
-      align: 'center',
-      render: (_, record) => {
-        const op = record.operations?.[0];
-        const isFinalInspection = op === 'Final Inspection';
-        const hasOperationData = isFinalInspection 
-          ? inspectionDetails?.operation_groups?.some(g => g.op_no === 999)
-          : inspectionDetails?.operation_groups?.some(g => g.op_no === op && g.details);
+    // {
+    //   title: 'Final Inspection',
+    //   key: 'final_inspection',
+    //   width: '15%',
+    //   render: (_, record) => {
+    //     // Check if we have operation groups with op_no 999
+    //     const hasFinalInspection = inspectionDetails?.operation_groups?.some(
+    //       group => group.op_no === 999
+    //     );
 
-        return (
-          <div className="text-center">
-            <Button 
-              type={hasOperationData ? 'primary' : 'default'}
-              size="small"
-              onClick={() => isFinalInspection ? handleFinalInspectionClick() : handleOperationClick(op)}
-              icon={hasOperationData ? <FileTextOutlined /> : <FileSearchOutlined />}
-              className={`w-full h-8 flex items-center justify-center ${
-                hasOperationData 
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                  : 'bg-white hover:bg-gray-50 border-gray-300 text-gray-700'
-              }`}
-            >
-              {hasOperationData ? 'View Plan' : 'Create Plan'}
-            </Button>
-          </div>
-        );
-      }
-    },
-    {
-      title: 'Measurements',
-      key: 'measurements',
-      width: '9%',
-      align: 'center',
-      render: (_, record) => {
-        const op = record.operations?.[0];
-        const isFinalInspection = op === 'Final Inspection';
-        const hasOperationData = isFinalInspection 
-          ? inspectionDetails?.operation_groups?.some(g => g.op_no === 999)
-          : inspectionDetails?.operation_groups?.some(g => g.op_no === op && g.details);
-        
-        // Check if there's any measured data for this operation
-        const hasMeasuredData = isFinalInspection 
-          ? inspectionDetails?.operation_groups?.some(g => g.op_no === 999)
-          : inspectionDetails?.operation_groups?.some(g => g.op_no === op);
-        return (
-          <div className="text-center">
-            <Button 
-              type={hasMeasuredData ? (hasOperationData ? 'primary' : 'default') : 'default'}
-              size="small"
-              onClick={() => {
-                if (isFinalInspection) {
-                  handleViewFinalMeasurements(999);
-                } else {
-                  handleViewMeasuredData(op);
-                }
-              }}
-              icon={<EyeOutlined />}
-              disabled={!hasMeasuredData}
-              className={`w-full h-8 flex items-center justify-center ${!hasMeasuredData ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              View Data
-            </Button>
-          </div>
-        );
-      }
-    },
+    //     return (
+    //       <Button
+    //         type={hasFinalInspection ? 'primary' : 'default'}
+    //         icon={<FileSearchOutlined />}
+    //         onClick={() => {handleFinalInspectionClick(); 
+    //           setSelectedOperation(999);}}
+    //         className={`
+    //           transition-all duration-300
+    //           ${hasFinalInspection 
+    //             ? 'bg-blue-100 hover:bg-blue-200 border-blue-200 hover:border-blue-300 text-blue-700' 
+    //             : 'bg-gray-100 hover:bg-gray-200 border-gray-200 hover:border-gray-300 text-gray-700'}
+    //         `}
+    //       >
+    //         Final Inspection
+    //       </Button>
+    //     );
+    //   }
+    // },
     {
       title: 'Required Qty',
       key: 'required_qty',
       width: '10%',
       align: 'center',
-      render: (_, record) => {
-        const opNumber = record.operations?.[0];
-        if (opNumber === 'Final Inspection') {
-          return <div className="text-center"></div>;
-        }
-        const opData = quantityData.operations[opNumber];
-        return (
-          <div className="text-center font-medium">
-            {loadingQty ? <Spin size="small" /> : (opData?.required_qty || '0')}
-          </div>
-        );
-      },
+      render: (_, record) => (
+        <div className="text-center font-medium">
+          {inspectionDetails?.required_qty || 'N/A'}
+        </div>
+      ),
     },
     {
       title: 'Completed Qty',
       key: 'completed_qty',
       width: '10%',
       align: 'center',
-      render: (_, record) => {
-        const opNumber = record.operations?.[0];
-        if (opNumber === 'Final Inspection') {
-          return <div className="text-center"></div>;
-        }
-        const opData = quantityData.operations[opNumber];
-        return (
-          <div className="text-center font-medium">
-            {loadingQty ? <Spin size="small" /> : (opData?.completed_qty || '0')}
-          </div>
-        );
-      },
+      render: (_, record) => (
+        <div className="text-center font-medium">
+          {inspectionDetails?.completed_qty || '0'}
+        </div>
+      ),
     },
     {
       title: 'Accepted Qty',
       key: 'accepted_qty',
       width: '10%',
       align: 'center',
-      render: (_, record) => {
-        const opNumber = record.operations?.[0];
-        if (opNumber === 'Final Inspection') {
-          return <div className="text-center"></div>;
-        }
-        const opData = quantityData.operations[opNumber];
-        const acceptedQty = opData ? (opData.completed_qty || 0) - (opData.rejected_qty || 0) : 0;
-        return (
-          <div className="text-center font-medium text-green-600">
-            {loadingQty ? <Spin size="small" /> : acceptedQty}
-          </div>
-        );
-      },
+      render: (_, record) => (
+        <div className="text-center font-medium text-green-600">
+          {inspectionDetails?.accepted_qty || '0'}
+        </div>
+      ),
     },
     {
       title: 'Rejected Qty',
       key: 'rejected_qty',
       width: '10%',
       align: 'center',
-      render: (_, record) => {
-        const opNumber = record.operations?.[0];
-        if (opNumber === 'Final Inspection') {
-          return <div className="text-center"></div>;
-        }
-        const opData = quantityData.operations[opNumber];
-        return (
-          <div className="text-center font-medium text-red-600">
-            {loadingQty ? <Spin size="small" /> : (opData?.rejected_qty || '0')}
-          </div>
-        );
-      },
+      render: (_, record) => (
+        <div className="text-center font-medium text-red-600">
+          {inspectionDetails?.rejected_qty || '0'}
+        </div>
+      ),
     },
     {
       title: 'Yield %',
       key: 'yield_percentage',
-      width: '15%',
+      width: '10%',
       align: 'center',
       render: (_, record) => {
-        const opNumber = record.operations?.[0];
-        
-        // For Final Inspection, show empty cell
-        if (opNumber === 'Final Inspection') {
-          return <div className="flex flex-col items-center px-2">
-            <div className="w-full flex items-center gap-2 mb-1">
-              <div className="text-sm font-medium"></div>
-            </div>
-            <div className="w-full h-2">
-              <div className="w-full h-full" />
-            </div>
-          </div>;
-        }
-        
-        // For regular operations, show the yield as before
-        let yieldPercentage = 0;
-        let completedQty = 0;
-        let rejectedQty = 0;
-        
-        const opData = quantityData.operations[opNumber];
-        if (opData) {
-          completedQty = opData.completed_qty || 0;
-          rejectedQty = opData.rejected_qty || 0;
-          const accepted = completedQty - rejectedQty;
-          yieldPercentage = completedQty > 0 ? Number(((accepted / completedQty) * 100).toFixed(2)) : 0;
-        }
+        const total = inspectionDetails?.completed_qty || 0;
+        const accepted = inspectionDetails?.accepted_qty || 0;
+        const yieldPercentage = total > 0 ? Math.round((accepted / total) * 100) : 0;
         
         // Determine color based on yield percentage
         const getColor = (percentage) => {
           if (percentage >= 95) return '#10B981'; // Green
           if (percentage >= 90) return '#F59E0B'; // Yellow
-          return percentage > 0 ? '#EF4444' : '#D1D5DB'; // Red for low yield, Gray for no data
+          return '#EF4444'; // Red
         };
         
-        const color = getColor(yieldPercentage);
-        const isDataAvailable = completedQty > 0;
-        
         return (
-          <div className="flex flex-col items-center px-2">
-            <div className="w-full flex items-center gap-2 mb-1">
-              <div className="text-sm font-medium text-gray-700">
-                {isDataAvailable ? `${yieldPercentage} %` : '0 %'}
-              </div>
-              {isDataAvailable && (
-                <div className="text-xs text-gray-500">
-                  ({completedQty - rejectedQty}/{completedQty})
-                </div>
-              )}
+          <div className="flex items-center justify-center">
+            <div 
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+              style={{ backgroundColor: getColor(yieldPercentage) }}
+            >
+              {yieldPercentage}
             </div>
-            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: isDataAvailable ? `${yieldPercentage}%` : '0%',
-                  backgroundColor: isDataAvailable ? color : '#D1D5DB',
-                  boxShadow: isDataAvailable ? `0 0 5px ${color}80` : 'none'
-                }}
-              />
-            </div>
+            <span className="ml-2 text-sm">%</span>
           </div>
         );
       }
@@ -548,7 +390,13 @@ const QualityInspectionDetails = ({
       children: (
         <Card 
           className="bg-white transition-all duration-300 hover:shadow-md"
-          
+          title={
+            <div className="flex justify-between items-center w-full">
+              <Typography.Title level={4} className="mb-0">
+                Inspection Details
+              </Typography.Title>
+            </div>
+          }
         >
           <div className="w-[100%] mx-auto">
             <Table
@@ -557,8 +405,7 @@ const QualityInspectionDetails = ({
               pagination={false}
               size="middle"
               loading={loading}
-              className="w-full with-gridlines"
-              bordered
+              className="w-full"
             />
           </div>
         </Card>
@@ -708,14 +555,8 @@ const QualityInspectionDetails = ({
   };
 
   // Function to handle viewing measured data
-  const handleViewMeasuredData = async (operation) => {
-    console.log("++++operation", operation);
-    const op = operation;
-    console.log("Viewing measured data for operation:", op);
-    if (!inspectionDetails?.order_id || op === undefined) return;
-    
-    // Update the selected operation in state
-    setSelectedOperation(op);
+  const handleViewMeasuredData = async () => {
+    if (!inspectionDetails?.order_id || !selectedOperation) return;
 
     try {
       // Show loading indicator
@@ -724,16 +565,16 @@ const QualityInspectionDetails = ({
       // Fetch inspection data using the new endpoint with quantity 1 by default
       const response = await qualityStore.fetchStageInspectionByOperation(
         inspectionDetails.order_id,
-        op,
+        selectedOperation,
         1 // Default to quantity 1
       );
       
       // Get the IPID for the selected operation
       const selectedOpGroup = inspectionDetails.operation_groups?.find(
-        group => group.op_no === op
+        group => group.op_no === selectedOperation
       );
       const ipid = selectedOpGroup?.ipid;
-      console.log("YEET%%", inspectionDetails.order_id, ipid);
+      
       // Check FTP approval status
       if (inspectionDetails.order_id && ipid) {
         const ftpStatus = await qualityStore.checkFTPApprovalStatus(
@@ -741,13 +582,14 @@ const QualityInspectionDetails = ({
           ipid
         );
         setFtpApprovalStatus(ftpStatus);
+        console.log("the statussssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss is ",ftpStatus)
       }
       
       if (response && response.length > 0) {
         // Transform the data to match the expected format
         const transformedData = {
           inspection_data: [{
-            operation_number: op,
+            operation_number: selectedOperation,
             inspections: response.map(item => ({
               ...item,
               is_done: item.is_done || false
@@ -976,7 +818,7 @@ const QualityInspectionDetails = ({
         </div>
 
         {/* Show approval status alert for final inspection */}
-        {/* {isViewingFinalInspection && ftpApprovalStatus?.is_completed && (
+        {isViewingFinalInspection && ftpApprovalStatus?.is_completed && (
           <Alert
             message="Final Inspection Approved"
             description={`This final inspection was approved on ${moment(ftpApprovalStatus.updated_at).format('DD-MM-YYYY HH:mm')}`}
@@ -984,128 +826,47 @@ const QualityInspectionDetails = ({
             showIcon
             className="mb-4"
           />
-        )} */}
+        )}
 
         {/* Add approve button for all operations - only show for quantity 1 */}
         {qtyFilter === 1 && (
-          <Row>
-            <div className="mb-4 w-full flex items-center justify-between">
-              {/* Left side - Alert */}
-              <div>
-                {ftpApprovalStatus?.is_completed && (
-                  <div className="pr-4 flex items-center">
-                    <Alert
-                      message={
-                        <div className="flex items-center gap-2">
-                          <CheckCircleFilled className="text-green-500 text-base" />
-                          <span className="font-medium text-gray-800 text-sm">
-                            First Article Inspection Approved on {moment(ftpApprovalStatus.updated_at).format('DD MMM YYYY [at] hh:mm A')}
-                          </span>
-                        </div>
-                      }
-                      type="success"
-                      showIcon={false}
-                      className="py-2 px-4 border border-green-100 bg-green-50 rounded-md text-sm"
-                      style={{
-                        borderLeft: '4px solid #52c41a',
-                        lineHeight: '1.75',
-                        minHeight: '44px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    />
-                  </div>
-                )}
-                {ftpApprovalStatus?.status === 'rejected' && (
-                  <div className="pr-4 flex items-center">
-                    <Alert
-                      message={
-                        <div className="flex items-center gap-2">
-                          <CloseCircleFilled className="text-red-500 text-base" />
-                          <span className="font-medium text-gray-800 text-sm">
-                            First Article Inspection Rejected on {moment(ftpApprovalStatus.updated_at).format('DD MMM YYYY [at] hh:mm A')}
-                          </span>
-                        </div>
-                      }
-                      type="error"
-                      showIcon={false}
-                      className="py-2 px-4 border border-red-100 bg-red-50 rounded-md text-sm"
-                      style={{
-                        borderLeft: '4px solid #ff4d4f',
-                        lineHeight: '1.75',
-                        minHeight: '44px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    />
-                  </div>
-                )}
-                {ftpApprovalStatus?.status === 'NA' && (
-                  <div className="pr-4 flex items-center">
-                    <Alert
-                      message={
-                        <div className="flex items-center gap-2">
-                          <ExclamationCircleFilled className="text-yellow-500 text-base" />
-                          <span className="font-medium text-gray-800 text-sm">
-                            Pending First Article Inspection Approval
-                          </span>
-                        </div>
-                      }
-                      type="warning"
-                      showIcon={false}
-                      className="py-2 px-4 border border-yellow-100 bg-yellow-50 rounded-md text-sm"
-                      style={{
-                        borderLeft: '4px solid #faad14',
-                        lineHeight: '1.75',
-                        minHeight: '44px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-              
-              {/* Right side - Buttons */}
-              <div className="flex gap-2">
-                <Button 
-                  type={ftpApprovalStatus?.is_completed === true ? "primary" : "default"}
-                  icon={<CheckCircleOutlined />}
-                  onClick={isViewingFinalInspection ? handleFinalApproveAll : handleApproveAll}
-                  loading={isViewingFinalInspection ? isFinalApprovingAll : isApprovingAll}
-                  size="large"
-                  className="approve-all-btn"
-                  style={ftpApprovalStatus?.is_completed === true ? { 
-                    backgroundColor: "#52c41a", 
-                    borderColor: "#52c41a", 
-                    color: "#fff",
-                    cursor: 'not-allowed',
-                    opacity: 0.8
-                  } : {}}
-                  disabled={ftpApprovalStatus?.is_completed === true}
-                >
-                  {ftpApprovalStatus?.is_completed === true 
-                    ? "Already Approved" 
-                    : isViewingFinalInspection 
-                      ? "Approve Final Inspection" 
-                      : "Approve All Measurements"}
-                </Button>
+          <div className="mb-4 flex justify-end gap-2">
+            <Button 
+              type={ftpApprovalStatus?.is_completed === true ? "primary" : "default"}
+              icon={<CheckCircleOutlined />}
+              onClick={isViewingFinalInspection ? handleFinalApproveAll : handleApproveAll}
+              loading={isViewingFinalInspection ? isFinalApprovingAll : isApprovingAll}
+              size="large"
+              className="approve-all-btn"
+              style={ftpApprovalStatus?.is_completed === true ? { 
+                backgroundColor: "#52c41a", 
+                borderColor: "#52c41a", 
+                color: "#fff",
+                cursor: 'not-allowed',
+                opacity: 0.8
+              } : {}}
+              disabled={ftpApprovalStatus?.is_completed === true}
+            >
+              {ftpApprovalStatus?.is_completed === true 
+                ? "Already Approved" 
+                : isViewingFinalInspection 
+                  ? "Approve Final Inspection" 
+                  : "Approve All Measurements"}
+            </Button>
 
-                {ftpApprovalStatus?.is_completed === false && (ftpApprovalStatus?.status === 'NA' || ftpApprovalStatus?.status === 'rejected') && (
-                  <Button
-                    type="primary" 
-                    danger
-                    icon={<CloseCircleOutlined />}
-                    size="large"
-                    className="reject-btn"
-                    onClick={RejectFTP}
-                  >
-                    Reject
-                  </Button>
-                )}
-              </div>
-            </div>
-          </Row>
+            {ftpApprovalStatus?.is_completed === false && (ftpApprovalStatus?.status === 'NA' || ftpApprovalStatus?.status === 'rejected') && (
+              <Button
+                type="primary" 
+                danger
+                icon={<CloseCircleOutlined />}
+                size="large"
+                className="reject-btn"
+                onClick={RejectFTP}
+              >
+                Rejected 
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Filter and search controls with updated functionality */}
@@ -1619,7 +1380,7 @@ const QualityInspectionDetails = ({
     // Confirm before rejecting
     Modal.confirm({
       title: 'Confirm Rejection',
-      content: 'Are you sure you want to reject this inspection? ',
+      content: 'Are you sure you want to reject this inspection? This will require QC intervention.',
       okText: 'Yes, Reject',
       okType: 'danger',
       cancelText: 'Cancel',
@@ -1630,9 +1391,7 @@ const QualityInspectionDetails = ({
 
           // Update FTP status after rejection
           const ftpStatus = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
-          console.log('FTP Status after rejection +++++++++++++++++++++++++++++++++++:', ftpStatus);
           setFtpApprovalStatus(ftpStatus);
-          
 
           Modal.error({
             title: 'Inspection Rejected',
@@ -1657,6 +1416,15 @@ const QualityInspectionDetails = ({
             <Typography.Title level={5} className="mb-0">
               Measurement Details
             </Typography.Title>
+            <Space>
+              <Button
+                type="primary"
+                icon={<FileSearchOutlined />}
+                onClick={handleViewMeasuredData}
+              >
+                View Measured Data
+              </Button>
+            </Space>
           </div>
           <Divider className="my-3" />
           {renderModalHeader()}
@@ -2056,18 +1824,14 @@ const QualityInspectionDetails = ({
   }, [finalInspectionDrawing]);
 
   // Add new function to handle viewing final inspection measurements
-  const handleViewFinalMeasurements = async (operation = 999) => {
-    const op = operation;
-    console.log("-----operation", operation);
-    if (!inspectionDetails?.order_id) {
-      message.error('Order ID not found');
-      return;
-    }
-    
-    // Update the selected operation in state
-    setSelectedOperation(op);
-    
+  const handleViewFinalMeasurements = async () => {
     try {
+      if (!inspectionDetails?.order_id) {
+        message.error('Order ID not found');
+        return;
+      }
+      
+      // Show loading indicator
       message.loading({ content: 'Loading final inspection measurements...', key: 'finalMeasurementsLoading' });
       
       // Get the IPID for final inspection
@@ -2422,6 +2186,13 @@ const QualityInspectionDetails = ({
                       Ballooned Drawing
                     </Typography.Title>
                     <Space>
+                      <Button
+                        type="primary"
+                        icon={<EyeOutlined />}
+                        onClick={handleViewFinalMeasurements}
+                      >
+                        View Measurements
+                      </Button>
                       {finalInspectionDrawing && (
                         <Button
                           type="default"
@@ -2861,13 +2632,13 @@ const QualityInspectionDetails = ({
             {/* Example: <Select ... /> */}
           </div>
           {/* Right: Open QMS Software button */}
-          {/* <Button
+          <Button
             type="primary"
             icon={<LinkOutlined />}
             onClick={handleLaunchQMS}
           >
             Open QMS Software
-          </Button> */}
+          </Button>
         </div>
         <Tabs 
           defaultActiveKey="details" 
@@ -2979,51 +2750,6 @@ const styles = `
     border: 1px solid #e5e7eb;
     border-top: none;
     border-radius: 0 0 8px 8px;
-  }
-  
-  /* Remove cell padding from tables with no-cell-padding class */
-  .no-cell-padding .ant-table-thead > tr > th,
-  .no-cell-padding .ant-table-tbody > tr > td {
-    padding: 0 !important;
-  }
-  
-  /* Gridlines for the table */
-  .with-gridlines .ant-table {
-    border: 1px solid #f0f0f0;
-    border-radius: 4px;
-  }
-  
-  .with-gridlines .ant-table-thead > tr > th,
-  .with-gridlines .ant-table-tbody > tr > td {
-    border-right: 1px solid #f0f0f0;
-    border-bottom: 1px solid #f0f0f0;
-    padding: 12px 16px;
-  }
-  
-  .with-gridlines .ant-table-thead > tr > th {
-    background-color: #fafafa;
-    font-weight: 600;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  
-  .with-gridlines .ant-table-tbody > tr:last-child > td {
-    border-bottom: 1px solid #f0f0f0;
-  }
-  
-  .with-gridlines .ant-table-tbody > tr > td:last-child,
-  .with-gridlines .ant-table-thead > tr > th:last-child {
-    border-right: none;
-  }
-  
-  .with-gridlines .ant-table-tbody > tr > td .ant-btn {
-    border-radius: 0;
-    height: 100%;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none !important;
-    box-shadow: none !important;
   }
 `;
 

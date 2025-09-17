@@ -1056,7 +1056,7 @@ const OrderDashboard = () => {
                     </div>
                   </div>
                 </TabPane>
-                <TabPane tab={<span className="font-semibold">In Progress</span>} key="in_progress">
+                {/* <TabPane tab={<span className="font-semibold">In Progress</span>} key="in_progress">
                   <div className="h-full overflow-auto">
                     <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center">
@@ -1089,7 +1089,7 @@ const OrderDashboard = () => {
                       />
                     </div>
                   </div>
-                </TabPane>
+                </TabPane> */}
                 <TabPane tab={<span className="font-semibold">Scheduled</span>} key="scheduled">
                   <div className="h-full overflow-auto">
                     <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">

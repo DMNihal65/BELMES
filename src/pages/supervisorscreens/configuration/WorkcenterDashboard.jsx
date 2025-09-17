@@ -1487,13 +1487,40 @@ const Workcenter = () => {
 
   const handleConfigSave = async (record) => {
     try {
+      // First update the schedulable status
       await updateWorkcenterSchedulable(record.id, record.is_schedulable);
+      
+      // Then update the workcenter details
+      const response = await fetch(`http://172.18.7.89:8008/api/v1/master-order/workcenters/${record.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: record.code,
+          plant_id: record.plant_id,
+          description: record.description,
+          is_schedulable: record.is_schedulable,
+          is_active: true,
+          type: "MACHINE",
+          work_center_name: record.work_center_name || record.code,
+          operation: record.operation || ""
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update workcenter details');
+      }
+
+      // Refresh the workcenter config data
+      await fetchWorkcenterConfig();
+      
       setEditingConfigKey('');
       setOriginalConfigData(null);
-      toast.success('Workcenter status updated successfully');
+      toast.success('Workcenter updated successfully');
     } catch (error) {
       console.error('Error saving config:', error);
-      toast.error('Failed to update workcenter status');
+      toast.error(error.message || 'Failed to update workcenter');
     }
   };
 
@@ -1514,6 +1541,23 @@ const Workcenter = () => {
       title: 'Plant ID',
       dataIndex: 'plant_id',
       width: 120,
+      render: (text, record) => {
+        const editable = isConfigEditing(record);
+        return editable ? (
+          <Input
+            value={text}
+            onChange={(e) => {
+              const updatedRecord = { ...record, plant_id: e.target.value };
+              setConfigData(configData.map(item => 
+                item.id === record.id ? updatedRecord : item
+              ));
+            }}
+            style={{ width: '100%' }}
+          />
+        ) : (
+          text || '-'
+        );
+      },
     },
     // {
     //   title: 'work centre Name',
@@ -1524,6 +1568,24 @@ const Workcenter = () => {
       title: 'Description',
       dataIndex: 'description',
       width: 200,
+      render: (text, record) => {
+        const editable = isConfigEditing(record);
+        return editable ? (
+          <Input.TextArea
+            value={text}
+            onChange={(e) => {
+              const updatedRecord = { ...record, description: e.target.value };
+              setConfigData(configData.map(item => 
+                item.id === record.id ? updatedRecord : item
+              ));
+            }}
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            style={{ width: '100%' }}
+          />
+        ) : (
+          text || '-'
+        );
+      },
     },
     {
       title: 'Schedulable',

@@ -1578,9 +1578,12 @@ const DocumentManagement = () => {
               optionFilterProp="children"
               allowClear
               onChange={(value) => setSelectedProductionOrder(value)}
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
+              filterOption={(input, option) => {
+                const children = Array.isArray(option.children) 
+                  ? option.children.join(' ') 
+                  : String(option.children || '');
+                return children.toLowerCase().includes(input.toLowerCase());
+              }}
             >
               {filteredProductionOrders.map(order => (
                 <Select.Option key={order.id} value={order.id}>

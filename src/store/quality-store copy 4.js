@@ -256,25 +256,6 @@ class QualityStore {
     }
   }
 
-  async getProductionOrderOperationsStatus(orderId) {
-    return this.retryRequest(async () => {
-      try {
-        const response = await this.api.get(`/operatorlogs2/production-order-operations-status/${orderId}`);
-        return response.data;
-      } catch (error) {
-        if (error.response?.status === 404) {
-          console.log('No operations status data found for order ID:', orderId);
-          return {
-            required_qty: 0,
-            completed_qty: 0,
-            rejected_qty: 0
-          };
-        }
-        this.handleError(error, 'Fetching production order operations status');
-      }
-    });
-  }
-
   async fetchInspectionDetails(orderId) {
     return this.retryRequest(async () => {
       try {
@@ -680,52 +661,6 @@ class QualityStore {
     });
   }
 
-  // async checkFTPApprovalStatus(orderId, ipid) {
-  //   return this.retryRequest(async () => {
-  //     try {
-  //       console.log(`Checking FTP approval status for Order ID: ${orderId}, IPID: ${ipid}`);
-        
-  //       const response = await this.api.get(`/quality/ftp/${orderId}/${ipid}`);
-        
-  //       console.log('FTP approval status response:', response.data);
-        
-  //       if (response.data && typeof response.data.is_completed === 'boolean') {
-  //         console.log('FTP approval status -------------------------------------:', response.data);
-  //         return {
-  //           order_id: response.data.order_id,
-  //           ipid: response.data.ipid,
-  //           is_completed: response.data.is_completed,
-  //           status: response.data.status, // Set default status to 'NA' if undefined
-  //           created_at: response.data.created_at,
-  //           updated_at: response.data.updated_at
-  //         };
-  //       } else {
-  //         console.warn('Unexpected FTP status response format:', response.data);
-  //         return {
-  //           order_id: orderId,
-  //           ipid: ipid,
-  //           is_completed: false,
-  //           status: 'pending'
-  //         };
-  //       }
-
-  //       console.log('FTP approval status -------------------------------------:', response.data);
-        
-  //     } catch (error) {
-  //       console.error('Error checking FTP approval status:', error);
-  //       return {
-  //         order_id: orderId,
-  //         ipid: ipid,
-  //         is_completed: false,
-  //         status: 'pending'
-  //       };
-  //     }
-  //   });
-  // }
-
-
-
-
   async checkFTPApprovalStatus(orderId, ipid) {
     return this.retryRequest(async () => {
       try {
@@ -736,20 +671,14 @@ class QualityStore {
         console.log('FTP approval status response:', response.data);
         
         if (response.data && typeof response.data.is_completed === 'boolean') {
-          // Use Status (capital S) from response or default to 'pending'
-          const status = response.data.Status || response.data.status || 'pending';
-          
-          const result = {
+          return {
             order_id: response.data.order_id,
             ipid: response.data.ipid,
             is_completed: response.data.is_completed,
-            status: status,
+            status: response.data.status || 'NA', // Set default status to 'NA' if undefined
             created_at: response.data.created_at,
             updated_at: response.data.updated_at
           };
-          
-          console.log('Processed FTP approval status:', result);
-          return result;
         } else {
           console.warn('Unexpected FTP status response format:', response.data);
           return {
@@ -759,6 +688,7 @@ class QualityStore {
             status: 'pending'
           };
         }
+        
       } catch (error) {
         console.error('Error checking FTP approval status:', error);
         return {

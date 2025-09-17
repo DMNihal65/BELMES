@@ -161,7 +161,7 @@ const OrderTable = ({ orders, onRefresh }) => {
           created: { color: '#1890ff', text: 'Created' }, // Blue
           in_progress: { color: '#722ed1', text: 'In Progress' }, // Purple
           completed: { color: '#52c41a', text: 'Completed' }, // Green
-          delayed: { color: '#f5222d', text: 'Delayed' }, // Red
+          // delayed: { color: '#f5222d', text: 'Delayed' }, // Red
           default: { color: '#d9d9d9', text: 'Pending' } // Gray
         };
         
@@ -184,7 +184,7 @@ const OrderTable = ({ orders, onRefresh }) => {
         { text: 'Created', value: 'created' },
         { text: 'In Progress', value: 'in_progress' },
         { text: 'Completed', value: 'completed' },
-        { text: 'Delayed', value: 'delayed' },
+        // { text: 'Delayed', value: 'delayed' },
       ],
       onFilter: (value, record) => (record.status || '').toLowerCase() === value,
     },

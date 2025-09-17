@@ -27,7 +27,8 @@ import {
   StarFilled,
   UploadOutlined,
   SearchOutlined,
-  ReloadOutlined
+  ReloadOutlined, 
+  LinkOutlined
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { qualityStore } from '../../store/quality-store';
@@ -37,6 +38,20 @@ const { Option } = Select;
 const { TabPane } = Tabs;
 const { Step } = Steps;
 const { RangePicker } = DatePicker;
+
+  const handleLaunchQMS = async () => {
+    try {
+      // Use the custom protocol handler to launch QMS
+      window.location.href = "belmes://launch-qms";
+      
+      // Close the QMS modal
+      setIsQmsModalVisible(false);
+
+    } catch (error) {
+      console.error('Failed to launch QMS:', error);
+      message.error('Failed to launch QMS software');
+    }
+  };
 
 const QualityManagementDashboard = () => {
   const [selectedPart, setSelectedPart] = useState(null);
@@ -754,6 +769,13 @@ const QualityManagementDashboard = () => {
               >
                 Refresh
               </Button>
+              <Button
+            type="primary"
+            icon={<LinkOutlined />}
+            onClick={handleLaunchQMS}
+          >
+            Open QMS Software
+          </Button>
             </Space>
           </Col>
         </Row>
@@ -767,6 +789,7 @@ const QualityManagementDashboard = () => {
           loading={loading}
           selectedOperation={selectedOperation}
           setSelectedOperation={setSelectedOperation}
+          orderId={selectedPart.value} // Pass the orderId from selectedPart
         />
       )}
 

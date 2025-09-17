@@ -24,7 +24,7 @@ const OrderTracking = () => {
     setSelectedOrder(null);
     setOperationStatus(null);
     try {
-      const response = await axios.get('http://172.16.0.229:1292/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.89:8008/api/v1/planning/all_orders');
       setOrders(response.data);
     } catch (err) {
       setError('Failed to fetch production orders. Please try again.');
@@ -41,7 +41,7 @@ const OrderTracking = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await axios.get('http://172.16.0.229:1292/api/v1/auth/api/v1/auth/users-get?active_only=true');
+        const res = await axios.get('http://172.18.7.89:8008/api/v1/auth/api/v1/auth/users-get?active_only=true');
         setUsers(res.data);
       } catch (err) {
         console.error('Failed to fetch users', err);
@@ -63,7 +63,7 @@ const OrderTracking = () => {
     try {
       const productionOrder = selected.production_order;
 
-      const { data } = await axios.get(`http://172.16.0.229:1292/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`);
+      const { data } = await axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`);
       setOperationStatus(data);
 
     } catch (err) {
@@ -92,7 +92,7 @@ const OrderTracking = () => {
         notes: values.notes || '',
         machine_id: values.machine_id || null,
       };
-      await axios.post('http://172.16.0.229:1292/api/v1/operatorlogs2/operator-log', payload);
+      await axios.post('http://172.18.7.89:8008/api/v1/operatorlogs2/operator-log', payload);
       message.success('Quantity updated successfully');
       setShowUpdateModal(false);
       // refresh

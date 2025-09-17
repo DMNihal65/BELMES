@@ -7,7 +7,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const ChecklistsTab = () => {
-  const { checklists, checklist, loading, error, fetchChecklists, fetchChecklist, createChecklist, addChecklistItem } = usePokayokeStore();
+  const { checklists, checklist, loading, error, fetchChecklists, fetchChecklist, createChecklist, addChecklistItem, deleteChecklist } = usePokayokeStore();
   
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
@@ -90,6 +90,20 @@ const ChecklistsTab = () => {
       console.error('Form validation error:', error);
     }
   };
+
+  const handleDeleteChecklist = async (checklistId, checklistName) => {
+    try {
+      const result = await deleteChecklist(checklistId);
+      if (result) {
+        message.success(`Checklist "${checklistName}" has been deleted successfully`);
+        // Refresh the checklists list
+        fetchChecklists();
+      }
+    } catch (error) {
+      console.error('Error deleting checklist:', error);
+      message.error('Failed to delete checklist. Please try again.');
+    }
+  };
   
   const columns = [
     {
@@ -163,7 +177,7 @@ const ChecklistsTab = () => {
     {
       title: 'Actions',
       key: 'actions',
-      width: '10%',
+      width: '15%',
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="View Checklist">
@@ -180,6 +194,33 @@ const ChecklistsTab = () => {
               size="small"
             />
           </Tooltip>
+          <Popconfirm
+            title="Delete Checklist"
+            description={
+              <div>
+                <p>Are you sure you want to delete this checklist?</p>
+                <p className="text-red-500 font-medium">
+                  <strong>Warning:</strong> This checklist will be deleted from all machines assigned to it.
+                </p>
+                <p className="text-sm text-gray-600">
+                  Checklist: <strong>{record.name}</strong>
+                </p>
+              </div>
+            }
+            onConfirm={() => handleDeleteChecklist(record.id, record.name)}
+            okText="Yes, Delete"
+            cancelText="Cancel"
+            okType="danger"
+            placement="topRight"
+          >
+            <Tooltip title="Delete Checklist">
+              <Button 
+                icon={<DeleteOutlined />} 
+                danger
+                size="small"
+              />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },

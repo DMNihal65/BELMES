@@ -103,25 +103,29 @@ const cellStyle = {
 };
 
 // Create a separate component for PDC info
-const PdcInfo = ({ productionOrder, partNumber }) => {
+const PdcInfo = ({ productionOrder, partNumber, isActive }) => {
   const [pdcData, setPdcData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { fetchPdcData } = usePlanningStore();
+  const [prevIsActive, setPrevIsActive] = useState(isActive);
 
   useEffect(() => {
     const loadPdcData = async () => {
-      if (!productionOrder || !partNumber) return;
+      // Don't fetch if we don't have required data
+      if (!productionOrder || !partNumber) {
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
         const data = await fetchPdcData(partNumber, productionOrder);
-        console.log('PDC Data from API:', data); // Debug log
+        console.log('PDC Data from API:', data);
         
         if (data && data.length > 0) {
-          // Use the first item from the array as the PDC data
           setPdcData({
-            pdc: data[0].pdc_data, // Updated to use pdc_data instead of pdc_date
+            pdc: data[0].pdc_data,
             last_updated: data[0].updated_at || new Date().toISOString()
           });
         } else {
@@ -137,30 +141,55 @@ const PdcInfo = ({ productionOrder, partNumber }) => {
       }
     };
 
-    loadPdcData();
-  }, [productionOrder, partNumber, fetchPdcData]);
+    // Load data if:
+    // 1. This is the first render and the job is active, or
+    // 2. The job status just changed from inactive to active
+    if ((isActive && !prevIsActive) || (isActive && pdcData === null)) {
+      loadPdcData();
+    } else if (!isActive) {
+      setLoading(false);
+    }
 
-  if (loading) return <Spin size="small" />;
-  if (error) return <span className="text-red-500">Error</span>;
-  if (!pdcData) return <span>N/A</span>;
+    // Update the previous active state
+    setPrevIsActive(isActive);
+  }, [productionOrder, partNumber, fetchPdcData, isActive]);
+
+  // If not active, show "Not yet scheduled"
+  if (!isActive) return <span>Not yet scheduled</span>;
   
+  // If active but still loading
+  if (loading) return <Spin size="small" />;
+  
+  // If error occurred
+  if (error) return <span className="text-red-500">Error</span>;
+  
+  // If no data found
+  if (!pdcData || !pdcData.pdc) return <span>Not yet scheduled</span>;
+  
+  // Show the PDC date
   return (
     <Tooltip title={`Last updated: ${pdcData.last_updated ? new Date(pdcData.last_updated).toLocaleString() : 'N/A'}`}>
       <span className="text-blue-600 font-medium">
-        {pdcData.pdc ? new Date(pdcData.pdc).toLocaleDateString() : 'Not Scheduled'}
+        {new Date(pdcData.pdc).toLocaleDateString()}
       </span>
     </Tooltip>
   );
 };
 
 // Component to fetch and display start date from scheduling API
-const StartDateWithLoader = ({ productionOrder, partNumber }) => {
+const StartDateWithLoader = ({ productionOrder, partNumber, isActive }) => {
   const [startDate, setStartDate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchStartDate = async () => {
+      // Only fetch start date if the status is active
+      if (!isActive) {
+        setLoading(false);
+        return;
+      }
+      
       if (!productionOrder || !partNumber) {
         setLoading(false);
         return;
@@ -188,13 +217,14 @@ const StartDateWithLoader = ({ productionOrder, partNumber }) => {
     };
 
     fetchStartDate();
-  }, [productionOrder, partNumber]);
+  }, [productionOrder, partNumber, isActive]);
 
+  if (!isActive) return <span>Not yet scheduled</span>;
   if (loading) return <Spin size="small" />;
   if (error) return <span className="text-red-500">Error</span>;
-  if (!startDate) return <span>N/A</span>;
+  if (!startDate) return <span>Not yet scheduled</span>;
 
-  return <span>{startDate.toLocaleDateString()}</span>;
+  return <span className="text-blue-600 font-medium">{startDate.toLocaleDateString()}</span>;
 };
 
 
@@ -693,7 +723,16 @@ const loadInventoryItems = async () => {
     // Show confirmation modal
     Modal.confirm({
       title: `Confirm Status Change`,
-      content: `Are you sure you want to change the status of production order ${productionOrder} to ${newStatus}?`,
+      content: (
+        <div>
+          <p>Are you sure you want to change the status of production order {productionOrder} to {newStatus}?</p>
+          {newStatus === 'active' && (
+         <p style={{ color: '#faad14', fontWeight: 'bold', marginTop: '10px' }}>
+         Note: Please manually update the scheduling chart to see the PDC.
+       </p>
+          )}
+        </div>
+      ),
       onOk: async () => {
         try {
           setUpdatingStatus(true);
@@ -1793,10 +1832,12 @@ const loadInventoryItems = async () => {
   // Function to render PDC info with both production order and part number
   const renderPdcInfo = (productionOrder) => {
     if (!selectedJob) return <span>N/A</span>;
+    const isActive = getJobStatus(productionOrder) === 'active';
     return (
       <PdcInfo 
         productionOrder={productionOrder} 
         partNumber={selectedJob.part_number}
+        isActive={isActive}
         key={`pdc-${productionOrder}`} 
       />
     );
@@ -3216,7 +3257,8 @@ const loadInventoryItems = async () => {
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Start Date</span>}>
                       <StartDateWithLoader 
                         productionOrder={selectedJob.production_order} 
-                        partNumber={selectedJob.part_number} 
+                        partNumber={selectedJob.part_number}
+                        isActive={getJobStatus(selectedJob.production_order) === 'active'}
                       />
                     </Descriptions.Item>
                     <Descriptions.Item label={<span style={{ fontWeight: 'bold' }}>Status</span>}>

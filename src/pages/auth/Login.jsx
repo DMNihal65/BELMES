@@ -180,7 +180,8 @@ const Login = () => {
               {(machines || [])
                 .filter(machine => 
                   !machine.make?.toLowerCase().includes('default') && 
-                  !machine.work_center?.code?.toLowerCase().includes('default')
+                  !machine.work_center?.code?.toLowerCase().includes('default') &&
+                  machine.id >= 1 && machine.id <= 14
                 )
                 .map(machine => (
                   <Option key={machine.id} value={machine.id}>

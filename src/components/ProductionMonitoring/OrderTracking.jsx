@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Select, Card, Spin, Alert, Row, Col, Typography, Descriptions, Table, Button, Statistic, Space, Modal, Form, InputNumber, DatePicker, Input, message,Progress } from 'antd';
-import { ReloadOutlined, FileTextOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Select, Card, Spin, Alert, Row, Col, Typography, Descriptions, Table, Button, Statistic, Space, Modal, Form, InputNumber, DatePicker, Input, message, Progress } from 'antd';
+import { ReloadOutlined, FileTextOutlined, DownloadOutlined, CalendarOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import * as XLSX from 'xlsx';
 
 const { Title, Text } = Typography;
 
 const OrderTracking = () => {
   const [orders, setOrders] = useState([]);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);  
   const [operationStatus, setOperationStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -20,6 +21,35 @@ const OrderTracking = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [showDailyReportModal, setShowDailyReportModal] = useState(false);
+  const [dailyReportData, setDailyReportData] = useState(null);
+  const [dailyReportLoading, setDailyReportLoading] = useState(false);
+
+
+  const downloadExcel = () => {
+  if (!dailyReportData) return;
+
+  // Prepare data for Excel
+  const worksheetData = dailyReportTableData.map(item => ({
+    Date: item.date,
+    'Part Number': item.part_number,
+    'Part Description': item.part_description,
+    'Operation Number': item.operation_number,
+    'Accepted Quantity': item.accepted_quantity,
+    'Rejected Quantity': item.rejected_quantity,
+    'Total Hours': item.total_hours,
+    Machines: item.machines?.join(', ') || '-',
+    Operators: item.operators?.join(', ') || '-'
+  }));
+
+  // Create worksheet
+  const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Daily Report');
+
+  // Generate Excel file and trigger download
+  XLSX.writeFile(workbook, `DailyProductionReport_${selectedOrder.production_order}.xlsx`);
+};
 
   // Fetch all orders
   const fetchOrders = async () => {
@@ -53,6 +83,57 @@ const OrderTracking = () => {
     };
     fetchUsers();
   }, []);
+
+  const downloadReportExcel = () => {
+  if (!reportData) return;
+
+  // Create a new workbook
+  const workbook = XLSX.utils.book_new();
+
+  // Operations sheet
+  const operationsData = reportData.operations.map(op => ({
+    'Operation Number': op.operation_number,
+    Description: op.description,
+    'Machine Name': op.machines_used?.join(', ') || '-',
+    Operator: op.operators?.join(', ') || '-',
+    'Total Time': op.total_time_invested_hours,
+    'Required Quantity': op.required_quantity,
+    'Completed Quantity': op.completed_quantity,
+    'Rejected Quantity': op.rejected_quantity
+  }));
+  const operationsSheet = XLSX.utils.json_to_sheet(operationsData);
+  XLSX.utils.book_append_sheet(workbook, operationsSheet, 'Operations');
+
+  // Operators sheet
+  const operatorsData = reportData.operators.flatMap(operator =>
+    operator.operations.map(op => ({
+      'Operator Name': operator.operator,
+      'Operation Number': op.operation_number,
+      Description: op.operation_description,
+      Machine: op.machine || '-',
+      'Total Time': op.time_invested_hours,
+      'Completed Quantity': op.completed_quantity,
+      'Rejected Quantity': op.rejected_quantity
+    }))
+  );
+  const operatorsSheet = XLSX.utils.json_to_sheet(operatorsData);
+  XLSX.utils.book_append_sheet(workbook, operatorsSheet, 'Operators');
+
+  // Machines sheet
+  const machinesData = reportData.machines.map(machine => ({
+    'Machine Name': machine.machine,
+    'Operation Number': machine.operation_number,
+    'Operation Description': machine.operation_description,
+    'Total Time': machine.time_invested_hours,
+    'Completed Quantity': machine.completed_quantity,
+    'Rejected Quantity': machine.rejected_quantity
+  }));
+  const machinesSheet = XLSX.utils.json_to_sheet(machinesData);
+  XLSX.utils.book_append_sheet(workbook, machinesSheet, 'Machines');
+
+  // Generate Excel file and trigger download
+  XLSX.writeFile(workbook, `ProductionOrderReport_${reportData.production_order}.xlsx`);
+};
 
   const handleOrderSelect = async (value) => {
     const selected = orders.find(order => order.production_order === value);
@@ -129,29 +210,35 @@ const OrderTracking = () => {
     setReportLoading(false);
   };
 
+  // Fetch daily report data
+  const fetchDailyReportData = async () => {
+    if (!selectedOrder) return;
+
+    setDailyReportLoading(true);
+    try {
+      const response = await axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-daily-report/${selectedOrder.production_order}`);
+      setDailyReportData(response.data);
+    } catch (err) {
+      message.error('Failed to fetch daily report data');
+      console.error(err);
+    }
+    setDailyReportLoading(false);
+  };
+
   // Handle view report button click
   const handleViewReport = () => {
     setShowReportModal(true);
     fetchReportData();
   };
 
-  const downloadPDF = async () => {
-    const input = document.getElementById('report-content');
-    if (!input) return;
-
-    try {
-      const canvas = await html2canvas(input, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`ProductionOrderReport_${reportData.production_order}.pdf`);
-    } catch (err) {
-      console.error('PDF download failed:', err);
-      message.error('Failed to generate PDF');
-    }
+  // Handle view daily report button click
+  const handleViewDailyReport = () => {
+    setShowDailyReportModal(true);
+    fetchDailyReportData();
   };
+
+
+
 
   const columns = [
     { title: 'Operation No', dataIndex: 'operation_number', key: 'operation_number', sorter: (a, b) => a.operation_number - b.operation_number },
@@ -183,15 +270,77 @@ const OrderTracking = () => {
     { title: 'Rejected Quantity', dataIndex: 'rejected_quantity', key: 'rejected_quantity' },
   ];
 
+  const dailyReportColumns = [
+    {
+      title: 'Date',
+      dataIndex: 'date',
+      key: 'date',
+      render: (text, record, index) => {
+        const rowSpan = dailyReportTableData.filter(item => item.date === record.date).length;
+        return index === dailyReportTableData.findIndex(item => item.date === record.date)
+          ? { children: text, props: { rowSpan } }
+          : { props: { rowSpan: 0 } };
+      },
+    },
+    {
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+      render: (text, record, index) => {
+        const rowSpan = dailyReportTableData.filter(item => item.date === record.date).length;
+        return index === dailyReportTableData.findIndex(item => item.date === record.date)
+          ? { children: text, props: { rowSpan } }
+          : { props: { rowSpan: 0 } };
+      },
+    },
+    {
+      title: 'Part Description',
+      dataIndex: 'part_description',
+      key: 'part_description',
+      render: (text, record, index) => {
+        const rowSpan = dailyReportTableData.filter(item => item.date === record.date).length;
+        return index === dailyReportTableData.findIndex(item => item.date === record.date)
+          ? { children: text, props: { rowSpan } }
+          : { props: { rowSpan: 0 } };
+      },
+    },
+    {
+      title: 'Operation Number',
+      dataIndex: 'operation_number',
+      key: 'operation_number',
+    },
+    { title: 'Accepted Quantity', dataIndex: 'accepted_quantity', key: 'accepted_quantity' },
+    { title: 'Rejected Quantity', dataIndex: 'rejected_quantity', key: 'rejected_quantity' },
+    { title: 'Total Hours', dataIndex: 'total_hours', key: 'total_hours' },
+    { title: 'Machine Name', dataIndex: 'machines', key: 'machines', render: (machines) => machines?.join(', ') || '-' },
+    { title: 'Operator', dataIndex: 'operators', key: 'operators', render: (operators) => operators?.join(', ') || '-' },
+  ];
+
   const totalOps = operationStatus?.operations?.length || 0;
   const completedOps = operationStatus?.operations?.filter(op => op.is_complete).length || 0;
   const overallPercent = operationStatus ? (operationStatus.completion_percentage ?? Math.round((completedOps / totalOps) * 100)) : 0;
 
+  // Prepare daily report table data
+  const dailyReportTableData = dailyReportData?.daily_reports?.flatMap(report =>
+    report.operations.map((op, index) => ({
+      key: `${report.date}-${op.operation_number}`,
+      date: report.date,
+      part_number: dailyReportData.part_number,
+      part_description: dailyReportData.part_description,
+      operation_number: op.operation_number,
+      accepted_quantity: op.accepted_quantity,
+      rejected_quantity: op.rejected_quantity,
+      total_hours: op.total_hours,
+      machines: op.machines,
+      operators: op.operators,
+    }))
+  ) || [];
+
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="p-6">
       <Title level={2}>Order Tracking (BETA)</Title>
       <Card
-        style={{ marginBottom: 24 }}
+        className="mb-6"
         title="Select Production Order"
         extra={<Button icon={<ReloadOutlined />} onClick={fetchOrders} disabled={loading} />}
       >
@@ -199,7 +348,7 @@ const OrderTracking = () => {
           <Select
             key={selectedOrder ? 'selected' : 'empty'}
             showSearch
-            style={{ width: '100%' }}
+            className="w-full"
             placeholder="Select a Production Order or Part Number"
             onChange={handleOrderSelect}
             optionFilterProp="children"
@@ -218,25 +367,34 @@ const OrderTracking = () => {
         </Spin>
       </Card>
 
-      {error && <Alert message="Error" description={error} type="error" showIcon style={{ marginBottom: 24 }} />}
+      {error && <Alert message="Error" description={error} type="error" showIcon className="mb-6" />}
 
       <Spin spinning={loading && !!selectedOrder}>
         {operationStatus && (
           <Card
-            style={{ marginBottom: 24 }}
+            className="mb-6"
             title="Order Overview"
             extra={
-              <Button
-                type="primary"
-                icon={<FileTextOutlined />}
-                onClick={handleViewReport}
-              >
-                View Report
-              </Button>
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<FileTextOutlined />}
+                  onClick={handleViewReport}
+                >
+                  View Report
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<CalendarOutlined />}
+                  onClick={handleViewDailyReport}
+                >
+                  View Daily Report
+                </Button>
+              </Space>
             }
           >
             <Row gutter={[16, 16]}>
-              <Col xs={24} md={12} lg={8} style={{ textAlign: 'center' }}>
+              <Col xs={24} md={12} lg={8} className="text-center">
                 <Progress
                   type="dashboard"
                   percent={overallPercent}
@@ -245,7 +403,7 @@ const OrderTracking = () => {
                 />
               </Col>
               <Col xs={24} md={12} lg={16}>
-                <Space size="large" style={{ marginBottom: 16 }}>
+                <Space size="large" className="mb-4">
                   <Statistic title="Completed Ops" value={completedOps} suffix={`/ ${totalOps}`} />
                   <Statistic title="Required Qty" value={operationStatus.required_quantity} />
                   <Statistic title="Priority" value={operationStatus.priority} />
@@ -292,19 +450,19 @@ const OrderTracking = () => {
             </Select>
           </Form.Item>
           <Form.Item name="quantity_completed" label="Quantity Completed" rules={[{ required: true, type: 'number', min: 1 }]}>
-            <InputNumber style={{ width: '100%' }} />
+            <InputNumber className="w-full" />
           </Form.Item>
           <Form.Item name="quantity_rejected" label="Quantity Rejected" rules={[{ required: true, type: 'number', min: 0 }]}>
-            <InputNumber style={{ width: '100%' }} />
+            <InputNumber className="w-full" />
           </Form.Item>
           <Form.Item name="start_time" label="Start Time" rules={[{ required: true }]}>
-            <DatePicker showTime style={{ width: '100%' }} />
+            <DatePicker showTime className="w-full" />
           </Form.Item>
           <Form.Item name="end_time" label="End Time" rules={[{ required: true }]}>
-            <DatePicker showTime style={{ width: '100%' }} />
+            <DatePicker showTime className="w-full" />
           </Form.Item>
           <Form.Item name="machine_id" label="Machine ID (optional)">
-            <InputNumber style={{ width: '100%' }} />
+            <InputNumber className="w-full" />
           </Form.Item>
           <Form.Item name="notes" label="Notes">
             <Input.TextArea rows={3} />
@@ -317,32 +475,33 @@ const OrderTracking = () => {
         title="Production Order Report"
         open={showReportModal}
         onCancel={() => setShowReportModal(false)}
-        width="50%"
+        width="80%"
         style={{ top: 20 }}
         footer={[
           <Button key="close" onClick={() => setShowReportModal(false)}>
             Close
           </Button>,
           <Button
-            key="download"
+            key="download-excel"
             type="primary"
             icon={<DownloadOutlined />}
-            onClick={downloadPDF}
+            onClick={downloadReportExcel}
             disabled={!reportData}
           >
-            Download PDF
+            Download Excel
           </Button>
+
         ]}
       >
         <Spin spinning={reportLoading}>
-          <div id="report-content" style={{ minHeight: '297mm', padding: '20px', backgroundColor: 'white' }}>
+          <div id="report-content" className="min-h-[297mm] p-5 bg-white">
             {reportData && (
               <>
-                <div className="report-header" style={{ textAlign: 'center', marginBottom: '30px' }}>
-                  <Title level={2} style={{ margin: 0 }}>PO Summary</Title>
+                <div className="report-header text-center mb-8">
+                  <Title level={2} className="m-0">PO Summary</Title>
                 </div>
 
-                <div className="report-subheader" style={{ marginBottom: '20px' }}>
+                <div className="report-subheader mb-5">
                   <Row gutter={[16, 8]}>
                     <Col span={12}>
                       <Text strong>Production Order: </Text>
@@ -363,7 +522,7 @@ const OrderTracking = () => {
                   </Row>
                 </div>
 
-                <Title level={4} style={{ marginBottom: '16px' }}>Operations</Title>
+                <Title level={4} className="mb-4">Operations</Title>
                 <Table
                   dataSource={reportData.operations}
                   columns={reportColumns}
@@ -373,7 +532,7 @@ const OrderTracking = () => {
                   scroll={{ x: 'max-content' }}
                   className="report-table"
                 />
-                <Title level={4} style={{ marginTop: '24px', marginBottom: '16px' }}>Operators</Title>
+                <Title level={4} className="mt-6 mb-4">Operators</Title>
                 <Table
                   dataSource={reportData?.operators?.flatMap(operator =>
                     operator.operations.map(op => ({
@@ -402,7 +561,7 @@ const OrderTracking = () => {
                   scroll={{ x: 'max-content' }}
                   className="report-table"
                 />
-                <Title level={4} style={{ marginTop: '24px', marginBottom: '16px' }}>Machines</Title>
+                <Title level={4} className="mt-6 mb-4">Machines</Title>
                 <Table
                   dataSource={reportData?.machines?.map(machine => ({
                     key: `${machine.machine}-${machine.operation_id}`,
@@ -426,6 +585,60 @@ const OrderTracking = () => {
                   size="small"
                   scroll={{ x: 'max-content' }}
                   className="report-table"
+                />
+              </>
+            )}
+          </div>
+        </Spin>
+      </Modal>
+
+      {/* Daily Report Modal */}
+      <Modal
+        title="Daily Production Report"
+        open={showDailyReportModal}
+        onCancel={() => setShowDailyReportModal(false)}
+        width="80%"
+        style={{ top: 20 }}
+        footer={[
+          <Button key="close" onClick={() => setShowDailyReportModal(false)}>
+            Close
+          </Button>,
+          <Button
+            key="download-excel"
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={downloadExcel}
+            disabled={!dailyReportData}
+          >
+            Download Excel
+          </Button>
+        ]}
+      >
+        <Spin spinning={dailyReportLoading}>
+          <div className="p-5">
+            {dailyReportData && (
+              <>
+                <Table
+                  dataSource={dailyReportTableData}
+                  columns={dailyReportColumns}
+                  rowKey="key"
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 'max-content' }}
+                  className="report-table border border-gray-300"
+                  rowClassName="border-b border-gray-300"
+                  components={{
+                    header: {
+                      cell: (props) => (
+                        <th {...props} style={{ border: '1px solid #d9d9d9', padding: '8px' }} />
+                      ),
+                    },
+                    body: {
+                      cell: (props) => (
+                        <td {...props} style={{ border: '1px solid #d9d9d9', padding: '8px' }} />
+                      ),
+                    },
+                  }}
                 />
               </>
             )}

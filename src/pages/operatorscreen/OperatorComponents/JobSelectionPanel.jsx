@@ -40,6 +40,9 @@ const JobSelectionPanel = ({ visible, onClose }) => {
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [filterKeyword, setFilterKeyword] = useState('');
   const [filterPriority, setFilterPriority] = useState(null);
+  const [filterProductionOrder, setFilterProductionOrder] = useState(null);
+
+
 
 useEffect(() => {
   setActiveTab('custom'); // Always open on custom jobs tab
@@ -47,30 +50,37 @@ useEffect(() => {
 }, [availableJobs]);
 
   // Filter jobs when filter criteria change
-  useEffect(() => {
-    if (!availableJobs) return;
-    
-    let filtered = [...availableJobs];
-    
-    // Apply keyword filter
-    if (filterKeyword) {
-      const keyword = filterKeyword.toLowerCase();
-      filtered = filtered.filter(job => 
-        job.part_number?.toLowerCase().includes(keyword) ||
-        job.production_order?.toLowerCase().includes(keyword) ||
-        job.part_description?.toLowerCase().includes(keyword)
-      );
-    }
-    
-    // Apply priority filter
-    if (filterPriority !== null) {
-      filtered = filtered.filter(job => 
-        job.project?.priority === filterPriority
-      );
-    }
-    
-    setFilteredJobs(filtered);
-  }, [filterKeyword, filterPriority, availableJobs]);
+useEffect(() => {
+  if (!availableJobs) return;
+  
+  let filtered = [...availableJobs];
+  
+  // Apply keyword filter
+  if (filterKeyword) {
+    const keyword = filterKeyword.toLowerCase();
+    filtered = filtered.filter(job => 
+      job.part_number?.toLowerCase().includes(keyword) ||
+      job.production_order?.toLowerCase().includes(keyword) ||
+      job.part_description?.toLowerCase().includes(keyword)
+    );
+  }
+  
+  // Apply priority filter
+  if (filterPriority !== null) {
+    filtered = filtered.filter(job => 
+      job.project?.priority === filterPriority
+    );
+  }
+  
+  // Apply production order filter
+  if (filterProductionOrder !== null) {
+    filtered = filtered.filter(job => 
+      job.production_order === filterProductionOrder
+    );
+  }
+  
+  setFilteredJobs(filtered);
+}, [filterKeyword, filterPriority, filterProductionOrder, availableJobs]);
 
   // Handle operation selection
   const handleSelectOperation = (operation) => {
@@ -145,7 +155,8 @@ useEffect(() => {
       <Button 
         onClick={() => {
           setFilterKeyword('');
-          setFilterPriority(null);
+          setFilterPriority(null); 
+          setFilterProductionOrder(null);
         }}
         type="link"
         className="mt-4"
@@ -168,6 +179,28 @@ useEffect(() => {
     });
 
     const isJobSelectionDisabled = !!localStorage.getItem('currentJobData');
+
+      const handleJobSelection = (job) => {
+        if (isJobSelectionDisabled) {
+          message.warning('Cannot select a job while another job is active. Please deactivate the current job first.');
+          return;
+        }
+
+        // Select the job in the store
+        selectJob(job);
+
+        // Store the latest selected job details in localStorage
+        const userSelectedJobData = {
+          production_order: job.production_order,
+          part_number: job.part_number
+        };
+        localStorage.setItem('user-selected-job', JSON.stringify(userSelectedJobData));
+
+        // Fetch job details if production order is available
+        if (job.production_order) {
+          fetchJobDetails(job.production_order);
+        }
+      };
   
     return (
       <>
@@ -187,9 +220,9 @@ useEffect(() => {
   
         {showFilterPanel && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <div className="text-xs text-gray-500 mb-1">Keyword</div>
+                <div className="text-xs text-gray-500 mb-1">Part Number</div>
                 <Select
                   placeholder="Search part number or order"
                   allowClear
@@ -207,23 +240,43 @@ useEffect(() => {
               <div>
                 <div className="text-xs text-gray-500 mb-1">Priority</div>
                 <Select
-                placeholder="Filter by priority"
-                allowClear
-                style={{ width: '100%' }}
-                onChange={(value) => setFilterPriority(value)}
-                value={filterPriority || undefined}
-              >
-                {Array.from(
-                  new Set(availableJobs.map(job => job.project?.priority).filter(p => p != null))
-                )
-                  .sort((a, b) => a - b)
-                  .map(priority => (
-                    <Option key={priority} value={priority}>
-                      Priority {priority}
-                    </Option>
-                  ))}
-              </Select>
-
+                  placeholder="Filter by priority"
+                  allowClear
+                  style={{ width: '100%' }}
+                  onChange={(value) => setFilterPriority(value)}
+                  value={filterPriority || undefined}
+                >
+                  {Array.from(
+                    new Set(availableJobs.map(job => job.project?.priority).filter(p => p != null))
+                  )
+                    .sort((a, b) => a - b)
+                    .map(priority => (
+                      <Option key={priority} value={priority}>
+                        Priority {priority}
+                      </Option>
+                    ))}
+                </Select>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Production Order</div>
+                <Select
+                  placeholder="Filter by production order"
+                  allowClear
+                  style={{ width: '100%' }}
+                  onChange={(value) => setFilterProductionOrder(value)}
+                  value={filterProductionOrder || undefined}
+                  showSearch
+                >
+                  {Array.from(
+                    new Set(availableJobs.map(job => job.production_order).filter(po => po != null))
+                  )
+                    .sort()
+                    .map(productionOrder => (
+                      <Option key={productionOrder} value={productionOrder}>
+                        {productionOrder}
+                      </Option>
+                    ))}
+                </Select>
               </div>
             </div>
           </div>
@@ -233,6 +286,7 @@ useEffect(() => {
         onClick={() => {
           setFilterKeyword('');
           setFilterPriority(null);
+          setFilterProductionOrder(null);
         }}
         size="small"
         type="default"
@@ -252,16 +306,17 @@ useEffect(() => {
               <List.Item>
                   <Card 
                   className={`w-full ${isJobSelectionDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow-md transition-all'}`}
-                  onClick={() => {
-                    if (isJobSelectionDisabled) {
-                      message.warning('Cannot select a job while another job is active. Please deactivate the current job first.');
-                      return;
-                    }
-                    selectJob(job);
-                    if (job.production_order) {
-                      fetchJobDetails(job.production_order);
-                    }
-                  }}
+                  // onClick={() => {
+                  //   if (isJobSelectionDisabled) {
+                  //     message.warning('Cannot select a job while another job is active. Please deactivate the current job first.');
+                  //     return;
+                  //   }
+                  //   selectJob(job);
+                  //   if (job.production_order) {
+                  //     fetchJobDetails(job.production_order);
+                  //   }
+                  // }}
+                  onClick={() => handleJobSelection(job)}
                   style={{
                     borderLeft: selectedJob?.id === job.id
                       ? '4px solid #1890ff'

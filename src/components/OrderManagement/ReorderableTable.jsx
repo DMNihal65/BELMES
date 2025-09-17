@@ -31,6 +31,7 @@ const ReorderableTable = ({ orders = [] }) => {
   const [showScheduled, setShowScheduled] = useState(true); // Set to true by default
   const [scheduledOrders, setScheduledOrders] = useState([]);
   const [isLoadingScheduled, setIsLoadingScheduled] = useState(false);
+  const [showHighPriority, setShowHighPriority] = useState(false);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -64,37 +65,44 @@ const ReorderableTable = ({ orders = [] }) => {
 
     let filteredOrders = [...orders];
     
-    // Filter for scheduled orders if the toggle is on
-    if (showScheduled && scheduledOrders.length > 0) {
-      // Create a set of scheduled production order numbers for quick lookup
-      const scheduledOrderNumbers = new Set(
-        scheduledOrders
-          .map(order => order.production_order?.toString())
-          .filter(Boolean) // Remove any undefined/null values
-      );
-      
-      console.log('Scheduled order numbers:', Array.from(scheduledOrderNumbers));
-      
-      // Filter orders to only include those that are in the scheduled orders list
-      filteredOrders = filteredOrders.filter(order => {
-        const orderNumber = order.production_order?.toString() || order.id?.toString();
-        const isScheduled = scheduledOrderNumbers.has(orderNumber);
-        console.log(`Order ${orderNumber} - Scheduled: ${isScheduled}`);
-        return isScheduled;
-      });
-      
-      console.log('Filtered orders:', filteredOrders);
+    // If showing scheduled orders
+    if (showScheduled) {
+      if (scheduledOrders.length > 0) {
+        // Create a set of scheduled production order numbers for quick lookup
+        const scheduledOrderNumbers = new Set(
+          scheduledOrders
+            .map(order => order.production_order?.toString())
+            .filter(Boolean) // Remove any undefined/null values
+        );
+        
+        console.log('Scheduled order numbers:', Array.from(scheduledOrderNumbers));
+        
+        // Filter orders to only include those that are in the scheduled orders list
+        filteredOrders = filteredOrders.filter(order => {
+          const orderNumber = order.production_order?.toString() || order.id?.toString();
+          return scheduledOrderNumbers.has(orderNumber);
+        });
+        
+        console.log('Filtered orders:', filteredOrders);
+      } else {
+        filteredOrders = [];
+      }
     }
-
-    // Sort by priority
-    const sortedOrders = [...filteredOrders].sort((a, b) => {
+    
+    // First sort by priority
+    let sortedAndFiltered = [...filteredOrders].sort((a, b) => {
       const priorityA = a.project?.priority || a.priority || 999;
       const priorityB = b.project?.priority || b.priority || 999;
       return priorityA - priorityB;
     });
 
-    setLocalOrders(sortedOrders);
-  }, [orders, showScheduled, scheduledOrders]);
+    // If high priority is enabled, show only first 15 orders after sorting
+    if (showHighPriority && showScheduled) {
+      sortedAndFiltered = sortedAndFiltered.slice(0, 15);
+    }
+
+    setLocalOrders(sortedAndFiltered);
+  }, [orders, showScheduled, scheduledOrders, showHighPriority]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -191,18 +199,18 @@ const ReorderableTable = ({ orders = [] }) => {
         );
       },
     },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (status) => (
-        <div className="flex items-center">
-          <span className="mr-2">•</span>
-          <span>PENDING</span>
-        </div>
-      ),
-    }
+    // {
+    //   title: 'Status',
+    //   dataIndex: 'status',
+    //   key: 'status',
+    //   width: 120,
+    //   render: (status) => (
+    //     <div className="flex items-center">
+    //       <span className="mr-2">•</span>
+    //       <span>PENDING</span>
+    //     </div>
+    //   ),
+    // }
   ];
 
   const getPriorityBackgroundColor = (priority) => {
@@ -298,23 +306,73 @@ const ReorderableTable = ({ orders = [] }) => {
 
   return (
     <div className="w-full">
+      <style jsx>{`
+        .priority-pagination .ant-pagination {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          margin: 16px 0 !important;
+          padding: 8px 0 !important;
+          min-height: 48px !important;
+        }
+        
+        .priority-pagination .ant-pagination-item,
+        .priority-pagination .ant-pagination-prev,
+        .priority-pagination .ant-pagination-next,
+        .priority-pagination .ant-pagination-jump-prev,
+        .priority-pagination .ant-pagination-jump-next {
+          min-width: 32px !important;
+          height: 32px !important;
+          line-height: 30px !important;
+          font-size: 14px !important;
+          margin: 0 4px !important;
+        }
+        
+        .priority-pagination .ant-pagination-options {
+          margin-left: 16px !important;
+        }
+        
+        .priority-pagination .ant-pagination-total-text {
+          font-size: 14px !important;
+          color: #666 !important;
+          margin-right: 16px !important;
+        }
+        
+        .priority-table .ant-table-pagination {
+          margin-top: 16px !important;
+          padding: 8px 0 !important;
+        }
+      `}</style>
       <div className="flex justify-between items-center mb-4">
         <div className="text-lg font-semibold text-gray-700">
           {showScheduled ? 'Scheduled Orders' : 'All Orders'}
         </div>
         <Space>
           {isLoadingScheduled && <Spin size="small" />}
+          {showScheduled && (
+            <Button 
+              type={showHighPriority ? 'primary' : 'default'}
+              onClick={() => setShowHighPriority(!showHighPriority)}
+              className={`mr-2 ${showHighPriority ? 'bg-green-500 text-white' : ''}`}
+              style={showHighPriority ? { border: '2px solid #166534' } : {}}
+            >
+              High Priority
+            </Button>
+          )}
           <span className="text-sm font-medium text-gray-600">Show Scheduled</span>
           <Switch 
             checked={showScheduled}
-            onChange={setShowScheduled}
+            onChange={(checked) => {
+              setShowScheduled(checked);
+              if (!checked) setShowHighPriority(false);
+            }}
             checkedChildren="Yes"
             unCheckedChildren="No"
             className={showScheduled ? 'bg-blue-500' : 'bg-gray-300'}
           />
         </Space>
       </div>
-      <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+      <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 350px)', minHeight: '400px' }}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -325,24 +383,40 @@ const ReorderableTable = ({ orders = [] }) => {
             strategy={verticalListSortingStrategy}
           >
             <Table
-              className="priority-table"
               components={{
                 body: {
                   row: Row,
                 },
               }}
+              rowKey="id"
               columns={columns}
               dataSource={localOrders}
-              rowKey={record => record.id || record.production_order}
               pagination={{
                 ...pagination,
+                style: { 
+                  margin: '8px 0',
+                  fontSize: '10px'
+                },
                 showSizeChanger: true,
+                showQuickJumper: true,
                 showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} orders`,
                 pageSizeOptions: ['10', '20', '50', '100'],
+                position: ['bottomCenter'],
+                size: 'default',
+                className: 'priority-pagination',
+                style: {
+                  marginTop: '16px',
+                  padding: '8px 0',
+                  fontSize: '14px',
+                  minHeight: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                },
                 onShowSizeChange: (current, size) => {
                   setPagination({
                     ...pagination,
-                    current: 1, // Reset to first page when changing page size
+                    current: 1,
                     pageSize: size,
                   });
                 },
@@ -353,7 +427,15 @@ const ReorderableTable = ({ orders = [] }) => {
                     pageSize: pageSize,
                   });
                 },
+                size: 'small',
+                showQuickJumper: false
               }}
+              className="text-2xs"
+              style={{ 
+                fontSize: '10px',
+                lineHeight: '1'
+              }}
+              bordered
               loading={isLoadingScheduled}
               locale={{
                 emptyText: showScheduled 
@@ -367,7 +449,7 @@ const ReorderableTable = ({ orders = [] }) => {
                 if (priority === 3) return 'bg-yellow-50';
                 return '';
               }}
-              scroll={{ y: 480 }}
+              scroll={{ y: 450 }}
               size="middle"
               onChange={(pagination, filters, sorter) => {
                 if (sorter.field === 'project') {

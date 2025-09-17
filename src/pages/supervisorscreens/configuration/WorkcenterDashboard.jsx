@@ -240,52 +240,52 @@ const Workcenter = () => {
   };
 
  const columns = [
-  {
-    title: 'Workcenter ID',
-    dataIndex: 'work_center_id',
-    width: 120,
-    sorter: (a, b) => {
+  // {
+  //   title: 'Sl.No',
+  //   dataIndex: 'work_center_id',
+  //   width: 120,
+  //   sorter: (a, b) => {
     
-      const aId = a.work_center_id || '';
-      const bId = b.work_center_id || '';
+  //     const aId = a.work_center_id || '';
+  //     const bId = b.work_center_id || '';
       
       
-      const aNum = parseInt(aId);
-      const bNum = parseInt(bId);
+  //     const aNum = parseInt(aId);
+  //     const bNum = parseInt(bId);
       
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        return aNum - bNum;
-      }
+  //     if (!isNaN(aNum) && !isNaN(bNum)) {
+  //       return aNum - bNum;
+  //     }
       
     
-      return String(aId).localeCompare(String(bId));
-    },
-    sortDirections: ['ascend', 'descend'],
-    defaultSortOrder: 'ascend',
-    render: (text) => text,
-    filters: [...new Set(data
-      .map(item => item.work_center_id)
-      .filter(Boolean)
-    )]
-    .sort((a, b) => {
-      const aNum = parseInt(a);
-      const bNum = parseInt(b);
+  //     return String(aId).localeCompare(String(bId));
+  //   },
+  //   sortDirections: ['ascend', 'descend'],
+  //   defaultSortOrder: 'ascend',
+  //   render: (text) => text,
+  //   filters: [...new Set(data
+  //     .map(item => item.work_center_id)
+  //     .filter(Boolean)
+  //   )]
+  //   .sort((a, b) => {
+  //     const aNum = parseInt(a);
+  //     const bNum = parseInt(b);
       
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        return aNum - bNum;
-      }
-      return String(a).localeCompare(String(b));
-    })
-    .map(id => ({ text: String(id), value: id })),
-    filterMode: 'menu',
-    filterSearch: true,
-    onFilter: (value, record) => {
-      if (!record.work_center_id) return false;
-      return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
-    },
-    className: 'filter-column',
-    showSorterTooltip: { title: 'Click to sort' }
-  },
+  //     if (!isNaN(aNum) && !isNaN(bNum)) {
+  //       return aNum - bNum;
+  //     }
+  //     return String(a).localeCompare(String(b));
+  //   })
+  //   .map(id => ({ text: String(id), value: id })),
+  //   filterMode: 'menu',
+  //   filterSearch: true,
+  //   onFilter: (value, record) => {
+  //     if (!record.work_center_id) return false;
+  //     return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
+  //   },
+  //   className: 'filter-column',
+  //   showSorterTooltip: { title: 'Click to sort' }
+  // },
   {
     title: 'Workcenter Code',
     dataIndex: ['work_center', 'code'],
@@ -1487,13 +1487,40 @@ const Workcenter = () => {
 
   const handleConfigSave = async (record) => {
     try {
+      // First update the schedulable status
       await updateWorkcenterSchedulable(record.id, record.is_schedulable);
+      
+      // Then update the workcenter details
+      const response = await fetch(`http://172.18.7.89:8008/api/v1/master-order/workcenters/${record.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: record.code,
+          plant_id: record.plant_id,
+          description: record.description,
+          is_schedulable: record.is_schedulable,
+          is_active: true,
+          type: "MACHINE",
+          work_center_name: record.work_center_name || record.code,
+          operation: record.operation || ""
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update workcenter details');
+      }
+
+      // Refresh the workcenter config data
+      await fetchWorkcenterConfig();
+      
       setEditingConfigKey('');
       setOriginalConfigData(null);
-      toast.success('Workcenter status updated successfully');
+      toast.success('Workcenter updated successfully');
     } catch (error) {
       console.error('Error saving config:', error);
-      toast.error('Failed to update workcenter status');
+      toast.error(error.message || 'Failed to update workcenter');
     }
   };
 
@@ -1514,6 +1541,23 @@ const Workcenter = () => {
       title: 'Plant ID',
       dataIndex: 'plant_id',
       width: 120,
+      render: (text, record) => {
+        const editable = isConfigEditing(record);
+        return editable ? (
+          <Input
+            value={text}
+            onChange={(e) => {
+              const updatedRecord = { ...record, plant_id: e.target.value };
+              setConfigData(configData.map(item => 
+                item.id === record.id ? updatedRecord : item
+              ));
+            }}
+            style={{ width: '100%' }}
+          />
+        ) : (
+          text || '-'
+        );
+      },
     },
     // {
     //   title: 'work centre Name',
@@ -1524,6 +1568,24 @@ const Workcenter = () => {
       title: 'Description',
       dataIndex: 'description',
       width: 200,
+      render: (text, record) => {
+        const editable = isConfigEditing(record);
+        return editable ? (
+          <Input.TextArea
+            value={text}
+            onChange={(e) => {
+              const updatedRecord = { ...record, description: e.target.value };
+              setConfigData(configData.map(item => 
+                item.id === record.id ? updatedRecord : item
+              ));
+            }}
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            style={{ width: '100%' }}
+          />
+        ) : (
+          text || '-'
+        );
+      },
     },
     {
       title: 'Schedulable',

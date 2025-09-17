@@ -915,7 +915,7 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
             className="shadow-sm"
             bodyStyle={{ padding: '12px' }}
           >
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600 mb-1">
                   {oeeData.average_availability ? Number(oeeData.average_availability.toFixed(2)) : 0}%
@@ -933,6 +933,12 @@ const MachineDetails = ({ selectedMachine, onZoomToMachine, show3DControls = tru
                   {oeeData.average_quality ? Number(oeeData.average_quality.toFixed(2)) : 0}%
                 </div>
                 <div className="text-xs text-gray-600">Quality</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600 mb-1">
+                  {oeeData.average_oee ? Number(oeeData.average_oee.toFixed(2)) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">Overall OEE</div>
               </div>
             </div>
           </Card>

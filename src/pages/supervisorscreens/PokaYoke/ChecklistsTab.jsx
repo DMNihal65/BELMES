@@ -7,7 +7,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const ChecklistsTab = () => {
-  const { checklists, checklist, loading, error, fetchChecklists, fetchChecklist, createChecklist, addChecklistItem } = usePokayokeStore();
+  const { checklists, checklist, loading, error, fetchChecklists, fetchChecklist, createChecklist, addChecklistItem, deleteChecklist } = usePokayokeStore();
   
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [isItemModalVisible, setIsItemModalVisible] = useState(false);
@@ -90,6 +90,20 @@ const ChecklistsTab = () => {
       console.error('Form validation error:', error);
     }
   };
+
+  const handleDeleteChecklist = async (checklistId, checklistName) => {
+    try {
+      const result = await deleteChecklist(checklistId);
+      if (result) {
+        message.success(`Checklist "${checklistName}" has been deleted successfully`);
+        // Refresh the checklists list
+        fetchChecklists();
+      }
+    } catch (error) {
+      console.error('Error deleting checklist:', error);
+      message.error('Failed to delete checklist. Please try again.');
+    }
+  };
   
   const columns = [
     {
@@ -122,7 +136,32 @@ const ChecklistsTab = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: '15%',
-      render: (date) => new Date(date).toLocaleString(),
+      render: (date) => {
+        if (!date) return '-';
+        
+        // Log the raw date for debugging
+        console.log('Raw date from API:', date);
+        
+        // Create a date object and account for timezone offset
+        const dateObj = new Date(date);
+        const timezoneOffset = dateObj.getTimezoneOffset() * 60000; // in milliseconds
+        const localDate = new Date(dateObj.getTime() - timezoneOffset);
+        
+        // Format the date manually
+        const formattedDate = localDate.toLocaleString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+        
+        console.log('Formatted date:', formattedDate);
+        return formattedDate;
+      },
     },
     {
       title: 'Status',
@@ -138,7 +177,7 @@ const ChecklistsTab = () => {
     {
       title: 'Actions',
       key: 'actions',
-      width: '10%',
+      width: '15%',
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="View Checklist">
@@ -155,6 +194,33 @@ const ChecklistsTab = () => {
               size="small"
             />
           </Tooltip>
+          <Popconfirm
+            title="Delete Checklist"
+            description={
+              <div>
+                <p>Are you sure you want to delete this checklist?</p>
+                <p className="text-red-500 font-medium">
+                  <strong>Warning:</strong> This checklist will be deleted from all machines assigned to it.
+                </p>
+                <p className="text-sm text-gray-600">
+                  Checklist: <strong>{record.name}</strong>
+                </p>
+              </div>
+            }
+            onConfirm={() => handleDeleteChecklist(record.id, record.name)}
+            okText="Yes, Delete"
+            cancelText="Cancel"
+            okType="danger"
+            placement="topRight"
+          >
+            <Tooltip title="Delete Checklist">
+              <Button 
+                icon={<DeleteOutlined />} 
+                danger
+                size="small"
+              />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -440,7 +506,23 @@ const ChecklistsTab = () => {
             <div className="mb-4 flex gap-4">
               <div>
                 <span className="text-gray-500">Created At:</span>
-                <span className="ml-2">{new Date(checklist.created_at).toLocaleString()}</span>
+                <span className="ml-2">
+                  {checklist.created_at ? (() => {
+                    const dateObj = new Date(checklist.created_at);
+                    const timezoneOffset = dateObj.getTimezoneOffset() * 60000;
+                    const localDate = new Date(dateObj.getTime() - timezoneOffset);
+                    return localDate.toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: true,
+                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                    });
+                  })() : '-'}
+                </span>
               </div>
               
               <div>

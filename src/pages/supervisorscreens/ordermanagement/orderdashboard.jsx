@@ -713,14 +713,19 @@ const OrderDashboard = () => {
   // Calculate the actual counts for each card based on tab data
   const totalOrdersCount = localOrders?.length || 0;
   
+  // Calculate in_progress count - only count orders with 'in_progress' status
+  const inProgressOrdersCount = localOrders?.filter(order => 
+    order.status === 'in_progress'
+  )?.length || 0;
+  
   // Calculate scheduled count - only count orders with 'scheduled' status
-  let inProgressOrdersCount = localOrders?.filter(order => 
+  let scheduledOrdersCount = localOrders?.filter(order => 
     order.status === 'scheduled'
   )?.length || 0;
   
   // If no scheduled orders found in localOrders, use timelineData as fallback
-  if (inProgressOrdersCount === 0 && timelineData && timelineData.length > 0) {
-    inProgressOrdersCount = timelineData.length;
+  if (scheduledOrdersCount === 0 && timelineData && timelineData.length > 0) {
+    scheduledOrdersCount = timelineData.length;
   }
   
   const priorityOrdersCount = priorityOrders?.length || 0;
@@ -806,6 +811,66 @@ const OrderDashboard = () => {
           {/* In Progress Card - 2nd */}
           <Col xs={24} sm={12} md={6}>
             <Card 
+              className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
+              bodyStyle={{ padding: 0 }}
+            >
+              {/* Animated background elements */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-4 right-4 w-32 h-32 bg-orange-200 rounded-full blur-2xl animate-pulse"></div>
+                <div className="absolute bottom-4 left-4 w-24 h-24 bg-amber-200 rounded-full blur-xl animate-pulse delay-1000"></div>
+              </div>
+              
+              {/* Main content container */}
+              <div className="relative p-6 flex items-center justify-between h-32">
+                
+                {/* Left side - Icon and Label */}
+                <div className="flex items-center gap-4 flex-1">
+                  {/* Animated icon container */}
+                  <div className="relative">
+                    <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-amber-200 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110 backdrop-blur-sm">
+                      <Lottie
+                        animationData={inprogressAnimation}
+                        style={{ width: 52, height: 52 }}
+                        {...lottieOptions}
+                        loop={true}
+                      />
+                    </div>
+                    {/* Pulse ring effect */}
+                    <div className="absolute inset-0 bg-orange-200 rounded-xl animate-ping opacity-20"></div>
+                  </div>
+                  
+                  {/* Label section */}
+                  <div className="flex flex-col justify-center">
+                    <h3 className="text-orange-800 font-semibold text-xl leading-tight">
+                      In Progress
+                    </h3>
+                    <p className="text-orange-600 text-sm font-medium opacity-80">
+                      Currently Processing
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Right side - Big number display */}
+                <div className="flex flex-col items-end justify-center">
+                  <div className="text-right">
+                    <div className="text-5xl font-bold text-orange-700 leading-none group-hover:text-orange-800 transition-colors duration-300">
+                      {inProgressOrdersCount}
+                    </div>
+                    <div className="text-orange-500 text-xs font-medium mt-1 uppercase tracking-wider">
+                      Active
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Bottom accent line */}
+              <div className="h-1 bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400 group-hover:h-1.5 transition-all duration-300"></div>
+            </Card>
+          </Col>
+          
+          {/* Scheduled Card - 3rd */}
+          <Col xs={24} sm={12} md={6}>
+            <Card 
               className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 hover:scale-[1.03] overflow-hidden group cursor-pointer"
               bodyStyle={{ padding: 0 }}
             >
@@ -840,7 +905,7 @@ const OrderDashboard = () => {
                     Scheduled
                     </h3>
                     <p className="text-emerald-600 text-sm font-medium opacity-80">
-                      Scheduled & In Progress
+                      Scheduled 
                     </p>
                   </div>
                 </div>
@@ -849,7 +914,7 @@ const OrderDashboard = () => {
                 <div className="flex flex-col items-end justify-center">
                   <div className="text-right">
                     <div className="text-5xl font-bold text-emerald-700 leading-none group-hover:text-emerald-800 transition-colors duration-300">
-                      {inProgressOrdersCount}
+                      {scheduledOrdersCount}
                     </div>
                     <div className="text-emerald-500 text-xs font-medium mt-1 uppercase tracking-wider">
                       Total
@@ -863,7 +928,7 @@ const OrderDashboard = () => {
             </Card>
           </Col>
           
-          {/* Completed Card - 3rd */}
+          {/* Completed Card - 4th */}
           <Col xs={24} sm={12} md={6}>
             <Card 
               className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100 hover:scale-[1.03] overflow-hidden group cursor-pointer"
@@ -991,7 +1056,41 @@ const OrderDashboard = () => {
                     </div>
                   </div>
                 </TabPane>
-                <TabPane tab={<span className="font-semibold">Scheduled</span>} key="in_progress">
+                {/* <TabPane tab={<span className="font-semibold">In Progress</span>} key="in_progress">
+                  <div className="h-full overflow-auto">
+                    <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <span className="text-base font-medium text-gray-700">In Progress Orders</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input.Search
+                          placeholder="Search in progress orders..."
+                          size="small"
+                          value={searchText}
+                          onChange={(e) => handleSearch(e.target.value)}
+                          style={{ width: 250 }}
+                          allowClear
+                        />
+                        <Button 
+                          size="small" 
+                          onClick={handleRefresh}
+                          loading={isLoading}
+                          icon={<ReloadOutlined />}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="h-[calc(100vh-320px)] overflow-auto">
+                      <OrderTable 
+                        orders={searchText ? filteredOrders.filter(order => order.status === 'in_progress') : localOrders.filter(order => order.status === 'in_progress')} 
+                        onRefresh={handleRefresh}
+                        key={`in-progress-${JSON.stringify(searchText ? filteredOrders : localOrders)}`}
+                      />
+                    </div>
+                  </div>
+                </TabPane> */}
+                <TabPane tab={<span className="font-semibold">Scheduled</span>} key="scheduled">
                   <div className="h-full overflow-auto">
                     <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center">

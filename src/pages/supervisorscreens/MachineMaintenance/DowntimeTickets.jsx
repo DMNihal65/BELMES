@@ -49,51 +49,58 @@ const DowntimeTickets = () => {
   }, [fetchDowntimes, searchText, dateRange, selectedColumn, selectedStatus, selectedDateColumn]);
 
   // Function to apply both search and date filters
-  const applyFilters = (dataToFilter, searchValue, dates, column, status, dateColumn) => {
-    let filtered = [...dataToFilter];
+const applyFilters = (dataToFilter, searchValue, dates, column, status, dateColumn) => {
+  let filtered = [...dataToFilter];
 
-    // Apply text search filter
-    if (searchValue) {
-      const searchVal = searchValue.toLowerCase();
-      filtered = filtered.filter(item => {
-        if (column === 'all') {
-          return Object.keys(item).some(key => {
-            const itemValue = item[key];
-            if (itemValue === null || itemValue === undefined) return false;
-            return String(itemValue).toLowerCase().includes(searchVal);
-          });
-        } else {
-          const itemValue = item[column];
+  // Apply text search filter
+  if (searchValue) {
+    const searchVal = searchValue.toLowerCase();
+    filtered = filtered.filter(item => {
+      if (column === 'all') {
+        return Object.keys(item).some(key => {
+          const itemValue = item[key];
           if (itemValue === null || itemValue === undefined) return false;
           return String(itemValue).toLowerCase().includes(searchVal);
-        }
-      });
-    }
+        });
+      } else {
+        const itemValue = item[column];
+        if (itemValue === null || itemValue === undefined) return false;
+        return String(itemValue).toLowerCase().includes(searchVal);
+      }
+    });
+  }
 
-    // Apply date range filter
-    if (dates && dates[0] && dates[1]) {
-      const startDate = moment(dates[0]).startOf('day');
-      const endDate = moment(dates[1]).endOf('day');
-      
-      filtered = filtered.filter(item => {
-        const dateValue = item[dateColumn];
-        if (!dateValue) return false;
-        const itemDate = moment(dateValue);
-        return itemDate.isBetween(startDate, endDate, 'day', '[]');
-      });
-    }
+  // Apply date range filter
+  if (dates && dates[0] && dates[1]) {
+    const startDate = moment(dates[0]).startOf('day');
+    const endDate = moment(dates[1]).endOf('day');
+    
+    filtered = filtered.filter(item => {
+      const dateValue = item[dateColumn];
+      if (!dateValue) return false;
+      const itemDate = moment(dateValue);
+      return itemDate.isBetween(startDate, endDate, 'day', '[]');
+    });
+  }
 
-    // Apply status filter
-    if (status !== 'all') {
-      filtered = filtered.filter(item => item.status === status);
-    }
+  // Apply status filter
+  if (status !== 'all') {
+    filtered = filtered.filter(item => item.status === status);
+  }
 
-    setFilteredData(filtered);
-    setPagination(prev => ({
-      ...prev,
-      total: filtered.length,
-    }));
-  };
+  // Sort by open_dt in descending order (latest first)
+  filtered = filtered.sort((a, b) => {
+    const dateA = a.open_dt ? moment(a.open_dt) : moment(0); // Handle null/undefined dates
+    const dateB = b.open_dt ? moment(b.open_dt) : moment(0);
+    return dateB - dateA; // Descending order
+  });
+
+  setFilteredData(filtered);
+  setPagination(prev => ({
+    ...prev,
+    total: filtered.length,
+  }));
+};
 
   // Handle search functionality
   const handleSearch = (value) => {

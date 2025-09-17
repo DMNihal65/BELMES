@@ -656,7 +656,7 @@ const useInventoryStore = create((set, get) => ({
   rejectRequest: async (requestId) => {
     set({ loading: true });
     try {
-      await axios.post(
+      await axios.put(
         `${BASE_URL}/requests/${requestId}/reject`,
         {},
         getAuthHeaders()

@@ -544,6 +544,7 @@ const useOperatorStore = create((set, get) => ({
       localStorage.removeItem('jobSource');
       localStorage.removeItem('currentJobData');
       localStorage.removeItem('activeOperation');
+      localStorage.removeItem('user-selected-job');
   
       // Reset all job-related state
       set({

@@ -722,9 +722,9 @@ const Scheduling = () => {
   }, [scheduleData?.work_centers, availableMachines]);
 
   // Load initial data when component mounts
-  // useEffect(() => {
-  //   fetchScheduleData();
-  // }, [fetchScheduleData]);
+  useEffect(() => {
+    fetchScheduleData();
+  }, [fetchScheduleData]);
 
   // Update available components to use scheduleData directly
   const availableComponents = React.useMemo(() => {

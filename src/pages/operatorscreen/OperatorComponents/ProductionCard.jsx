@@ -33,7 +33,61 @@ const ProductionCard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
+  const [scheduleStartDate, setScheduleStartDate] = useState(null);
+  const [isLoadingStartDate, setIsLoadingStartDate] = useState(false);
+
   const now = new Date();
+
+  const fetchScheduleStartDate = async () => {
+  try {
+    setIsLoadingStartDate(true);
+    
+    // Get production order and part number from localStorage
+    const userSelectedJob = localStorage.getItem('user-selected-job');
+    if (!userSelectedJob) {
+      console.error('No user-selected-job found in localStorage');
+      return;
+    }
+    
+    const jobData = JSON.parse(userSelectedJob);
+    const { production_order, part_number } = jobData;
+    
+    if (!production_order || !part_number) {
+      console.error('Missing production_order or part_number in user-selected-job');
+      return;
+    }
+    
+    // Make API call to fetch start date
+    const response = await fetch(
+      `http://172.18.7.91:8008/api/v1/scheduling/part-schedule-start-date/${encodeURIComponent(production_order)}/${encodeURIComponent(part_number)}`,
+      {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json'
+        }
+      }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      const startDate = new Date(data.start_date);
+      setScheduleStartDate(startDate);
+    } else {
+      console.error('Failed to fetch schedule start date:', response.statusText);
+    }
+  } catch (error) {
+    console.error('Error fetching schedule start date:', error);
+  } finally {
+    setIsLoadingStartDate(false);
+  }
+};
+
+// Add this useEffect to fetch start date when component mounts or selectedOperation changes
+useEffect(() => {
+  if (selectedOperation) {
+    fetchScheduleStartDate();
+  }
+}, [selectedOperation]);
 
   // Allowed hours for a given date
   const allowedHours = (date) => {
@@ -347,44 +401,43 @@ const ProductionCard = () => {
               <div className="text-xs text-gray-600 mb-1">From Date & Time</div>
               <div className="flex gap-2">
                 <DatePicker
-                selected={fromDate}
-                onChange={setFromDate}
-                minDate={thirtyDaysAgo}
-                maxDate={now}
-                placeholderText="Select From Date"
-                dateFormat="MMMM d, yyyy"
-                className="flex-1 text-xs p-1 border border-gray-300 rounded"
-                disabled={!selectedOperation}
-              />
-                <select
-                  value={fromHour}
-                  onChange={(e) => setFromHour(e.target.value)}
-                  disabled={!fromDate || !selectedOperation}
-                  className="w-20 text-xs p-1 border border-gray-300 rounded"
-                >
-                  <option value="">Hour</option>
-                  {allowedHours(fromDate).map((h) => (
-                    <option key={h} value={h}>
-                      {h.toString().padStart(2, "0")}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={fromMinute}
-                  onChange={(e) => setFromMinute(e.target.value)}
-                  disabled={!fromHour || !selectedOperation}
-                  className="w-20 text-xs p-1 border border-gray-300 rounded"
-                >
-                  <option value="">Minute</option>
-                  {allowedMinutes(fromDate, fromHour).map((m) => (
-                    <option key={m} value={m}>
-                      {m.toString().padStart(2, "0")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+                      selected={fromDate}
+                      onChange={setFromDate}
+                      minDate={scheduleStartDate} // Use fetched start date as min
+                      maxDate={now} // Current date/time as max
+                      placeholderText={isLoadingStartDate ? "Loading..." : "Select From Date"}
+                      dateFormat="MMMM d, yyyy"
+                      className="flex-1 text-xs p-1 border border-gray-300 rounded"
+                      disabled={!selectedOperation || isLoadingStartDate}
+                    />
+                    <select
+                      value={fromHour}
+                      onChange={(e) => setFromHour(e.target.value)}
+                      disabled={!fromDate || !selectedOperation}
+                      className="w-20 text-xs p-1 border border-gray-300 rounded"
+                    >
+                      <option value="">Hour</option>
+                      {allowedHours(fromDate).map((h) => (
+                        <option key={h} value={h}>
+                          {h.toString().padStart(2, "0")}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={fromMinute}
+                      onChange={(e) => setFromMinute(e.target.value)}
+                      disabled={!fromHour || !selectedOperation}
+                      className="w-20 text-xs p-1 border border-gray-300 rounded"
+                    >
+                      <option value="">Minute</option>
+                      {allowedMinutes(fromDate, fromHour).map((m) => (
+                        <option key={m} value={m}>
+                          {m.toString().padStart(2, "0")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
             {/* To Date */}
             <div className="mb-2">

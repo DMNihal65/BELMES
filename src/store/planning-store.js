@@ -1609,6 +1609,8 @@ console.log('Content-Disposition Header:', contentDisposition);
         bel_partnumber: tool.bel_partnumber,
         description: tool.description,
         quantity: tool.quantity,
+        available_quantity: tool.available_quantity,
+        item_status: tool.item_status,
         order_id: tool.order_id,
         operation_id: tool.operation_id,
         created_at: tool.created_at,
@@ -1636,6 +1638,7 @@ console.log('Content-Disposition Header:', contentDisposition);
         // The API expects these as numbers, not strings
         order_id: Number(toolData.order_id),
         operation_id: Number(toolData.operation_id),
+        tool_id: toolData.tool_id ? Number(toolData.tool_id) : null, // Include tool_id if provided
         quantity: Number(toolData.quantity)
       };
       
@@ -1687,6 +1690,7 @@ console.log('Content-Disposition Header:', contentDisposition);
         ...toolData,
         order_id: Number(toolData.order_id),
         operation_id: Number(toolData.operation_id),
+        tool_id: toolData.tool_id ? Number(toolData.tool_id) : null, // Include tool_id if provided
         quantity: Number(toolData.quantity)
       };
       

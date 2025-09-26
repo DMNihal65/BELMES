@@ -33,7 +33,7 @@ const useScheduleStore = create((set, get) => ({
   fetchScheduleData: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('http://172.18.7.89:8008/api/v1/scheduling/schedule/latest');
+      const response = await fetch('http://172.18.7.91:8008/api/v1/scheduling/schedule/latest');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -100,7 +100,7 @@ const useScheduleStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       // Call the update endpoint
-      const updateResponse = await fetch('http://172.18.7.89:8008/api/v1/scheduling/schedule/update', {
+      const updateResponse = await fetch('http://172.18.7.91:8008/api/v1/scheduling/schedule/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,7 +114,7 @@ const useScheduleStore = create((set, get) => ({
       }
 
       // After successful update, fetch the latest schedule
-      const latestResponse = await fetch('http://172.18.7.89:8008/api/v1/scheduling/schedule/latest');
+      const latestResponse = await fetch('http://172.18.7.91:8008/api/v1/scheduling/schedule/latest');
       if (!latestResponse.ok) {
         throw new Error(`Failed to fetch latest schedule: ${latestResponse.status}`);
       }
@@ -183,7 +183,7 @@ const useScheduleStore = create((set, get) => ({
   fetchLeadTimeData: async () => {
     set({ leadTimeLoading: true, leadTimeError: null });
     try {
-      const response = await axios.get('http://172.18.7.89:8008/api/v1/component_status/');
+      const response = await axios.get('http://172.18.7.91:8008/api/v1/component_status/');
       const formattedData = [
         ...response.data.early_complete,
         ...response.data.delayed_complete
@@ -446,7 +446,7 @@ const useScheduleStore = create((set, get) => ({
   fetchProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.89:8008/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.91:8008/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -466,7 +466,7 @@ const useScheduleStore = create((set, get) => ({
   fetchWeeklyProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.89:8008/api/v1/production/weekly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.91:8008/api/v1/production/weekly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -490,7 +490,7 @@ const useScheduleStore = create((set, get) => ({
   fetchMonthlyProductionStatus: async (partNumber, startEpoch, endEpoch) => {
     set({ productionStatusLoading: true, productionStatusError: null });
     try {
-      let url = `http://172.18.7.89:8008/api/v1/production/monthly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
+      let url = `http://172.18.7.91:8008/api/v1/production/monthly/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`;
       if (partNumber) {
         url += `&part_number=${partNumber}`;
       }
@@ -528,7 +528,7 @@ const useScheduleStore = create((set, get) => ({
       const endEpoch = Math.floor(Date.now() / 1000);
       const startEpoch = endEpoch - (365 * 24 * 60 * 60);
       
-      const response = await axios.get(`http://172.18.7.89:8008/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`);
+      const response = await axios.get(`http://172.18.7.91:8008/api/v1/production/daily/?start_epoch=${startEpoch}&end_epoch=${endEpoch}`);
       const allPartNumbers = response.data.daily_production || [];
       
       const uniquePartNumbers = [...new Set(allPartNumbers.map(item => item.part_number))];
@@ -548,7 +548,7 @@ const useScheduleStore = create((set, get) => ({
   fetchCombinedScheduleData: async () => {
     set({ combinedScheduleLoading: true, combinedScheduleError: null });
     try {
-      const response = await axios.get('http://172.18.7.89:8008/api/v1/rescheduling/reschedule-actual-planned-combined');
+      const response = await axios.get('http://172.18.7.91:8008/api/v1/rescheduling/reschedule-actual-planned-combined');
       set({ 
         combinedScheduleData: response.data,
         combinedScheduleLoading: false 

@@ -485,6 +485,7 @@ const MachineDashboard = () => {
     // Get data safely with our helper function
     const part_count = getMachineData(machine, 'part_count', 0);
     const required_quantity = getMachineData(machine, 'required_quantity', 0);
+    const launched_quantity = getMachineData(machine, 'launched_quantity', 0);
     const production_order = getMachineData(machine, 'production_order', '');
     const part_number = getMachineData(machine, 'part_number', '');
     

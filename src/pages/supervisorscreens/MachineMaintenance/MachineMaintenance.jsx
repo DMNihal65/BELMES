@@ -49,7 +49,7 @@ export default function MachineMaintenance() {
   const fetchAssetLogs = async () => {
     try {
       setLogsLoading(true);
-      const response = await fetch('http://172.18.7.89:8008/api/v1/newlogs/asset-logs');
+      const response = await fetch('http://172.18.7.91:8008/api/v1/newlogs/asset-logs');
       if (!response.ok) throw new Error('Failed to fetch asset logs');
       const data = await response.json();
       setAssetLogs(Array.isArray(data) ? data : []);
@@ -139,7 +139,7 @@ export default function MachineMaintenance() {
             status: newStatusId === '1' ? 'ON' : 'OFF',
             remarks: newDesc
           };
-          const resp = await fetch('http://172.18.7.89:8008/api/v1/newlogs/asset-logs', {
+          const resp = await fetch('http://172.18.7.91:8008/api/v1/newlogs/asset-logs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

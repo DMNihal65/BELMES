@@ -58,7 +58,7 @@ const OrderTracking = () => {
     setSelectedOrder(null);
     setOperationStatus(null);
     try {
-      const response = await axios.get('http://172.18.7.89:8008/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.91:8008/api/v1/planning/all_orders');
       setOrders(response.data);
     } catch (err) {
       setError('Failed to fetch production orders. Please try again.');
@@ -75,7 +75,7 @@ const OrderTracking = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await axios.get('http://172.18.7.89:8008/api/v1/auth/api/v1/auth/users-get?active_only=true');
+        const res = await axios.get('http://172.18.7.91:8008/api/v1/auth/api/v1/auth/users-get?active_only=true');
         setUsers(res.data);
       } catch (err) {
         console.error('Failed to fetch users', err);
@@ -146,7 +146,7 @@ const OrderTracking = () => {
 
     try {
       const productionOrder = selected.production_order;
-      const { data } = await axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`);
+      const { data } = await axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`);
       setOperationStatus(data);
     } catch (err) {
       setError('Failed to fetch order details. Please check the order and try again.');
@@ -174,7 +174,7 @@ const OrderTracking = () => {
         notes: values.notes || '',
         machine_id: values.machine_id || null,
       };
-      await axios.post('http://172.18.7.89:8008/api/v1/operatorlogs2/operator-log', payload);
+      await axios.post('http://172.18.7.91:8008/api/v1/operatorlogs2/operator-log', payload);
       message.success('Quantity updated successfully');
       setShowUpdateModal(false);
       if (selectedOrder) {
@@ -194,9 +194,9 @@ const OrderTracking = () => {
     setReportLoading(true);
     try {
       const [orderResponse, operatorsResponse, machinesResponse] = await Promise.all([
-        axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-report/${selectedOrder.production_order}`),
-        axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-report-operators/${selectedOrder.production_order}`),
-        axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-report-machines/${selectedOrder.production_order}`)
+        axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-report/${selectedOrder.production_order}`),
+        axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-report-operators/${selectedOrder.production_order}`),
+        axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-report-machines/${selectedOrder.production_order}`)
       ]);
       setReportData({
         ...orderResponse.data,
@@ -216,7 +216,7 @@ const OrderTracking = () => {
 
     setDailyReportLoading(true);
     try {
-      const response = await axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-daily-report/${selectedOrder.production_order}`);
+      const response = await axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-daily-report/${selectedOrder.production_order}`);
       setDailyReportData(response.data);
     } catch (err) {
       message.error('Failed to fetch daily report data');

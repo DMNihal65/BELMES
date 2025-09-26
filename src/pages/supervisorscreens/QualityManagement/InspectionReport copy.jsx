@@ -471,7 +471,7 @@ const InspectionReport = () => {
                   fontSize: '0.9em',
                   wordBreak: 'break-all'
                 }}>
-                  DELETE http://127.0.0.1:8000/api/v1/document-management/report/structure/document/{documentId}
+                  DELETE http://172.18.7.91:8008/api/v1/document-management/report/structure/document/{documentId}
                 </div>
                 <div style={{ marginTop: '8px' }}>
                   Possible solutions:

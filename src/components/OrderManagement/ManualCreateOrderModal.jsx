@@ -31,7 +31,7 @@ const ManualCreateOrderModal = ({ visible, onCancel }) => {
       };
 
       // Create order using the create_order endpoint
-      const response = await fetch('http://127.0.0.1:8000/api/v1/planning/create_order', {
+      const response = await fetch('http://172.18.7.91:8008/api/v1/planning/create_order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -739,11 +739,11 @@ const NotificationsNew = () => {
           </span>
         );
       },
-      sorter: (a, b) => {
-        const aPartNumber = a.instrument_details?.dynamic_data?.['BEL Part Number '] || '';
-        const bPartNumber = b.instrument_details?.dynamic_data?.['BEL Part Number '] || '';
-        return aPartNumber.localeCompare(bPartNumber);
-      },
+      // sorter: (a, b) => {
+      //   const aPartNumber = a.instrument_details?.dynamic_data?.['BEL Part Number '] || '';
+      //   const bPartNumber = b.instrument_details?.dynamic_data?.['BEL Part Number '] || '';
+      //   return aPartNumber.localeCompare(bPartNumber);
+      // },
     },
     {
       title: 'Category',
@@ -779,18 +779,18 @@ const NotificationsNew = () => {
           {type || 'CALIBRATION'}
         </Tag>
       ),
-      filters: (() => {
-        const types = new Set();
-        instrumentCalibrationNotifications.forEach(item => {
-          if (item.calibration_type) {
-            types.add(item.calibration_type);
-          }
-        });
-        return Array.from(types).map(type => ({
-          text: type,
-          value: type
-        }));
-      })(),
+      // filters: (() => {
+      //   const types = new Set();
+      //   instrumentCalibrationNotifications.forEach(item => {
+      //     if (item.calibration_type) {
+      //       types.add(item.calibration_type);
+      //     }
+      //   });
+      //   return Array.from(types).map(type => ({
+      //     text: type,
+      //     value: type
+      //   }));
+      // })(),
       onFilter: (value, record) => record.calibration_type === value,
     },
     {

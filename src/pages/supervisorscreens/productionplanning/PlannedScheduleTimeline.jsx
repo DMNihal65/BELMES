@@ -405,7 +405,7 @@ const ProductionTimelineChart = () => {
           <Spin size="large" />
           <div style={{ marginTop: '16px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 500, color: '#262626', marginBottom: '8px' }}>
-              Please be patient, data is being Loaded.
+              Data is being Loaded.
             </div>
             <div style={{ fontSize: '14px', color: '#666' }}>
               Loading schedule data...

@@ -238,14 +238,10 @@ const RequestTable = () => {
     const date = new Date(dateString);
     // Convert to local timezone by adding the timezone offset
     const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-    return localDate.toLocaleString('en-IN', {
+    return localDate.toLocaleDateString('en-IN', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
+      day: '2-digit'
     });
   };
 
@@ -424,6 +420,8 @@ const RequestTable = () => {
       width: 150,
       ...getColumnSearchProps('created_at'),
       render: formatDate,
+      sorter: (a, b) => new Date(b.created_at) - new Date(a.created_at),
+      defaultSortOrder: 'ascend',
     },
     {
       title: 'Updated At',
@@ -478,11 +476,13 @@ const RequestTable = () => {
             title="Requests Table" 
             extra={
               <Space>
-                {/* <Button
+                <Button
                   icon={<ReloadOutlined />}
                   onClick={handleRefresh}
                   loading={loading}
-                /> */}
+                >
+                  Refresh
+                </Button>
                 <AntInput.Search
                   placeholder="Search across all columns..."
                   onChange={(e) => handleGlobalSearch(e.target.value)}
@@ -507,6 +507,8 @@ const RequestTable = () => {
                 }}
                 scroll={{ x: 2500 }}
                 size="middle"
+                defaultSortOrder="ascend"
+                sortDirections={['descend', 'ascend']}
               />
             </Spin>
 

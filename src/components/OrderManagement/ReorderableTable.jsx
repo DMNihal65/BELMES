@@ -306,6 +306,43 @@ const ReorderableTable = ({ orders = [] }) => {
 
   return (
     <div className="w-full">
+      <style jsx>{`
+        .priority-pagination .ant-pagination {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          margin: 16px 0 !important;
+          padding: 8px 0 !important;
+          min-height: 48px !important;
+        }
+        
+        .priority-pagination .ant-pagination-item,
+        .priority-pagination .ant-pagination-prev,
+        .priority-pagination .ant-pagination-next,
+        .priority-pagination .ant-pagination-jump-prev,
+        .priority-pagination .ant-pagination-jump-next {
+          min-width: 32px !important;
+          height: 32px !important;
+          line-height: 30px !important;
+          font-size: 14px !important;
+          margin: 0 4px !important;
+        }
+        
+        .priority-pagination .ant-pagination-options {
+          margin-left: 16px !important;
+        }
+        
+        .priority-pagination .ant-pagination-total-text {
+          font-size: 14px !important;
+          color: #666 !important;
+          margin-right: 16px !important;
+        }
+        
+        .priority-table .ant-table-pagination {
+          margin-top: 16px !important;
+          padding: 8px 0 !important;
+        }
+      `}</style>
       <div className="flex justify-between items-center mb-4">
         <div className="text-lg font-semibold text-gray-700">
           {showScheduled ? 'Scheduled Orders' : 'All Orders'}
@@ -335,7 +372,7 @@ const ReorderableTable = ({ orders = [] }) => {
           />
         </Space>
       </div>
-      <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+      <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 350px)', minHeight: '400px' }}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -361,8 +398,21 @@ const ReorderableTable = ({ orders = [] }) => {
                   fontSize: '10px'
                 },
                 showSizeChanger: true,
+                showQuickJumper: true,
                 showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} orders`,
                 pageSizeOptions: ['10', '20', '50', '100'],
+                position: ['bottomCenter'],
+                size: 'default',
+                className: 'priority-pagination',
+                style: {
+                  marginTop: '16px',
+                  padding: '8px 0',
+                  fontSize: '14px',
+                  minHeight: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                },
                 onShowSizeChange: (current, size) => {
                   setPagination({
                     ...pagination,

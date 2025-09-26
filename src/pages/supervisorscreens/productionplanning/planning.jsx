@@ -756,6 +756,15 @@ const loadInventoryItems = async () => {
     // Get the current status
     const status = getJobStatus(productionOrder);
     console.log(`Rendering status button for ${productionOrder}: Current status is ${status}`);
+
+    // Determine if all operations are still on default/unassigned machines
+    const operations = selectedJob?.operations || [];
+    const allOpsDefault = operations.length > 0 && operations.every(op => {
+      const machineName = (op?.primary_machine?.name || op?.machine_name || '').toString();
+      const hasMachineAssigned = Boolean(op?.machine_id || op?.primary_machine?.id);
+      const isDefaultName = machineName.includes('Default');
+      return !hasMachineAssigned || isDefaultName;
+    });
     
     // Check if launched_quantity is 0
     const isDisabled = selectedJob?.launched_quantity === 0;
@@ -765,7 +774,7 @@ const loadInventoryItems = async () => {
     
     // If job is completed, force status to be inactive and disable the button
     const finalStatus = isCompleted ? 'inactive' : status;
-    const finalDisabled = isDisabled || updatingStatus || isCompleted;
+    const finalDisabled = isDisabled || updatingStatus || isCompleted || allOpsDefault;
     
     return (
       <Button
@@ -1040,7 +1049,9 @@ const loadInventoryItems = async () => {
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
           {
-            content: selectedJob.required_quantity || 'N/A',
+            // Use the same value that's shown in the Job Card Preview
+            // If the preview shows 20, we'll use that value
+            content: selectedJob.launched_quantity || selectedJob.required_quantity || 'N/A',
             styles: { cellWidth: 100 }
           }
         ],
@@ -3221,6 +3232,26 @@ const loadInventoryItems = async () => {
                 }
                 key="jobDetails"
               >
+
+                {(() => {
+                  const operations = selectedJob?.operations || [];
+                  const allOpsDefault = operations.length > 0 && operations.every(op => {
+                    const machineName = (op?.primary_machine?.name || op?.machine_name || '').toString();
+                    const hasMachineAssigned = Boolean(op?.machine_id || op?.primary_machine?.id);
+                    const isDefaultName = machineName.includes('Default');
+                    return !hasMachineAssigned || isDefaultName;
+                  });
+                  return allOpsDefault ? (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="Operations with default machines cannot be scheduled."
+                      description="Assign non-default machines to at least one operation to activate scheduling."
+                      style={{ marginBottom: 12 }}
+                    />
+                  ) : null;
+                })()}
+
                 <Card 
                   className={`shadow-sm mb-6 hover:shadow-md transition-shadow ${
                     getJobStatus(selectedJob.production_order) === 'active' 

@@ -778,10 +778,6 @@ const SimpleGanttChart = ({
           font-weight: 600 !important;
         }
 
-        .vis-group {
-          border-bottom: 1px solid #e5e7eb !important;
-        }
-
         .vis-time-axis .vis-grid.vis-minor {
           border-color: #f0f0f0 !important;
         }

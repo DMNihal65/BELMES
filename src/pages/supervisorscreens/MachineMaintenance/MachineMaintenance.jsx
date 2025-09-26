@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import useMachineMaintenanceStore from '../../../store/maintenance';
 import { format } from 'date-fns';
-import { Table, Switch, Card, Button, Form, Space, Row, Col, DatePicker, Tag, Input, Dropdown, Menu, Typography, Statistic } from 'antd';
+import { Table, Switch, Card, Button, Form, Space, Row, Col, DatePicker, Tag, Input, Dropdown, Menu, Typography, Statistic, Tabs } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, SearchOutlined, FilterOutlined, AppstoreOutlined, ReloadOutlined, PoweroffOutlined, DesktopOutlined } from '@ant-design/icons';
 import Lottie from 'lottie-react';
 import shopAnimation from '../../../assets/assets.json';
@@ -35,11 +35,31 @@ export default function MachineMaintenance() {
   const [form] = Form.useForm();
 
   const [currentStatus, setCurrentStatus] = useState('');
+  const [assetLogs, setAssetLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logDateRange, setLogDateRange] = useState([]);
+  const [logMachineFilter, setLogMachineFilter] = useState('');
 
   useEffect(() => {
     fetchMachineStatuses();
     fetchAvailableStatuses();
+    fetchAssetLogs();
   }, []);
+
+  const fetchAssetLogs = async () => {
+    try {
+      setLogsLoading(true);
+      const response = await fetch('http://172.18.7.91:8008/api/v1/newlogs/asset-logs');
+      if (!response.ok) throw new Error('Failed to fetch asset logs');
+      const data = await response.json();
+      setAssetLogs(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Error fetching asset logs:', e);
+      toast.error('Failed to load asset logs');
+    } finally {
+      setLogsLoading(false);
+    }
+  };
 
   const isEditing = (record) => record.machine_id === editingKey;
 
@@ -91,6 +111,48 @@ export default function MachineMaintenance() {
       console.log('Sending request data:', formattedData); // Log the request data
       
       await updateMachineStatus(record.machine_id, formattedData); // Ensure record.machine_id is used
+
+      // Prepare change detection compared to original record
+      const originalStatusId = record.status_name === 'ON' ? '1' : '2';
+      const originalFrom = record.available_from ? dayjs(record.available_from).format('YYYY-MM-DDTHH:mm:ss') : null;
+      const originalTo = record.available_to ? dayjs(record.available_to).format('YYYY-MM-DDTHH:mm:ss') : null;
+      const originalDesc = (record.description || '').trim();
+
+      const newStatusId = values.status_id;
+      const newFrom = formattedData.available_from || null;
+      const newTo = formattedData.available_to || null;
+      const newDesc = (description || '').trim();
+
+      const hasChanges = (
+        originalStatusId !== newStatusId ||
+        originalFrom !== newFrom ||
+        originalTo !== newTo ||
+        originalDesc !== newDesc
+      );
+
+      if (hasChanges) {
+        try {
+          const payload = {
+            machine_name: record.machine_make,
+            from_time: newFrom,
+            to_time: newTo,
+            status: newStatusId === '1' ? 'ON' : 'OFF',
+            remarks: newDesc
+          };
+          const resp = await fetch('http://172.18.7.91:8008/api/v1/newlogs/asset-logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!resp.ok) throw new Error('Failed to save asset log');
+          // Refresh logs after successful post
+          fetchAssetLogs();
+        } catch (e) {
+          console.error('Error posting asset log:', e);
+          toast.error('Failed to save asset log');
+        }
+      }
+
       setEditingKey('');
       setCurrentStatus('');
       form.resetFields();
@@ -325,9 +387,8 @@ export default function MachineMaintenance() {
     );
   }
 
-  return (
-    <div className="w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-fixed">
-      <ToastContainer position="top-right" theme="colored" />
+  const AvailabilityContent = (
+    <div>
       <div className="bg-white bg-opacity-80 backdrop-blur-sm p-6 rounded-xl shadow-md mb-6 border border-indigo-100">
         <Row>
           <Col xs={24}>
@@ -520,23 +581,100 @@ export default function MachineMaintenance() {
       </div>
     </div>
   );
+
+  // Filter logs based on date range and machine name
+  const filteredLogs = assetLogs.filter(log => {
+    const matchesMachine = !logMachineFilter || 
+      log.machine_name?.toLowerCase().includes(logMachineFilter.toLowerCase());
+    
+    const matchesDateRange = !logDateRange.length || !logDateRange[0] || !logDateRange[1] || (() => {
+      const logDate = log.created_at ? new Date(log.created_at) : new Date(log.from_time || log.to_time);
+      const startDate = dayjs(logDateRange[0]).startOf('day');
+      const endDate = dayjs(logDateRange[1]).endOf('day');
+      return dayjs(logDate).isBetween(startDate, endDate, null, '[]');
+    })();
+    
+    return matchesMachine && matchesDateRange;
+  });
+
+  const LogsContent = (
+    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-lg border border-indigo-600"
+      style={{
+        border: '1px solid #e0e0e0',
+        borderRadius: '16px',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+        padding: '24px',
+      }}
+    >
+      <div className="flex justify-between items-center mb-4">
+        <Title level={4} className="m-0">Asset Logs</Title>
+        <Button onClick={fetchAssetLogs} icon={<ReloadOutlined />}>Refresh</Button>
+      </div>
+      
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap gap-4 items-center">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-gray-700">Machine Name:</span>
+          <Input
+            placeholder="Search machine name..."
+            value={logMachineFilter}
+            onChange={(e) => setLogMachineFilter(e.target.value)}
+            style={{ width: 200 }}
+            allowClear
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-gray-700">Date Range:</span>
+          <DatePicker.RangePicker
+            value={logDateRange}
+            onChange={setLogDateRange}
+            format="DD/MM/YYYY"
+            placeholder={['Start Date', 'End Date']}
+            allowClear
+          />
+        </div>
+        <Button 
+          onClick={() => {
+            setLogMachineFilter('');
+            setLogDateRange([]);
+          }}
+          icon={<ReloadOutlined />}
+        >
+          Clear Filters
+        </Button>
+      </div>
+      
+      <Table
+        dataSource={filteredLogs}
+        loading={logsLoading}
+        rowKey={(row, idx) => idx}
+        pagination={{ 
+          pageSize: 10, 
+          position: ['bottomCenter'],
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
+        }}
+         columns={[
+           { title: 'Machine', dataIndex: 'machine_name', key: 'machine_name' },
+           { title: 'From', dataIndex: 'from_time', key: 'from_time', render: (v, record) => record.status === 'ON' ? '-' : (v ? format(new Date(v), 'dd/MM/yyyy HH:mm') : '-') },
+           { title: 'To', dataIndex: 'to_time', key: 'to_time', render: (v, record) => record.status === 'ON' ? '-' : (v ? format(new Date(v), 'dd/MM/yyyy HH:mm') : '-') },
+           { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={s === 'ON' ? 'success' : 'error'}>{s}</Tag> },
+           { title: 'Remarks', dataIndex: 'remarks', key: 'remarks' },
+           { title: 'Created At', dataIndex: 'created_at', key:'created_at', render: (v) => v ? format(new Date(v), 'dd/MM/yyyy HH:mm') : '-' }
+         ]}
+      />
+    </div>
+  );
+
+  return (
+    <div className="w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-fixed">
+      <ToastContainer position="top-right" theme="colored" />
+      <Tabs
+        defaultActiveKey="availability"
+        items={[
+          { key: 'availability', label: 'Assets Availability', children: AvailabilityContent },
+          { key: 'logs', label: 'Asset Logs', children: LogsContent }
+        ]}
+      />
+    </div>
+  );
 }
-
-
-
-
-
-
-//testing
-
-
-
-
-
-
-
-
-
-
-
-// fghf

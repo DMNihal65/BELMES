@@ -4,7 +4,7 @@ class QualityStore {
   constructor() {
     // Create axios instance with better configuration
     this.api = axios.create({
-      baseURL: 'http://172.18.7.89:8008/api/v1',
+      baseURL: 'http://172.18.7.91:8008/api/v1',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
@@ -88,6 +88,20 @@ class QualityStore {
         
         await new Promise(resolve => setTimeout(resolve, delay * attempt));
       }
+    }
+  }
+
+  // Check FTP approval status
+  async checkFTPApprovalStatus(orderId, ipid) {
+    try {
+      const response = await this.api.get(`/quality/ftp/${orderId}/${ipid}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking FTP status:', error);
+      return { 
+        status: 'error',
+        message: error.response?.data?.message || 'Failed to fetch FTP status'
+      };
     }
   }
 
@@ -202,7 +216,7 @@ class QualityStore {
       }
       
       // Create URL with production order and operation_no as a query parameter
-      const baseUrl = 'http://172.18.7.89:8008/api/v1/document-management/report/generate-consolidated';
+      const baseUrl = 'http://172.18.7.91:8008/api/v1/document-management/report/generate-consolidated';
       const url = new URL(`${baseUrl}/${productionOrder}`);
       url.searchParams.append('operation_no', opNo);
       

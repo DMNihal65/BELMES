@@ -198,7 +198,7 @@ const StartDateWithLoader = ({ productionOrder, partNumber, isActive }) => {
       try {
         setLoading(true);
         const response = await fetch(
-          `http://172.18.7.89:8008/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
+          `http://172.18.7.91:8008/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
         );
         
         if (!response.ok) {
@@ -1036,7 +1036,7 @@ const loadInventoryItems = async () => {
         ],
         [
           {
-            content: 'Qty',
+            content: 'Launched Qty',
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
           {
@@ -1427,8 +1427,8 @@ const loadInventoryItems = async () => {
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Batch</td>
                     <td className="p-4 font-bold"> </td>
-                    <td className="font-bold p-4 bg-blue-50">Qty</td>
-                    <td className="p-4 font-bold">{selectedJob.required_quantity || ''}</td>
+                    <td className="font-bold p-4 bg-blue-50">Launched Qty</td>
+                    <td className="p-4 font-bold">{selectedJob.launched_quantity || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Heat No.</td>

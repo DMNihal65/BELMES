@@ -281,11 +281,6 @@ const Workcenter = () => {
   //   filterSearch: true,
   //   onFilter: (value, record) => {
   //     if (!record.work_center_id) return false;
-  //     return String(record.work_center_id).toLowerCase().includes(String(value).toLowerCase());
-  //   },
-  //   className: 'filter-column',
-  //   showSorterTooltip: { title: 'Click to sort' }
-  // },
   {
     title: 'Workcenter Code',
     dataIndex: ['work_center', 'code'],
@@ -296,6 +291,34 @@ const Workcenter = () => {
       const bCode = b.work_center?.code || '';
       return aCode.localeCompare(bCode);
     },
+    sortDirections: ['ascend', 'descend'],
+  },
+  {
+    title: 'Operation Description',
+    dataIndex: ['work_center', 'description'],
+    width: 250,
+    render: (text, record) => {
+      const editable = isEditing(record);
+      return editable ? (
+        <Form.Item
+          name="operation_description"
+          style={{ margin: 0 }}
+          initialValue={text}
+          rules={[{ required: true, message: 'Please enter Operation Description' }]}
+        >
+          <Input.TextArea autoSize={{ minRows: 1, maxRows: 4 }} />
+        </Form.Item>
+      ) : (
+        <span>{text || '-'}</span>
+      );
+    },
+    filterSearch: true,
+    filters: [...new Set(data.map(item => item.work_center?.description).filter(Boolean))].map(desc => ({
+      text: desc,
+      value: desc
+    })),
+    onFilter: (value, record) => record.work_center?.description === value,
+    sorter: (a, b) => (a.work_center?.description || '').localeCompare(b.work_center?.description || ''),
     sortDirections: ['ascend', 'descend'],
   },
   {
@@ -810,7 +833,7 @@ const Workcenter = () => {
 
       <Form.Item
         name="description"
-        label="Description"
+        label="Operation Description"
         rules={[
           { required: true, message: 'Please enter Description' },
           { whitespace: true, message: 'Description cannot be empty' },
@@ -869,7 +892,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.89:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.91:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1418,6 +1441,9 @@ const Workcenter = () => {
     }
   };
 
+
+  
+
   useEffect(() => {
     if (machineModalStep === 'existing_form') {
       fetchMachinesData();
@@ -1491,7 +1517,7 @@ const Workcenter = () => {
       await updateWorkcenterSchedulable(record.id, record.is_schedulable);
       
       // Then update the workcenter details
-      const response = await fetch(`http://172.18.7.89:8008/api/v1/master-order/workcenters/${record.id}`, {
+      const response = await fetch(`http://172.18.7.91:8008/api/v1/master-order/workcenters/${record.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1565,7 +1591,7 @@ const Workcenter = () => {
     //   width: 150,
     // },
     {
-      title: 'Description',
+      title: 'Operation Description',
       dataIndex: 'description',
       width: 200,
       render: (text, record) => {

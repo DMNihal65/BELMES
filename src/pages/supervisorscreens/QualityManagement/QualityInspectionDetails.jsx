@@ -87,6 +87,28 @@ const QualityInspectionDetails = ({
     accepted_qty: 0
   });
 
+  // Fetch FTP status for an operation
+  const fetchFTPStatus = async (orderId, operationNo) => {
+    try {
+      // Create IPID in the format IPID-{partNumber}-{opNo}
+      const partNumber = inspectionDetails?.part_number || '';
+      const ipid = `IPID-${partNumber}-${operationNo}`;
+      
+      console.log(`Fetching FTP status for Order: ${orderId}, IPID: ${ipid}`);
+      
+      const status = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+      console.log(`FTP Status for OP${operationNo}:`, status);
+      
+      return status;
+    } catch (error) {
+      console.error(`Error fetching FTP status for OP${operationNo}:`, error);
+      return {
+        status: 'pending',
+        is_completed: false
+      };
+    }
+  };
+
   // Fetch quantity data when component mounts or orderId changes
   useEffect(() => {
     const fetchQuantityData = async () => {
@@ -103,6 +125,7 @@ const QualityInspectionDetails = ({
         let totalRejected = 0;
         
         if (data.operations && Array.isArray(data.operations)) {
+          // First, create the operations map with basic data
           data.operations.forEach(op => {
             operationsMap[op.operation_number] = {
               completed_qty: op.completed_quantity || 0,
@@ -110,21 +133,52 @@ const QualityInspectionDetails = ({
               required_qty: op.required_quantity || 0,
               remaining_qty: op.remaining_quantity || 0,
               is_complete: op.is_complete || false,
-              description: op.description || ''
+              description: op.description || '',
+              ftp_status: {
+                status: 'loading',
+                is_completed: false
+              }
             };
             
             totalCompleted += op.completed_quantity || 0;
             totalRejected += op.rejected_quantity || 0;
           });
+
+          // Set initial state with loading status
+          setQuantityData({
+            operations: operationsMap,
+            required_qty: data.required_quantity || 0,
+            completed_qty: totalCompleted,
+            rejected_qty: totalRejected,
+            accepted_qty: totalCompleted - totalRejected
+          });
+
+          // Then fetch FTP status for each operation
+          const fetchAllFTPStatus = async () => {
+            const updatedOperations = { ...operationsMap };
+            
+            for (const op of data.operations) {
+              try {
+                const status = await fetchFTPStatus(inspectionDetails.order_id, op.operation_number);
+                updatedOperations[op.operation_number].ftp_status = {
+                  status: status.status || 'pending',
+                  is_completed: status.is_completed || false,
+                  updated_at: status.updated_at
+                };
+                
+                // Update state after each operation to show progress
+                setQuantityData(prev => ({
+                  ...prev,
+                  operations: { ...updatedOperations }
+                }));
+              } catch (error) {
+                console.error(`Failed to fetch FTP status for OP${op.operation_number}:`, error);
+              }
+            }
+          };
+          
+          fetchAllFTPStatus();
         }
-        
-        setQuantityData({
-          operations: operationsMap,
-          required_qty: data.required_quantity || 0,
-          completed_qty: totalCompleted,
-          rejected_qty: totalRejected,
-          accepted_qty: totalCompleted - totalRejected
-        });
       } catch (error) {
         console.error('Error fetching quantity data:', error);
         message.error('Failed to load quantity data');
@@ -274,7 +328,7 @@ const QualityInspectionDetails = ({
 
   // Create summary data from the response - one row per operation
   const summaryData = hasData ? [
-    // First create rows for each operation
+    // Create rows for each operation
     ...(inspectionDetails.operations || []).map((op, index) => ({
       key: `op-${op}-${index}`,
       order_id: inspectionDetails.order_id,
@@ -283,15 +337,15 @@ const QualityInspectionDetails = ({
       operations: [op],
       isFinalInspection: false
     })),
-    // Then add the final inspection row
-    {
-      key: 'final-inspection',
-      order_id: inspectionDetails.order_id,
-      production_order: inspectionDetails.production_order,
-      part_number: inspectionDetails.part_number,
-      operations: ['Final Inspection'],
-      isFinalInspection: true
-    }
+    // Final inspection row commented out as per request
+    // {
+    //   key: 'final-inspection',
+    //   order_id: inspectionDetails.order_id,
+    //   production_order: inspectionDetails.production_order,
+    //   part_number: inspectionDetails.part_number,
+    //   operations: ['Final Inspection'],
+    //   isFinalInspection: true
+    // }
   ] : [];
   // console.log("SUMMARY", summaryData);
   const summaryColumns = [
@@ -320,6 +374,63 @@ const QualityInspectionDetails = ({
         return (
           <div className="font-normal">
             {opData?.description || `Operation ${opNumber}`}
+          </div>
+        );
+      }
+    },
+    {
+      title: 'FTP Status',
+      key: 'ftp_status',
+      width: '12%',
+      align: 'center',
+      render: (_, record) => {
+        const opNumber = record.operations?.[0];
+        if (opNumber === 'Final Inspection') {
+          return <div className="text-center">-</div>;
+        }
+        
+        const opData = quantityData.operations[opNumber];
+        const ftpStatus = opData?.ftp_status?.status?.toLowerCase() || 'pending';
+        const updatedAt = opData?.ftp_status?.updated_at;
+        
+        const getStatusInfo = () => {
+          switch(ftpStatus) {
+            case 'approved':
+              return {
+                text: 'Approved',
+                color: 'bg-green-100 text-green-800',
+                icon: <CheckCircleFilled className="mr-1" />
+              };
+            case 'rejected':
+              return {
+                text: 'Rejected',
+                color: 'bg-red-100 text-red-800',
+                icon: <CloseCircleFilled className="mr-1" />
+              };
+            default:
+              return {
+                text: 'Pending',
+                color: 'bg-yellow-100 text-yellow-800',
+                icon: <InfoCircleOutlined className="mr-1" />
+              };
+          }
+        };
+        
+        const statusInfo = getStatusInfo();
+        
+        return (
+          <div className="flex flex-col items-center">
+            <Tag 
+              className={`${statusInfo.color} font-medium text-xs py-0.5 px-2 rounded-md border-0`}
+              icon={statusInfo.icon}
+            >
+              {statusInfo.text}
+            </Tag>
+            {updatedAt && (
+              <div className="text-xs text-gray-500 mt-1">
+                {moment(updatedAt).format('DD MMM YYYY')}
+              </div>
+            )}
           </div>
         );
       }

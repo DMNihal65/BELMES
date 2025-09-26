@@ -93,11 +93,17 @@ const ChecklistsTab = () => {
   
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
+      title: 'Sl No',
+      key: 'sl_no',
       width: '5%',
+      render: (_, __, index) => index + 1,
     },
+    // {
+    //   title: 'ID',
+    //   dataIndex: 'id',
+    //   key: 'id',
+    //   width: '5%',
+    // },
     {
       title: 'Name',
       dataIndex: 'name',
@@ -187,11 +193,17 @@ const ChecklistsTab = () => {
   
   const itemsColumns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
+      title: 'Sl No',
+      key: 'sl_no',
       width: '5%',
+      render: (_, __, index) => index + 1,
     },
+    // {
+    //   title: 'ID',
+    //   dataIndex: 'id',
+    //   key: 'id',
+    //   width: '5%',
+    // },
     {
       title: 'Item Text',
       dataIndex: 'item_text',

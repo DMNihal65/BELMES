@@ -7,8 +7,8 @@ import usePlanningStore from '../../../store/planning-store';
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.18.7.89:8008";
-const MPP_API_BASE_URL = "http://172.18.7.89:8008";
+const API_BASE_URL = "http://172.18.7.91:8008";
+const MPP_API_BASE_URL = "http://172.18.7.91:8008";
 
 const DocumentsCard = () => {
   const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials, fetchJobDocuments, selectJob } = useOperatorStore();

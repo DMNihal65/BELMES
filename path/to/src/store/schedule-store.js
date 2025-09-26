@@ -12,7 +12,7 @@ const useScheduleStore = create((set, get) => ({
   fetchLeadTimeData: async () => {
     set({ leadTimeLoading: true, leadTimeError: null });
     try {
-      const response = await axios.get('http://172.18.7.91:8008/component_status/');
+      const response = await axios.get('http://127.0.0.1:8000/component_status/');
       const formattedData = [
         ...response.data.early_complete,
         ...response.data.delayed_complete

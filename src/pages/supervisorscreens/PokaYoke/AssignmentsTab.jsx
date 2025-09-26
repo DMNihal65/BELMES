@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Select, Form, Input, Modal, message, Tag, Tooltip, Empty, Card, Descriptions, Alert } from 'antd';
-import { LinkOutlined, FileSearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Select, Form, Input, Modal, message, Tag, Tooltip, Empty, Card, Descriptions, Alert, Popconfirm } from 'antd';
+import { LinkOutlined, FileSearchOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import usePokayokeStore from '../../../store/pokayoke-store';
 
 const { Option } = Select;
@@ -15,7 +15,8 @@ const AssignmentsTab = () => {
     fetchChecklists, 
     fetchMachines,
     fetchMachineAssignments, 
-    assignChecklistToMachine 
+    assignChecklistToMachine,
+    deleteAssignment
   } = usePokayokeStore();
   
   const [selectedMachine, setSelectedMachine] = useState(null);
@@ -74,6 +75,22 @@ const AssignmentsTab = () => {
       fetchMachineAssignments(selectedMachine);
     }
   };
+
+  const handleDeleteAssignment = async (assignmentId, checklistName, machineName) => {
+    try {
+      const result = await deleteAssignment(assignmentId);
+      if (result) {
+        message.success(`Assignment "${checklistName}" has been removed from machine "${machineName}" successfully`);
+        // Refresh the machine assignments list
+        if (selectedMachine) {
+          fetchMachineAssignments(selectedMachine);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting assignment:', error);
+      message.error('Failed to delete assignment. Please try again.');
+    }
+  };
   
   const getMachineName = (machine) => {
     if (!machine) return 'Unknown Machine';
@@ -130,39 +147,75 @@ const AssignmentsTab = () => {
       title: 'Checklist',
       dataIndex: 'checklist_name',
       key: 'checklist_name',
-      width: '25%',
+      width: '22%',
     },
     {
       title: 'Machine ID',
       dataIndex: 'machine_id',
       key: 'machine_id',
-      width: '10%',
+      width: '8%',
     },
     {
       title: 'Machine Make',
       dataIndex: 'machine_make',
       key: 'machine_make',
-      width: '25%',
+      width: '22%',
     },
     {
       title: 'Assigned At',
       dataIndex: 'assigned_at',
       key: 'assigned_at',
-      width: '15%',
+      width: '13%',
       render: (date) => new Date(date).toLocaleString(),
     },
     {
       title: 'Status',
       dataIndex: 'is_active',
       key: 'is_active',
-      width: '10%',
+      width: '8%',
       render: (active) => (
         <Tag color={active ? 'success' : 'error'}>
           {active ? 'Active' : 'Inactive'}
         </Tag>
       ),
     },
-    
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: '7%',
+      render: (_, record) => (
+        <Space size="small">
+          <Popconfirm
+            title="Remove Assignment"
+            description={
+              <div>
+                <p>Are you sure you want to remove this checklist assignment?</p>
+                <p className="text-red-500 font-medium">
+                  <strong>Warning:</strong> This will remove the checklist from this specific machine.
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Checklist:</strong> {record.checklist_name}<br/>
+                  {/* <strong>Machine:</strong> {record.machine_make} */}
+                </p>
+              </div>
+            }
+            onConfirm={() => handleDeleteAssignment(record.id, record.checklist_name, record.machine_make)}
+            okText="Yes, Remove"
+            cancelText="Cancel"
+            okType="danger"
+            placement="topRight"
+          >
+            <Tooltip title="Remove Assignment">
+              <Button 
+                icon={<DeleteOutlined />} 
+                danger
+                size="small"
+              />
+            </Tooltip>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
   
   return (

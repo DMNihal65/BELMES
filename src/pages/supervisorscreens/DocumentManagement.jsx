@@ -1606,33 +1606,21 @@ const DocumentManagement = () => {
   // Update the handleSearch function
   const handleSearch = async (value) => {
     if (!value || value.length < 2) {
-      // If search is cleared, show current folder documents
-      if (selectedFolder) {
-        try {
-          await retryOperation(() => fetchFolderDocuments(selectedFolder));
-        } catch (error) {
-          console.error('Failed to fetch folder documents:', error);
-          message.error('Failed to load documents. Please try again.');
-        }
+      try {
+        await retryOperation(() => fetchFolderDocuments(currentFolderContext.folderId || null));
+      } catch (error) {
+        console.error('Failed to fetch documents:', error);
+        message.error('Failed to load documents. Please try again.');
       }
       return;
     }
 
     try {
-      if (searchType === 'partNumber') {
-        // Call the part number search function
-        await retryOperation(() => searchByPartNumber(
-          value,
-          selectedDocType?.id || null
-        ));
-      } else {
-        // Call the text search function
-        await retryOperation(() => searchDocuments(
-          value,
-          selectedDocType?.id || null,
-          currentFolderContext.folderId
-        ));
-      }
+      await retryOperation(() => searchDocuments(
+        value,
+        null,
+        currentFolderContext.folderId
+      ));
     } catch (error) {
       console.error('Search error:', error);
       message.error('Search failed: ' + error.message);
@@ -1643,142 +1631,41 @@ const DocumentManagement = () => {
   const renderSearchSection = () => (
     <Row gutter={[16, 16]} align="middle" style={{ marginBottom: '16px' }}>
       <Col flex="auto">
-        <Input.Group compact>
-          <Select
-            defaultValue="text"
-            style={{ width: '130px' }}
-            onChange={(value) => {
-              setSearchType(value);
-              setSearchInput('');
-              if (selectedFolder) {
-                fetchFolderDocuments(selectedFolder);
-              }
-            }}
-          >
-            <Select.Option value="text">Search Text</Select.Option>
-            <Select.Option value="partNumber">Part Number</Select.Option>
-            <Select.Option value="productionOrder">Production Order</Select.Option>
-          </Select>
-          {searchType === 'text' ? (
-            // Text search with real-time updates
-            <Search
-              placeholder="Search documents (min. 3 characters)..."
-              allowClear
-              enterButton
-              value={searchInput}
-              style={{ width: 'calc(100% - 130px)' }}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSearchInput(value);
-                if (value.length >= 3 || value.length === 0) {
-                  searchDocuments(
-                    value,
-                    selectedDocType?.id || null,
-                    currentFolderContext.folderId
-                  );
-                }
-              }}
-              onSearch={(value) => {
-                if (value && value.length >= 3) {
-                  searchDocuments(
-                  value,
-                  selectedDocType?.id || null,
-                  currentFolderContext.folderId
-                );
-                }
-              }}
-            />
-          ) : searchType === 'partNumber' ? (
-              // Part number search
-              <Search
-                placeholder="Enter or select part number"
-                allowClear
-                enterButton
-                value={searchInput}
-                style={{ width: 'calc(100% - 130px)' }}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onSearch={(value) => {
-                  if (value && value.length >= 2) {
-                    searchByPartNumber(value, selectedDocType?.id || null);
-                  }
-                }}
-                addonBefore={
-                  <Select
-                    showSearch
-                    value={searchInput || undefined}
-                    placeholder="Select from list"
-                    style={{ width: 200 }}
-                    onChange={(value) => {
-                      setSearchInput(value);
-                      searchByPartNumber(value, selectedDocType?.id || null);
-                    }}
-                    filterOption={(input, option) =>
-                      option?.children?.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                    }
-                  >
-                    {partNumbers.map(part => (
-                      <Select.Option key={part.id} value={part.part_number}>
-                        {part.part_number} - {part.part_description}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                }
-              />
-            ) : (
-              // Production order search
-              <Search
-                placeholder="Enter or select production order"
-                allowClear
-                enterButton
-                value={searchInput}
-                style={{ width: 'calc(100% - 130px)' }}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onSearch={(value) => {
-                  if (value) {
-                    const order = allOrders.find(o => o.production_order === value);
-                    if (order) {
-                      searchByProductionOrder(order.id, selectedDocType?.id || null);
-                    }
-                  }
-                }}
-                addonBefore={
-                  <Select
-                    showSearch
-                    value={searchInput || undefined}
-                    placeholder="Select from list"
-                    style={{ width: 200 }}
-                    onChange={(value) => {
-                      const order = allOrders.find(o => o.production_order === value);
-                      setSearchInput(value);
-                      if (order) {
-                        searchByProductionOrder(order.id, selectedDocType?.id || null);
-                      }
-                    }}
-                    filterOption={(input, option) =>
-                      option?.children?.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                    }
-                    dropdownRender={menu => (
-                      <>
-                        <div style={{ padding: '8px', color: '#666' }}>
-                          <InfoCircleOutlined /> Select from list or type and search
-                        </div>
-                        {menu}
-                      </>
-                    )}
-                  >
-                    {allOrders.map(order => (
-                      <Select.Option key={order.id} value={order.production_order}>
-                        {order.production_order} - {order.part_description}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                }
-              />
-            )}
-        </Input.Group>
+        <Search
+          placeholder="Search documents (min. 2 characters)..."
+          allowClear
+          enterButton
+          value={searchInput}
+          onChange={async (e) => {
+            const value = e.target.value;
+            setSearchInput(value);
+            if (value.length >= 2) {
+              await handleSearch(value);
+            }
+            if (value.length === 0) {
+              await handleSearch('');
+            }
+          }}
+          onSearch={async (value) => {
+            await handleSearch(value || '');
+          }}
+        />
       </Col>
       <Col>
         <Space>
+          <Button
+            icon={<SyncOutlined />}
+            onClick={async () => {
+              setSearchInput('');
+              try {
+                await retryOperation(() => fetchFolderDocuments(currentFolderContext.folderId || null));
+              } catch (error) {
+                message.error('Failed to refresh documents. Please try again.');
+              }
+            }}
+          >
+            Clear
+          </Button>
           <Button
             type="primary"
             icon={<UploadIcon size={16} />}
@@ -1786,18 +1673,6 @@ const DocumentManagement = () => {
           >
             Upload Machine Document
           </Button>
-          <Radio.Group 
-            value={viewMode} 
-            onChange={e => setViewMode(e.target.value)}
-            buttonStyle="solid"
-          >
-            {/* <Tooltip title="Table View">
-              <Radio.Button value="table"><BarsOutlined /></Radio.Button>
-            </Tooltip>
-            <Tooltip title="Grid View">
-              <Radio.Button value="grid"><AppstoreOutlined /></Radio.Button>
-            </Tooltip> */}
-          </Radio.Group>
           {documentTypeButton}
         </Space>
       </Col>

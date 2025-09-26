@@ -182,7 +182,7 @@ const EnhancedTransactionHistory = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return dayjs(dateString).format('DD/MM/YYYY HH:mm');
+    return dayjs(dateString).format('DD/MM/YYYY');
   };
 
   const getTransactionTypeTag = (type) => {
@@ -215,14 +215,13 @@ const EnhancedTransactionHistory = () => {
 
   const columns = [
     {
-      title: 'Date & Time',
+      title: 'Date',
       dataIndex: ['transaction', 'created_at'],
       key: 'created_at',
       width: 30,
       render: (date) => (
         <div className="text-center">
-          <div className="font-medium text-gray-900">{dayjs(date).format('DD/MM')}</div>
-          <div className="text-xs text-gray-500">{dayjs(date).format('HH:mm')}</div>
+          <div className="font-medium text-gray-900">{dayjs(date).format('DD/MM/YYYY')}</div>
         </div>
       ),
       sorter: (a, b) => dayjs(a.transaction.created_at).unix() - dayjs(b.transaction.created_at).unix(),

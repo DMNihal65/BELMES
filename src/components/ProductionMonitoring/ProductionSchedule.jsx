@@ -49,7 +49,7 @@ const ProductionSchedule = () => {
     <div className="space-y-4">
       <div className="px-1">
         <Title level={4} className="mb-1">
-          Production vs Actual
+          Planned vs Actual
         </Title>
         <Text type="secondary">
           This chart displays scheduled operations against actual production logs. Only machines involved in currently active production orders are shown.

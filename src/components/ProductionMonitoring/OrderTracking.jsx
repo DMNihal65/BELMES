@@ -244,9 +244,29 @@ const OrderTracking = () => {
     { title: 'Operation No', dataIndex: 'operation_number', key: 'operation_number', sorter: (a, b) => a.operation_number - b.operation_number },
     { title: 'Description', dataIndex: 'description', key: 'description' },
     { title: 'Work Center', dataIndex: 'work_center', key: 'work_center' },
-    { title: 'Completed Qty', dataIndex: 'completed_quantity', key: 'completed_quantity' },
-    { title: 'Rejected Qty', dataIndex: 'rejected_quantity', key: 'rejected_quantity' },
     { title: 'Required Qty', dataIndex: 'required_quantity', key: 'required_quantity' },
+    { title: 'Completed Qty', dataIndex: 'completed_quantity', key: 'completed_quantity' },
+    
+    
+    { 
+      title: 'Accepted Qty', 
+      key: 'accepted_quantity',
+      render: (_, record) => {
+        const acceptedQty = (record.completed_quantity || 0) - (record.rejected_quantity || 0);
+        return acceptedQty;
+      }
+    },
+    { title: 'Rejected Qty', dataIndex: 'rejected_quantity', key: 'rejected_quantity' },
+    { 
+      title: 'Yield %', 
+      key: 'yield_percentage',
+      render: (_, record) => {
+        const acceptedQty = (record.completed_quantity || 0) - (record.rejected_quantity || 0);
+        const requiredQty = record.required_quantity || 0;
+        const yieldPercentage = requiredQty > 0 ? ((acceptedQty / requiredQty) * 100).toFixed(2) : 0;
+        return `${yieldPercentage}%`;
+      }
+    },
     {
       title: 'Action',
       key: 'action',
@@ -338,7 +358,7 @@ const OrderTracking = () => {
 
   return (
     <div className="p-6">
-      <Title level={2}>Order Tracking (BETA)</Title>
+      <Title level={2}>Order Tracking </Title>
       <Card
         className="mb-6"
         title="Select Production Order"

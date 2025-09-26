@@ -203,9 +203,15 @@ const MachineIssueModal = ({
 
         case 'machine':
           values = await machineForm.validateFields();
+          
+          // Combine selected reasons and additional description
+          const selectedReasons = values.machineIssueReason ? values.machineIssueReason.join(', ') : '';
+          const additionalDesc = values.description || '';
+          const combinedDescription = additionalDesc ? `${selectedReasons} - ${additionalDesc}` : selectedReasons;
+          
           const machinePayload = {
             machine_id: values.machineId,
-            description: values.description || '',
+            description: combinedDescription,
             is_on: values.machineStatus === 'ON',
             created_by: currentUserId.toString()
           };
@@ -216,7 +222,7 @@ const MachineIssueModal = ({
           const downtimePayload = {
             machine_id: machineId,
             category: values.machineIssueCategory,
-            description: values.machineIssueReason.join(', ') || '',
+            description: combinedDescription,
             priority: 0,
             reported_by: parseInt(currentUserId)
           };
@@ -428,6 +434,18 @@ const MachineIssueModal = ({
                     </Option>
                   ))}
                 </Select>
+              </Form.Item>
+
+              <Form.Item
+                name="description"
+                label="Additional Description (Optional)"
+              >
+                <TextArea 
+                  rows={3} 
+                  placeholder="Add any additional details about the machine issue"
+                  maxLength={500}
+                  showCount
+                />
               </Form.Item>
 
               <Button 

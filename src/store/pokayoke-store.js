@@ -174,6 +174,56 @@ const usePokayokeStore = create((set, get) => ({
       return null;
     }
   },
+
+  // Delete (deactivate) a checklist
+  deleteChecklist: async (checklistId) => {
+    try {
+      set({ loading: true, error: null });
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.put(`${API_BASE_URL}/pokayoke/checklists/${checklistId}/deactivate`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Remove the deleted checklist from the state
+      const updatedChecklists = get().checklists.filter(checklist => checklist.id !== checklistId);
+      set({ checklists: updatedChecklists, loading: false });
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting checklist:", error);
+      set({ 
+        error: error.response?.data?.message || "Failed to delete checklist", 
+        loading: false 
+      });
+      return null;
+    }
+  },
+
+  // Delete (deactivate) a machine assignment
+  deleteAssignment: async (assignmentId) => {
+    try {
+      set({ loading: true, error: null });
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.put(`${API_BASE_URL}/pokayoke/assignments/${assignmentId}/deactivate`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Remove the deleted assignment from the state
+      const updatedAssignments = get().machineAssignments.filter(assignment => assignment.id !== assignmentId);
+      set({ machineAssignments: updatedAssignments, loading: false });
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      set({ 
+        error: error.response?.data?.message || "Failed to delete assignment", 
+        loading: false 
+      });
+      return null;
+    }
+  },
   
   // Assign checklist to machine
   assignChecklistToMachine: async (assignmentData) => {

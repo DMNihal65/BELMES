@@ -403,7 +403,7 @@ const MachineDashboard = () => {
               </div>
               <div>
                 <div className="text-xs text-gray-500 font-medium">TARGET</div>
-                <div className="text-xl font-bold">{required_quantity}</div>
+                <div className="text-xl font-bold">{launched_quantity}</div>
               </div>
             </div>
           </div>
@@ -485,6 +485,7 @@ const MachineDashboard = () => {
     // Get data safely with our helper function
     const part_count = getMachineData(machine, 'part_count', 0);
     const required_quantity = getMachineData(machine, 'required_quantity', 0);
+    const launched_quantity = getMachineData(machine, 'launched_quantity', 0);
     const production_order = getMachineData(machine, 'production_order', '');
     const part_number = getMachineData(machine, 'part_number', '');
     
@@ -496,8 +497,8 @@ const MachineDashboard = () => {
     const fullProgramPath = active_program || program_number || selected_program;
     const programName = formatProgramName(fullProgramPath);
 
-    const completionPercentage = required_quantity > 0
-    ? Math.min(Math.round((parseInt(part_count) || 0) / parseInt(required_quantity) * 100), 100)
+    const completionPercentage = launched_quantity > 0
+    ? Math.min(Math.round((parseInt(part_count) || 0) / parseInt(launched_quantity) * 100), 100)
     : 0;
   
   // Determine if the machine is behind, on track, or ahead of schedule
@@ -541,7 +542,7 @@ const MachineDashboard = () => {
                 </div>
                 <div>
                   <div className="text-xs text-gray-500">Parts</div>
-                  <div className="font-medium">{part_count}/{required_quantity}</div>
+                  <div className="font-medium">{part_count}/{launched_quantity}</div>
                 </div>
               </div>
               

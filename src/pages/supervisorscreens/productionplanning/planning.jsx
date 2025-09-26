@@ -198,7 +198,7 @@ const StartDateWithLoader = ({ productionOrder, partNumber, isActive }) => {
       try {
         setLoading(true);
         const response = await fetch(
-          `http://172.18.7.89:8008/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
+          `http://172.18.7.91:8008/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
         );
         
         if (!response.ok) {
@@ -1677,6 +1677,7 @@ const loadInventoryItems = async () => {
       ...values,
       order_id: selectedJob.id,
       operation_id: values.operation_id,
+      tool_id: values.inventory_item_id, // Include the inventory item ID as tool_id
       tool_name: selectedSubcategoryName,
       bel_partnumber: selectedPartNumber,
       description: selectedPartDescription,
@@ -1713,7 +1714,8 @@ const loadInventoryItems = async () => {
       const toolData = {
         ...values,
         order_id: selectedJob.id,
-        operation_id: values.operation_id
+        operation_id: values.operation_id,
+        tool_id: values.inventory_item_id || values.tool_id // Include tool_id if available
       };
       
       const updatedTool = await updateOrderTool(selectedTool.id, toolData);
@@ -3797,6 +3799,11 @@ const loadInventoryItems = async () => {
                         }
                       }}
                     />
+                  </Form.Item>
+
+                  {/** Hidden field to carry the selected inventory item id so we can submit it as tool_id */}
+                  <Form.Item name="inventory_item_id" style={{ display: 'none' }}>
+                    <input type="hidden" />
                   </Form.Item>
 
                   <Form.Item

@@ -27,7 +27,8 @@ const OperationDetailsCard = () => {
     isLoadingMppData,
     scheduledJobs,
     fetchJobDetails,
-    selectJob, // Add selectJob to the destructuring
+    selectJob,
+    machineStatus,
   } = useOperatorStore();
 
   const [activateModalVisible, setActivateModalVisible] = useState(false);
@@ -160,6 +161,10 @@ const OperationDetailsCard = () => {
 
   // Handle activation confirmation
   const handleActivate = async () => {
+    if (machineStatus.status == "OFF") {
+      message.error('Failed to activate operation: Cannot Activate the operation when Machine is OFF');
+      return;
+    }
     if (!operationToActivate) return;
     const operationId = operationToActivate.operation_id || operationToActivate.id;
     if (!operationId) {

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Card, List, Empty, Button, Tag, Table, Spin, Alert, message } from 'antd';
+import { Tabs, Card, List, Empty, Button, Tag, Table, Spin, Alert, message, Modal, Form, Input, Select, DatePicker } from 'antd';
 import { FileText, Download, Eye, FileArchive, FileImage, Database, AlertCircle, Info, Package } from 'lucide-react';
 import useOperatorStore from '../../../store/operator-store';
 import usePlanningStore from '../../../store/planning-store';
+import useInventoryStore from '../../../store/inventory-store';
 
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.18.7.89:8008";
-const MPP_API_BASE_URL = "http://172.18.7.89:8008";
+const API_BASE_URL = "http://172.18.7.91:8008";
+const MPP_API_BASE_URL = "http://172.18.7.91:8008";
 
 const DocumentsCard = () => {
   const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials, fetchJobDocuments, selectJob } = useOperatorStore();
@@ -21,6 +22,9 @@ const DocumentsCard = () => {
   const [cncLoading, setCncLoading] = useState(false);
   const [cncError, setCncError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isRequestModalVisible, setIsRequestModalVisible] = useState(false);
+  const [requestForm] = Form.useForm();
+  const [selectedToolRow, setSelectedToolRow] = useState(null);
 
   // Hydrate selectedJob from localStorage on mount if not set
 useEffect(() => {
@@ -45,6 +49,9 @@ useEffect(() => {
   };
   hydrateSelectedJob();
 }, [selectedJob, selectJob]);
+
+  // Inventory store functions for requests and operations
+  const { submitItemRequest, fetchOperationsByPartNumber, operations, fetchItems } = useInventoryStore();
 
   // Fetch job documents if selectedJob exists and jobDocuments is empty
   useEffect(() => {
@@ -134,6 +141,89 @@ useEffect(() => {
     };
     fetchCncPrograms();
   }, [selectedJob?.part_number, activeTab, fetchCncProgramDetails]);
+
+  // Open Request modal for a tool
+  const openRequestModal = async (toolRow) => {
+    try {
+      setSelectedToolRow(toolRow);
+      const userSelectedJob = localStorage.getItem('user-selected-job');
+      const parsed = userSelectedJob ? JSON.parse(userSelectedJob) : {};
+      const partNumber = parsed?.part_number || selectedJob?.part_number;
+      const productionOrder = parsed?.production_order || selectedJob?.production_order;
+
+      if (partNumber) {
+        await fetchOperationsByPartNumber(partNumber);
+      }
+
+      // Resolve order_id from local storage all_orders using production_order
+      let orderId = null;
+      const allOrders = localStorage.getItem('all_orders');
+      if (allOrders && productionOrder) {
+        try {
+          const parsedOrders = JSON.parse(allOrders);
+          const match = parsedOrders.find(o => o.production_order === productionOrder);
+          orderId = match?.id || null;
+        } catch (e) {
+          console.error('Failed parsing all_orders', e);
+        }
+      }
+
+      // Resolve inventory item id
+      let resolvedItemId = toolRow?.tool_id || toolRow?.inventory_item_id;
+      if (!resolvedItemId && toolRow?.bel_partnumber) {
+        try {
+          const allItems = await fetchItems();
+          const normalize = (s) => (s || '').toString().trim();
+          const matchItem = (allItems || []).find((item) => {
+            const bp1 = normalize(item?.dynamic_data?.['BEL Part Number']);
+            const bp2 = normalize(item?.dynamic_data?.['BEL Part Number ']);
+            const rowBp = normalize(toolRow.bel_partnumber);
+            return bp1 === rowBp || bp2 === rowBp;
+          });
+          if (matchItem?.id) {
+            resolvedItemId = matchItem.id;
+          }
+        } catch (e) {
+          console.error('Failed to resolve inventory item id by BEL part number', e);
+        }
+      }
+
+      requestForm.setFieldsValue({
+        part_number: partNumber || '',
+        production_order: productionOrder || '',
+        quantity: toolRow?.quantity || 1,
+        operation_id: toolRow?.operation_id || undefined,
+        order_id: orderId,
+        item_id: resolvedItemId,
+        purpose: '',
+      });
+
+      setIsRequestModalVisible(true);
+    } catch (err) {
+      console.error('Error opening request modal:', err);
+      message.error('Failed to open request modal');
+    }
+  };
+
+  const handleSubmitRequest = async () => {
+    try {
+      const values = await requestForm.validateFields();
+      const payload = {
+        item_id: values.item_id,
+        operation_id: values.operation_id,
+        order_id: values.order_id,
+        purpose: values.purpose,
+        quantity: values.quantity,
+        remarks: values.remarks,
+        expected_return_date: values.expected_return_date,
+      };
+      await submitItemRequest(payload);
+      setIsRequestModalVisible(false);
+      requestForm.resetFields();
+    } catch (err) {
+      // validation or submit error already handled
+    }
+  };
 
   // Handle document preview with authentication
   const handlePreview = async (documentId) => {
@@ -412,6 +502,33 @@ useEffect(() => {
       key: 'quantity',
       className: 'bg-gray-50',
       align: 'center',
+    },
+        {
+      title: 'Available Quantity',
+      dataIndex: 'available_quantity',
+      key: 'available_quantity',
+      className: 'bg-gray-50',
+      align: 'center',
+    },
+     {
+      title: 'Tool Status',
+      dataIndex: 'item_status',
+      key: 'item_status',
+      className: 'bg-gray-50',
+      align: 'center',
+    },
+    {
+      title: 'Action',
+      key: 'action',
+      className: 'bg-gray-50',
+      align: 'center',
+      render: (_, record) => (
+        <Button type="primary" size="small" onClick={() => openRequestModal(record)}
+        disabled={record.available_quantity === 0 || record.available_quantity === null}
+        title={record.available_quantity === 0 || record.available_quantity === null ? 'Request disabled: No available quantity' : ''}
+        >
+        Request</Button>
+      ),
     },
   ];
 
@@ -708,6 +825,48 @@ useEffect(() => {
           )}
         </TabPane>
       </Tabs>
+
+      <Modal
+        title="Request Item"
+        open={isRequestModalVisible}
+        onOk={handleSubmitRequest}
+        onCancel={() => { setIsRequestModalVisible(false); requestForm.resetFields(); }}
+        okText="Submit"
+      >
+        <Form form={requestForm} layout="vertical">
+          <Form.Item name="part_number" label="Part Number">
+            <Input disabled />
+          </Form.Item>
+          <Form.Item name="production_order" label="Production Order">
+            <Input disabled />
+          </Form.Item>
+          <Form.Item name="item_id" hidden>
+            <Input type="hidden" />
+          </Form.Item>
+          <Form.Item name="order_id" hidden>
+            <Input type="hidden" />
+          </Form.Item>
+          <Form.Item name="operation_id" label="Operation" rules={[{ required: true, message: 'Select operation' }]}>
+            <Select placeholder="Select operation">
+              {(operations || []).map(op => (
+                <Select.Option key={op.id} value={op.id}>{`${op.operation_number} - ${op.operation_description}`}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Quantity is required' }]}>
+            <Input type="number" min={1} />
+          </Form.Item>
+          <Form.Item name="purpose" label="Purpose" rules={[{ required: true}]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="expected_return_date" label="Expected Return Date" rules={[{ required: true}]}>
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="remarks" label="Remarks">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

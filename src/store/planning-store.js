@@ -1999,7 +1999,7 @@ console.log('Content-Disposition Header:', contentDisposition);
   },
 
   // Function to update program version
-  updateProgramVersion: async (documentId, file, versionNumber) => {
+  updateProgramVersion: async (documentId, file, versionNumber, metadata = null) => {
     try {
       set({ isLoading: true, error: null });
       
@@ -2007,6 +2007,42 @@ console.log('Content-Disposition Header:', contentDisposition);
       const formData = new FormData();
       formData.append('file', file);
       formData.append('version_number', versionNumber);
+      
+      // Include metadata from previous version if available
+      if (metadata) {
+        // Preserve key metadata fields from the previous version
+        if (metadata.program_name) {
+          formData.append('program_name', metadata.program_name);
+        }
+        if (metadata.description) {
+          formData.append('description', metadata.description);
+        }
+        if (metadata.part_number) {
+          formData.append('part_number', metadata.part_number);
+        }
+        if (metadata.operation_number) {
+          formData.append('operation_number', metadata.operation_number);
+        }
+        if (metadata.operation_id) {
+          formData.append('operation_id', metadata.operation_id);
+        }
+        if (metadata.production_order_id) {
+          formData.append('production_order_id', metadata.production_order_id);
+        }
+        if (metadata.doc_type_id) {
+          formData.append('doc_type_id', metadata.doc_type_id);
+        }
+        
+        // Add metadata as JSON string
+        formData.append('metadata', JSON.stringify({
+          part_number: metadata.part_number,
+          program_path: file.name,
+          operation_number: metadata.operation_number
+        }));
+      } else {
+        // If no metadata provided, add empty metadata object
+        formData.append('metadata', JSON.stringify({}));
+      }
       
       const response = await fetch(`http://172.18.7.89:8008/api/v1/document-management/documents/${documentId}/versions`, {
         method: 'POST',

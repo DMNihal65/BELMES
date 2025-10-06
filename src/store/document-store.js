@@ -679,7 +679,11 @@ const useDocumentStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
       formData.append('version_number', nextVersionNumber);
-      formData.append('metadata', '{}');
+      
+      // Add metadata as JSON string - for CNC programs, include part_number, program_path, and operation_number
+      formData.append('metadata', JSON.stringify({
+        program_path: file.name
+      }));
 
       const response = await fetch(
         `http://172.18.7.89:8008/api/v1/document-management/documents/${documentId}/versions`,

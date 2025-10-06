@@ -160,17 +160,44 @@ const OperationDetailsCard = () => {
   };
 
   // Handle activation confirmation
-  const handleActivate = async () => {
-    if (machineStatus.status == "OFF") {
-      message.error('Failed to activate operation: Cannot Activate the operation when Machine is OFF');
+// Handle activation confirmation
+const handleActivate = async () => {
+  if (!operationToActivate) return;
+  const operationId = operationToActivate.operation_id || operationToActivate.id;
+  if (!operationId) {
+    console.error('No valid operation ID found for activation');
+    return;
+  }
+
+  // Fetch machine status from API
+  try {
+    const response = await fetch('http://172.18.7.89:8008/api/v1/maintainance/machine-status/', {
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await response.json();
+    const currentMachine = JSON.parse(localStorage.getItem('currentMachine') || '{}');
+    const machineId = currentMachine?.id;
+    const machine = data.statuses.find(m => m.machine_id === machineId);
+
+    if (!machine) {
+      message.error('Failed to activate operation: Machine information not found.');
       return;
     }
-    if (!operationToActivate) return;
-    const operationId = operationToActivate.operation_id || operationToActivate.id;
-    if (!operationId) {
-      console.error('No valid operation ID found for activation');
+
+    const currentDate = new Date();
+    const availableFrom = machine.available_from ? new Date(machine.available_from) : null;
+    const availableTo = machine.available_to ? new Date(machine.available_to) : null;
+
+    if (machine.status_name === 'OFF' && availableFrom && availableTo) {
+      if (currentDate >= availableFrom && currentDate <= availableTo) {
+        message.error('Failed to activate operation: Machine is unavailable during this period.');
+        return;
+      }
+    } else if (machine.status_name === 'OFF') {
+      message.error('Failed to activate operation: Machine is currently OFF.');
       return;
     }
+
     setIsActivating(true);
     try {
       const result = await activateJob(operationId);
@@ -183,7 +210,12 @@ const OperationDetailsCard = () => {
     } finally {
       setIsActivating(false);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching machine status:', error);
+    message.error('Failed to fetch machine status.');
+    return;
+  }
+};
 
   // Handle viewing MPP for an operation
   const handleViewMpp = async (operation) => {

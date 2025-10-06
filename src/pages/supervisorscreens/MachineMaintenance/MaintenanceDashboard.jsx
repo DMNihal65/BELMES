@@ -41,10 +41,16 @@ const OEEIssues = () => {
       key: 'machine_name',
     },
     {
-      title: 'Timestamp',
+      title: 'Start Time',
       dataIndex: 'timestamp',
       key: 'timestamp',
       render: (text) => new Date(text).toLocaleString(),
+    },
+    {
+      title: 'End Time',
+      dataIndex: 'end_timestamp',
+      key: 'end_timestamp',
+      render: (text) => text ? new Date(text).toLocaleString() : '-',
     },
     {
       title: 'Reported By',

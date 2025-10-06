@@ -5,6 +5,10 @@ import useWebSocketStore from '../../store/websocket-store';
 import useAuthStore from '../../store/auth-store'; 
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
+import moment from 'moment';
+import { DatePicker } from 'antd';
+
+const { RangePicker } = DatePicker;
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -185,14 +189,22 @@ const MachineIssueModal = ({
       switch (type) {
         case 'oeeissue':
           values = await oeeissueForm.validateFields();
+          const [startTime, endTime] = values.timeRange || [null, null];
+          if (!startTime || !endTime) {
+            toast.error('Please select both start and end times');
+            return;
+          }
+
           const oeeIssuePayload = {
-            category: values.oeeissueCategory.charAt(0).toUpperCase() + values.oeeissueCategory.slice(1), // Capitalize category
-            description: values.oeeissueReason.join(', '), // Join selected reasons
-            machine: machineId, // Changed from machine_id to machine
-            reported_by: parseInt(currentUserId) // Add reported_by
+            category: "OEE",
+            description: values.oeeissueReason.join(', '),
+            machine: machineId,
+            reported_by: parseInt(currentUserId),
+            timestamp: startTime.toISOString(),
+            end_timestamp: endTime.toISOString()
           };
 
-          const oeeissueResult = await submitOeeIssueReport(oeeIssuePayload); // Use the new function
+          const oeeissueResult = await submitOeeIssueReport(oeeIssuePayload);
           if (oeeissueResult?.success) {
             toast.success('OEE Issue submitted successfully');
             onClose();
@@ -354,6 +366,19 @@ const MachineIssueModal = ({
                     ))}
                   </Select>
                 </Form.Item>
+
+                <Form.Item
+                    name="timeRange"
+                    label="Start and End Time"
+                    rules={[{ required: true, message: 'Please select start and end times' }]}
+                  >
+                    <RangePicker
+                      showTime={{ format: 'HH:mm:ss' }}
+                      format="YYYY-MM-DD HH:mm:ss"
+                      placeholder={['Start Time', 'End Time']}
+                      className="w-full"
+                    />
+                  </Form.Item>
 
                 <Button 
                   type="primary" 
@@ -553,8 +578,4 @@ export default MachineIssueModal;
 
 
 
-
-
-//testing
-//testingggg
 

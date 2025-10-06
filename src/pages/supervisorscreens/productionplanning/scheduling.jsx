@@ -846,7 +846,7 @@ const Scheduling = () => {
   useEffect(() => {
     const fetchPartDescriptions = async () => {
       try {
-        const response = await fetch('http://172.18.7.91:8008/api/v1/planning/all_orders');
+        const response = await fetch('http://172.18.7.89:8008/api/v1/planning/all_orders');
         const data = await response.json();
         
         const descriptions = data.reduce((acc, order) => {

@@ -27,29 +27,41 @@ const OrderTracking = () => {
 
 
   const downloadExcel = () => {
-  if (!dailyReportData) return;
-
-  // Prepare data for Excel
-  const worksheetData = dailyReportTableData.map(item => ({
-    Date: item.date,
-    'Part Number': item.part_number,
-    'Part Description': item.part_description,
-    'Operation Number': item.operation_number,
-    'Accepted Quantity': item.accepted_quantity,
-    'Rejected Quantity': item.rejected_quantity,
-    'Total Hours': item.total_hours,
-    Machines: item.machines?.join(', ') || '-',
-    Operators: item.operators?.join(', ') || '-'
-  }));
-
-  // Create worksheet
-  const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Daily Report');
-
-  // Generate Excel file and trigger download
-  XLSX.writeFile(workbook, `DailyProductionReport_${selectedOrder.production_order}.xlsx`);
-};
+    if (!dailyReportData) return;
+  
+    // Create header rows with production order details
+    const headerRows = [
+      ['Production Order', dailyReportData.production_order || selectedOrder.production_order],
+      ['Sale Order', dailyReportData.sale_order || selectedOrder.sale_order || '-'],
+      [], // Empty row for spacing
+      // Column headers
+      ['Date', 'Part Number', 'Part Description', 'Operation Number', 'Accepted Quantity', 'Rejected Quantity', 'Total Hours', 'Machines', 'Operators']
+    ];
+  
+    // Prepare data rows
+    const dataRows = dailyReportTableData.map(item => [
+      item.date,
+      item.part_number,
+      item.part_description,
+      item.operation_number,
+      item.accepted_quantity,
+      item.rejected_quantity,
+      item.total_hours,
+      item.machines?.join(', ') || '-',
+      item.operators?.join(', ') || '-'
+    ]);
+  
+    // Combine headers and data
+    const allData = [...headerRows, ...dataRows];
+  
+    // Create worksheet from array of arrays
+    const worksheet = XLSX.utils.aoa_to_sheet(allData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Daily Report');
+  
+    // Generate Excel file and trigger download
+    XLSX.writeFile(workbook, `DailyProductionReport_${selectedOrder.production_order}.xlsx`);
+  };
 
   // Fetch all orders
   const fetchOrders = async () => {
@@ -58,7 +70,7 @@ const OrderTracking = () => {
     setSelectedOrder(null);
     setOperationStatus(null);
     try {
-      const response = await axios.get('http://172.18.7.91:8008/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.89:8008/api/v1/planning/all_orders');
       setOrders(response.data);
     } catch (err) {
       setError('Failed to fetch production orders. Please try again.');
@@ -75,7 +87,7 @@ const OrderTracking = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await axios.get('http://172.18.7.91:8008/api/v1/auth/api/v1/auth/users-get?active_only=true');
+        const res = await axios.get('http://172.18.7.89:8008/api/v1/auth/api/v1/auth/users-get?active_only=true');
         setUsers(res.data);
       } catch (err) {
         console.error('Failed to fetch users', err);
@@ -85,55 +97,67 @@ const OrderTracking = () => {
   }, []);
 
   const downloadReportExcel = () => {
-  if (!reportData) return;
+    if (!reportData) return;
 
-  // Create a new workbook
-  const workbook = XLSX.utils.book_new();
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
 
-  // Operations sheet
-  const operationsData = reportData.operations.map(op => ({
-    'Operation Number': op.operation_number,
-    Description: op.description,
-    'Machine Name': op.machines_used?.join(', ') || '-',
-    Operator: op.operators?.join(', ') || '-',
-    'Total Time': op.total_time_invested_hours,
-    'Required Quantity': op.required_quantity,
-    'Completed Quantity': op.completed_quantity,
-    'Rejected Quantity': op.rejected_quantity
-  }));
-  const operationsSheet = XLSX.utils.json_to_sheet(operationsData);
-  XLSX.utils.book_append_sheet(workbook, operationsSheet, 'Operations');
+    // Common header rows for production order details
+    const commonHeaderRows = [
+      ['Production Order', reportData.production_order],
+      ['Part Number', reportData.part_number],
+      ['Project', reportData.project],
+      ['Sale Order', reportData.sale_order],
+      [], // Empty row for spacing
+    ];
 
-  // Operators sheet
-  const operatorsData = reportData.operators.flatMap(operator =>
-    operator.operations.map(op => ({
-      'Operator Name': operator.operator,
-      'Operation Number': op.operation_number,
-      Description: op.operation_description,
-      Machine: op.machine || '-',
-      'Total Time': op.time_invested_hours,
-      'Completed Quantity': op.completed_quantity,
-      'Rejected Quantity': op.rejected_quantity
-    }))
-  );
-  const operatorsSheet = XLSX.utils.json_to_sheet(operatorsData);
-  XLSX.utils.book_append_sheet(workbook, operatorsSheet, 'Operators');
+    // Operations sheet
+    const operationsHeaders = [...commonHeaderRows, ['Operation Number','Operation Description', 'Machine Name', 'Operator', 'Total Time', 'Required Quantity', 'Completed Quantity', 'Rejected Quantity']];
+    const operationsData = reportData.operations.map(op => [
+      op.operation_number || '-',
+      op.description || '-',
+      op.machines_used?.join(', ') || '-',
+      op.operators?.join(', ') || '-',
+      op.total_time_invested_hours || '0 min',
+      op.required_quantity || 0,
+      op.completed_quantity || 0,
+      op.rejected_quantity || 0
+    ]);
+    const operationsSheet = XLSX.utils.aoa_to_sheet([...operationsHeaders, ...operationsData]);
+    XLSX.utils.book_append_sheet(workbook, operationsSheet, 'Operations');
 
-  // Machines sheet
-  const machinesData = reportData.machines.map(machine => ({
-    'Machine Name': machine.machine,
-    'Operation Number': machine.operation_number,
-    'Operation Description': machine.operation_description,
-    'Total Time': machine.time_invested_hours,
-    'Completed Quantity': machine.completed_quantity,
-    'Rejected Quantity': machine.rejected_quantity
-  }));
-  const machinesSheet = XLSX.utils.json_to_sheet(machinesData);
-  XLSX.utils.book_append_sheet(workbook, machinesSheet, 'Machines');
+    // Operators sheet
+    const operatorsHeaders = [...commonHeaderRows, ['Operator Name', 'Operation Number', 'Description', 'Machine', 'Total Time', 'Completed Quantity', 'Rejected Quantity']];
+    const operatorsData = reportData.operators.flatMap(operator =>
+      operator.operations.map(op => [
+        operator.operator || '-',
+        op.operation_number || '-',
+        op.operation_description || '-',
+        op.machine || '-',
+        op.time_invested_hours || '0 min',
+        op.completed_quantity || 0,
+        op.rejected_quantity || 0
+      ])
+    );
+    const operatorsSheet = XLSX.utils.aoa_to_sheet([...operatorsHeaders, ...operatorsData]);
+    XLSX.utils.book_append_sheet(workbook, operatorsSheet, 'Operators');
 
-  // Generate Excel file and trigger download
-  XLSX.writeFile(workbook, `ProductionOrderReport_${reportData.production_order}.xlsx`);
-};
+    // Machines sheet
+    const machinesHeaders = [...commonHeaderRows, ['Machine Name', 'Operation Number', 'Description', 'Total Time', 'Completed Quantity', 'Rejected Quantity']];
+    const machinesData = reportData.machines.map(machine => [
+      machine.machine || '-',
+      machine.operation_number || '-',
+      machine.operation_description || '-',
+      machine.time_invested_hours || '0 min',
+      machine.completed_quantity || 0,
+      machine.rejected_quantity || 0
+    ]);
+    const machinesSheet = XLSX.utils.aoa_to_sheet([...machinesHeaders, ...machinesData]);
+    XLSX.utils.book_append_sheet(workbook, machinesSheet, 'Machines');
+
+    // Generate Excel file and trigger download
+    XLSX.writeFile(workbook, `ProductionOrderReport_${reportData.production_order}.xlsx`);
+  };
 
   const handleOrderSelect = async (value) => {
     const selected = orders.find(order => order.production_order === value);
@@ -146,7 +170,7 @@ const OrderTracking = () => {
 
     try {
       const productionOrder = selected.production_order;
-      const { data } = await axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`);
+      const { data } = await axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-operations-status/${productionOrder}`);
       setOperationStatus(data);
     } catch (err) {
       setError('Failed to fetch order details. Please check the order and try again.');
@@ -174,7 +198,7 @@ const OrderTracking = () => {
         notes: values.notes || '',
         machine_id: values.machine_id || null,
       };
-      await axios.post('http://172.18.7.91:8008/api/v1/operatorlogs2/operator-log', payload);
+      await axios.post('http://172.18.7.89:8008/api/v1/operatorlogs2/operator-log', payload);
       message.success('Quantity updated successfully');
       setShowUpdateModal(false);
       if (selectedOrder) {
@@ -194,9 +218,9 @@ const OrderTracking = () => {
     setReportLoading(true);
     try {
       const [orderResponse, operatorsResponse, machinesResponse] = await Promise.all([
-        axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-report/${selectedOrder.production_order}`),
-        axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-report-operators/${selectedOrder.production_order}`),
-        axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-report-machines/${selectedOrder.production_order}`)
+        axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-report/${selectedOrder.production_order}`),
+        axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-report-operators/${selectedOrder.production_order}`),
+        axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-report-machines/${selectedOrder.production_order}`)
       ]);
       setReportData({
         ...orderResponse.data,
@@ -216,7 +240,7 @@ const OrderTracking = () => {
 
     setDailyReportLoading(true);
     try {
-      const response = await axios.get(`http://172.18.7.91:8008/api/v1/operatorlogs2/production-order-daily-report/${selectedOrder.production_order}`);
+      const response = await axios.get(`http://172.18.7.89:8008/api/v1/operatorlogs2/production-order-daily-report/${selectedOrder.production_order}`);
       setDailyReportData(response.data);
     } catch (err) {
       message.error('Failed to fetch daily report data');
@@ -224,6 +248,7 @@ const OrderTracking = () => {
     }
     setDailyReportLoading(false);
   };
+
 
   // Handle view report button click
   const handleViewReport = () => {

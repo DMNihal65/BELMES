@@ -533,7 +533,7 @@ useEffect(() => {
               loading={isSubmitting}
               disabled={
                 !selectedOperation ||
-                !isValidRange() || 
+                !isValidRange() ||  localStorage.getItem('activeOperation') === false ||
                 (quantityCompleted <= 0 && quantityRejected <= 0)
               }
               className="bg-sky-500"

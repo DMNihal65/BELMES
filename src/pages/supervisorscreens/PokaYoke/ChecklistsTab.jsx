@@ -107,11 +107,17 @@ const ChecklistsTab = () => {
   
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
+      title: 'Sl No',
+      key: 'sl_no',
       width: '5%',
+      render: (_, __, index) => index + 1,
     },
+    // {
+    //   title: 'ID',
+    //   dataIndex: 'id',
+    //   key: 'id',
+    //   width: '5%',
+    // },
     {
       title: 'Name',
       dataIndex: 'name',
@@ -227,11 +233,23 @@ const ChecklistsTab = () => {
   ];
   
   const itemsColumns = [
+    // {
+    //   title: 'Sl No',
+    //   key: 'sl_no',
+    //   width: '5%',
+    //   render: (_, __, index) => index + 1,
+    // },
+    // {
+    //   title: 'ID',
+    //   dataIndex: 'id',
+    //   key: 'id',
+    //   width: '5%',
+    // },
     {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: '5%',
+      title: 'Sequence',
+      dataIndex: 'sequence_number',
+      key: 'sequence_number',
+      width: '10%',
     },
     {
       title: 'Item Text',
@@ -268,12 +286,7 @@ const ChecklistsTab = () => {
       width: '20%',
       render: (value) => value || '-',
     },
-    {
-      title: 'Sequence',
-      dataIndex: 'sequence_number',
-      key: 'sequence_number',
-      width: '10%',
-    },
+    
   ];
   
   return (
@@ -537,7 +550,7 @@ const ChecklistsTab = () => {
             
             <Table
               columns={itemsColumns}
-              dataSource={checklist.items}
+              dataSource={[...(checklist.items || [])].sort((a, b) => (a.sequence_number ?? 0) - (b.sequence_number ?? 0))}
               rowKey="id"
               pagination={false}
               size="small"

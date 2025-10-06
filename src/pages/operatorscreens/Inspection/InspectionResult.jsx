@@ -1,6 +1,125 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, Table, Typography, Space, Button, Row, Col, Statistic, Progress, Select, DatePicker, Tooltip, Tag, Badge, Empty, Spin, Modal, Divider, Alert, message, Switch, Input } from 'antd';
+
+// FTP Status Cell Component
+const FTPStatusCell = ({ record, viewMode }) => {
+  const [ftpStatuses, setFtpStatuses] = useState({});
+  const [loading, setLoading] = useState({});
+
+  // Get current operation from localStorage
+  const getCurrentOperationNumber = () => {
+    try {
+      const activeOpStr = localStorage.getItem('activeOperation');
+      if (activeOpStr) {
+        const activeOp = JSON.parse(activeOpStr);
+        return activeOp.operation_number?.toString();
+      }
+    } catch (error) {
+      console.error('Error getting current operation:', error);
+    }
+    return null;
+  };
+
+  const currentOpNumber = getCurrentOperationNumber();
+  const operations = record.operations || [];
+  
+  // If in current operation view, filter to show only the current operation
+  const opsToShow = viewMode === 'current' ? 
+    operations.filter(op => op.toString() === currentOpNumber) : 
+    operations;
+
+  // Function to fetch FTP status
+  const fetchFtpStatus = useCallback(async (orderId, opNumber) => {
+    const opKey = `${orderId}-${opNumber}`;
+    
+    // Don't fetch if already loading or already has data
+    if (loading[opKey] || ftpStatuses[opKey]) return;
+    
+    setLoading(prev => ({ ...prev, [opKey]: true }));
+    
+    try {
+      // Construct IPID in the format: IPID-{part_number}-{operation_number}
+      const ipid = `IPID-${record.part_number}-${opNumber}`;
+      const response = await qualityStore.checkFTPApprovalStatus(orderId, ipid);
+      
+      setFtpStatuses(prev => ({
+        ...prev,
+        [opKey]: response.status?.toLowerCase() || 'pending'
+      }));
+    } catch (error) {
+      console.error(`Error fetching FTP status for operation ${opNumber}:`, error);
+      setFtpStatuses(prev => ({
+        ...prev,
+        [opKey]: 'error'
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, [opKey]: false }));
+    }
+  }, [ftpStatuses, loading, record.part_number]);
+
+  // Fetch statuses when component mounts or when opsToShow changes
+  useEffect(() => {
+    if (record.order_id) {
+      opsToShow.forEach(op => {
+        fetchFtpStatus(record.order_id, op);
+      });
+    }
+  }, [record.order_id, JSON.stringify(opsToShow), fetchFtpStatus]);
+
+  const getStatusInfo = (status) => {
+    const statusLower = status?.toLowerCase() || 'pending';
+    
+    switch(statusLower) {
+      case 'approved':
+        return { text: 'Approved', color: 'success' };
+      case 'rejected':
+        return { text: 'Rejected', color: 'error' };
+      case 'pending':
+        return { text: 'Pending', color: 'warning' };
+      case 'error':
+        return { text: 'Error', color: 'default' };
+      default:
+        return { text: 'Pending', color: 'warning' };
+    }
+  };
+
+  return (
+    <Space direction="vertical" size="small">
+      {opsToShow.map((op) => {
+        const opNumber = op;
+        const opKey = `${record.order_id}-${opNumber}`;
+        const status = ftpStatuses[opKey] || 'pending';
+        const statusInfo = getStatusInfo(status);
+        
+        return (
+          <div key={opKey} style={{ minWidth: '80px' }}>
+            {loading[opKey] ? (
+              <div style={{ textAlign: 'center' }}>
+                <Spin size="small" />
+              </div>
+            ) : (
+              <Tag 
+                color={statusInfo.color}
+                style={{ 
+                  margin: 0, 
+                  width: '100%',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  opacity: loading[opKey] ? 0.6 : 1
+                }}
+                onClick={() => fetchFtpStatus(record.order_id, opNumber)}
+              >
+                {statusInfo.text}
+              </Tag>
+            )}
+          </div>
+        );
+      })}
+    </Space>
+  );
+};
 import { ArrowLeftOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, PlusCircleOutlined, CloseOutlined, DatabaseOutlined, UserOutlined, ClockCircleOutlined, LoadingOutlined, LinkOutlined, RocketOutlined } from '@ant-design/icons';
 import { Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -161,7 +280,9 @@ function InspectionResult() {
             measured_3: item.measured_3,
             measured_mean: item.measured_mean,
             measured_instrument: item.measured_instrument,
+            used_inst: item.used_inst,
             operator: item.operator,
+            created_at: item.created_at,
             is_done: ftpApprovalStatus?.is_completed === true ? true : item.measured_mean !== 0
           }))
         }]
@@ -834,39 +955,39 @@ function InspectionResult() {
     }
   ];
 
-  // Mock data for inspection history
-  const inspectionHistory = [
-    {
-      key: '1',
-      date: '2024-12-19',
-      partNumber: 'PA-0678',
-      operator: 'John Doe',
-      operationNumber: 'OP-101',
-      result: 'Pass',
-      deviations: 0,
-      remarks: 'All parameters within specification',
-    },
-    {
-      key: '2',
-      date: '2024-12-19',
-      partNumber: 'PA-0678',
-      operator: 'John Doe',
-      operationNumber: 'OP-102',
-      result: 'Fail',
-      deviations: 2,
-      remarks: 'Dimension out of tolerance',
-    },
-    {
-      key: '3',
-      date: '2024-12-18',
-      partNumber: 'PA-0678',
-      operator: 'Jane Smith',
-      operationNumber: 'OP-101',
-      result: 'Pass',
-      deviations: 1,
-      remarks: 'Minor surface finish variation',
-    },
-  ];
+  // // Mock data for inspection history
+  // const inspectionHistory = [
+  //   {
+  //     key: '1',
+  //     date: '2024-12-19',
+  //     partNumber: 'PA-0678',
+  //     operator: 'John Doe',
+  //     operationNumber: 'OP-101',
+  //     result: 'Pass',
+  //     deviations: 0,
+  //     remarks: 'All parameters within specification',
+  //   },
+  //   {
+  //     key: '2',
+  //     date: '2024-12-19',
+  //     partNumber: 'PA-0678',
+  //     operator: 'John Doe',
+  //     operationNumber: 'OP-102',
+  //     result: 'Fail',
+  //     deviations: 2,
+  //     remarks: 'Dimension out of tolerance',
+  //   },
+  //   {
+  //     key: '3',
+  //     date: '2024-12-18',
+  //     partNumber: 'PA-0678',
+  //     operator: 'Jane Smith',
+  //     operationNumber: 'OP-101',
+  //     result: 'Pass',
+  //     deviations: 1,
+  //     remarks: 'Minor surface finish variation',
+  //   },
+  // ];
 
   // Update the columns definition to handle current view
   const columns = useMemo(() => [
@@ -900,7 +1021,7 @@ function InspectionResult() {
       title: 'Operations',
       dataIndex: 'operations',
       key: 'operations',
-      width: '28%',
+      width: '25%',
       render: (operations, record) => {
         // Get current operation from localStorage to highlight it
         const getCurrentOperationNumber = () => {
@@ -967,6 +1088,23 @@ function InspectionResult() {
               );
             })}
           </Space>
+        );
+      }
+    },
+    {
+      title: 'FTP Status',
+      key: 'ftp_status',
+      width: '15%',
+      render: (_, record) => {
+        // Create a unique key for this cell to force re-render when record changes
+        const cellKey = `ftp-status-${record.order_id}-${record.operations?.join('-') || 'none'}`;
+        
+        return (
+          <FTPStatusCell 
+            key={cellKey}
+            record={record}
+            viewMode={viewMode}
+          />
         );
       }
     },
@@ -1382,12 +1520,13 @@ function InspectionResult() {
       }
     ];
     
-    // Simplified measurement columns as requested
-    const simplifiedColumns = [
+    // Detailed columns for View Measurements modal
+    const detailedColumns = [
       {
         title: 'S.No',
         key: 'sno',
         width: '5%',
+        fixed: 'left',
         render: (text, record, index) => {
           const current = pagination.current || 1;
           const pageSize = pagination.pageSize || 10;
@@ -1398,7 +1537,8 @@ function InspectionResult() {
         title: 'Zone',
         dataIndex: 'zone',
         key: 'zone',
-        width: '10%',
+        width: '8%',
+        fixed: 'left',
         render: (zone) => (
           <Tag color="blue" className="zone-tag">{zone || 'N/A'}</Tag>
         )
@@ -1407,9 +1547,8 @@ function InspectionResult() {
         title: 'Description',
         dataIndex: 'dimension_type',
         key: 'dimension_type',
-        width: '25%',
+        width: '15%',
         render: (type) => {
-          // Handle GDT symbols properly
           if (type?.includes('GDT:')) {
             return (
               <div className="flex items-center">
@@ -1426,14 +1565,202 @@ function InspectionResult() {
         title: 'Nominal',
         dataIndex: 'nominal_value',
         key: 'nominal_value',
-        width: '20%',
-        render: (value) => {
-          if (value?.toLowerCase().includes('hole') || 
-              value?.toLowerCase().includes('tapped')) {
-            return <Tag color="orange" className="w-full text-center">{value}</Tag>;
-          }
-          return <span className="font-mono font-medium">{value || '-'}</span>;
+        width: '10%',
+        render: (value) => (
+          <span className="font-mono font-medium">{value || '-'}</span>
+        )
+      },
+      {
+        title: 'Upper Tol',
+        dataIndex: 'uppertol',
+        key: 'uppertol',
+        width: '8%',
+        render: (value) => (
+          <span className="font-mono text-green-600 font-medium">
+            {value > 0 ? `+${value}` : value}
+          </span>
+        )
+      },
+      {
+        title: 'Lower Tol',
+        dataIndex: 'lowertol',
+        key: 'lowertol',
+        width: '8%',
+        render: (value) => (
+          <span className="font-mono text-red-600 font-medium">
+            {value}
+          </span>
+        )
+      },
+      {
+        title: 'Measured 1',
+        dataIndex: 'measured_1',
+        key: 'measured_1',
+        width: '8%',
+        render: (value) => (
+          <span className="font-mono">{value || '-'}</span>
+        )
+      },
+      {
+        title: 'Measured 2',
+        dataIndex: 'measured_2',
+        key: 'measured_2',
+        width: '8%',
+        render: (value) => (
+          <span className="font-mono">{value || '-'}</span>
+        )
+      },
+      {
+        title: 'Measured 3',
+        dataIndex: 'measured_3',
+        key: 'measured_3',
+        width: '8%',
+        render: (value) => (
+          <span className="font-mono">{value || '-'}</span>
+        )
+      },
+      {
+        title: 'Mean',
+        dataIndex: 'measured_mean',
+        key: 'measured_mean',
+        width: '8%',
+        render: (value) => (
+          <span className="font-mono font-semibold">{value || '-'}</span>
+        )
+      },
+      {
+        title: 'Instrument',
+        dataIndex: 'measured_instrument',
+        key: 'measured_instrument',
+        width: '10%',
+        render: (value) => (
+          <Tag color="cyan" className="instrument-tag">
+            {value || 'N/A'}
+          </Tag>
+        )
+      },
+      {
+        title: 'Used Instrument',
+        dataIndex: 'used_inst',
+        key: 'used_inst',
+        width: '15%',
+        render: (value, record) => {
+          console.log('Record:', record);
+          const usedInstrument = record.used_inst || record.instrument_used;
+          return (
+            <Tag color="purple">
+              {usedInstrument || 'N/A'}
+            </Tag>
+          );
         }
+      },
+      {
+        title: 'Operator',
+        dataIndex: 'operator',
+        key: 'operator',
+        width: '12%',
+        render: (operator) => (
+          <div className="text-sm">
+            <div>{operator?.username || 'N/A'}</div>
+            <div className="text-gray-500 text-xs">{operator?.email || ''}</div>
+          </div>
+        )
+      },
+      {
+        title: 'Date',
+        dataIndex: 'created_at',
+        key: 'created_at',
+        width: '12%',
+        render: (date) => {
+          if (!date) return <div className="text-sm">N/A</div>;
+          
+          const formatDate = (dateString) => {
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+          };
+          
+          return <div className="text-sm">{formatDate(date)}</div>;
+        }
+      },
+      // {
+      //   title: 'Status',
+      //   key: 'status',
+      //   width: '10%',
+      //   fixed: 'right',
+      //   render: (_, record) => {
+      //     const mean = parseFloat(record.measured_mean);
+      //     const nominal = parseFloat(record.nominal_value);
+      //     const upperTol = parseFloat(record.uppertol) || 0;
+      //     const lowerTol = parseFloat(record.lowertol) || 0;
+          
+      //     if (isNaN(mean)) {
+      //       return <Tag color="default">Not Measured</Tag>;
+      //     }
+          
+      //     const upperLimit = nominal + upperTol;
+      //     const lowerLimit = nominal + lowerTol;
+          
+      //     if (mean >= lowerLimit && mean <= upperLimit) {
+      //       return <Tag color="success" icon={<CheckCircleOutlined />}>OK</Tag>;
+      //     } else {
+      //       return <Tag color="error" icon={<CloseCircleOutlined />}>NG</Tag>;
+      //     }
+      //   }
+      // }
+    ];
+
+    // Simplified columns for the left side table (Measurement Details popup)
+    const simplifiedColumns = [
+      {
+        title: 'S.No',
+        key: 'sno',
+        width: '8%',
+        fixed: 'left',
+        render: (text, record, index) => {
+          const current = pagination.current || 1;
+          const pageSize = pagination.pageSize || 10;
+          return (current - 1) * pageSize + index + 1;
+        },
+      },
+      {
+        title: 'Zone',
+        dataIndex: 'zone',
+        key: 'zone',
+        width: '12%',
+        fixed: 'left',
+        render: (zone) => (
+          <Tag color="blue" className="zone-tag">{zone || 'N/A'}</Tag>
+        )
+      },
+      {
+        title: 'Description',
+        dataIndex: 'dimension_type',
+        key: 'dimension_type',
+        width: '25%',
+        render: (type) => {
+          if (type?.includes('GDT:')) {
+            return (
+              <div className="flex items-center">
+                <span className="text-purple-700 font-medium">
+                  {type}
+                </span>
+              </div>
+            );
+          }
+          return <span className="text-gray-800">{type || '-'}</span>;
+        }
+      },
+      {
+        title: 'Nominal',
+        dataIndex: 'nominal_value',
+        key: 'nominal_value',
+        width: '15%',
+        render: (value) => (
+          <span className="font-mono font-medium">{value || '-'}</span>
+        )
       },
       {
         title: 'Upper Tol',
@@ -1487,6 +1814,7 @@ function InspectionResult() {
     };
     
     const measurements = getOperationMeasurements();
+    console.log('Measurements data:', measurements);
     
     return (
       <Modal
@@ -1552,33 +1880,67 @@ function InspectionResult() {
 
               {measurements && measurements.length > 0 ? (
                 <div>
-                  <Alert
-                    message={
-                      <div className="flex items-center gap-2">
-                        <Text strong>Operation Status:</Text>
-                        {ftpApprovalStatus?.is_completed === true ? (
-                          <Tag color="success" icon={<CheckCircleOutlined />}>
-                            Approved
-                          </Tag>
-                        ) : (
-                          <Tag color="warning" icon={<ClockCircleOutlined />}>
-                            Not Yet Approved
-                          </Tag>
-                        )}
-                        {ftpApprovalStatus?.updated_at && (
-                          <Text type="secondary" className="ml-4">
-                            Last Updated: {new Date(ftpApprovalStatus.updated_at).toLocaleDateString()}
-                          </Text>
-                        )}
-                      </div>
-                    }
-                    type={ftpApprovalStatus?.is_completed === true ? "success" : "warning"}
-                    showIcon
-                    className="mb-4"
-                  />
+                  <div className="mb-4 p-4 rounded" style={{
+                    backgroundColor: !ftpApprovalStatus 
+                      ? '#fffbeb' 
+                      : ['rejected', 'Rejected'].includes(ftpApprovalStatus.Status || ftpApprovalStatus.status)
+                        ? '#fef2f2'
+                        : ['approved', 'Approved'].includes(ftpApprovalStatus.Status || ftpApprovalStatus.status)
+                          ? '#f0fdf4'
+                          : '#fffbeb',
+                    borderLeft: '4px solid ' + (
+                      !ftpApprovalStatus 
+                        ? '#f59e0b' 
+                        : ['rejected', 'Rejected'].includes(ftpApprovalStatus.Status || ftpApprovalStatus.status)
+                          ? '#ef4444'
+                          : ['approved', 'Approved'].includes(ftpApprovalStatus.Status || ftpApprovalStatus.status)
+                            ? '#10b981'
+                            : '#f59e0b'
+                    )
+                  }}>
+                    <div className="flex items-center gap-2">
+                      <Text strong style={{
+                        color: !ftpApprovalStatus 
+                          ? '#92400e' 
+                          : ['rejected', 'Rejected'].includes(ftpApprovalStatus.Status || ftpApprovalStatus.status)
+                            ? '#991b1b'
+                            : ['approved', 'Approved'].includes(ftpApprovalStatus.Status || ftpApprovalStatus.status)
+                              ? '#065f46'
+                              : '#92400e'
+                      }}>Operation Status: </Text>
+                      {!ftpApprovalStatus ? (
+                        <Tag color="warning" icon={<ClockCircleOutlined />}>
+                          Loading...
+                        </Tag>
+                      ) : (
+                        <>
+                          {['rejected', 'Rejected'].includes(ftpApprovalStatus.Status || ftpApprovalStatus.status) ? (
+                            <Tag color="error" icon={<CloseCircleOutlined />}>
+                              Rejected
+                            </Tag>
+                          ) : ['approved', 'Approved'].includes(ftpApprovalStatus.Status || ftpApprovalStatus.status) ? (
+                            <Tag color="success" icon={<CheckCircleOutlined />}>
+                              Approved
+                            </Tag>
+                          ) : (
+                            <Tag color="warning" icon={<ClockCircleOutlined />}>
+                              {['na', 'NA', null, undefined, ''].includes(ftpApprovalStatus?.Status || ftpApprovalStatus?.status) 
+                                ? 'Pending' 
+                                : ftpApprovalStatus?.Status || ftpApprovalStatus?.status || 'Pending'}
+                            </Tag>
+                          )}
+                          {ftpApprovalStatus?.updated_at && (
+                            <Text type="secondary" className="ml-4">
+                              Last Updated: {new Date(ftpApprovalStatus.updated_at).toLocaleString()}
+                            </Text>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
                   
                   <Table
-                    columns={simplifiedColumns}
+                    columns={isDetailedMeasurementsVisible ? detailedColumns : simplifiedColumns}
                     dataSource={measurements}
                     rowKey={record => record.id || `${record.zone}-${record.dimension_type}`}
                     bordered
@@ -1685,33 +2047,7 @@ function InspectionResult() {
             <div className="flex flex-col md:flex-row gap-6">
               {/* Left side - Measurements */}
               <div className="w-full md:w-1/2">
-                {/* Simple zone filter */}
-                {zones.length > 0 && (
-                  <div className="mb-4 pb-3 border-b border-gray-200">
-                    <Text strong className="mr-2">Filter by Zone:</Text>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Button
-                        type={activeTab === 'all' ? 'primary' : 'default'}
-                        onClick={() => setActiveTab('all')}
-                        className="zone-button"
-                        size="small"
-                      >
-                        All Zones
-                      </Button>
-                      {zones.map(zone => (
-                        <Button
-                          key={zone}
-                          type={activeTab === zone ? 'primary' : 'default'}
-                          onClick={() => setActiveTab(activeTab === zone ? 'all' : zone)}
-                          className="zone-button"
-                          size="small"
-                        >
-                          {zone}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+               
 
                 {/* Main Table with simplified columns */}
                 <Table

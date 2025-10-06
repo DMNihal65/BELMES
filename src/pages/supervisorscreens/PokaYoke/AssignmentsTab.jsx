@@ -137,24 +137,24 @@ const AssignmentsTab = () => {
   };
   
   const columns = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: '5%',
-    },
+    // {
+    //   title: 'ID',
+    //   dataIndex: 'id',
+    //   key: 'id',
+    //   width: '5%',
+    // },
     {
       title: 'Checklist',
       dataIndex: 'checklist_name',
       key: 'checklist_name',
       width: '22%',
     },
-    {
-      title: 'Machine ID',
-      dataIndex: 'machine_id',
-      key: 'machine_id',
-      width: '8%',
-    },
+    // {
+    //   title: 'Machine ID',
+    //   dataIndex: 'machine_id',
+    //   key: 'machine_id',
+    //   width: '8%',
+    // },
     {
       title: 'Machine Make',
       dataIndex: 'machine_make',

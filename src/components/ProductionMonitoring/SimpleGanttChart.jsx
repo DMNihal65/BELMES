@@ -630,9 +630,9 @@ const SimpleGanttChart = ({
             <Tooltip title="Zoom Out">
               <Button icon={<ZoomOut size={16} />} onClick={handleZoomOut} disabled={isLoading} />
             </Tooltip>
-            <Tooltip title="Fit View">
+            {/* <Tooltip title="Fit View">
               <Button icon={<Maximize size={16} />} onClick={handleFit} disabled={isLoading} />
-            </Tooltip>
+            </Tooltip> */}
             <Tooltip title="Refresh Now">
               <Button icon={<RefreshCw size={16} />} onClick={() => onSubmit && onSubmit(false)} disabled={isLoading} />
             </Tooltip>

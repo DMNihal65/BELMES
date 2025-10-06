@@ -151,6 +151,16 @@ const OrderTable = ({ orders, onRefresh }) => {
       key: 'sale_order',
     },
     {
+      title: 'Created At',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (text) => text ? dayjs(text).format('DD MMM YYYY [at] hh:mm A') : '-',
+      sorter: (a, b) => {
+        if (!a.created_at || !b.created_at) return 0;
+        return dayjs(a.created_at).unix() - dayjs(b.created_at).unix();
+      },
+    },
+    {
       title: 'Status',
       key: 'status',
       fixed: 'right',
@@ -158,11 +168,11 @@ const OrderTable = ({ orders, onRefresh }) => {
       render: (_, record) => {
         const status = (record.status || 'created').toLowerCase();
         const statusConfig = {
-          created: { color: '#1890ff', text: 'Created' }, // Blue
-          in_progress: { color: '#722ed1', text: 'In Progress' }, // Purple
+          created: { color: '#d9d9d9', text: 'Created' }, // Blue
+          in_progress: { color: '#fa8c16', text: 'In Progress' }, // Orange
           completed: { color: '#52c41a', text: 'Completed' }, // Green
           // delayed: { color: '#f5222d', text: 'Delayed' }, // Red
-          default: { color: '#d9d9d9', text: 'Pending' } // Gray
+          default: { color: '#1890ff', text: 'Scheduled' } // Gray
         };
         
         const { color, text } = statusConfig[status] || statusConfig.default;
@@ -184,6 +194,7 @@ const OrderTable = ({ orders, onRefresh }) => {
         { text: 'Created', value: 'created' },
         { text: 'In Progress', value: 'in_progress' },
         { text: 'Completed', value: 'completed' },
+        { text: 'Scheduled', value: 'scheduled' },
         // { text: 'Delayed', value: 'delayed' },
       ],
       onFilter: (value, record) => (record.status || '').toLowerCase() === value,
@@ -256,7 +267,7 @@ const OrderTable = ({ orders, onRefresh }) => {
         dataSource={sortedOrders}
         rowKey="id"
         scroll={{ 
-          x: 1800, 
+          x: 2000, // Increased to accommodate the new column
           y: 'calc(100vh - 420px)'
         }}
         pagination={{

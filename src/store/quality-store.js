@@ -91,6 +91,20 @@ class QualityStore {
     }
   }
 
+  // Check FTP approval status
+  async checkFTPApprovalStatus(orderId, ipid) {
+    try {
+      const response = await this.api.get(`/quality/ftp/${orderId}/${ipid}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking FTP status:', error);
+      return { 
+        status: 'error',
+        message: error.response?.data?.message || 'Failed to fetch FTP status'
+      };
+    }
+  }
+
   // Enhanced error handling
   handleError(error, context = 'API request') {
     console.error(`${context} error:`, error);

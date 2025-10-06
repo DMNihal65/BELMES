@@ -587,7 +587,7 @@ export default function MachineMaintenance() {
     const matchesMachine = !logMachineFilter || 
       log.machine_name?.toLowerCase().includes(logMachineFilter.toLowerCase());
     
-    const matchesDateRange = !logDateRange.length || !logDateRange[0] || !logDateRange[1] || (() => {
+    const matchesDateRange = !logDateRange || !logDateRange.length || !logDateRange[0] || !logDateRange[1] || (() => {
       const logDate = log.created_at ? new Date(log.created_at) : new Date(log.from_time || log.to_time);
       const startDate = dayjs(logDateRange[0]).startOf('day');
       const endDate = dayjs(logDateRange[1]).endOf('day');

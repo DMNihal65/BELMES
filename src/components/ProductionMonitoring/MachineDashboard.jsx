@@ -813,18 +813,7 @@ const MachineDashboard = () => {
                   </Select>
                 </div>
                 
-                <div>
-                  <div className="text-sm text-gray-500 mb-1">Sort By</div>
-                  <Select
-                    value={sortOrder}
-                    onChange={setSortOrder}
-                    style={{ width: 150 }}
-                  >
-                    <Select.Option value="status">Status</Select.Option>
-                    <Select.Option value="name">Machine Name</Select.Option>
-                    <Select.Option value="parts">Parts Count</Select.Option>
-                  </Select>
-                </div>
+                
                 
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Search</div>

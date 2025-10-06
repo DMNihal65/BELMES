@@ -119,7 +119,8 @@ const useWorkcenterStore = create((set, get) => ({
         remarks: updatedItem.remarks || '',
         calibration_date: updatedItem.calibration_date || null,
         calibration_due_date: updatedItem.calibration_due_date || null,
-        last_maintenance_date: updatedItem.last_maintenance_date || null
+        last_maintenance_date: updatedItem.last_maintenance_date || null,
+        pm_due_date: updatedItem.pm_due_date || null
       };
 
       console.log('Sending update request with data:', requestBody);

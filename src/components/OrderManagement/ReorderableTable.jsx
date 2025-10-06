@@ -47,6 +47,9 @@ const ReorderableTable = ({ orders = [] }) => {
           const scheduled = await fetchScheduledOrders();
           console.log('Fetched scheduled orders:', scheduled);
           setScheduledOrders(scheduled);
+        } else {
+          // Reset scheduled orders when toggle is off
+          setScheduledOrders([]);
         }
       } catch (error) {
         console.error('Error loading scheduled orders:', error);
@@ -100,6 +103,12 @@ const ReorderableTable = ({ orders = [] }) => {
     if (showHighPriority && showScheduled) {
       sortedAndFiltered = sortedAndFiltered.slice(0, 15);
     }
+
+    // Reset pagination to first page when switching between scheduled/all orders
+    setPagination(prev => ({
+      ...prev,
+      current: 1
+    }));
 
     setLocalOrders(sortedAndFiltered);
   }, [orders, showScheduled, scheduledOrders, showHighPriority]);
@@ -173,8 +182,11 @@ const ReorderableTable = ({ orders = [] }) => {
       title: 'Project',
       key: 'project',
       width: 200,
-      render: (_, record) => {
-        const priority = record.project?.priority || record.priority;
+      render: (_, record, index) => {
+        const currentPage = pagination.current;
+        const pageSize = pagination.pageSize;
+        const continuousIndex = ((currentPage - 1) * pageSize) + index + 1;
+        const priority = showScheduled ? continuousIndex : (record.project?.priority || record.priority);
         const priorityLabel = priority ? `Priority ${priority}` : 'N/A';
         
         return (
@@ -346,6 +358,11 @@ const ReorderableTable = ({ orders = [] }) => {
       <div className="flex justify-between items-center mb-4">
         <div className="text-lg font-semibold text-gray-700">
           {showScheduled ? 'Scheduled Orders' : 'All Orders'}
+          {!isLoadingScheduled && (
+            <span className="ml-2 text-sm text-gray-500">
+              ({localOrders.length} {localOrders.length === 1 ? 'order' : 'orders'})
+            </span>
+          )}
         </div>
         <Space>
           {isLoadingScheduled && <Spin size="small" />}
@@ -363,12 +380,17 @@ const ReorderableTable = ({ orders = [] }) => {
           <Switch 
             checked={showScheduled}
             onChange={(checked) => {
+              setIsLoadingScheduled(true); // Show loading state immediately
               setShowScheduled(checked);
-              if (!checked) setShowHighPriority(false);
+              if (!checked) {
+                setShowHighPriority(false);
+                setIsLoadingScheduled(false); // Clear loading immediately when switching to all orders
+              }
             }}
             checkedChildren="Yes"
             unCheckedChildren="No"
             className={showScheduled ? 'bg-blue-500' : 'bg-gray-300'}
+            disabled={isLoadingScheduled} // Prevent multiple clicks while loading
           />
         </Space>
       </div>

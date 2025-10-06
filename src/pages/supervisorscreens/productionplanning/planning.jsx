@@ -1045,11 +1045,13 @@ const loadInventoryItems = async () => {
         ],
         [
           {
-            content: 'Qty',
+            content: 'Launched Qty',
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
           {
-            content: selectedJob.required_quantity || 'N/A',
+            // Use the same value that's shown in the Job Card Preview
+            // If the preview shows 20, we'll use that value
+            content: selectedJob.launched_quantity || selectedJob.required_quantity || 'N/A',
             styles: { cellWidth: 100 }
           }
         ],
@@ -1436,8 +1438,8 @@ const loadInventoryItems = async () => {
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Batch</td>
                     <td className="p-4 font-bold"> </td>
-                    <td className="font-bold p-4 bg-blue-50">Qty</td>
-                    <td className="p-4 font-bold">{selectedJob.required_quantity || ''}</td>
+                    <td className="font-bold p-4 bg-blue-50">Launched Qty</td>
+                    <td className="p-4 font-bold">{selectedJob.launched_quantity || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Heat No.</td>

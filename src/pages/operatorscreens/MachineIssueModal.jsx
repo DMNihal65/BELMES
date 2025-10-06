@@ -195,13 +195,30 @@ const MachineIssueModal = ({
             return;
           }
 
+          // Normalize picker values (supports Moment or Dayjs) and add +5:30 hours
+          const toAdjustedIso = (value) => {
+            let m;
+            if (moment.isMoment(value)) {
+              m = value.clone();
+            } else if (value && typeof value === 'object' && typeof value.toDate === 'function') {
+              // Likely a Dayjs instance
+              m = moment(value.toDate());
+            } else {
+              m = moment(value);
+            }
+            return m.add(330, 'minutes').toISOString();
+          };
+
+          const adjustedStart = toAdjustedIso(startTime);
+          const adjustedEnd = toAdjustedIso(endTime);
+
           const oeeIssuePayload = {
             category: "OEE",
             description: values.oeeissueReason.join(', '),
             machine: machineId,
             reported_by: parseInt(currentUserId),
-            timestamp: startTime.toISOString(),
-            end_timestamp: endTime.toISOString()
+            timestamp: adjustedStart,
+            end_timestamp: adjustedEnd
           };
 
           const oeeissueResult = await submitOeeIssueReport(oeeIssuePayload);

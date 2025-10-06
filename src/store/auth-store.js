@@ -178,6 +178,39 @@ const useAuthStore = create(
         }
       },
 
+      machineIdLogin: async (machineId, password) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('http://172.18.7.89:8008/api/v1/auth/machine-id-login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'accept': 'application/json',
+            },
+            body: JSON.stringify({
+              machine_id: machineId,
+              password: password,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            // Capture and set the error detail from the server response
+            const errorMessage = data.detail || 'Machine ID login failed';
+            set({ error: errorMessage, isLoading: false });
+            throw new Error(errorMessage);
+          }
+
+          return data;
+        } catch (error) {
+          // If fetch itself fails or throws, handle here
+          set({ error: error.message, isLoading: false });
+          throw error;
+        }
+      },
+
+
       logout: () => {
         set({ token: null, user: null, currentMachine: null, user_id: null });
         localStorage.removeItem('token');

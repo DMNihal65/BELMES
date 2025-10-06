@@ -227,7 +227,7 @@ server {
 
     # API proxy configuration
     location /api/v5/ {
-        proxy_pass http://172.18.7.91:7777/api/v5/;
+        proxy_pass http://172.18.7.89:7777/api/v5/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';

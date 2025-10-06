@@ -622,14 +622,14 @@ const QualityInspectionDetails = ({
         
         return (
           <div className="flex flex-col items-center px-2">
-            <div className="w-full flex items-center gap-2 mb-1">
-              <div className="text-sm font-medium text-gray-700">
-                {isDataAvailable ? `${yieldPercentage} %` : '0 %'}
-              </div>
+            <div className="w-full flex items-center justify-center gap-2 mb-1 whitespace-nowrap">
+              <span className="text-sm font-medium text-gray-700">
+                {isDataAvailable ? `${yieldPercentage}%` : '0%'}
+              </span>
               {isDataAvailable && (
-                <div className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500">
                   ({completedQty - rejectedQty}/{completedQty})
-                </div>
+                </span>
               )}
             </div>
             <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -1485,13 +1485,13 @@ const QualityInspectionDetails = ({
                 //   width: 60,
                 //   render: (value) => <Tag color="orange">{value || '1'}</Tag>
                 // },
-                {
-                  title: 'Date',
-                  dataIndex: 'created_at',
-                  key: 'created_at',
-                  width: 130,
-                  render: (value) => value ? moment(value).format('DD-MM-YYYY HH:mm') : '-'
-                },
+                // {
+                //   title: 'Date',
+                //   dataIndex: 'created_at',
+                //   key: 'created_at',
+                //   width: 130,
+                //   render: (value) => value ? moment.utc(value).local().format('DD-MM-YYYY HH:mm') : '-'
+                // },
                 { 
                   title: 'Operator',
                   dataIndex: 'operator',

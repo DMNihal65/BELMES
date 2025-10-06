@@ -1182,7 +1182,7 @@ function Calibration() {
                           }}
                           className="reset-button"
                         >
-                          Reset
+                          Clear
                         </Button>
                       </Space>
                     </div>

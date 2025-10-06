@@ -198,7 +198,7 @@ const StartDateWithLoader = ({ productionOrder, partNumber, isActive }) => {
       try {
         setLoading(true);
         const response = await fetch(
-          `http://172.18.7.91:8008/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
+          `http://172.18.7.89:8008/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
         );
         
         if (!response.ok) {

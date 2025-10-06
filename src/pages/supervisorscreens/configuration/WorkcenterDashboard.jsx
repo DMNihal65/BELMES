@@ -108,6 +108,7 @@ const Workcenter = () => {
       calibration_date: record.calibration_date ? dayjs(record.calibration_date) : null,
       calibration_due_date: record.calibration_due_date ? dayjs(record.calibration_due_date) : null,
       last_maintenance_date: record.last_maintenance_date ? dayjs(record.last_maintenance_date) : null,
+      pm_due_date: record.pm_due_date ? dayjs(record.pm_due_date) : null,
     });
     setEditingKey(record.id);
   };
@@ -138,6 +139,10 @@ const Workcenter = () => {
         ? row.last_maintenance_date
         : (currentRecord.last_maintenance_date ? dayjs(currentRecord.last_maintenance_date) : null);
 
+      const pmDueDateValue = row.pm_due_date
+        ? row.pm_due_date
+        : (currentRecord.pm_due_date ? dayjs(currentRecord.pm_due_date) : null);
+
       if (effectiveInstallationYear !== null && calibrationDateValue && calibrationDateValue.year() < effectiveInstallationYear) {
         toast.error('Calibration Date cannot be before Installation Year');
         return;
@@ -158,6 +163,11 @@ const Workcenter = () => {
         return;
       }
 
+      if (effectiveInstallationYear !== null && pmDueDateValue && pmDueDateValue.year() < effectiveInstallationYear) {
+        toast.error('PM Due Date cannot be before Installation Year');
+        return;
+      }
+
       const updatedItem = {
         id: currentRecord.id,
         work_center_id: currentRecord.work_center_id,
@@ -170,7 +180,8 @@ const Workcenter = () => {
         remarks: row.remarks?.trim() || '',
         calibration_date: row.calibration_date?.format('YYYY-MM-DD') || null,
         calibration_due_date: row.calibration_due_date?.format('YYYY-MM-DD') || null,
-        last_maintenance_date: row.last_maintenance_date?.format('YYYY-MM-DD') || null
+        last_maintenance_date: row.last_maintenance_date?.format('YYYY-MM-DD') || null,
+        pm_due_date: row.pm_due_date?.format('YYYY-MM-DD') || null
       };
 
       console.log('Updating machine with data:', updatedItem);
@@ -513,7 +524,7 @@ const Workcenter = () => {
       },
     },
     {
-      title: 'Last Maintenance',
+      title: 'Last PM Date',
       dataIndex: 'last_maintenance_date',
       width: 150,
       editable: true,
@@ -538,6 +549,34 @@ const Workcenter = () => {
         if (!a.last_maintenance_date) return -1;
         if (!b.last_maintenance_date) return 1;
         return dayjs(a.last_maintenance_date).unix() - dayjs(b.last_maintenance_date).unix();
+      },
+    },
+    {
+      title: 'PM Due Date',
+      dataIndex: 'pm_due_date',
+      width: 150,
+      editable: true,
+      render: (text, record) => isEditing(record) ? (
+        <Form.Item name="pm_due_date" style={{ margin: 0 }}>
+          <DatePicker 
+            style={{ width: '100%' }}
+            disabledDate={current => {
+              // Only allow dates from tomorrow onwards
+              return current && current < dayjs().endOf('day');
+            }}
+          />
+        </Form.Item>
+      ) : text ? dayjs(text).format('YYYY-MM-DD') : '-',
+      filterSearch: true,
+      filters: [...new Set(data.map(item => item.pm_due_date ? dayjs(item.pm_due_date).format('YYYY-MM-DD') : null))]
+        .filter(Boolean)
+        .map(date => ({ text: date, value: date })),
+      onFilter: (value, record) => record.pm_due_date ? dayjs(record.pm_due_date).format('YYYY-MM-DD') === value : false,
+      sorter: (a, b) => {
+        if (!a.pm_due_date && !b.pm_due_date) return 0;
+        if (!a.pm_due_date) return -1;
+        if (!b.pm_due_date) return 1;
+        return dayjs(a.pm_due_date).unix() - dayjs(b.pm_due_date).unix();
       },
     },
     {
@@ -749,7 +788,8 @@ const Workcenter = () => {
           remarks: values.remarks?.trim() || '',
           calibration_date: values.calibration_date?.format('YYYY-MM-DD') || null,
           calibration_due_date: values.calibration_due_date?.format('YYYY-MM-DD') || null,
-          last_maintenance_date: values.last_maintenance_date?.format('YYYY-MM-DD') || null
+          last_maintenance_date: values.last_maintenance_date?.format('YYYY-MM-DD') || null,
+          pm_due_date: values.pm_due_date?.format('YYYY-MM-DD') || null
         };
 
         console.log('Creating new machine with data:', machineData);
@@ -892,7 +932,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.91:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.89:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1365,9 +1405,9 @@ const Workcenter = () => {
 
 <Form.Item
   name="last_maintenance_date"
-  label="Last Maintenance Date"
+  label="Last PM Date"
   rules={[
-    { required: true, message: 'Please select Last Maintenance Date' },
+    { required: true, message: 'Please select Last PM Date' },
     ({ getFieldValue }) => ({
       validator(_, value) {
         const installationDate = getFieldValue('year_of_installation');
@@ -1375,7 +1415,35 @@ const Workcenter = () => {
           return Promise.resolve();
         }
         if (value.year() < installationDate.year()) {
-          return Promise.reject(new Error('Last Maintenance cannot be before Installation Year'));
+          return Promise.reject(new Error('Last PM Date cannot be before Installation Year'));
+        }
+        return Promise.resolve();
+      },
+    }),
+  ]}
+>
+  <DatePicker 
+    style={{ width: '100%' }} 
+    disabledDate={(current) => {
+      const installationDate = addMachineForm.getFieldValue('year_of_installation');
+      return installationDate ? current && current.year() < installationDate.year() : false;
+    }}
+  />
+</Form.Item>
+
+<Form.Item
+  name="pm_due_date"
+  label="PM Due Date"
+  rules={[
+    { required: true, message: 'Please select PM Due Date' },
+    ({ getFieldValue }) => ({
+      validator(_, value) {
+        const installationDate = getFieldValue('year_of_installation');
+        if (!value || !installationDate) {
+          return Promise.resolve();
+        }
+        if (value.year() < installationDate.year()) {
+          return Promise.reject(new Error('PM Due Date cannot be before Installation Year'));
         }
         return Promise.resolve();
       },
@@ -1517,7 +1585,7 @@ const Workcenter = () => {
       await updateWorkcenterSchedulable(record.id, record.is_schedulable);
       
       // Then update the workcenter details
-      const response = await fetch(`http://172.18.7.91:8008/api/v1/master-order/workcenters/${record.id}`, {
+      const response = await fetch(`http://172.18.7.89:8008/api/v1/master-order/workcenters/${record.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1708,7 +1776,8 @@ const Workcenter = () => {
         workcenter.remarks?.toString().toLowerCase() || '',
         workcenter.calibration_date ? dayjs(workcenter.calibration_date).format('YYYY-MM-DD') : '',
         workcenter.calibration_due_date ? dayjs(workcenter.calibration_due_date).format('YYYY-MM-DD') : '',
-        workcenter.last_maintenance_date ? dayjs(workcenter.last_maintenance_date).format('YYYY-MM-DD') : ''
+        workcenter.last_maintenance_date ? dayjs(workcenter.last_maintenance_date).format('YYYY-MM-DD') : '',
+        workcenter.pm_due_date ? dayjs(workcenter.pm_due_date).format('YYYY-MM-DD') : ''
       ].join(' ');
 
       // Check if all search terms are found in any of the fields
@@ -1982,7 +2051,8 @@ const EditableCell = ({
 }) => {
   const inputNode = dataIndex === 'calibration_date' || 
                    dataIndex === 'calibration_due_date' || 
-                   dataIndex === 'last_maintenance_date' ? (
+                   dataIndex === 'last_maintenance_date' ||
+                   dataIndex === 'pm_due_date' ? (
     <DatePicker style={{ width: '100%' }} />
   ) : dataIndex === 'year_of_installation' ? (
     <DatePicker 
@@ -2003,7 +2073,8 @@ const EditableCell = ({
           style={{ margin: 0 }}
           valuePropName={dataIndex === 'calibration_date' || 
                         dataIndex === 'calibration_due_date' || 
-                        dataIndex === 'last_maintenance_date' ? 'value' : undefined}
+                        dataIndex === 'last_maintenance_date' ||
+                        dataIndex === 'pm_due_date' ? 'value' : undefined}
         >
           {inputNode}
         </Form.Item>

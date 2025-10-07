@@ -274,7 +274,7 @@ const QualityInspectionDetails = ({
 
   // Create summary data from the response - one row per operation
   const summaryData = hasData ? [
-    // First create rows for each operation
+    // Create rows for each operation
     ...(inspectionDetails.operations || []).map((op, index) => ({
       key: `op-${op}-${index}`,
       order_id: inspectionDetails.order_id,
@@ -283,15 +283,15 @@ const QualityInspectionDetails = ({
       operations: [op],
       isFinalInspection: false
     })),
-    // Then add the final inspection row
-    {
-      key: 'final-inspection',
-      order_id: inspectionDetails.order_id,
-      production_order: inspectionDetails.production_order,
-      part_number: inspectionDetails.part_number,
-      operations: ['Final Inspection'],
-      isFinalInspection: true
-    }
+    // Final inspection row commented out as per request
+    // {
+    //   key: 'final-inspection',
+    //   order_id: inspectionDetails.order_id,
+    //   production_order: inspectionDetails.production_order,
+    //   part_number: inspectionDetails.part_number,
+    //   operations: ['Final Inspection'],
+    //   isFinalInspection: true
+    // }
   ] : [];
   // console.log("SUMMARY", summaryData);
   const summaryColumns = [

@@ -846,7 +846,7 @@ const Scheduling = () => {
   useEffect(() => {
     const fetchPartDescriptions = async () => {
       try {
-        const response = await fetch('http://172.18.7.89:8008/api/v1/planning/all_orders');
+        const response = await fetch('http://172.16.0.203:8002/api/v1/planning/all_orders');
         const data = await response.json();
         
         const descriptions = data.reduce((acc, order) => {
@@ -1147,7 +1147,7 @@ const Scheduling = () => {
                       </Select>
 
                       <Button.Group>
-                        <Tooltip title="Zoom In">
+                        {/* <Tooltip title="Zoom In">
                           <Button 
                             icon={<ZoomInOutlined />} 
                             onClick={() => timelineRef.current?.timeline?.zoomIn(0.5)} 
@@ -1158,13 +1158,13 @@ const Scheduling = () => {
                             icon={<ZoomOutOutlined />} 
                             onClick={() => timelineRef.current?.timeline?.zoomOut(0.5)} 
                           />
-                        </Tooltip>
-                        <Tooltip title="Fit Timeline">
+                        </Tooltip> */}
+                        {/* <Tooltip title="Fit Timeliness">
                           <Button 
                             icon={<FullscreenOutlined />} 
                             onClick={() => timelineRef.current?.timeline?.fit()} 
                           />
-                        </Tooltip>
+                        </Tooltip> */}
                       </Button.Group>
                       
                       <Tooltip title="How to use timeline">
@@ -1221,12 +1221,12 @@ const Scheduling = () => {
                     )}
                   </div>
 
-                  {scheduleData && memoizedComponentColors && Object.keys(memoizedComponentColors).length > 0 && (
+                  {/* {scheduleData && memoizedComponentColors && Object.keys(memoizedComponentColors).length > 0 && (
                     <ComponentLegend 
                       componentColors={memoizedComponentColors} 
                       title="Production Orders"
                     />
-                  )}
+                  )} */}
                 </TabPane>
                 
                 {/* <TabPane 

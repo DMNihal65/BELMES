@@ -198,7 +198,7 @@ const StartDateWithLoader = ({ productionOrder, partNumber, isActive }) => {
       try {
         setLoading(true);
         const response = await fetch(
-          `http://172.18.7.89:8008/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
+          `http://172.16.0.203:8002/api/v1/scheduling/part-schedule-start-date/${productionOrder}/${partNumber}`
         );
         
         if (!response.ok) {
@@ -224,7 +224,7 @@ const StartDateWithLoader = ({ productionOrder, partNumber, isActive }) => {
   if (error) return <span className="text-red-500">Error</span>;
   if (!startDate) return <span>Not yet scheduled</span>;
 
-  return <span className="text-blue-600 font-medium">{startDate.toLocaleDateString()}</span>;
+  return <span className="text-blue-600 font-medium">{dayjs(startDate).format('DD/MM/YY')}</span>;
 };
 
 

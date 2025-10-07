@@ -298,6 +298,13 @@ const Workcenter = () => {
     },
     sortDirections: ['ascend', 'descend'],
   },
+   {
+    title: 'Operation Description',
+    dataIndex: ['work_center', 'description'],
+    width: 150,
+    render: (text) => text || '-',
+
+  },
   {
     title: 'Machine Type',
     dataIndex: 'type',
@@ -810,7 +817,7 @@ const Workcenter = () => {
 
       <Form.Item
         name="description"
-        label="Description"
+        label="Operation Description"
         rules={[
           { required: true, message: 'Please enter Description' },
           { whitespace: true, message: 'Description cannot be empty' },
@@ -869,7 +876,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.18.7.89:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.16.0.203:8002/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1491,7 +1498,7 @@ const Workcenter = () => {
       await updateWorkcenterSchedulable(record.id, record.is_schedulable);
       
       // Then update the workcenter details
-      const response = await fetch(`http://172.18.7.89:8008/api/v1/master-order/workcenters/${record.id}`, {
+      const response = await fetch(`http://172.16.0.203:8002/api/v1/master-order/workcenters/${record.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

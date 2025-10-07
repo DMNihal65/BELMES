@@ -902,10 +902,10 @@ const OrderDashboard = () => {
                   {/* Label section */}
                   <div className="flex flex-col justify-center">
                     <h3 className="text-emerald-800 font-semibold text-xl leading-tight">
-                    Scheduled
+                    Pending
                     </h3>
                     <p className="text-emerald-600 text-sm font-medium opacity-80">
-                      Scheduled 
+                      Yet to be started 
                     </p>
                   </div>
                 </div>

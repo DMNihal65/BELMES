@@ -5,6 +5,10 @@ import useWebSocketStore from '../../store/websocket-store';
 import useAuthStore from '../../store/auth-store'; 
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
+import moment from 'moment';
+import { DatePicker } from 'antd';
+
+const { RangePicker } = DatePicker;
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -185,14 +189,39 @@ const MachineIssueModal = ({
       switch (type) {
         case 'oeeissue':
           values = await oeeissueForm.validateFields();
-          const oeeIssuePayload = {
-            category: values.oeeissueCategory.charAt(0).toUpperCase() + values.oeeissueCategory.slice(1), // Capitalize category
-            description: values.oeeissueReason.join(', '), // Join selected reasons
-            machine: machineId, // Changed from machine_id to machine
-            reported_by: parseInt(currentUserId) // Add reported_by
+          const [startTime, endTime] = values.timeRange || [null, null];
+          if (!startTime || !endTime) {
+            toast.error('Please select both start and end times');
+            return;
+          }
+
+          // Normalize picker values (supports Moment or Dayjs) and add +5:30 hours
+          const toAdjustedIso = (value) => {
+            let m;
+            if (moment.isMoment(value)) {
+              m = value.clone();
+            } else if (value && typeof value === 'object' && typeof value.toDate === 'function') {
+              // Likely a Dayjs instance
+              m = moment(value.toDate());
+            } else {
+              m = moment(value);
+            }
+            return m.add(330, 'minutes').toISOString();
           };
 
-          const oeeissueResult = await submitOeeIssueReport(oeeIssuePayload); // Use the new function
+          const adjustedStart = toAdjustedIso(startTime);
+          const adjustedEnd = toAdjustedIso(endTime);
+
+          const oeeIssuePayload = {
+            category: "OEE",
+            description: values.oeeissueReason.join(', '),
+            machine: machineId,
+            reported_by: parseInt(currentUserId),
+            timestamp: adjustedStart,
+            end_timestamp: adjustedEnd
+          };
+
+          const oeeissueResult = await submitOeeIssueReport(oeeIssuePayload);
           if (oeeissueResult?.success) {
             toast.success('OEE Issue submitted successfully');
             onClose();
@@ -354,6 +383,19 @@ const MachineIssueModal = ({
                     ))}
                   </Select>
                 </Form.Item>
+
+                <Form.Item
+                    name="timeRange"
+                    label="Start and End Time"
+                    rules={[{ required: true, message: 'Please select start and end times' }]}
+                  >
+                    <RangePicker
+                      showTime={{ format: 'HH:mm:ss' }}
+                      format="YYYY-MM-DD HH:mm:ss"
+                      placeholder={['Start Time', 'End Time']}
+                      className="w-full"
+                    />
+                  </Form.Item>
 
                 <Button 
                   type="primary" 
@@ -553,8 +595,4 @@ export default MachineIssueModal;
 
 
 
-
-
-//testing
-//testingggg
 

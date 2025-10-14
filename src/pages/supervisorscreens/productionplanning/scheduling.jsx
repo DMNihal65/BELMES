@@ -250,51 +250,88 @@ const getTimeRange = (viewType, dateRange, selectedComponents, selectedMachines,
 };
 
 // Timeline Chart Component
-const TimelineChart = ({ 
-  scheduleData, 
-  selectedMachines, 
-  selectedComponents, 
-  selectedProductionOrders, 
-  dateRange, 
-  viewType,
-  availableMachines,
-  machineMapping,
-  memoizedComponentColors
-}) => {
-  const timelineRef = useRef(null);
+const TimelineChart = React.forwardRef((props, ref) => {
+  const {
+    scheduleData,
+    selectedMachines,
+    selectedComponents,
+    selectedProductionOrders,
+    dateRange,
+    viewType,
+    machineMapping,
+    memoizedComponentColors
+  } = props;
+
   const timelineContainerRef = useRef(null);
+  const timelineRef = useRef(null);
   const styleElementRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  const initializeTimeline = useCallback(() => {
-    if (!timelineContainerRef.current || !availableMachines.length) {
-      if (isInitialized) {
-        setIsInitialized(false);
+  // Update availableMachines to use scheduleData directly
+  const availableMachines = React.useMemo(() => {
+    if (!scheduleData?.work_centers) return [];
+    
+    const workCenterMachines = scheduleData.work_centers
+      .filter(wc => wc.is_schedulable === true)
+      .flatMap(wc => 
+        wc.machines
+          .filter(machine => !machine.name.includes('Default'))
+          .map(machine => ({
+            id: machine.id,
+            machineId: `${wc.work_center_code}-${machine.id}`,
+            name: machine.name,
+            work_center_code: wc.work_center_code,
+            work_center_name: wc.work_center_name,
+            displayName: `${wc.work_center_code} - ${machine.name}`,
+            order: scheduleData.work_centers.indexOf(wc) * 100 + wc.machines.indexOf(machine)
+          }))
+    );
+    
+    const scheduledMachines = new Set((scheduleData?.scheduled_operations || []).map(op => op.machine));
+    
+    const getMachineStatus = (machineId) => {
+      const now = new Date();
+      const isRunning = (scheduleData?.scheduled_operations || []).some(op => {
+        const startTime = new Date(op.start_time);
+        const endTime = new Date(op.end_time);
+        return op.machine === machineId && startTime <= now && endTime >= now;
+      });
+      return isRunning;
+    };
+
+    return workCenterMachines.sort((a, b) => {
+      if (a.order !== b.order) {
+        return a.order - b.order;
       }
-      return;
-    }
+      
+      const isRunningA = getMachineStatus(a.machineId);
+      const isRunningB = getMachineStatus(b.machineId);
+      
+      if (isRunningA && !isRunningB) return -1;
+      if (!isRunningA && isRunningB) return 1;
+      
+      return 0;
+    });
+  }, [scheduleData]);
 
+  const initializeTimeline = useCallback(() => {
     try {
-        let operations = [];
-        
-        if (scheduleData && scheduleData.scheduled_operations) {
-          operations = scheduleData.scheduled_operations;
-          
-          operations = operations.filter(op => {
-            const matchesComponent = selectedComponents.length === 0 || selectedComponents.includes(op.component);
-            const matchesOrder = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
-            const matchesMachine = selectedMachines.length === 0 || selectedMachines.includes(machineMapping.get(op.machine));
-            
-            return matchesComponent && matchesOrder && matchesMachine;
-          });
-        }
+      if (!timelineContainerRef.current || !scheduleData) return;
 
-        const colors = memoizedComponentColors || {};
+      const operations = scheduleData.scheduled_operations || [];
+      const colors = memoizedComponentColors;
 
-        const items = new DataSet(
-          operations.map((op, index) => ({
-            id: index,
-            group: machineMapping.get(op.machine) || op.machine,
+      const items = new DataSet(
+        operations
+          .filter(op => {
+            const isComponentSelected = selectedComponents.length === 0 || selectedComponents.includes(op.component);
+            const isOrderSelected = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
+            const isMachineSelected = selectedMachines.length === 0 || selectedMachines.includes(machineMapping.get(op.machine));
+            return isComponentSelected && isOrderSelected && isMachineSelected;
+          })
+          .map(op => ({
+            id: op.id || `${op.machine}-${op.component}-${op.production_order}-${op.description}-${op.start_time}`,
+            group: machineMapping.get(op.machine),
             content: `
               <div class="timeline-item">
                 <div class="item-header">${op.production_order}</div>
@@ -311,260 +348,271 @@ const TimelineChart = ({
               color: white;
             `
           }))
-        );
+      );
 
-        const groups = new DataSet(
-          availableMachines
-            .filter(machine => {
-              if (!scheduleData || !scheduleData.scheduled_operations || scheduleData.scheduled_operations.length === 0) {
-                return selectedMachines.length === 0 || selectedMachines.includes(machine.machineId);
-              }
-              
-              if (selectedComponents.length === 0 && selectedProductionOrders.length === 0) {
-                return selectedMachines.length === 0 || selectedMachines.includes(machine.machineId);
-              }
-              
-              const hasSelectedComponentOperations = selectedComponents.length === 0 || 
-                operations.some(op => 
-                  selectedComponents.includes(op.component) && 
-                  machineMapping.get(op.machine) === machine.machineId
-                );
-              
-              const hasSelectedOrderOperations = selectedProductionOrders.length === 0 || 
-                operations.some(op => 
-                  selectedProductionOrders.includes(op.production_order) && 
-                  machineMapping.get(op.machine) === machine.machineId
-                );
-              
-              return hasSelectedComponentOperations && 
-                     hasSelectedOrderOperations && 
-                     (selectedMachines.length === 0 || selectedMachines.includes(machine.machineId));
-            })
-            .map(machine => ({
-              id: machine.machineId,
-              content: `
-                <div class="machine-group">
-                  <span class="machine-name">
-                    ${machine.displayName}
-                  </span>
-                </div>
-              `,
-              className: operations.some(op => machineMapping.get(op.machine) === machine.machineId) ? 'machine-with-ops' : 'machine-without-ops',
-              order: machine.order
-            }))
-        );
-
-        if (styleElementRef.current) {
-          styleElementRef.current.remove();
-        }
-
-        const styles = `
-          ${Object.entries(colors).map(([order, colors]) => `
-            .order-${order.replace(/[^a-zA-Z0-9]/g, '-')} {
-              background-color: ${colors.backgroundColor} !important;
-              border-color: ${colors.borderColor} !important;
+      const groups = new DataSet(
+        availableMachines
+          .filter(machine => {
+            if (!scheduleData || !scheduleData.scheduled_operations || scheduleData.scheduled_operations.length === 0) {
+              return selectedMachines.length === 0 || selectedMachines.includes(machine.machineId);
             }
-            .order-${order.replace(/[^a-zA-Z0-9]/g, '-')}:hover {
-              background-color: ${colors.hoverColor} !important;
+            
+            if (selectedComponents.length === 0 && selectedProductionOrders.length === 0) {
+              return selectedMachines.length === 0 || selectedMachines.includes(machine.machineId);
             }
-          `).join('\n')}
-          
-          .machine-group {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 4px 8px;
-          }
-          .machine-status {
-            margin-left: 8px;
-          }
-          .machine-status.has-ops {
-            color: #52c41a;
-          }
-          .machine-status.no-ops {
-            color: #d9d9d9;
-          }
-          .machine-with-ops {
-            font-weight: 500;
-          }
-          .machine-without-ops {
-            color: #8c8c8c;
-          }
-        `;
-
-        const styleElement = document.createElement('style');
-        styleElement.textContent = styles;
-        document.head.appendChild(styleElement);
-        styleElementRef.current = styleElement;
-
-        const timeRange = getTimeRange(viewType, dateRange, selectedComponents, selectedMachines, selectedProductionOrders, scheduleData);
-
-        const options = {
-          stack: false,
-          horizontalScroll: true,
-          zoomKey: 'ctrlKey',
-          orientation: 'top',
-          height: '670px',
-          margin: {
-            item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
-            axis: 5
-          },
-          start: timeRange.start,
-          end: timeRange.end,
-          min: timeRange.dataMin,
-          max: timeRange.dataMax,
-          zoomMin: 1000 * 60 * 30,
-          zoomMax: 1000 * 60 * 60 * 24 * 365 * 2,
-          mousewheel: {
-            zoom: false,
-            scroll: true
-          },
-          editable: false,
-          tooltip: {
-            followMouse: true,
-            overflowMethod: 'cap',
-            template: function(item) {
-              const op = item.operation;
-              if (!op || !scheduleData) return '';
             
-              const opId = op.id || `${op.machine}-${op.component}-${op.production_order}-${op.description}-${op.start_time}`;
+            const hasSelectedComponentOperations = selectedComponents.length === 0 || 
+              operations.some(op => 
+                selectedComponents.includes(op.component) && 
+                machineMapping.get(op.machine) === machine.machineId
+              );
             
-              const groupOperations = scheduleData.scheduled_operations
-                .filter(o =>
-                  o.component === op.component &&
-                  o.machine === op.machine &&
-                  o.production_order === op.production_order &&
-                  o.description === op.description
-                )
-                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+            const hasSelectedOrderOperations = selectedProductionOrders.length === 0 || 
+              operations.some(op => 
+                selectedProductionOrders.includes(op.production_order) && 
+                machineMapping.get(op.machine) === machine.machineId
+              );
             
-              const firstOp = groupOperations[0];
-              const lastOp = groupOperations[groupOperations.length - 1];
-              const firstOpId = firstOp?.id || `${firstOp?.machine}-${firstOp?.component}-${firstOp?.production_order}-${firstOp?.description}-${firstOp?.start_time}`;
-              const lastOpId = lastOp?.id || `${lastOp?.machine}-${lastOp?.component}-${lastOp?.production_order}-${lastOp?.description}-${lastOp?.start_time}`;
-            
-              const isFirstOperation = opId === firstOpId;
-              const isLastOperation = opId === lastOpId;
-            
-              return `
-                <div class="timeline-tooltip">
-                  <div class="tooltip-header">
-                    <div class="info-row">
-                      <span class="label">Part Number:</span>
-                      <span class="component">${op.component}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="label">Machine:</span>
-                      <span class="value">${op.machine}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="label">Production Order:</span>
-                      <span class="value">${op.production_order}</span>
-                    </div>
-                  </div>
-                  <div class="tooltip-body">
-                    <div class="info-row">
-                      <span class="label">Operation:</span>
-                      <span class="value">${op.description}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="label">Quantity:</span>
-                      <span class="value">${op.quantity}</span>
-                    </div>
-                    ${
-                      isLastOperation
-                        ? `<div class="info-row">
-                            <span class="label">End:</span>
-                            <span class="value">${new Date(op.end_time).toLocaleString()}</span>
-                          </div>`
-                        : `
-                            <div class="info-row">
-                              <span class="label">Start:</span>
-                              <span class="value">${new Date(firstOp.start_time).toLocaleString()}</span>
-                            </div>
-                            <div class="info-row">
-                              <span class="label">PDC of Operation:</span>
-                              <span class="value">${new Date(groupOperations[groupOperations.length - 1].end_time).toLocaleString()}</span>
-                            </div>
-                          `
-                    }
-                  </div>
-                </div>
-              `;
-            }
-          },
-          timeAxis: { 
-            scale: getTimeAxisScale(viewType),
-            step: getTimeAxisStep(viewType)
-          },
-          format: {
-            minorLabels: {
-              hour: 'HH:00',
-              minute: 'HH:mm',
-              day: 'D',
-              week: 'w',
-              month: 'MMM',
-              year: 'YYYY'
-            },
-            majorLabels: {
-              hour: 'ddd D MMM',
-              minute: 'HH:00',
-              day: 'ddd D MMM',
-              week: 'MMM YYYY',
-              month: 'YYYY',
-              year: ''
-            }
-          },
-          hiddenDates: [
-            {
-              start: '1970-01-04 00:00:00',
-              end: '1970-01-05 00:00:00',
-              repeat: 'weekly'
-            },
-            {
-              start: '1970-01-01 00:00:00',
-              end: '1970-01-01 06:00:00',
-              repeat: 'daily'
-            },
-            {
-              start: '1970-01-01 22:00:00',
-              end: '1970-01-01 23:59:59',
-              repeat: 'daily'
-            }
-          ],
-        };
+            return hasSelectedComponentOperations && 
+                   hasSelectedOrderOperations && 
+                   (selectedMachines.length === 0 || selectedMachines.includes(machine.machineId));
+          })
+          .map(machine => ({
+            id: machine.machineId,
+            content: `
+              <div class="machine-group">
+                <span class="machine-name">
+                  ${machine.displayName}
+                </span>
+              </div>
+            `,
+            className: operations.some(op => machineMapping.get(op.machine) === machine.machineId) ? 'machine-with-ops' : 'machine-without-ops',
+            order: machine.order
+          }))
+      );
 
-        if (timelineRef.current) {
-          timelineRef.current.destroy();
-        }
-
-        const timeline = new Timeline(
-          timelineContainerRef.current,
-          items,
-          groups,
-          options
-        );
-
-        timelineRef.current = timeline;
-        setIsInitialized(true);
-
-        timelineRef.current.setWindow(
-          timeRange.start,
-          timeRange.end,
-          { animation: false }
-        );
-
-      } catch (error) {
-        console.error('Timeline initialization error:', error);
-        message.error('Failed to initialize timeline');
-        setIsInitialized(false);
+      if (styleElementRef.current) {
+        styleElementRef.current.remove();
       }
+
+      const styles = `
+        ${Object.entries(colors).map(([order, colors]) => `
+          .order-${order.replace(/[^a-zA-Z0-9]/g, '-')} {
+            background-color: ${colors.backgroundColor} !important;
+            border-color: ${colors.borderColor} !important;
+          }
+          .order-${order.replace(/[^a-zA-Z0-9]/g, '-')}:hover {
+            background-color: ${colors.hoverColor} !important;
+          }
+        `).join('\n')}
+        
+        .machine-group {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 4px 8px;
+        }
+        .machine-status {
+          margin-left: 8px;
+        }
+        .machine-status.has-ops {
+          color: #52c41a;
+        }
+        .machine-status.no-ops {
+          color: #d9d9d9;
+        }
+        .machine-with-ops {
+          font-weight: 500;
+        }
+        .machine-without-ops {
+          color: #8c8c8c;
+        }
+      `;
+
+      const styleElement = document.createElement('style');
+      styleElement.textContent = styles;
+      document.head.appendChild(styleElement);
+      styleElementRef.current = styleElement;
+
+      const timeRange = getTimeRange(viewType, dateRange, selectedComponents, selectedMachines, selectedProductionOrders, scheduleData);
+
+      const options = {
+        stack: false,
+        horizontalScroll: true,
+        zoomKey: 'ctrlKey',
+        orientation: 'top',
+        height: '670px',
+        margin: {
+          item: { horizontal: 10, vertical: selectedMachines.length === 1 ? 20 : 5 },
+          axis: 5
+        },
+        start: timeRange.start,
+        end: timeRange.end,
+        min: timeRange.dataMin,
+        max: timeRange.dataMax,
+        zoomMin: 1000 * 60 * 30, // 30 minutes minimum zoom
+        zoomMax: 1000 * 60 * 60 * 24 * 365 * 2, // 2 years maximum zoom
+        mousewheel: {
+          zoom: true,
+          scroll: false
+        },
+        moveable: true,
+        zoomable: true,
+        editable: false,
+        tooltip: {
+          followMouse: true,
+          overflowMethod: 'cap',
+          template: function(item) {
+            const op = item.operation;
+            if (!op || !scheduleData) return '';
+          
+            const opId = op.id || `${op.machine}-${op.component}-${op.production_order}-${op.description}-${op.start_time}`;
+          
+            const groupOperations = scheduleData.scheduled_operations
+              .filter(o =>
+                o.component === op.component &&
+                o.machine === op.machine &&
+                o.production_order === op.production_order &&
+                o.description === op.description
+              )
+              .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+          
+            const firstOp = groupOperations[0];
+            const lastOp = groupOperations[groupOperations.length - 1];
+            const firstOpId = firstOp?.id || `${firstOp?.machine}-${firstOp?.component}-${firstOp?.production_order}-${firstOp?.description}-${firstOp?.start_time}`;
+            const lastOpId = lastOp?.id || `${lastOp?.machine}-${lastOp?.component}-${lastOp?.production_order}-${lastOp?.description}-${lastOp?.start_time}`;
+          
+            const isFirstOperation = opId === firstOpId;
+            const isLastOperation = opId === lastOpId;
+          
+            return `
+              <div class="timeline-tooltip">
+                <div class="tooltip-header">
+                  <div class="info-row">
+                    <span class="label">Part Number:</span>
+                    <span class="component">${op.component}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Machine:</span>
+                    <span class="value">${op.machine}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Production Order:</span>
+                    <span class="value">${op.production_order}</span>
+                  </div>
+                </div>
+                <div class="tooltip-body">
+                  <div class="info-row">
+                    <span class="label">Operation:</span>
+                    <span class="value">${op.description}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Quantity:</span>
+                    <span class="value">${op.quantity}</span>
+                  </div>
+                  ${
+                    isLastOperation
+                      ? `<div class="info-row">
+                          <span class="label">End:</span>
+                          <span class="value">${new Date(op.end_time).toLocaleString()}</span>
+                        </div>`
+                      : `
+                          <div class="info-row">
+                            <span class="label">Start:</span>
+                            <span class="value">${new Date(firstOp.start_time).toLocaleString()}</span>
+                          </div>
+                          <div class="info-row">
+                            <span class="label">PDC of Operation:</span>
+                            <span class="value">${new Date(groupOperations[groupOperations.length - 1].end_time).toLocaleString()}</span>
+                          </div>
+                        `
+                  }
+                </div>
+              </div>
+            `;
+          }
+        },
+        timeAxis: { 
+          scale: getTimeAxisScale(viewType),
+          step: getTimeAxisStep(viewType)
+        },
+        format: {
+          minorLabels: {
+            hour: 'HH:00',
+            minute: 'HH:mm',
+            day: 'D',
+            week: 'w',
+            month: 'MMM',
+            year: 'YYYY'
+          },
+          majorLabels: {
+            hour: 'ddd D MMM',
+            minute: 'HH:00',
+            day: 'ddd D MMM',
+            week: 'MMM YYYY',
+            month: 'YYYY',
+            year: ''
+          }
+        },
+        hiddenDates: [
+          {
+            start: '1970-01-04 00:00:00',
+            end: '1970-01-05 00:00:00',
+            repeat: 'weekly'
+          },
+          {
+            start: '1970-01-01 00:00:00',
+            end: '1970-01-01 06:00:00',
+            repeat: 'daily'
+          },
+          {
+            start: '1970-01-01 22:00:00',
+            end: '1970-01-01 23:59:59',
+            repeat: 'daily'
+          }
+        ]
+      };
+
+      if (timelineRef.current) {
+        timelineRef.current.destroy();
+      }
+
+      const timeline = new Timeline(
+        timelineContainerRef.current,
+        items,
+        groups,
+        options
+      );
+
+      // Add event listeners for zoom
+      timeline.on('rangechange', function(properties) {
+        if (properties.byZoom) {
+          const window = timeline.getWindow();
+          const duration = moment.duration(moment(window.end).diff(moment(window.start)));
+          console.log('Zoom level changed:', duration.asHours(), 'hours');
+        }
+      });
+
+      timelineRef.current = timeline;
+      setIsInitialized(true);
+
+      timelineRef.current.setWindow(
+        timeRange.start,
+        timeRange.end,
+        { animation: false }
+      );
+
+    } catch (error) {
+      console.error('Timeline initialization error:', error);
+      message.error('Failed to initialize timeline');
+      setIsInitialized(false);
+    }
   }, [
-    scheduleData, 
-    selectedMachines, 
-    selectedComponents, 
-    selectedProductionOrders, 
-    dateRange, 
+    scheduleData,
+    selectedMachines,
+    selectedComponents,
+    selectedProductionOrders,
+    dateRange,
     viewType,
     availableMachines,
     machineMapping,
@@ -588,16 +636,23 @@ const TimelineChart = ({
     };
   }, [initializeTimeline]);
 
+  // Expose the timeline instance and methods via ref
+  React.useImperativeHandle(ref, () => ({
+    timeline: timelineRef.current,
+    getWindow: () => timelineRef.current?.getWindow(),
+    setWindow: (start, end, options) => timelineRef.current?.setWindow(start, end, options),
+    zoomIn: (amount = 0.5) => timelineRef.current?.zoomIn(amount),
+    zoomOut: (amount = 0.5) => timelineRef.current?.zoomOut(amount),
+    fit: () => timelineRef.current?.fit()
+  }), [timelineRef.current]);
+
   return (
     <div 
       ref={timelineContainerRef} 
-      className="schedule-timeline"
-      style={{ 
-        height: '690px',
-        backgroundColor: '#fff',
-        padding: '20px',
-        borderRadius: '8px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      style={{
+        width: '100%',
+        height: '670px',
+        position: 'relative',
         minHeight: '690px'
       }}
     >
@@ -608,7 +663,7 @@ const TimelineChart = ({
       )}
     </div>
   );
-};
+});
 
 const Scheduling = () => {
   const [form] = Form.useForm();
@@ -896,8 +951,8 @@ const Scheduling = () => {
   };
 
   const handleTimelineNavigation = (direction) => {
-    if (timelineRef.current && timelineRef.current.timeline) {
-      const currentWindow = timelineRef.current.timeline.getWindow();
+    if (timelineRef.current) {
+      const currentWindow = timelineRef.current.getWindow();
       const start = moment(currentWindow.start);
       const end = moment(currentWindow.end);
 
@@ -989,19 +1044,10 @@ const Scheduling = () => {
           break;
       }
 
-      timelineRef.current.timeline.setWindow(newStart.toDate(), newEnd.toDate(), { animation: true });
+      timelineRef.current.setWindow(newStart.toDate(), newEnd.toDate(), { animation: true });
     }
   };
 
-  const handleRefresh = () => {
-    setSelectedMachines([]);
-    setSelectedComponents([]);
-    setSelectedProductionOrders([]);
-    setDateRange(null);
-    fetchScheduleData();
-  };
-
-  // NEW: Handle Update button - shows confirmation modal and calls updateSchedule
   const handleUpdate = () => {
     confirm({
       title: 'Update Schedule',
@@ -1019,6 +1065,14 @@ const Scheduling = () => {
         console.log('Schedule update cancelled');
       },
     });
+  };
+
+  const handleRefresh = () => {
+    setSelectedMachines([]);
+    setSelectedComponents([]);
+    setSelectedProductionOrders([]);
+    setDateRange(null);
+    fetchScheduleData();
   };
 
   // Enhanced TimelineChart component with ref forwarding
@@ -1146,8 +1200,13 @@ const Scheduling = () => {
                         })}
                       </Select>
 
+<<<<<<< HEAD
                       <Button.Group>
                         {/* <Tooltip title="Zoom In">
+=======
+                      {/* <Button.Group>
+                        <Tooltip title="Zoom In">
+>>>>>>> 0912eac745efc743b34f489f5cb35b56883d95a5
                           <Button 
                             icon={<ZoomInOutlined />} 
                             onClick={() => timelineRef.current?.timeline?.zoomIn(0.5)} 
@@ -1164,8 +1223,13 @@ const Scheduling = () => {
                             icon={<FullscreenOutlined />} 
                             onClick={() => timelineRef.current?.timeline?.fit()} 
                           />
+<<<<<<< HEAD
                         </Tooltip> */}
                       </Button.Group>
+=======
+                        </Tooltip>
+                      </Button.Group> */}
+>>>>>>> 0912eac745efc743b34f489f5cb35b56883d95a5
                       
                       <Tooltip title="How to use timeline">
                         <Button

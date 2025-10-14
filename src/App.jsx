@@ -57,7 +57,11 @@ const App = () => {
   return (
     <ConfigProvider>
       {/* basename="/belmes" this should be added in the deployment mode ISNIDE BROWSER ROUTER*/}
+<<<<<<< HEAD
       <BrowserRouter basename="/belmes" >
+=======
+      <BrowserRouter >
+>>>>>>> 0912eac745efc743b34f489f5cb35b56883d95a5
         <Routes>
           <Route path="/login" element={<Login />} />
 

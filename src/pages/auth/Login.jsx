@@ -414,7 +414,8 @@ const Login = () => {
             className="text-center"
           >
             <div className="bg-blue-100  text-white py-6 -mt-6 -mx-6 rounded-t-xl">
-              {/* BEL Logo and Title */}
+              <div className="flex flex-row items-center justify-center gap-4">
+                 {/* BEL Logo and Title */}
               <div className="flex items-center justify-center gap-4 mb-4">
                 <img 
                   src={belLogo} 
@@ -423,6 +424,17 @@ const Login = () => {
                 />
                
               </div>
+              <div className='text-2xl font-bold text-sky-600'>X</div>
+              <div className="flex items-center justify-center gap-2">
+                {/* <Text className="text-slate-700 text-sm">Powered by</Text> */}
+                <img 
+                  src={cmtiLogo} 
+                  alt="CMTI Logo" 
+                  className="h-16 object-contain"
+                />
+              </div>
+              </div>
+             
               <div className="flex items-center justify-center text-left">
                   {/* <Title level={2} className="text-white mb-0 font-bold"></Title> */}
                   <Text className="text-slate-700 text-xl font-bold">Manufacturing Execution System</Text>
@@ -432,14 +444,7 @@ const Login = () => {
               <div className="w-3/4 mx-auto border-t border-blue-400/30 my-4" />
 
               {/* Powered By Section */}
-              <div className="flex items-center justify-center gap-2">
-                <Text className="text-slate-700 text-sm">Powered by</Text>
-                <img 
-                  src={cmtiLogo} 
-                  alt="CMTI Logo" 
-                  className="h-8 object-contain"
-                />
-              </div>
+              
             </div>
           </motion.div>
 
@@ -713,11 +718,12 @@ const Login = () => {
             className="text-center mt-6 pt-4 border-t border-gray-200"
           >
             <div className="flex flex-col items-center gap-2">
-              <Text type="secondary" className="text-xs">
-                © 2025 Bharat Electronics Limited. All rights reserved.
+              
+              <Text type="secondary" className="text-lg">
+                © Developed and maintained by CMTI 2025
               </Text>
               <Text type="secondary" className="text-xs">
-                Developed and maintained by CMTI 
+                
               </Text>
             </div>
           </motion.div>

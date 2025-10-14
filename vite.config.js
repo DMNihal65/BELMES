@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     // proxy: {
     //   '/api/v5': {
-    //     target: 'http://172.18.7.91:7777',
+    //     target: 'http://172.18.7.89:7777',
     //     changeOrigin: true,
     //     secure: false,
     //     rewrite: (path) => path.replace(/^\/api\/v5/, '/api/v5')

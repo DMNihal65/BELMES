@@ -7,6 +7,7 @@ import useMachineMaintenanceStore from '../../../store/maintenance';
 import DowntimeTickets from './DowntimeTickets';
 import TicketAnalytics from './TicketAnalytics';
 import MachineCalibrationDueDates from './MachineCalibrationDueDates';
+import AssetLogs from './AssetLogs';
 
 const { TabPane } = Tabs;
 
@@ -41,10 +42,16 @@ const OEEIssues = () => {
       key: 'machine_name',
     },
     {
-      title: 'Timestamp',
+      title: 'Start Time',
       dataIndex: 'timestamp',
       key: 'timestamp',
       render: (text) => new Date(text).toLocaleString(),
+    },
+    {
+      title: 'End Time',
+      dataIndex: 'end_timestamp',
+      key: 'end_timestamp',
+      render: (text) => text ? new Date(text).toLocaleString() : '-',
     },
     {
       title: 'Reported By',
@@ -132,16 +139,10 @@ export default function MaintenanceDashboard() {
         {/* <TabPane tab="Machine Maintenance" key="1">
           <MachineMaintenance />
         </TabPane> */}
-        <TabPane 
-          tab={
-         
-              <span>Maintenance Logs</span>
-           
-          } 
-          key="2"
-        >
-          <Notifications />
+         <TabPane tab="Assets Logs" key="1">
+          <AssetLogs />
         </TabPane>
+       
         <TabPane tab="KPIs" key="3">
           <Tabs defaultActiveKey="1" className='bg-white p-4'>
             {/* <TabPane tab="Tickets" key="1">
@@ -185,6 +186,17 @@ export default function MaintenanceDashboard() {
         <TabPane tab="Machine Calibration Due" key="7">
           <MachineCalibrationDueDates />
         </TabPane>
+        <TabPane 
+          tab={
+         
+              <span>Maintenance Logs</span>
+           
+          } 
+          key="8"
+        >
+          <Notifications />
+        </TabPane>
+       
       </Tabs>
     </div>
   );

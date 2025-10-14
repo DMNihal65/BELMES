@@ -1609,6 +1609,8 @@ console.log('Content-Disposition Header:', contentDisposition);
         bel_partnumber: tool.bel_partnumber,
         description: tool.description,
         quantity: tool.quantity,
+        available_quantity: tool.available_quantity,
+        item_status: tool.item_status,
         order_id: tool.order_id,
         operation_id: tool.operation_id,
         created_at: tool.created_at,
@@ -1636,6 +1638,7 @@ console.log('Content-Disposition Header:', contentDisposition);
         // The API expects these as numbers, not strings
         order_id: Number(toolData.order_id),
         operation_id: Number(toolData.operation_id),
+        tool_id: toolData.tool_id ? Number(toolData.tool_id) : null, // Include tool_id if provided
         quantity: Number(toolData.quantity)
       };
       
@@ -1687,6 +1690,7 @@ console.log('Content-Disposition Header:', contentDisposition);
         ...toolData,
         order_id: Number(toolData.order_id),
         operation_id: Number(toolData.operation_id),
+        tool_id: toolData.tool_id ? Number(toolData.tool_id) : null, // Include tool_id if provided
         quantity: Number(toolData.quantity)
       };
       
@@ -1995,7 +1999,7 @@ console.log('Content-Disposition Header:', contentDisposition);
   },
 
   // Function to update program version
-  updateProgramVersion: async (documentId, file, versionNumber) => {
+  updateProgramVersion: async (documentId, file, versionNumber, metadata = null) => {
     try {
       set({ isLoading: true, error: null });
       
@@ -2004,7 +2008,47 @@ console.log('Content-Disposition Header:', contentDisposition);
       formData.append('file', file);
       formData.append('version_number', versionNumber);
       
+<<<<<<< HEAD
       const response = await fetch(`http://172.16.0.203:8002/api/v1/document-management/documents/${documentId}/versions`, {
+=======
+      // Include metadata from previous version if available
+      if (metadata) {
+        // Preserve key metadata fields from the previous version
+        if (metadata.program_name) {
+          formData.append('program_name', metadata.program_name);
+        }
+        if (metadata.description) {
+          formData.append('description', metadata.description);
+        }
+        if (metadata.part_number) {
+          formData.append('part_number', metadata.part_number);
+        }
+        if (metadata.operation_number) {
+          formData.append('operation_number', metadata.operation_number);
+        }
+        if (metadata.operation_id) {
+          formData.append('operation_id', metadata.operation_id);
+        }
+        if (metadata.production_order_id) {
+          formData.append('production_order_id', metadata.production_order_id);
+        }
+        if (metadata.doc_type_id) {
+          formData.append('doc_type_id', metadata.doc_type_id);
+        }
+        
+        // Add metadata as JSON string
+        formData.append('metadata', JSON.stringify({
+          part_number: metadata.part_number,
+          program_path: file.name,
+          operation_number: metadata.operation_number
+        }));
+      } else {
+        // If no metadata provided, add empty metadata object
+        formData.append('metadata', JSON.stringify({}));
+      }
+      
+      const response = await fetch(`http://172.18.7.89:8008/api/v1/document-management/documents/${documentId}/versions`, {
+>>>>>>> 0912eac745efc743b34f489f5cb35b56883d95a5
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

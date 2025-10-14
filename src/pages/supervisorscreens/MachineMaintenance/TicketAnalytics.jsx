@@ -238,16 +238,22 @@ const TicketAnalytics = () => {
     sorter: (a, b) => a.machine.localeCompare(b.machine),
     filterSearch: true,
     filters: [
-      { text: 'Select All', value: 'all' },
+      // { text: 'Select All', value: 'all' },
       ...Array.from(new Set(tableData.map(item => item.machine))).map(machine => ({
         text: machine,
         value: machine,
       })),
     ],
     onFilter: (value, record) => {
-      if (value === 'all') return true;
+      if (value === 'all') {
+        // When 'Select All' is chosen, show all machines
+        return true;
+      }
+      // When a specific machine is selected, filter by that machine
       return record.machine === value;
     },
+    filterMode: 'menu',
+    filterMultiple: true,
   },
   {
     title: 'No of Failures',
@@ -255,7 +261,7 @@ const TicketAnalytics = () => {
     key: 'failures',
     sorter: (a, b) => a.failures - b.failures,
     filters: [
-      { text: 'Select All', value: 'all' },
+      // { text: 'Select All', value: 'all' },
       ...Array.from(new Set(tableData.map(item => item.failures))).map(failures => ({
         text: failures.toString(),
         value: failures,
@@ -273,7 +279,7 @@ const TicketAnalytics = () => {
     sorter: (a, b) => a.mttr - b.mttr,
     filterSearch: true,
     filters: [
-      { text: 'Select All', value: 'all' },
+      // { text: 'Select All', value: 'all' },
       ...Array.from(new Set(tableData.map(item => item.mttr))).map(mttr => ({
         text: mttr.toFixed(2),
         value: mttr,
@@ -292,7 +298,7 @@ const TicketAnalytics = () => {
     sorter: (a, b) => a.mtbf - b.mtbf,
     filterSearch: true,
     filters: [
-      { text: 'Select All', value: 'all' },
+      // { text: 'Select All', value: 'all' },
       ...Array.from(new Set(tableData.map(item => item.mtbf))).map(mtbf => ({
         text: mtbf.toFixed(2),
         value: mtbf,

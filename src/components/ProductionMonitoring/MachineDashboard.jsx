@@ -485,6 +485,7 @@ const MachineDashboard = () => {
     // Get data safely with our helper function
     const part_count = getMachineData(machine, 'part_count', 0);
     const required_quantity = getMachineData(machine, 'required_quantity', 0);
+    const launched_quantity = getMachineData(machine, 'launched_quantity', 0);
     const production_order = getMachineData(machine, 'production_order', '');
     const part_number = getMachineData(machine, 'part_number', '');
     
@@ -812,18 +813,7 @@ const MachineDashboard = () => {
                   </Select>
                 </div>
                 
-                <div>
-                  <div className="text-sm text-gray-500 mb-1">Sort By</div>
-                  <Select
-                    value={sortOrder}
-                    onChange={setSortOrder}
-                    style={{ width: 150 }}
-                  >
-                    <Select.Option value="status">Status</Select.Option>
-                    <Select.Option value="name">Machine Name</Select.Option>
-                    <Select.Option value="parts">Parts Count</Select.Option>
-                  </Select>
-                </div>
+                
                 
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Search</div>

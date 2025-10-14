@@ -1045,11 +1045,13 @@ const loadInventoryItems = async () => {
         ],
         [
           {
-            content: 'Qty',
+            content: 'Launched Qty',
             styles: { fontStyle: 'bold', cellWidth: 40 }
           },
           {
-            content: selectedJob.required_quantity || 'N/A',
+            // Use the same value that's shown in the Job Card Preview
+            // If the preview shows 20, we'll use that value
+            content: selectedJob.launched_quantity || selectedJob.required_quantity || 'N/A',
             styles: { cellWidth: 100 }
           }
         ],
@@ -1436,8 +1438,8 @@ const loadInventoryItems = async () => {
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Batch</td>
                     <td className="p-4 font-bold"> </td>
-                    <td className="font-bold p-4 bg-blue-50">Qty</td>
-                    <td className="p-4 font-bold">{selectedJob.required_quantity || ''}</td>
+                    <td className="font-bold p-4 bg-blue-50">Launched Qty</td>
+                    <td className="p-4 font-bold">{selectedJob.launched_quantity || ''}</td>
                   </tr>
                   <tr className="border-2 border-gray-300">
                     <td className="font-bold p-4 bg-blue-50">Heat No.</td>
@@ -1686,6 +1688,7 @@ const loadInventoryItems = async () => {
       ...values,
       order_id: selectedJob.id,
       operation_id: values.operation_id,
+      tool_id: values.inventory_item_id, // Include the inventory item ID as tool_id
       tool_name: selectedSubcategoryName,
       bel_partnumber: selectedPartNumber,
       description: selectedPartDescription,
@@ -1722,7 +1725,8 @@ const loadInventoryItems = async () => {
       const toolData = {
         ...values,
         order_id: selectedJob.id,
-        operation_id: values.operation_id
+        operation_id: values.operation_id,
+        tool_id: values.inventory_item_id || values.tool_id // Include tool_id if available
       };
       
       const updatedTool = await updateOrderTool(selectedTool.id, toolData);
@@ -1930,6 +1934,13 @@ const loadInventoryItems = async () => {
         formData.append('part_number', selectedJob.part_number);
         formData.append('operation_number', selectedOperation.operation_number);
         formData.append('operation_id', selectedOperation.id); // Add operation_id explicitly
+        
+        // Add metadata as JSON string
+        formData.append('metadata', JSON.stringify({
+          part_number: selectedJob.part_number,
+          program_path: file.name,
+          operation_number: selectedOperation.operation_number
+        }));
 
         // Return upload promise
         return uploadCncProgram(formData);
@@ -2219,8 +2230,19 @@ const loadInventoryItems = async () => {
         return;
       }
 
-      // Use the document ID directly for the API call
-      await updateProgramVersion(selectedProgramForVersion.id, versionFile, versionNumber);
+      // Extract metadata from the selected program to preserve it in the new version
+      const metadata = {
+        program_name: selectedProgramForVersion.name,
+        description: selectedProgramForVersion.description,
+        part_number: selectedProgramForVersion.part_number,
+        operation_number: selectedProgramForVersion.operation_number,
+        operation_id: selectedProgramForVersion.operation_id,
+        production_order_id: selectedProgramForVersion.production_order_id,
+        doc_type_id: selectedProgramForVersion.doc_type_id
+      };
+
+      // Use the document ID directly for the API call with metadata
+      await updateProgramVersion(selectedProgramForVersion.id, versionFile, versionNumber, metadata);
       message.success('Program version updated successfully');
       setIsVersionUpdateModalVisible(false);
       
@@ -2344,12 +2366,12 @@ const loadInventoryItems = async () => {
       key: 'file_size',
       render: (size) => size ? `${(size / 1024).toFixed(2)} KB` : 'N/A',
     },
-    {
-      title: 'File Name',
-      dataIndex: 'file_name',
-      key: 'file_name',
-      render: (name) => name || 'N/A',
-    },
+    // {
+    //   title: 'File Name',
+    //   dataIndex: 'file_name',
+    //   key: 'file_name',
+    //   render: (name) => name || 'N/A',
+    // },
     {
       title: 'Action',
       key: 'action',
@@ -3826,6 +3848,11 @@ const loadInventoryItems = async () => {
                         }
                       }}
                     />
+                  </Form.Item>
+
+                  {/** Hidden field to carry the selected inventory item id so we can submit it as tool_id */}
+                  <Form.Item name="inventory_item_id" style={{ display: 'none' }}>
+                    <input type="hidden" />
                   </Form.Item>
 
                   <Form.Item

@@ -2,7 +2,7 @@
 # Frontend Development Deployment Script - Local Docker Build
 
 # Configuration
-$SERVER_IP = "172.18.7.91"
+$SERVER_IP = "172.18.7.89"
 $REMOTE_USER = "smc" # Replace with your SSH username
 $REMOTE_BASE_DIR = "/home/smc/belfrontend"
 $REMOTE_CURRENT_DIR = "$REMOTE_BASE_DIR/current"

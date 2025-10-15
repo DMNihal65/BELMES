@@ -82,10 +82,10 @@ function Header() {
     logout();
     resetStore();
     navigate('/login');
-    localStorage.removeItem('jobSource');
-    localStorage.removeItem('currentJobData');
-    localStorage.removeItem('activeOperation');
-    localStorage.removeItem('user-selected-job');
+    // localStorage.removeItem('jobSource');
+    // localStorage.removeItem('currentJobData');
+    // localStorage.removeItem('activeOperation');
+    // localStorage.removeItem('user-selected-job');
   };
   
   // Handle acknowledging a single notification

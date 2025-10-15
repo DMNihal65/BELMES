@@ -321,16 +321,25 @@ const TimelineChart = React.forwardRef((props, ref) => {
       const operations = scheduleData.scheduled_operations || [];
       const colors = memoizedComponentColors;
 
+      // Build items with guaranteed-unique IDs to prevent DataSet duplicate key errors
+      const filteredOperations = operations.filter(op => {
+        const isComponentSelected = selectedComponents.length === 0 || selectedComponents.includes(op.component);
+        const isOrderSelected = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
+        const isMachineSelected = selectedMachines.length === 0 || selectedMachines.includes(machineMapping.get(op.machine));
+        return isComponentSelected && isOrderSelected && isMachineSelected;
+      });
+
+      const idOccurrences = new Map();
       const items = new DataSet(
-        operations
-          .filter(op => {
-            const isComponentSelected = selectedComponents.length === 0 || selectedComponents.includes(op.component);
-            const isOrderSelected = selectedProductionOrders.length === 0 || selectedProductionOrders.includes(op.production_order);
-            const isMachineSelected = selectedMachines.length === 0 || selectedMachines.includes(machineMapping.get(op.machine));
-            return isComponentSelected && isOrderSelected && isMachineSelected;
-          })
-          .map(op => ({
-            id: op.id || `${op.machine}-${op.component}-${op.production_order}-${op.description}-${op.start_time}`,
+        filteredOperations.map(op => {
+          // Use a stable base id; include end_time to reduce natural collisions
+          const baseId = op.id || `${machineMapping.get(op.machine)}-${op.component}-${op.production_order}-${op.description}-${op.start_time}-${op.end_time}`;
+          const seen = idOccurrences.get(baseId) || 0;
+          idOccurrences.set(baseId, seen + 1);
+          const uniqueId = seen === 0 ? baseId : `${baseId}__${seen}`;
+
+          return ({
+            id: uniqueId,
             group: machineMapping.get(op.machine),
             content: `
               <div class="timeline-item">
@@ -347,7 +356,8 @@ const TimelineChart = React.forwardRef((props, ref) => {
               border-color: ${colors[op.production_order]?.borderColor || '#096dd9'};
               color: white;
             `
-          }))
+          });
+        })
       );
 
       const groups = new DataSet(
@@ -901,7 +911,7 @@ const Scheduling = () => {
   useEffect(() => {
     const fetchPartDescriptions = async () => {
       try {
-        const response = await fetch('http://172.18.7.89:8008/api/v1/planning/all_orders');
+        const response = await fetch('http://172.19.224.1:8002/api/v1/planning/all_orders');
         const data = await response.json();
         
         const descriptions = data.reduce((acc, order) => {

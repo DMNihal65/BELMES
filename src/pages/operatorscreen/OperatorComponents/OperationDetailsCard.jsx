@@ -171,7 +171,7 @@ const handleActivate = async () => {
 
   // Fetch machine status from API
   try {
-    const response = await fetch('http://172.18.7.89:8008/api/v1/maintainance/machine-status/', {
+    const response = await fetch('http://172.19.224.1:8002/api/v1/maintainance/machine-status/', {
       headers: { 'Accept': 'application/json' }
     });
     const data = await response.json();

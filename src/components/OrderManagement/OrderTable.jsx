@@ -154,7 +154,7 @@ const OrderTable = ({ orders, onRefresh }) => {
       title: 'Created At',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (text) => text ? dayjs(text).format('DD MMM YYYY [at] hh:mm A') : '-',
+      render: (text) => text ? dayjs(text).format('DD MMM YYYY') : '-',
       sorter: (a, b) => {
         if (!a.created_at || !b.created_at) return 0;
         return dayjs(a.created_at).unix() - dayjs(b.created_at).unix();

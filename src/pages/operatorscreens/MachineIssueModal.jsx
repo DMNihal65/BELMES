@@ -416,7 +416,7 @@ const MachineIssueModal = ({
             tab={
               <span className="flex items-center gap-2">
                 <Wrench className="h-4 w-4" />
-                Machine Breakdownd
+                Machine Breakdown
               </span>
             }
             key="machine"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Table, Tag, Button, Empty, Tooltip, Space, Modal, Spin, Row, Col, message } from 'antd';
 import { 
   ClipboardList, 
@@ -39,6 +39,10 @@ const OperationDetailsCard = () => {
   const [isActivating, setIsActivating] = useState(false);
   const [localActiveOperation, setLocalActiveOperation] = useState(null);
 
+  // Add ref to track if we've already fetched for this production order
+  const fetchedProductionOrderRef = useRef(null);
+  const isFetchingRef = useRef(false);
+
   // Hydrate selectedJob from localStorage on mount if not set
   useEffect(() => {
     const hydrateSelectedJob = () => {
@@ -47,7 +51,7 @@ const OperationDetailsCard = () => {
         if (currentJobData) {
           try {
             const parsedJobData = JSON.parse(currentJobData);
-            selectJob(parsedJobData); // Use selectJob to set selectedJob in the store
+            selectJob(parsedJobData);
           } catch (error) {
             console.error('Error parsing currentJobData from localStorage:', error);
             message.error('Failed to parse job data from storage');
@@ -61,7 +65,7 @@ const OperationDetailsCard = () => {
                 production_order: parsedUserSelected.production_order,
                 part_number: parsedUserSelected.part_number
               };
-              selectJob(minimalJob); // Set minimal selectedJob and trigger fetches
+              selectJob(minimalJob);
             } catch (error) {
               console.error('Error parsing user-selected-job from localStorage:', error);
               message.error('Failed to parse user-selected job from storage');
@@ -71,26 +75,69 @@ const OperationDetailsCard = () => {
       }
     };
     hydrateSelectedJob();
-  }, [selectedJob, selectJob]);
+  }, []); // Run only once on mount
 
-  // Fetch job details when selectedJob changes
+  // Fetch job details when selectedJob changes - FIXED VERSION
   useEffect(() => {
     const fetchDetails = async () => {
-      if (selectedJob?.production_order && (!availableOperations || availableOperations.length === 0)) {
-        try {
-          const result = await fetchJobDetails(selectedJob.production_order);
-          if (!result.success) {
-            console.error('Failed to fetch job details:', result.error);
-            message.error(`Failed to load operations: ${result.error}`);
-          }
-        } catch (error) {
-          console.error('Error fetching job details:', error);
-          message.error('Failed to fetch job details');
+      // Check if we have a production order
+      if (!selectedJob?.production_order) {
+        return;
+      }
+
+      const currentProductionOrder = selectedJob.production_order;
+
+      // Prevent duplicate fetches for the same production order
+      if (fetchedProductionOrderRef.current === currentProductionOrder) {
+        console.log('Already fetched details for this production order, skipping');
+        return;
+      }
+
+      // Check if we already have operations for this job
+      if (availableOperations && availableOperations.length > 0) {
+        console.log('Operations already loaded, skipping fetch');
+        return;
+      }
+
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log('Fetch already in progress, skipping');
+        return;
+      }
+
+      // Mark as fetching and track the production order
+      isFetchingRef.current = true;
+      fetchedProductionOrderRef.current = currentProductionOrder;
+
+      try {
+        console.log('Fetching job details for:', currentProductionOrder);
+        const result = await fetchJobDetails(currentProductionOrder);
+        
+        if (!result.success) {
+          console.error('Failed to fetch job details:', result.error);
+          // message.error(`Failed to load operations: ${result.error}`);
+          // Reset on error so user can retry
+          fetchedProductionOrderRef.current = null;
         }
+      } catch (error) {
+        console.error('Error fetching job details:', error);
+        message.error('Failed to fetch job details');
+        // Reset on error so user can retry
+        fetchedProductionOrderRef.current = null;
+      } finally {
+        isFetchingRef.current = false;
       }
     };
+
     fetchDetails();
-  }, [selectedJob, fetchJobDetails, availableOperations]);
+  }, [selectedJob?.production_order]); // Only depend on production_order
+
+  // Reset fetch tracking when selectedJob changes to a different job
+  useEffect(() => {
+    if (!selectedJob?.production_order) {
+      fetchedProductionOrderRef.current = null;
+    }
+  }, [selectedJob?.production_order]);
 
   // Fetch active operation from localStorage
   useEffect(() => {
@@ -160,62 +207,61 @@ const OperationDetailsCard = () => {
   };
 
   // Handle activation confirmation
-// Handle activation confirmation
-const handleActivate = async () => {
-  if (!operationToActivate) return;
-  const operationId = operationToActivate.operation_id || operationToActivate.id;
-  if (!operationId) {
-    console.error('No valid operation ID found for activation');
-    return;
-  }
-
-  // Fetch machine status from API
-  try {
-    const response = await fetch('http://172.19.224.1:8002/api/v1/maintainance/machine-status/', {
-      headers: { 'Accept': 'application/json' }
-    });
-    const data = await response.json();
-    const currentMachine = JSON.parse(localStorage.getItem('currentMachine') || '{}');
-    const machineId = currentMachine?.id;
-    const machine = data.statuses.find(m => m.machine_id === machineId);
-
-    if (!machine) {
-      message.error('Failed to activate operation: Machine information not found.');
+  const handleActivate = async () => {
+    if (!operationToActivate) return;
+    const operationId = operationToActivate.operation_id || operationToActivate.id;
+    if (!operationId) {
+      console.error('No valid operation ID found for activation');
       return;
     }
 
-    const currentDate = new Date();
-    const availableFrom = machine.available_from ? new Date(machine.available_from) : null;
-    const availableTo = machine.available_to ? new Date(machine.available_to) : null;
+    // Fetch machine status from API
+    try {
+      const response = await fetch('http://172.18.7.91:8008/api/v1/maintainance/machine-status/', {
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await response.json();
+      const currentMachine = JSON.parse(localStorage.getItem('currentMachine') || '{}');
+      const machineId = currentMachine?.id;
+      const machine = data.statuses.find(m => m.machine_id === machineId);
 
-    if (machine.status_name === 'OFF' && availableFrom && availableTo) {
-      if (currentDate >= availableFrom && currentDate <= availableTo) {
-        message.error('Failed to activate operation: Machine is unavailable during this period.');
+      if (!machine) {
+        message.error('Failed to activate operation: Machine information not found.');
         return;
       }
-    } else if (machine.status_name === 'OFF') {
-      message.error('Failed to activate operation: Machine is currently OFF.');
-      return;
-    }
 
-    setIsActivating(true);
-    try {
-      const result = await activateJob(operationId);
-      if (result.success) {
-        setActivateModalVisible(false);
+      const currentDate = new Date();
+      const availableFrom = machine.available_from ? new Date(machine.available_from) : null;
+      const availableTo = machine.available_to ? new Date(machine.available_to) : null;
+
+      if (machine.status_name === 'OFF' && availableFrom && availableTo) {
+        if (currentDate >= availableFrom && currentDate <= availableTo) {
+          message.error('Failed to activate operation: Machine is unavailable during this period.');
+          return;
+        }
+      } else if (machine.status_name === 'OFF') {
+        message.error('Failed to activate operation: Machine is currently OFF.');
+        return;
+      }
+
+      setIsActivating(true);
+      try {
+        const result = await activateJob(operationId);
+        if (result.success) {
+          setActivateModalVisible(false);
+        }
+      } catch (error) {
+        console.error('Error activating job:', error);
+        message.error(`Failed to activate operation: ${error.message}`);
+      } finally {
+        setIsActivating(false);
       }
     } catch (error) {
-      console.error('Error activating job:', error);
-      message.error(`Failed to activate operation: ${error.message}`);
-    } finally {
-      setIsActivating(false);
+      console.error('Error fetching machine status:', error);
+      message.error('Failed to fetch machine status.');
+      return;
     }
-  } catch (error) {
-    console.error('Error fetching machine status:', error);
-    message.error('Failed to fetch machine status.');
-    return;
-  }
-};
+  };
 
   // Handle viewing MPP for an operation
   const handleViewMpp = async (operation) => {

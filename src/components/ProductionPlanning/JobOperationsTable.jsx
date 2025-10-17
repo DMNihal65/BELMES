@@ -334,7 +334,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
       const response = await fetch(
-        `http://172.19.224.1:8002/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
+        `http://172.18.7.91:8008/api/v1/planning/operations/${partNumber}/${record.operation_number}?production_order=${updateData.production_order}`, 
         {
           method: 'PUT',
           headers: {
@@ -838,7 +838,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
 
       // Construct the URL to fetch the document
-      let downloadUrl = `http://172.19.224.1:8002/api/v1/document-management/documents/${documentId}/download`;
+      let downloadUrl = `http://172.18.7.91:8008/api/v1/document-management/documents/${documentId}/download`;
       if (versionId) {
         downloadUrl += `?version_id=${versionId}`;
       }
@@ -931,7 +931,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
       }
 
       // Construct the download URL
-      let downloadUrl = `http://172.19.224.1:8002/api/v1/document-management/documents/${documentId}/download`;
+      let downloadUrl = `http://172.18.7.91:8008/api/v1/document-management/documents/${documentId}/download`;
       if (versionId) {
         downloadUrl += `?version_id=${versionId}`;
       }
@@ -1151,7 +1151,7 @@ const JobOperationsTable = ({ jobId, onOperationEdit, operations: initialOperati
 
       // Use the correct URL format: /api/v1/planning/operations/{part_number}/{operation_number}
       const response = await fetch(
-        `http://172.19.224.1:8002/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
+        `http://172.18.7.91:8008/api/v1/planning/operations/${partNumber}/${selectedOperationForMachine.operation_number}?production_order=${currentData.production_order}`, 
         {
           method: 'PUT',
           headers: {

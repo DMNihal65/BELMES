@@ -56,8 +56,8 @@ const App = () => {
   console.log("Deployed on 20-08-2025")
   return (
     <ConfigProvider>
-      {/* basename="/belmes" this should be added in the deployment mode ISNIDE BROWSER ROUTER*/}
-      <BrowserRouter basename="/belmes"  >
+      {/* basename="/belmes" this should be added in the deployment mode INSIDE BROWSER ROUTER*/}
+      <BrowserRouter basename="/belmes" >
         <Routes>
           <Route path="/login" element={<Login />} />
 

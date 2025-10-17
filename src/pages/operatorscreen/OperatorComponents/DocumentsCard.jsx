@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Tabs, Card, List, Empty, Button, Tag, Table, Spin, Alert, message, Modal, Form, Input, Select, DatePicker } from 'antd';
 import { FileText, Download, Eye, FileArchive, FileImage, Database, AlertCircle, Info, Package } from 'lucide-react';
 import useOperatorStore from '../../../store/operator-store';
@@ -8,8 +8,8 @@ import useInventoryStore from '../../../store/inventory-store';
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.19.224.1:8002";
-const MPP_API_BASE_URL = "http://172.19.224.1:8002";
+const API_BASE_URL = "http://172.18.7.91:8008";
+const MPP_API_BASE_URL = "http://172.18.7.91:8008";
 
 const DocumentsCard = () => {
   const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials, fetchJobDocuments, selectJob } = useOperatorStore();
@@ -26,56 +26,81 @@ const DocumentsCard = () => {
   const [requestForm] = Form.useForm();
   const [selectedToolRow, setSelectedToolRow] = useState(null);
 
+  // Use refs to track if documents have been fetched
+  const hasFetchedDocuments = useRef(false);
+  const lastFetchedPartNumber = useRef(null);
+
   // Hydrate selectedJob from localStorage on mount if not set
-useEffect(() => {
-  const hydrateSelectedJob = () => {
-    if (!selectedJob) {
-      const currentJobData = localStorage.getItem('currentJobData');
-      if (currentJobData) {
-        const parsedJobData = JSON.parse(currentJobData);
-        selectJob(parsedJobData); // Use selectJob to set selectedJob in the store
-      } else {
-        const userSelectedJob = localStorage.getItem('user-selected-job');
-        if (userSelectedJob) {
-          const parsedUserSelected = JSON.parse(userSelectedJob);
-          const minimalJob = {
-            production_order: parsedUserSelected.production_order,
-            part_number: parsedUserSelected.part_number
-          };
-          selectJob(minimalJob); // Set minimal selectedJob and trigger fetches
-        }
-      }
-    }
-  };
-  hydrateSelectedJob();
-}, [selectedJob, selectJob]);
 
-  // Inventory store functions for requests and operations
-  const { submitItemRequest, fetchOperationsByPartNumber, operations, fetchItems } = useInventoryStore();
-
-  // Fetch job documents if selectedJob exists and jobDocuments is empty
   useEffect(() => {
-    const fetchDocumentsIfEmpty = async () => {
-      if (selectedJob && (!jobDocuments || !jobDocuments.all_documents || jobDocuments.all_documents.length === 0)) {
-        try {
-          const partNumber = selectedJob.part_number;
-          if (partNumber) {
-            const result = await fetchJobDocuments(partNumber);
-            if (!result.success) {
-              message.error(`Failed to fetch job documents: ${result.error}`);
-            }
-          } else {
-            message.error('Part number not found in selectedJob');
+    const hydrateSelectedJob = () => {
+      if (!selectedJob) {
+        const currentJobData = localStorage.getItem('currentJobData');
+        if (currentJobData) {
+          const parsedJobData = JSON.parse(currentJobData);
+          selectJob(parsedJobData);
+        } else {
+          const userSelectedJob = localStorage.getItem('user-selected-job');
+          if (userSelectedJob) {
+            const parsedUserSelected = JSON.parse(userSelectedJob);
+            const minimalJob = {
+              production_order: parsedUserSelected.production_order,
+              part_number: parsedUserSelected.part_number
+            };
+            selectJob(minimalJob);
           }
-        } catch (error) {
-          console.error('Error fetching job documents:', error);
-          message.error('Failed to fetch job documents');
         }
       }
     };
+    hydrateSelectedJob();
+  }, [selectedJob, selectJob]);
 
+
+
+  // Inventory store functions for requests and operations
+  const { submitItemRequest, fetchOperationsByPartNumber, operations, fetchItems } = useInventoryStore();
+  // Fetch job documents if selectedJob exists - FIXED VERSION
+  useEffect(() => {
+    const fetchDocumentsIfEmpty = async () => {
+      if (!selectedJob?.part_number) {
+        return;
+      }
+      const partNumber = selectedJob.part_number;
+      // Check if we've already fetched for this part number
+      if (hasFetchedDocuments.current && lastFetchedPartNumber.current === partNumber) {
+        return;
+      }
+
+      // Check if documents already exist for this part number
+      if (jobDocuments?.all_documents?.length > 0) {
+        hasFetchedDocuments.current = true;
+        lastFetchedPartNumber.current = partNumber;
+        return;
+      }
+
+      try {
+        hasFetchedDocuments.current = true;
+        lastFetchedPartNumber.current = partNumber;
+        const result = await fetchJobDocuments(partNumber);
+        if (!result.success) {
+          message.error(`Failed to fetch job documents: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error fetching job documents:', error);
+        message.error('Failed to fetch job documents');
+        // Reset on error so it can retry
+        hasFetchedDocuments.current = false;
+      }
+    };
     fetchDocumentsIfEmpty();
-  }, [jobDocuments, fetchJobDocuments, selectedJob]);
+  }, [selectedJob?.part_number, fetchJobDocuments]); // Remove jobDocuments from dependencies
+
+
+  useEffect(() => {
+    if (selectedJob?.part_number !== lastFetchedPartNumber.current) {
+      hasFetchedDocuments.current = false;
+    }
+  }, [selectedJob?.part_number]);
 
   // Fetch tools using production_order to get id from localStorage
   useEffect(() => {

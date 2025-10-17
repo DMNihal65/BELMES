@@ -84,7 +84,9 @@ const Workcenter = () => {
       item.make !== 'Default' &&
       item.model !== 'Default'
     );
-    setData(filtered);
+    // Sort by ID in ascending order
+    const sortedFiltered = filtered.sort((a, b) => a.id - b.id);
+    setData(sortedFiltered);
   }, [workcenters]);
 
   useEffect(() => {
@@ -186,10 +188,25 @@ const Workcenter = () => {
 
       console.log('Updating machine with data:', updatedItem);
 
-      await updateWorkcenter(updatedItem);
+      // Clear editing state first
       setEditingKey('');
+      
+      // Send update to server
+      await updateWorkcenter(updatedItem);
+      
+      // Update only the specific record in local state without changing order
+      setData(prevData => {
+        const updated = prevData.map(item => {
+          if (item.id === key) {
+            return { ...item, ...updatedItem };
+          }
+          return item;
+        });
+        // Sort by ID after update to maintain order
+        return updated.sort((a, b) => a.id - b.id);
+      });
+      
       toast.success('Machine updated successfully');
-      await fetchWorkcenters(); // Refresh the table data
     } catch (errInfo) {
       console.error('Save failed:', errInfo);
       toast.error(errInfo.message || 'Failed to update machine');
@@ -251,47 +268,6 @@ const Workcenter = () => {
   };
 
  const columns = [
-  // {
-  //   title: 'Sl.No',
-  //   dataIndex: 'work_center_id',
-  //   width: 120,
-  //   sorter: (a, b) => {
-    
-  //     const aId = a.work_center_id || '';
-  //     const bId = b.work_center_id || '';
-      
-      
-  //     const aNum = parseInt(aId);
-  //     const bNum = parseInt(bId);
-      
-  //     if (!isNaN(aNum) && !isNaN(bNum)) {
-  //       return aNum - bNum;
-  //     }
-      
-    
-  //     return String(aId).localeCompare(String(bId));
-  //   },
-  //   sortDirections: ['ascend', 'descend'],
-  //   defaultSortOrder: 'ascend',
-  //   render: (text) => text,
-  //   filters: [...new Set(data
-  //     .map(item => item.work_center_id)
-  //     .filter(Boolean)
-  //   )]
-  //   .sort((a, b) => {
-  //     const aNum = parseInt(a);
-  //     const bNum = parseInt(b);
-      
-  //     if (!isNaN(aNum) && !isNaN(bNum)) {
-  //       return aNum - bNum;
-  //     }
-  //     return String(a).localeCompare(String(b));
-  //   })
-  //   .map(id => ({ text: String(id), value: id })),
-  //   filterMode: 'menu',
-  //   filterSearch: true,
-  //   onFilter: (value, record) => {
-  //     if (!record.work_center_id) return false;
   {
     title: 'Workcenter Code',
     dataIndex: ['work_center', 'code'],
@@ -304,33 +280,12 @@ const Workcenter = () => {
     },
     sortDirections: ['ascend', 'descend'],
   },
-  {
+   {
     title: 'Operation Description',
     dataIndex: ['work_center', 'description'],
-    width: 250,
-    render: (text, record) => {
-      const editable = isEditing(record);
-      return editable ? (
-        <Form.Item
-          name="operation_description"
-          style={{ margin: 0 }}
-          initialValue={text}
-          rules={[{ required: true, message: 'Please enter Operation Description' }]}
-        >
-          <Input.TextArea autoSize={{ minRows: 1, maxRows: 4 }} />
-        </Form.Item>
-      ) : (
-        <span>{text || '-'}</span>
-      );
-    },
-    filterSearch: true,
-    filters: [...new Set(data.map(item => item.work_center?.description).filter(Boolean))].map(desc => ({
-      text: desc,
-      value: desc
-    })),
-    onFilter: (value, record) => record.work_center?.description === value,
-    sorter: (a, b) => (a.work_center?.description || '').localeCompare(b.work_center?.description || ''),
-    sortDirections: ['ascend', 'descend'],
+    width: 150,
+    render: (text) => text || '-',
+
   },
   {
     title: 'Machine Type',
@@ -617,27 +572,12 @@ const Workcenter = () => {
             >
               Edit
             </Button>
-            {/* <Button
-              type="link"
-              icon={<EyeOutlined />}
-              onClick={() => handleView(record)}
-              className="text-gray-600 hover:text-gray-700"
-            >
-              View
-            </Button> */}
             <Popconfirm
               title="Are you sure you want to delete this machine?"
               onConfirm={() => handleDelete(record)}
               okText="Yes"
               cancelText="No"
             >
-              {/* <Button
-            type="link"
-                icon={<DeleteOutlined />}
-                className="text-red-600 hover:text-red-700"
-              >
-                Delete
-              </Button> */}
             </Popconfirm>
           </Space>
         );
@@ -815,9 +755,6 @@ const Workcenter = () => {
     }
   };
 
-
-  
-
   const addWorkcenterForm = (
     <Form
       form={addForm}
@@ -887,23 +824,6 @@ const Workcenter = () => {
           showCount
         />
       </Form.Item>
-
-      {/* <Form.Item
-        name="operation"
-        label="Operation"
-        rules={[
-          { required: true, message: 'Please enter Operation' },
-          { whitespace: true, message: 'Operation cannot be empty' },
-          { max: 100, message: 'Operation cannot be longer than 100 characters' }
-        ]}
-      >
-        <Input.TextArea 
-          rows={2} 
-          placeholder="Enter Operation"
-          maxLength={100}
-          showCount
-        />
-      </Form.Item> */}
     </Form>
   );
 
@@ -932,7 +852,7 @@ const Workcenter = () => {
 
   const fetchWorkcenterOptions = async () => {
     try {
-      const response = await fetch('http://172.19.224.1:8002/api/v1/master-order/workcenters/?skip=0&limit=100');
+      const response = await fetch('http://172.18.7.91:8008/api/v1/master-order/workcenters/?skip=0&limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch workcenters');
       }
@@ -1108,15 +1028,6 @@ const Workcenter = () => {
           </div>
 
           <div className="flex justify-center gap-4 mt-4">
-            {/* <Button 
-              type="primary" 
-              size="large"
-              onClick={() => setMachineModalStep('existing_form')}
-              className="w-48"
-              icon={<PlusOutlined />}
-            >
-              Existing Machine
-            </Button> */}
             <Button 
               type="primary" 
               size="large"
@@ -1285,190 +1196,190 @@ const Workcenter = () => {
           </div>
 
           <Form
-  form={addMachineForm}
-  layout="vertical"
-  onFinish={handleAddMachine}
-  initialValues={{ work_center_id: selectedWorkcenterId }}
->
-  <Form.Item name="work_center_id" hidden>
-    <Input />
-  </Form.Item>
+            form={addMachineForm}
+            layout="vertical"
+            onFinish={handleAddMachine}
+            initialValues={{ work_center_id: selectedWorkcenterId }}
+          >
+            <Form.Item name="work_center_id" hidden>
+              <Input />
+            </Form.Item>
 
-  <div className="grid grid-cols-2 gap-4">
-    <Form.Item
-      name="machine_name"
-      label="Machine Type"
-      rules={[{ required: true, message: 'Please enter Machine Name' }]}
-    >
-      <Input placeholder="Enter Machine Name" />
-    </Form.Item>
+            <div className="grid grid-cols-2 gap-4">
+              <Form.Item
+                name="machine_name"
+                label="Machine Type"
+                rules={[{ required: true, message: 'Please enter Machine Name' }]}
+              >
+                <Input placeholder="Enter Machine Name" />
+              </Form.Item>
 
-    <Form.Item
-      name="make"
-      label="Machine Name"
-      rules={[{ required: true, message: 'Please enter Make' }]}
-    >
-      <Input placeholder="Enter Make" />
-    </Form.Item>
+              <Form.Item
+                name="make"
+                label="Machine Name"
+                rules={[{ required: true, message: 'Please enter Make' }]}
+              >
+                <Input placeholder="Enter Make" />
+              </Form.Item>
 
-    <Form.Item
-      name="model"
-      label="Model"
-      rules={[{ required: true, message: 'Please enter Model' }]}
-    >
-      <Input placeholder="Enter Model" />
-    </Form.Item>
+              <Form.Item
+                name="model"
+                label="Model"
+                rules={[{ required: true, message: 'Please enter Model' }]}
+              >
+                <Input placeholder="Enter Model" />
+              </Form.Item>
 
-    <Form.Item
-  name="year_of_installation"
-  label="Year of Installation"
-  rules={[{ required: true, message: 'Please select Year of Installation' }]}
->
-  <DatePicker 
-    picker="year" 
-    style={{ width: '100%' }}
-    format="YYYY"
-  />
-</Form.Item>
+              <Form.Item
+                name="year_of_installation"
+                label="Year of Installation"
+                rules={[{ required: true, message: 'Please select Year of Installation' }]}
+              >
+                <DatePicker 
+                  picker="year" 
+                  style={{ width: '100%' }}
+                  format="YYYY"
+                />
+              </Form.Item>
 
-    <Form.Item
-      name="cnc_controller"
-      label="CNC Controller"
-      rules={[{ required: true, message: 'Please enter CNC Controller' }]}
-    >
-      <Input placeholder="Enter CNC Controller" />
-    </Form.Item>
+              <Form.Item
+                name="cnc_controller"
+                label="CNC Controller"
+                rules={[{ required: true, message: 'Please enter CNC Controller' }]}
+              >
+                <Input placeholder="Enter CNC Controller" />
+              </Form.Item>
 
-    <Form.Item
-      name="cnc_controller_series"
-      label="Controller Series"
-      rules={[{ required: true, message: 'Please enter Controller Series' }]}
-    >
-      <Input placeholder="Enter Controller Series" />
-    </Form.Item>
+              <Form.Item
+                name="cnc_controller_series"
+                label="Controller Series"
+                rules={[{ required: true, message: 'Please enter Controller Series' }]}
+              >
+                <Input placeholder="Enter Controller Series" />
+              </Form.Item>
 
-    <Form.Item
-  name="calibration_date"
-  label="Calibration Date"
-  rules={[
-    { required: true, message: 'Please select Calibration Date' },
-    ({ getFieldValue }) => ({
-      validator(_, value) {
-        const installationDate = getFieldValue('year_of_installation');
-        if (!value || !installationDate) {
-          return Promise.resolve();
-        }
-        if (value.year() < installationDate.year()) {
-          return Promise.reject(new Error('Calibration Date cannot be before Installation Year'));
-        }
-        return Promise.resolve();
-      },
-    }),
-  ]}
->
-  <DatePicker 
-    style={{ width: '100%' }} 
-    disabledDate={(current) => {
-      const installationDate = addMachineForm.getFieldValue('year_of_installation');
-      return installationDate ? current && current.year() < installationDate.year() : false;
-    }}
-  />
-</Form.Item>
+              <Form.Item
+                name="calibration_date"
+                label="Calibration Date"
+                rules={[
+                  { required: true, message: 'Please select Calibration Date' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      const installationDate = getFieldValue('year_of_installation');
+                      if (!value || !installationDate) {
+                        return Promise.resolve();
+                      }
+                      if (value.year() < installationDate.year()) {
+                        return Promise.reject(new Error('Calibration Date cannot be before Installation Year'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <DatePicker 
+                  style={{ width: '100%' }} 
+                  disabledDate={(current) => {
+                    const installationDate = addMachineForm.getFieldValue('year_of_installation');
+                    return installationDate ? current && current.year() < installationDate.year() : false;
+                  }}
+                />
+              </Form.Item>
 
-<Form.Item
-  name="calibration_due_date"
-  label="Calibration Due Date"
-  rules={[
-    { required: true, message: 'Please select Calibration Due Date' },
-    ({ getFieldValue }) => ({
-      validator(_, value) {
-        const calibrationDate = getFieldValue('calibration_date');
-        if (!value || !calibrationDate) {
-          return Promise.resolve();
-        }
-        if (value.isBefore(calibrationDate, 'day')) {
-          return Promise.reject(new Error('Due Date cannot be before Calibration Date'));
-        }
-        return Promise.resolve();
-      },
-    }),
-  ]}
->
-  <DatePicker 
-    style={{ width: '100%' }} 
-    disabledDate={(current) => {
-      const calibrationDate = addMachineForm.getFieldValue('calibration_date');
-      return calibrationDate ? current && current.isBefore(calibrationDate, 'day') : false;
-    }}
-  />
-</Form.Item>
+              <Form.Item
+                name="calibration_due_date"
+                label="Calibration Due Date"
+                rules={[
+                  { required: true, message: 'Please select Calibration Due Date' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      const calibrationDate = getFieldValue('calibration_date');
+                      if (!value || !calibrationDate) {
+                        return Promise.resolve();
+                      }
+                      if (value.isBefore(calibrationDate, 'day')) {
+                        return Promise.reject(new Error('Due Date cannot be before Calibration Date'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <DatePicker 
+                  style={{ width: '100%' }} 
+                  disabledDate={(current) => {
+                    const calibrationDate = addMachineForm.getFieldValue('calibration_date');
+                    return calibrationDate ? current && current.isBefore(calibrationDate, 'day') : false;
+                  }}
+                />
+              </Form.Item>
 
-<Form.Item
-  name="last_maintenance_date"
-  label="Last PM Date"
-  rules={[
-    { required: true, message: 'Please select Last PM Date' },
-    ({ getFieldValue }) => ({
-      validator(_, value) {
-        const installationDate = getFieldValue('year_of_installation');
-        if (!value || !installationDate) {
-          return Promise.resolve();
-        }
-        if (value.year() < installationDate.year()) {
-          return Promise.reject(new Error('Last PM Date cannot be before Installation Year'));
-        }
-        return Promise.resolve();
-      },
-    }),
-  ]}
->
-  <DatePicker 
-    style={{ width: '100%' }} 
-    disabledDate={(current) => {
-      const installationDate = addMachineForm.getFieldValue('year_of_installation');
-      return installationDate ? current && current.year() < installationDate.year() : false;
-    }}
-  />
-</Form.Item>
+              <Form.Item
+                name="last_maintenance_date"
+                label="Last PM Date"
+                rules={[
+                  { required: true, message: 'Please select Last PM Date' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      const installationDate = getFieldValue('year_of_installation');
+                      if (!value || !installationDate) {
+                        return Promise.resolve();
+                      }
+                      if (value.year() < installationDate.year()) {
+                        return Promise.reject(new Error('Last PM Date cannot be before Installation Year'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <DatePicker 
+                  style={{ width: '100%' }} 
+                  disabledDate={(current) => {
+                    const installationDate = addMachineForm.getFieldValue('year_of_installation');
+                    return installationDate ? current && current.year() < installationDate.year() : false;
+                  }}
+                />
+              </Form.Item>
 
-<Form.Item
-  name="pm_due_date"
-  label="PM Due Date"
-  rules={[
-    { required: true, message: 'Please select PM Due Date' },
-    ({ getFieldValue }) => ({
-      validator(_, value) {
-        const installationDate = getFieldValue('year_of_installation');
-        if (!value || !installationDate) {
-          return Promise.resolve();
-        }
-        if (value.year() < installationDate.year()) {
-          return Promise.reject(new Error('PM Due Date cannot be before Installation Year'));
-        }
-        return Promise.resolve();
-      },
-    }),
-  ]}
->
-  <DatePicker 
-    style={{ width: '100%' }} 
-    disabledDate={(current) => {
-      const installationDate = addMachineForm.getFieldValue('year_of_installation');
-      return installationDate ? current && current.year() < installationDate.year() : false;
-    }}
-  />
-</Form.Item>
-    <Form.Item
-      name="remarks"
-      label="Remarks"
-      className="col-span-2"
-      rules={[{ required: true, message: 'Please Enter Remarks or any other Related information' }]}
-    >
-      <Input.TextArea rows={2} placeholder="Enter Remarks" />
-    </Form.Item>
-  </div>
-</Form>
+              <Form.Item
+                name="pm_due_date"
+                label="PM Due Date"
+                rules={[
+                  { required: true, message: 'Please select PM Due Date' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      const installationDate = getFieldValue('year_of_installation');
+                      if (!value || !installationDate) {
+                        return Promise.resolve();
+                      }
+                      if (value.year() < installationDate.year()) {
+                        return Promise.reject(new Error('PM Due Date cannot be before Installation Year'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <DatePicker 
+                  style={{ width: '100%' }} 
+                  disabledDate={(current) => {
+                    const installationDate = addMachineForm.getFieldValue('year_of_installation');
+                    return installationDate ? current && current.year() < installationDate.year() : false;
+                  }}
+                />
+              </Form.Item>
 
+              <Form.Item
+                name="remarks"
+                label="Remarks"
+                className="col-span-2"
+                rules={[{ required: true, message: 'Please Enter Remarks or any other Related information' }]}
+              >
+                <Input.TextArea rows={2} placeholder="Enter Remarks" />
+              </Form.Item>
+            </div>
+          </Form>
 
           <div className="flex justify-between mt-4">
             <Button 
@@ -1508,9 +1419,6 @@ const Workcenter = () => {
       setMachines([]);
     }
   };
-
-
-  
 
   useEffect(() => {
     if (machineModalStep === 'existing_form') {
@@ -1585,7 +1493,7 @@ const Workcenter = () => {
       await updateWorkcenterSchedulable(record.id, record.is_schedulable);
       
       // Then update the workcenter details
-      const response = await fetch(`http://172.19.224.1:8002/api/v1/master-order/workcenters/${record.id}`, {
+      const response = await fetch(`http://172.18.7.91:8008/api/v1/master-order/workcenters/${record.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1619,12 +1527,6 @@ const Workcenter = () => {
   };
 
   const configColumns = [
-    // {
-    //   title: 'ID',
-    //   dataIndex: 'id',
-    //   width: 80,
-    //   sorter: (a, b) => a.id - b.id,
-    // },
     {
       title: 'work centre Name',
       dataIndex: 'code',
@@ -1653,11 +1555,6 @@ const Workcenter = () => {
         );
       },
     },
-    // {
-    //   title: 'work centre Name',
-    //   dataIndex: 'work_center_name',
-    //   width: 150,
-    // },
     {
       title: 'Operation Description',
       dataIndex: 'description',
@@ -1821,14 +1718,6 @@ const Workcenter = () => {
               </div>
             </div>
             <div className="flex gap-3">
-              {/* <Input.Search
-                placeholder="Search workcenters..."
-                size="middle"
-                value={searchText}
-                onChange={(e) => handleSearch(e.target.value)}
-                style={{ width: 250 }}
-                allowClear
-              /> */}
               <Button 
                 type="primary"
                 icon={<PlusOutlined />}
@@ -1869,7 +1758,7 @@ const Workcenter = () => {
                         }
                         loading={isLoading}
                         pagination={{ pageSize: 10 }}
-scroll={{ x: 'max-content' }}
+                        scroll={{ x: 'max-content' }}
                       />
                     </Form>
                   </div>

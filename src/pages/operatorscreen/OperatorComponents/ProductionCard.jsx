@@ -59,7 +59,7 @@ const ProductionCard = () => {
     
     // Make API call to fetch start date
     const response = await fetch(
-      `http://172.19.224.1:8002/api/v1/scheduling/part-schedule-start-date/${encodeURIComponent(production_order)}/${encodeURIComponent(part_number)}`,
+      `http://172.18.7.91:8008/api/v1/scheduling/part-schedule-start-date/${encodeURIComponent(production_order)}/${encodeURIComponent(part_number)}`,
       {
         method: 'GET',
         headers: {

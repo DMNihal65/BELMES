@@ -127,7 +127,7 @@ const DynamicSchedulingGraph = () => {
   // Add new function to fetch part details
   const fetchPartDetails = async () => {
     try {
-      const response = await axios.get('http://172.19.224.1:8002/api/v1/planning/all_orders');
+      const response = await axios.get('http://172.18.7.91:8008/api/v1/planning/all_orders');
       setPartDetails(response.data);
     } catch (err) {
       console.error('Error fetching part details:', err);

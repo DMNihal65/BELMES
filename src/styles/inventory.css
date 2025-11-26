@@ -1,0 +1,112 @@
+/* Add these styles to your CSS file */
+.inventory-card {
+  @apply bg-white rounded-lg shadow-md;
+}
+
+.inventory-title {
+  @apply text-xl font-semibold text-gray-800 mb-4;
+}
+
+.action-button {
+  @apply px-4 py-2 rounded-md transition-all duration-200;
+}
+
+.primary-button {
+  @apply bg-blue-500 text-white hover:bg-blue-600 action-button;
+}
+
+.secondary-button {
+  @apply bg-gray-100 text-gray-700 hover:bg-gray-200 action-button;
+}
+
+.upload-button {
+  @apply bg-green-500 text-white hover:bg-green-600 action-button;
+}
+
+.download-button {
+  @apply bg-purple-500 text-white hover:bg-purple-600 action-button;
+}
+
+.ant-table {
+  @apply shadow-sm;
+}
+
+.ant-table-thead > tr > th {
+  @apply bg-gray-50 text-gray-700 font-semibold;
+}
+
+.status-available {
+  @apply px-2 py-1 rounded-full bg-green-100 text-green-800 text-sm;
+}
+
+.status-in-use {
+  @apply px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm;
+}
+
+/* Tab styles */
+.custom-tabs .ant-tabs-nav {
+  margin-bottom: 24px;
+}
+
+.custom-tabs .ant-tabs-tab {
+  padding: 12px 24px;
+  transition: all 0.3s;
+  border-radius: 8px 8px 0 0;
+  margin-right: 4px;
+}
+
+.custom-tabs .ant-tabs-tab-active {
+  background-color: #1890ff !important;
+}
+
+.custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: white !important;
+}
+
+.custom-tabs .ant-tabs-tab:hover {
+  background-color: #e6f7ff;
+}
+
+.custom-tabs .ant-tabs-tab-btn {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Card styles */
+.ant-card {
+  border-radius: 12px;
+}
+
+.ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px;
+}
+
+.ant-card-head-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Dashboard title */
+.dashboard-title {
+  color: #1f2937;
+  margin-bottom: 0;
+}
+
+/* Content area */
+.content-area {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .custom-tabs .ant-tabs-tab {
+    padding: 8px 16px;
+  }
+
+  .custom-tabs .ant-tabs-tab-btn {
+    font-size: 14px;
+  }
+} 

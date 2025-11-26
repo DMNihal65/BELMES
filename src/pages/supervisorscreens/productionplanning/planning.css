@@ -1,0 +1,126 @@
+.statistic-card {
+  transition: all 0.3s ease;
+  border-radius: 8px;
+}
+
+.statistic-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.job-list-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.job-list-card .ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px;
+  background: #fafafa;
+  border-radius: 8px 8px 0 0;
+}
+
+.operation-card {
+  margin: 0 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.operation-card .ant-card-head {
+  background: #f8fafc;
+  border-radius: 8px 8px 0 0;
+}
+
+/* Table Styles */
+:global(.ant-table) {
+  border-radius: 8px;
+}
+
+:global(.ant-table-thead > tr > th) {
+  background: #f8fafc !important;
+  padding: 16px 12px !important;
+}
+
+:global(.ant-table-tbody > tr > td) {
+  padding: 12px !important;
+}
+
+:global(.ant-table-row-expand-icon-cell) {
+  width: 48px;
+}
+
+:global(.ant-table-expanded-row > td) {
+  background: #fafafa !important;
+}
+
+/* Progress Bar */
+:global(.ant-progress-line) {
+  margin: 0 !important;
+}
+
+/* Tags */
+:global(.ant-tag) {
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-weight: 500;
+}
+
+/* Buttons */
+:global(.ant-btn) {
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Search */
+:global(.ant-input-search) {
+  border-radius: 6px;
+}
+
+:global(.ant-input-search .ant-input) {
+  border-radius: 6px 0 0 6px;
+}
+
+:global(.ant-input-search .ant-input-group-addon .ant-btn) {
+  border-radius: 0 6px 6px 0;
+}
+
+/* Drawer */
+:global(.ant-drawer-content) {
+  border-radius: 8px 0 0 8px;
+}
+
+:global(.ant-drawer-header) {
+  padding: 16px 24px;
+  background: #fafafa;
+}
+
+/* Form */
+:global(.ant-form-item) {
+  margin-bottom: 16px;
+}
+
+:global(.ant-input),
+:global(.ant-input-number),
+:global(.ant-select-selector),
+:global(.ant-picker) {
+  border-radius: 6px !important;
+}
+
+:global(.ant-input-number-handler-wrap) {
+  border-radius: 0 6px 6px 0;
+}
+
+/* Upload */
+:global(.ant-upload-list-picture-card-container) {
+  width: 104px;
+  height: 104px;
+  margin: 0 8px 8px 0;
+}
+
+:global(.ant-upload.ant-upload-select-picture-card) {
+  width: 104px;
+  height: 104px;
+  border-radius: 8px;
+}

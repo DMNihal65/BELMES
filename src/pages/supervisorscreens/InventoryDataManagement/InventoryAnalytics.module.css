@@ -1,0 +1,9 @@
+:global(.custom-tabs .ant-tabs-tab.ant-tabs-tab-active) {
+    background-color: #EBF8FF !important;
+    border-radius: 4px;
+}
+
+:global(.custom-tabs .ant-tabs-tab:hover) {
+    background-color: #F0F9FF !important;
+    border-radius: 4px;
+} 

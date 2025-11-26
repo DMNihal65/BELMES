@@ -1,0 +1,52 @@
+.editable-row > td {
+  padding: 12px !important;
+  transition: background 0.3s;
+}
+
+.editable-row:hover > td {
+  background: #fafafa;
+}
+
+.editable-row .ant-form-item {
+  margin: 0 !important;
+}
+
+:global(.ant-table-cell .ant-tag) {
+  margin: 2px;
+  border-radius: 4px;
+}
+
+:global(.ant-table-thead > tr > th) {
+  background: #f8fafc !important;
+  font-weight: 600;
+  padding: 16px 12px !important;
+}
+
+:global(.ant-table-tbody > tr > td) {
+  vertical-align: middle;
+}
+
+:global(.ant-select-selector) {
+  border-radius: 6px !important;
+}
+
+:global(.ant-picker) {
+  width: 100%;
+  border-radius: 6px !important;
+}
+
+:global(.ant-input-number) {
+  border-radius: 6px !important;
+}
+
+:global(.ant-input) {
+  border-radius: 6px !important;
+}
+
+:global(.ant-btn) {
+  border-radius: 6px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}

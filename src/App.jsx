@@ -1,0 +1,204 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
+import ProtectedRoute from './components/ProtectedRoute';
+import MainLayout from './components/layout/MainLayout';
+import Login from './pages/auth/Login';
+import SupervisorDashboard from './pages/supervisorscreens/dashboard';
+import OperatorDashboard from './pages/operatorscreens/dashboard';
+import OrderDashboard from './pages/supervisorscreens/ordermanagement/orderdashboard';
+import WorkcenterDashboard from './pages/supervisorscreens/configuration/WorkcenterDashboard';
+import Maintenance from './pages/supervisorscreens/MachineMaintenance/MaintenanceDashboard';
+import Planning from './pages/supervisorscreens/productionplanning/planning';
+import Scheduling from './pages/supervisorscreens/productionplanning/scheduling';
+import CapacityPlanning from './components/ProductionPlanning/CapacityPlanning';
+import ProductionMonitoring from './pages/supervisorscreens/ProductionMon';
+import MachineMaintenance from './pages/supervisorscreens/MachineMaintenance/MachineMaintenance';
+import DocumentManagement from './pages/supervisorscreens/DocumentManagement';
+import RequestsCalibrationHistory from './pages/supervisorscreens/inventory/requestsCalibrationHistory';
+import DataManagement from './pages/supervisorscreens/InventoryDataManagement/DataManagement';
+import InventoryAllData from './pages/supervisorscreens/InventoryDataManagement/InventoryAllData';
+import InventoryAnalytics from './pages/supervisorscreens/InventoryDataManagement/InventoryAnalytics';
+import JobDetails from './pages/operatorscreens/jobdetails';
+// import Inventory from './pages/operatorscreens/inventory/inventoryRequest';
+import Inventory from './pages/operatorscreens/inventory/InventoryViewData';
+import HelpAndSupport from './pages/operatorscreens/HelpAndSupport';
+import QualityManagementDashboard from './pages/supervisorscreens/qualitymanagement';
+import AlertScreens from './pages/operatorscreens/AlertScreens';
+import MaintenanceDashboard from './pages/operatorscreens/maintanance/MaintenanceDashboard';
+import InspectionResult from './pages/operatorscreens/Inspection/InspectionResult';
+import InventoryHistory from './pages/operatorscreens/inventory/InventoryHistory';
+import EnergyMonitoring from './pages/supervisorscreens/EnergyMonitoring/EnergyMonitoring';
+import MachineDetails from './pages/supervisorscreens/EnergyMonitoring/MachineDetails';
+// import Notifications from './pages/supervisorscreens/Notifications';
+import NotificationsNew from './pages/supervisorscreens/NotificationsNew';
+import MaintenanceNotifications from './pages/supervisorscreens/MachineMaintenance/Notifications';
+
+import Machines from './pages/supervisorscreens/EnergyMonitoring/Machines';
+import MachinesVisualization from './pages/supervisorscreens/EnergyMonitoringBEL/Machines';
+import MachineOverlay from './pages/supervisorscreens/EnergyMonitoring/MachineOverlay';
+import Report from './pages/supervisorscreens/EnergyMonitoring/Report';
+import Reportnew from './pages/supervisorscreens/EnergyMonitoringBEL/Reportnew';
+
+import InspectionReport from './pages/supervisorscreens/QualityManagement/InspectionReport';
+
+import QualityInspectionDetails from './pages/supervisorscreens/QualityManagement/QualityInspectionDetails';
+import LogsDashboard from './pages/supervisorscreens/Logs_new/LogsDashboard';
+import PokaYokeDashboard from './pages/supervisorscreens/PokaYoke/PokaYokeDashboard';
+
+import RegisterNewUser from './pages/adminscreens/userManagement/RegisterNewuser';
+import MachinePasswordManagement from './pages/adminscreens/machineManagement/MachinePasswordManagement'
+import UserManagement from './pages/adminscreens/userManagement/userManagement';
+import AccessControlManagement from './pages/adminscreens/AccessControlManagement';
+import NewOperatorDashboard from './pages/operatorscreen/NewOperatorDashboard';
+
+const App = () => {
+
+  console.log("Deployed on 20-08-2025")
+  return (
+    <ConfigProvider>
+      {/* basename="/belmes" this should be added in the deployment mode ISNIDE BROWSER ROUTER*/}
+      <BrowserRouter basename="/belmes"  >
+        <Routes>
+          <Route path="/login" element={<Login />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="dashboard" element={<SupervisorDashboard />} />
+            <Route path="order-management" element={<OrderDashboard />} />
+            <Route path="configuration" element={<WorkcenterDashboard />} />
+            <Route path="maintenance" element={<Maintenance />} />
+            <Route path="production-planning/planning" element={<Planning />} />
+            <Route path="production-planning/scheduling" element={<Scheduling />} />
+            <Route path="production-planning/capacity_planning" element={<CapacityPlanning />} />
+
+            <Route path="production-monitoring/dashboard" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/production-vs-actual" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-analysis" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/oee-overview" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-tracking" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/analytics" element={<ProductionMonitoring />} />
+
+            <Route path="machine_availability" element={<MachineMaintenance />}/> 
+            <Route path="documents" element={<DocumentManagement />} />
+            <Route path="quality-management" element={<QualityManagementDashboard />} />
+            <Route path="inventory_master/requests_calibration_history" element={<RequestsCalibrationHistory />} />
+            <Route path="inventory_data_management/data_management" element={<DataManagement />} />
+            <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
+            <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
+            <Route path="energy-monitoring" element={<EnergyMonitoring />} />
+            <Route path="energy-monitoring-bel" element={<MachinesVisualization />} />
+            <Route path="energy-monitoring-bel/machines" element={<Machines />} />
+            <Route path="energy-monitoring-bel/report" element={<Reportnew />} />
+
+            <Route path="quality-management/inspection-details" element={<QualityInspectionDetails />} />
+
+            <Route path="quality-management/inspection-report" element={<InspectionReport />} />
+            <Route path="logs" element={<LogsDashboard />} />
+            <Route path="pokayoke" element={<PokaYokeDashboard />} />
+            {/* <Route path="notifications" element={<Notifications />} /> */}
+            <Route path="notifications_new" element={<NotificationsNew />} />
+            <Route path="access_control_management" element={<AccessControlManagement />} />
+            <Route path="access_control_management/user_management" element={<UserManagement />} />
+            <Route path="access_control_management/machine_password_management" element={<MachinePasswordManagement />} />
+          </Route>
+          
+          {/* Supervisor Routes */}
+          <Route path="/supervisor" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="dashboard" element={<SupervisorDashboard />} />
+            <Route path="order-management" element={<OrderDashboard />} />
+            <Route path="configuration" element={<WorkcenterDashboard />} />
+            <Route path="maintenance" element={<Maintenance />} />
+            <Route path="production-planning/planning" element={<Planning />} />
+            <Route path="production-planning/scheduling" element={<Scheduling />} />
+            <Route path="production-planning/capacity_planning" element={<CapacityPlanning />} />
+
+            <Route path="production-monitoring/dashboard" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/production-vs-actual" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-analysis" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/oee-overview" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/analytics" element={<ProductionMonitoring />} />
+            <Route path="production-monitoring/order-tracking" element={<ProductionMonitoring />} />
+
+            <Route path="machine_availability" element={<MachineMaintenance />}/> 
+            <Route path="documents" element={<DocumentManagement />} />
+            <Route path="quality-management" element={<QualityManagementDashboard />} />
+            <Route path="inventory_master/requests_calibration_history" element={<RequestsCalibrationHistory />} />
+            <Route path="inventory_data_management/data_management" element={<DataManagement />} />
+            <Route path="inventory_data_management/inventory_all_data" element={<InventoryAllData />} />
+            <Route path="inventory_data_management/inventory_analytics" element={<InventoryAnalytics />} />
+            {/* <Route path="energy-monitoring" element={<EnergyMonitoring />} /> */}
+            <Route path="energy-monitoring-bel" element={<MachinesVisualization />} />
+            {/* <Route path="energy-monitoring-bel/machines" element={<Machines />} /> */}
+            <Route path="energy-monitoring-bel/report" element={<Reportnew />} />
+
+            <Route path="quality-management/inspection-details" element={<QualityInspectionDetails />} />
+
+            <Route path="quality-management/inspection-report" element={<InspectionReport />} />
+            <Route path="logs" element={<LogsDashboard />} />
+            <Route path="pokayoke" element={<PokaYokeDashboard />} />
+            {/* <Route path="notifications" element={<Notifications />} /> */}
+            <Route path="notifications_new" element={<NotificationsNew />} />
+          </Route>
+
+          {/* Operator Routes */}
+          <Route path="/operator" element={
+            // <ProtectedRoute>
+              <MainLayout />
+            // </ProtectedRoute>
+          }>
+            <Route path="dashboard" element={<NewOperatorDashboard />} />
+            <Route path="alerts" element={<AlertScreens />} />
+            <Route path="maintenance" element={<MaintenanceDashboard />} />
+            <Route path="inspection" element={<InspectionResult />} />
+            <Route path="inventory" element={<Inventory />} />
+            <Route path="inventory/history" element={<InventoryHistory />} />
+            <Route path="help" element={<HelpAndSupport />} />
+          </Route>
+
+          {/* Shared Routes */}
+          {/* <Route path="/machine-details/:machineId" element={<MachineDetails />} /> */}
+          {/* <Route path="/machines" element={<Machines />} /> */}
+          {/* <Route path="/machine/:machineId" element={<MachineOverlay />} /> */}
+          {/* <Route path="/report" element={<Report />} /> */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </BrowserRouter>
+
+      <style jsx="true" global="true">{`
+        * {
+          font-family: 'CustomFont', system-ui, sans-serif;
+        }
+
+        /* Ant Design specific overrides */
+        .ant-btn,
+        .ant-input,
+        .ant-select,
+        .ant-modal-title,
+        .ant-tabs-tab,
+        .ant-menu-item,
+        .ant-dropdown-menu-item,
+        .ant-statistic-title,
+        .ant-statistic-content,
+        .ant-card-head-title,
+        .ant-tag,
+        .ant-badge,
+        .ant-divider,
+        .ant-modal-content,
+        .ant-space,
+        .ant-typography {
+          font-family: 'CustomFont', system-ui, sans-serif !important;
+        }
+      `}</style>
+    </ConfigProvider>
+  );
+};
+
+export default App;

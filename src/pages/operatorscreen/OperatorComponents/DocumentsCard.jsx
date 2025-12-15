@@ -8,8 +8,8 @@ import useInventoryStore from '../../../store/inventory-store';
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.18.100.67:4546";
-const MPP_API_BASE_URL = "http://172.18.100.67:4546";
+const API_BASE_URL = "http://172.16.0.203:8002";
+const MPP_API_BASE_URL = "http://172.16.0.203:8002";
 
 const DocumentsCard = () => {
   const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials, fetchJobDocuments, selectJob } = useOperatorStore();

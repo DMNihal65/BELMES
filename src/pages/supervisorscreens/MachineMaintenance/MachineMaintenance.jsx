@@ -59,7 +59,7 @@ export default function MachineMaintenance() {
   const fetchShiftHours = async () => {
     try {
       setLoadingShift(true);
-      const response = await fetch('http://172.18.100.67:4546/api/v1/planning/shift-hours');
+      const response = await fetch('http://172.16.0.203:8002/api/v1/planning/shift-hours');
       if (!response.ok) throw new Error('Failed to fetch shift hours');
       const data = await response.json();
 
@@ -99,7 +99,7 @@ export default function MachineMaintenance() {
       let newRecord;
       if (existing?.id) {
         // Update existing
-        const res = await fetch(`http://172.18.100.67:4546/api/v1/planning/shift-hours/${existing.id}`, {
+        const res = await fetch(`http://172.16.0.203:8002/api/v1/planning/shift-hours/${existing.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -158,7 +158,7 @@ export default function MachineMaintenance() {
   const fetchAssetLogs = async () => {
     try {
       setLogsLoading(true);
-      const response = await fetch('http://172.18.100.67:4546/api/v1/newlogs/asset-logs');
+      const response = await fetch('http://172.16.0.203:8002/api/v1/newlogs/asset-logs');
       if (!response.ok) throw new Error('Failed to fetch asset logs');
       const data = await response.json();
       setAssetLogs(Array.isArray(data) ? data : []);
@@ -245,7 +245,7 @@ export default function MachineMaintenance() {
             status: newStatusId === '1' ? 'ON' : 'OFF',
             remarks: newDesc
           };
-          const resp = await fetch('http://172.18.100.67:4546/api/v1/newlogs/asset-logs', {
+          const resp = await fetch('http://172.16.0.203:8002/api/v1/newlogs/asset-logs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -781,7 +781,7 @@ export default function MachineMaintenance() {
 const WorkingHoursContent = (
   <>
     <div className="mb-4 flex justify-between items-center">
-      <Title level={3}>Shift Hours Configuration</Title>
+      <Title level={3}>Shift Configuration</Title>
       <Button
         onClick={fetchShiftHours}
         loading={loadingShift}

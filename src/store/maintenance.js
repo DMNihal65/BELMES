@@ -3,9 +3,9 @@ import { create } from 'zustand';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
 
-const SUPERVISOR_BASE_URL = 'http://172.18.100.67:4546/api/v1/maintainance';
-const OPERATOR_BASE_URL = 'http://172.18.100.67:4546/api/v1/operator';
-const MASTER_ORDER_URL = 'http://172.18.100.67:4546/api/v1/master-order';
+const SUPERVISOR_BASE_URL = 'http://172.16.0.203:8002/api/v1/maintainance';
+const OPERATOR_BASE_URL = 'http://172.16.0.203:8002/api/v1/operator';
+const MASTER_ORDER_URL = 'http://172.16.0.203:8002/api/v1/master-order';
 
 // Helper function to sort notifications by date
 const sortNotifications = (notifications) => {
@@ -414,7 +414,7 @@ fetchAllMachines: async () => {
 
   try {
 
-    const response = await axios.get('http://172.18.100.67:4546/api/v1/master-order/all-machines/');
+    const response = await axios.get('http://172.16.0.203:8002/api/v1/master-order/all-machines/');
 
     set({ loading: false });
 
@@ -430,7 +430,7 @@ fetchAllMachines: async () => {
 fetchMachineCalibrationLogs: async (skip = 0) => {
   set({ loading: true, error: null });
   try {
-    const response = await axios.get(`http://172.18.100.67:4546/api/v1/newlogs/machine-calibration-logs?skip=${skip}`);
+    const response = await axios.get(`http://172.16.0.203:8002/api/v1/newlogs/machine-calibration-logs?skip=${skip}`);
     set({
       machineCalibrationLogs: response.data,
       totalMachineCalibrationLogs: response.data.length,

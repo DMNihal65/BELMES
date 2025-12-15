@@ -4,7 +4,7 @@ class QualityStore {
   constructor() {
     // Create axios instance with better configuration
     this.api = axios.create({
-      baseURL: 'http://172.18.100.67:4546/api/v1',
+      baseURL: 'http://172.16.0.203:8002/api/v1',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
@@ -216,7 +216,7 @@ class QualityStore {
       }
       
       // Create URL with production order and operation_no as a query parameter
-      const baseUrl = 'http://172.18.100.67:4546/api/v1/document-management/report/generate-consolidated';
+      const baseUrl = 'http://172.16.0.203:8002/api/v1/document-management/report/generate-consolidated';
       const url = new URL(`${baseUrl}/${productionOrder}`);
       url.searchParams.append('operation_no', opNo);
       

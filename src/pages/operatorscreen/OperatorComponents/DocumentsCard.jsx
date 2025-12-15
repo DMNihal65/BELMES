@@ -8,8 +8,8 @@ import useInventoryStore from '../../../store/inventory-store';
 const { TabPane } = Tabs;
 
 // API endpoints for document downloads
-const API_BASE_URL = "http://172.18.7.91:8008";
-const MPP_API_BASE_URL = "http://172.18.7.91:8008";
+const API_BASE_URL = "http://172.16.0.203:8002";
+const MPP_API_BASE_URL = "http://172.16.0.203:8002";
 
 const DocumentsCard = () => {
   const { jobDocuments, selectedJob, isLoadingJobs, rawMaterials, isLoadingRawMaterials, fetchRawMaterials, fetchJobDocuments, selectJob } = useOperatorStore();
@@ -83,11 +83,12 @@ const DocumentsCard = () => {
         lastFetchedPartNumber.current = partNumber;
         const result = await fetchJobDocuments(partNumber);
         if (!result.success) {
-          message.error(`Failed to fetch job documents: ${result.error}`);
+          // message.error(`Failed to fetch job documents: ${result.error}`);
+          console.error(`Failed to fetch job documents: ${result.error}`);
         }
       } catch (error) {
         console.error('Error fetching job documents:', error);
-        message.error('Failed to fetch job documents');
+        // message.error('Failed to fetch job documents');
         // Reset on error so it can retry
         hasFetchedDocuments.current = false;
       }

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Tag, Badge, Button, Space, Tooltip, Modal, message, Switch, Spin } from 'antd';
-import { EyeOutlined, MenuOutlined, SwapOutlined, SwapRightOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Table, Button, Space, Modal, message, Switch, Spin } from 'antd';
+import { MenuOutlined, SwapOutlined } from '@ant-design/icons';
 import {
   DndContext,
   closestCenter,
@@ -10,12 +10,9 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
-  useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import useOrderStore from '../../store/order-store';
 import Row from './Row';
 
@@ -28,17 +25,22 @@ const ReorderableTable = ({ orders = [] }) => {
     position1: null,
     position2: null
   });
-  const [showScheduled, setShowScheduled] = useState(true); // Set to true by default
+  
+  // --- NEW STATE: Toggle to show all rows ---
+  const [showAllRows, setShowAllRows] = useState(false);
+  
+  const [showScheduled, setShowScheduled] = useState(true);
   const [scheduledOrders, setScheduledOrders] = useState([]);
   const [isLoadingScheduled, setIsLoadingScheduled] = useState(false);
-  const [showHighPriority, setShowHighPriority] = useState(false);
+  const [showHighPriority, setShowHighPriority] = useState(true);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
   });
+  
   const { swapOrderPriority, fetchScheduledOrders } = useOrderStore();
 
-  // Fetch scheduled orders when the component mounts or when showScheduled changes
+  // Fetch scheduled orders
   useEffect(() => {
     const loadScheduledOrders = async () => {
       try {
@@ -48,7 +50,6 @@ const ReorderableTable = ({ orders = [] }) => {
           console.log('Fetched scheduled orders:', scheduled);
           setScheduledOrders(scheduled);
         } else {
-          // Reset scheduled orders when toggle is off
           setScheduledOrders([]);
         }
       } catch (error) {
@@ -62,7 +63,7 @@ const ReorderableTable = ({ orders = [] }) => {
     loadScheduledOrders();
   }, [fetchScheduledOrders, showScheduled]);
 
-  // Filter and sort orders based on the toggle state
+  // Filter and sort orders
   useEffect(() => {
     if (!Array.isArray(orders)) return;
 
@@ -71,40 +72,34 @@ const ReorderableTable = ({ orders = [] }) => {
     // If showing scheduled orders
     if (showScheduled) {
       if (scheduledOrders.length > 0) {
-        // Create a set of scheduled production order numbers for quick lookup
         const scheduledOrderNumbers = new Set(
           scheduledOrders
             .map(order => order.production_order?.toString())
-            .filter(Boolean) // Remove any undefined/null values
+            .filter(Boolean)
         );
         
-        console.log('Scheduled order numbers:', Array.from(scheduledOrderNumbers));
-        
-        // Filter orders to only include those that are in the scheduled orders list
         filteredOrders = filteredOrders.filter(order => {
           const orderNumber = order.production_order?.toString() || order.id?.toString();
           return scheduledOrderNumbers.has(orderNumber);
         });
-        
-        console.log('Filtered orders:', filteredOrders);
       } else {
         filteredOrders = [];
       }
     }
     
-    // First sort by priority
+    // Sort by priority
     let sortedAndFiltered = [...filteredOrders].sort((a, b) => {
       const priorityA = a.project?.priority || a.priority || 999;
       const priorityB = b.project?.priority || b.priority || 999;
       return priorityA - priorityB;
     });
 
-    // If high priority is enabled, show only first 15 orders after sorting
+    // If high priority is enabled
     if (showHighPriority && showScheduled) {
       sortedAndFiltered = sortedAndFiltered.slice(0, 15);
     }
 
-    // Reset pagination to first page when switching between scheduled/all orders
+    // Reset pagination when data changes significantly
     setPagination(prev => ({
       ...prev,
       current: 1
@@ -183,10 +178,8 @@ const ReorderableTable = ({ orders = [] }) => {
       key: 'project',
       width: 200,
       render: (_, record, index) => {
-        const currentPage = pagination.current;
-        const pageSize = pagination.pageSize;
-        const continuousIndex = ((currentPage - 1) * pageSize) + index + 1;
-        const priority = showScheduled ? continuousIndex : (record.project?.priority || record.priority);
+        // Always use the actual priority from the order data, not the row index
+        const priority = record.project?.priority || record.priority || record.project_priority;
         const priorityLabel = priority ? `Priority ${priority}` : 'N/A';
         
         return (
@@ -211,18 +204,6 @@ const ReorderableTable = ({ orders = [] }) => {
         );
       },
     },
-    // {
-    //   title: 'Status',
-    //   dataIndex: 'status',
-    //   key: 'status',
-    //   width: 120,
-    //   render: (status) => (
-    //     <div className="flex items-center">
-    //       <span className="mr-2">•</span>
-    //       <span>PENDING</span>
-    //     </div>
-    //   ),
-    // }
   ];
 
   const getPriorityBackgroundColor = (priority) => {
@@ -248,7 +229,6 @@ const ReorderableTable = ({ orders = [] }) => {
   };
 
   const getPriorityBorderColor = (priority) => {
-    // Using text color for border for consistency and good contrast
     return getPriorityTextColor(priority);
   };
 
@@ -276,12 +256,10 @@ const ReorderableTable = ({ orders = [] }) => {
     try {
       const { order1, order2, position1, position2 } = swapConfirmation;
       
-      // Create a new array by removing the dragged item and inserting it at the new position
       let newOrders = [...localOrders];
       const [draggedItem] = newOrders.splice(position1 - 1, 1);
       newOrders.splice(position2 - 1, 0, draggedItem);
 
-      // Update priorities based on new positions
       newOrders = newOrders.map((order, index) => {
         return {
           ...order,
@@ -293,10 +271,8 @@ const ReorderableTable = ({ orders = [] }) => {
         };
       });
 
-      // Update the local state first for immediate UI feedback
       setLocalOrders(newOrders);
 
-      // Then try to update the backend
       try {
         await swapOrderPriority(
           order1.production_order,
@@ -306,7 +282,6 @@ const ReorderableTable = ({ orders = [] }) => {
         );
         message.success('Orders reordered successfully');
       } catch (error) {
-        // If backend update fails, keep the UI change but show error
         message.warning('Order display updated locally only. Server sync failed: ' + error.message);
       }
     } catch (error) {
@@ -314,6 +289,47 @@ const ReorderableTable = ({ orders = [] }) => {
     } finally {
       setSwapConfirmation({ visible: false, order1: null, order2: null, position1: null, position2: null });
     }
+  };
+
+  // Pagination Configuration Object
+  const paginationConfig = {
+    ...pagination,
+    style: { 
+      margin: '8px 0',
+      fontSize: '10px'
+    },
+    showSizeChanger: true,
+    showQuickJumper: true,
+    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} orders`,
+    pageSizeOptions: ['10', '20', '50', '100'],
+    position: ['bottomCenter'],
+    size: 'default',
+    className: 'priority-pagination',
+    style: {
+      marginTop: '16px',
+      padding: '8px 0',
+      fontSize: '14px',
+      minHeight: '48px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    onShowSizeChange: (current, size) => {
+      setPagination({
+        ...pagination,
+        current: 1,
+        pageSize: size,
+      });
+    },
+    onChange: (page, pageSize) => {
+      setPagination({
+        ...pagination,
+        current: page,
+        pageSize: pageSize,
+      });
+    },
+    size: 'small',
+    showQuickJumper: false
   };
 
   return (
@@ -327,7 +343,6 @@ const ReorderableTable = ({ orders = [] }) => {
           padding: 8px 0 !important;
           min-height: 48px !important;
         }
-        
         .priority-pagination .ant-pagination-item,
         .priority-pagination .ant-pagination-prev,
         .priority-pagination .ant-pagination-next,
@@ -339,22 +354,20 @@ const ReorderableTable = ({ orders = [] }) => {
           font-size: 14px !important;
           margin: 0 4px !important;
         }
-        
         .priority-pagination .ant-pagination-options {
           margin-left: 16px !important;
         }
-        
         .priority-pagination .ant-pagination-total-text {
           font-size: 14px !important;
           color: #666 !important;
           margin-right: 16px !important;
         }
-        
         .priority-table .ant-table-pagination {
           margin-top: 16px !important;
           padding: 8px 0 !important;
         }
       `}</style>
+      
       <div className="flex justify-between items-center mb-4">
         <div className="text-lg font-semibold text-gray-700">
           {showScheduled ? 'Scheduled Orders' : 'All Orders'}
@@ -366,6 +379,7 @@ const ReorderableTable = ({ orders = [] }) => {
         </div>
         <Space>
           {isLoadingScheduled && <Spin size="small" />}
+          
           {showScheduled && (
             <Button 
               type={showHighPriority ? 'primary' : 'default'}
@@ -376,24 +390,21 @@ const ReorderableTable = ({ orders = [] }) => {
               High Priority
             </Button>
           )}
-          <span className="text-sm font-medium text-gray-600">Show Scheduled</span>
-          <Switch 
-            checked={showScheduled}
-            onChange={(checked) => {
-              setIsLoadingScheduled(true); // Show loading state immediately
-              setShowScheduled(checked);
-              if (!checked) {
-                setShowHighPriority(false);
-                setIsLoadingScheduled(false); // Clear loading immediately when switching to all orders
-              }
-            }}
-            checkedChildren="Yes"
-            unCheckedChildren="No"
-            className={showScheduled ? 'bg-blue-500' : 'bg-gray-300'}
-            disabled={isLoadingScheduled} // Prevent multiple clicks while loading
-          />
+
+          {/* --- NEW SECTION: Show All Rows Toggle --- */}
+          {/* <div className="flex items-center mx-2 border-l pl-4 border-gray-300">
+             <span className="text-sm font-medium text-gray-600 mr-2">Show All</span>
+             <Switch 
+               checked={showAllRows}
+               onChange={setShowAllRows}
+               className={showAllRows ? 'bg-indigo-500' : 'bg-gray-300'}
+             />
+          </div> */}
+          {/* -------------------------------------- */}
+
         </Space>
       </div>
+
       <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 350px)', minHeight: '400px' }}>
         <DndContext
           sensors={sensors}
@@ -413,45 +424,10 @@ const ReorderableTable = ({ orders = [] }) => {
               rowKey="id"
               columns={columns}
               dataSource={localOrders}
-              pagination={{
-                ...pagination,
-                style: { 
-                  margin: '8px 0',
-                  fontSize: '10px'
-                },
-                showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} orders`,
-                pageSizeOptions: ['10', '20', '50', '100'],
-                position: ['bottomCenter'],
-                size: 'default',
-                className: 'priority-pagination',
-                style: {
-                  marginTop: '16px',
-                  padding: '8px 0',
-                  fontSize: '14px',
-                  minHeight: '48px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                },
-                onShowSizeChange: (current, size) => {
-                  setPagination({
-                    ...pagination,
-                    current: 1,
-                    pageSize: size,
-                  });
-                },
-                onChange: (page, pageSize) => {
-                  setPagination({
-                    ...pagination,
-                    current: page,
-                    pageSize: pageSize,
-                  });
-                },
-                size: 'small',
-                showQuickJumper: false
-              }}
+              
+              // --- UPDATED: Conditionally render pagination ---
+              pagination={showHighPriority && !showAllRows ? paginationConfig : false}
+              
               className="text-2xs"
               style={{ 
                 fontSize: '10px',
@@ -471,6 +447,7 @@ const ReorderableTable = ({ orders = [] }) => {
                 if (priority === 3) return 'bg-yellow-50';
                 return '';
               }}
+              // Ensure scroll is active so "Show All" doesn't break the layout
               scroll={{ y: 450 }}
               size="middle"
               onChange={(pagination, filters, sorter) => {

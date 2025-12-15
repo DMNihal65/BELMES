@@ -20,7 +20,7 @@ const MachinePasswordManagement = ({ onClose }) => {
   //   setIsLoading(true);
   //   try {
   //     const response = await axios.get(
-  //       "http://172.18.7.91:8008/api/v1/master-order/all-machines/"
+  //       "http://172.16.0.203:8002/api/v1/master-order/all-machines/"
   //     );
   //     setMachines(response.data || []);
   //   } catch (error) {
@@ -35,7 +35,7 @@ const MachinePasswordManagement = ({ onClose }) => {
   const fetchMachines = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://172.18.7.91:8008/api/v1/master-order/all-machines/');
+      const response = await fetch('http://172.16.0.203:8002/api/v1/master-order/all-machines/');
       const data = await response.json();
       // Filter machines where work_center_boolean is true and extract the code
       const machinesWithCode = data
@@ -60,7 +60,7 @@ const MachinePasswordManagement = ({ onClose }) => {
     setSubmitLoading(true);
     try {
       const response = await axios.post(
-        `http://172.18.7.91:8008/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
+        `http://172.16.0.203:8002/api/v1/auth/register-machine-password?machine_id=${machineName}&password=${password}`
       );
       message.success(response.data.status || "Password set successfully");
       toast.success(response.data.status || "Password set successfully");
